@@ -364,3 +364,268 @@ fn height_fog_fills_low_ground_and_leaves_high_ground_clear() {
     let c = far(&classic);
     assert!((c[0] as i32 - c[2] as i32).abs() < 40, "classic mode is not fogged red: {c:?}");
 }
+
+// ------------------------------------------------------------------------------------------------ eye adaptation
+
+fn mean_lum(f: &Frame) -> f32 {
+    let mut sum = 0.0f64;
+    for p in f.rgba.chunks(4) {
+        sum += lum([p[0], p[1], p[2]]) as f64;
+    }
+    (sum / (f.rgba.len() / 4) as f64) as f32
+}
+
+fn measured(f: &Frame, key: &str) -> f64 {
+    f.info.iter().find(|(k, _)| k == key).map(|(_, v)| *v).unwrap_or(f64::NAN)
+}
+
+/// A lit floor and a cube seen from above, filling the whole picture (no sky or flat background in view): `sun` is the sun's intensity and `ambient` the strength of the sky's light, so that a dark scene and a bright one are hundreds of times apart.
+fn lit_from_above(sun: f32, ambient: f32, adapt: &str) -> Vec<String> {
+    let mut v = vec![
+        r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0.1,0.1,0.15,1]},"Transform":{"pos":[0,9,5],"rot":[-0.5,0,0,0.866]}}}"#.to_string(),
+        format!(r#"{{"uid":2,"components":{{"Light":{{"kind":0,"intensity":{sun}}},"Transform":{{"rot":[-0.5,0.3,0,0.81]}}}}}}"#),
+        FLOOR.to_string(),
+        CUBE.to_string(),
+        format!(r#"{{"uid":9,"components":{{"Environment":{{"sky":true,"clouds":0,"ambient":{ambient},"ssao":0,"bloom":0,"vignette":0}}}}}}"#),
+    ];
+    if !adapt.is_empty() {
+        v.push(format!(r#"{{"uid":10,"components":{{"AutoExposure":{adapt}}}}}"#));
+    }
+    v
+}
+
+fn draw_owned(gpu: &mut GpuRenderer, entities: &[String], quality: &Quality, w: u32, h: u32) -> Frame {
+    let refs: Vec<&str> = entities.iter().map(|s| s.as_str()).collect();
+    draw(gpu, &refs, quality, w, h)
+}
+
+#[test]
+fn eye_adaptation_brings_dark_and_bright_scenes_to_a_similar_brightness_and_takes_time_to_do_it() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let ae = r#"{"min":0.001,"max":1000}"#;
+    let (dark_off, bright_off) = (draw_owned(&mut gpu, &lit_from_above(0.02, 0.02, ""), &Quality::high(), 240, 135), draw_owned(&mut gpu, &lit_from_above(8.0, 1.5, ""), &Quality::high(), 240, 135));
+    let (dark_on, bright_on) = (draw_owned(&mut gpu, &lit_from_above(0.02, 0.02, ae), &Quality::high(), 240, 135), draw_owned(&mut gpu, &lit_from_above(8.0, 1.5, ae), &Quality::high(), 240, 135));
+    let (a, b, c, d) = (mean_lum(&dark_off), mean_lum(&bright_off), mean_lum(&dark_on), mean_lum(&bright_on));
+    eprintln!("without: dark {a:.1} bright {b:.1}; with: dark {c:.1} bright {d:.1}; exposure dark {:.3} bright {:.3}", measured(&dark_on, "exposure"), measured(&bright_on, "exposure"));
+    // without it the two scenes are worlds apart, with it they are about equally bright
+    assert!(b > a * 5.0, "the scenes should differ without eye adaptation: {a} vs {b}");
+    assert!((c - d).abs() < 0.2 * c.max(d) && c > 60.0 && d > 60.0, "eye adaptation should even them out: {c} vs {d}");
+    // what the renderer says it did: a bright scene is exposed down, a dark one up, and the picture of the average luminance matches
+    let (ed, eb) = (measured(&dark_on, "exposure"), measured(&bright_on, "exposure"));
+    assert!(ed > eb * 50.0 && eb < 0.5 && ed > 3.0, "exposure dark {ed} bright {eb}");
+    assert!(measured(&bright_on, "average_luminance") > measured(&dark_on, "average_luminance") * 50.0);
+    assert!(measured(&dark_off, "exposure").is_nan(), "nothing is measured without the component");
+
+    // a picture asked for by itself is measured and applied at once: drawn twice, or after something else, it is the same picture
+    let again = draw_owned(&mut gpu, &lit_from_above(0.02, 0.02, ae), &Quality::high(), 240, 135);
+    assert_eq!(dark_on.rgba, again.rgba);
+    // classic ignores it
+    let (c1, c2) = (draw_owned(&mut gpu, &lit_from_above(0.02, 0.02, ""), &Quality::classic(), 120, 68), draw_owned(&mut gpu, &lit_from_above(0.02, 0.02, ae), &Quality::classic(), 120, 68));
+    assert_eq!(c1.rgba, c2.rgba, "classic does not adapt");
+
+    // films of the world: every picture counts as a quarter of a second after the one before, and the eye needs several to adapt to a change of light
+    gpu.set_adaptation_step(Some(0.25));
+    for _ in 0..3 {
+        draw_owned(&mut gpu, &lit_from_above(8.0, 1.5, ae), &Quality::high(), 240, 135);
+    }
+    let series: Vec<f32> = (0..10).map(|_| mean_lum(&draw_owned(&mut gpu, &lit_from_above(0.02, 0.02, ae), &Quality::high(), 240, 135))).collect();
+    gpu.set_adaptation_step(None);
+    eprintln!("a bright room, then a dark one, a picture each quarter of a second: {series:?}");
+    assert!(series[0] < d * 0.3, "the first picture in the dark is still dark: {series:?}");
+    assert!(series.windows(2).all(|w| w[1] >= w[0] - 1.0), "it brightens step by step: {series:?}");
+    assert!(series[3] > series[0] * 2.0 && series[3] < d * 0.9, "it is part of the way after a second: {series:?}");
+    assert!(series[9] > d * 0.8, "and there after a few seconds: {series:?} (bright scene {d})");
+}
+
+// ------------------------------------------------------------------------------------------------ screen-space reflections
+
+const MIRROR_FLOOR: &str = r#"{"uid":3,"components":{"Transform":{"scale":[40,1,40]},"MeshRenderer":{"mesh":"plane","color":[0.9,0.9,0.95,1],"metallic":1.0,"roughness":0.05}}}"#;
+/// A glowing orange cube floating above the floor (dull itself: only the floor is a mirror).
+const LAMP_CUBE: &str = r#"{"uid":4,"components":{"Transform":{"pos":[0,1.8,-2],"scale":[1.6,1.6,1.6]},"MeshRenderer":{"mesh":"cube","color":[1.0,0.55,0.1,1],"emissive":3,"roughness":0.9}}}"#;
+const BLUE_SKY: &str = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"sky_top":[0.1,0.25,0.6],"sky_horizon":[0.4,0.5,0.7],"shadows":false,"ssao":0,"bloom":0,"vignette":0}}}"#;
+
+/// How many pixels differ by more than `by` in brightness (brighter in `b` than in `a`, darker in `b` than in `a`), and how many are the same to within one level.
+fn compare_pictures(a: &Frame, b: &Frame, by: f32) -> (usize, usize, usize) {
+    let (mut brighter, mut darker, mut same) = (0, 0, 0);
+    for (p, q) in a.rgba.chunks(4).zip(b.rgba.chunks(4)) {
+        let d = lum([q[0], q[1], q[2]]) - lum([p[0], p[1], p[2]]);
+        if d > by {
+            brighter += 1;
+        }
+        if d < -by {
+            darker += 1;
+        }
+        if (0..3).all(|k| (p[k] as i32 - q[k] as i32).abs() <= 1) {
+            same += 1;
+        }
+    }
+    (brighter, darker, same)
+}
+
+#[test]
+fn screen_space_reflections_show_a_bright_cube_in_a_glossy_floor_and_in_water() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let ssr = r#"{"uid":10,"components":{"Ssr":{}}}"#;
+    let q = Quality::high();
+    let (w, h) = (480u32, 270u32);
+    let off = draw(&mut gpu, &[CAMERA_3D, MIRROR_FLOOR, LAMP_CUBE, BLUE_SKY], &q, w, h);
+    let on = draw(&mut gpu, &[CAMERA_3D, MIRROR_FLOOR, LAMP_CUBE, BLUE_SKY, ssr], &q, w, h);
+    let (brighter, darker, same) = compare_pictures(&off, &on, 25.0);
+    eprintln!("mirror floor: {brighter} pixels brighter, {darker} darker, {same} of {} the same", w * h);
+    // the cube's picture appears in the floor: many pixels get brighter and orange
+    assert!(brighter > 300, "the cube should show in the floor: only {brighter} pixels brightened");
+    let (mut r, mut b) = (0i64, 0i64);
+    for (p, o) in off.rgba.chunks(4).zip(on.rgba.chunks(4)) {
+        if lum([o[0], o[1], o[2]]) - lum([p[0], p[1], p[2]]) > 25.0 {
+            r += o[0] as i64 - p[0] as i64;
+            b += o[2] as i64 - p[2] as i64;
+        }
+    }
+    assert!(r > b + 300, "what shows in the floor is the orange cube: red gained {r}, blue gained {b}");
+    // where a ray finds nothing the sky's reflection is what it was: most of the picture is the same, and the cube itself did not change
+    assert!(same > (w * h) as usize * 6 / 10, "only {same} pixels are the same");
+    // the same picture twice
+    let again = draw(&mut gpu, &[CAMERA_3D, MIRROR_FLOOR, LAMP_CUBE, BLUE_SKY, ssr], &q, w, h);
+    assert_eq!(on.rgba, again.rgba);
+    // a rough floor is no mirror: nothing changes
+    let chalk = r#"{"uid":3,"components":{"Transform":{"scale":[40,1,40]},"MeshRenderer":{"mesh":"plane","color":[0.9,0.9,0.95,1],"metallic":0.0,"roughness":0.95}}}"#;
+    let (a, b) = (draw(&mut gpu, &[CAMERA_3D, chalk, LAMP_CUBE, BLUE_SKY], &q, w, h), draw(&mut gpu, &[CAMERA_3D, chalk, LAMP_CUBE, BLUE_SKY, ssr], &q, w, h));
+    assert_eq!(a.rgba, b.rgba, "a rough floor is not reflected in");
+    // classic and the lower qualities ignore it
+    for quality in [Quality::classic(), Quality::low()] {
+        let (a, b) = (draw(&mut gpu, &[CAMERA_3D, MIRROR_FLOOR, LAMP_CUBE, BLUE_SKY], &quality, 240, 135), draw(&mut gpu, &[CAMERA_3D, MIRROR_FLOOR, LAMP_CUBE, BLUE_SKY, ssr], &quality, 240, 135));
+        assert_eq!(a.rgba, b.rgba, "{quality:?} has no reflections");
+    }
+    // a lake reflects it too (a little ripple in its surface)
+    let lake = r#"{"uid":3,"components":{"Transform":{"pos":[0,0,0]},"Water":{"size":[40,40],"color":[0.02,0.1,0.15,0.9],"wave_height":0.05,"wave_length":12}}}"#;
+    let (still, mirror) = (draw(&mut gpu, &[CAMERA_3D, lake, LAMP_CUBE, BLUE_SKY], &q, w, h), draw(&mut gpu, &[CAMERA_3D, lake, LAMP_CUBE, BLUE_SKY, ssr], &q, w, h));
+    let (brighter, _, _) = compare_pictures(&still, &mirror, 20.0);
+    eprintln!("lake: {brighter} pixels brighter");
+    assert!(brighter > 150, "the cube should show in the water: only {brighter} pixels brightened");
+}
+
+// ------------------------------------------------------------------------------------------------ reflection probes
+
+/// A closed room 12 x 6 x 12 metres: `left` is the colour of the left wall, a green wall on the right, a blue one at the back, white behind the camera, grey floor and ceiling, and a mirror ball in the middle. The
+/// probe stands in the middle of the ball (a box of `size` metres around it) when `size` is not empty.
+fn probe_room(left: &str, size: &str) -> Vec<String> {
+    let wall = |uid: u32, pos: &str, scale: &str, colour: &str| format!(r#"{{"uid":{uid},"components":{{"Transform":{{"pos":{pos},"scale":{scale}}},"MeshRenderer":{{"mesh":"cube","color":{colour},"roughness":0.9}}}}}}"#);
+    let mut v = vec![
+        r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0.1,0.1,0.15,1]},"Transform":{"pos":[0,2.5,5.5]}}}"#.to_string(),
+        wall(20, "[-6.5,3,0]", "[1,6,13]", left),
+        wall(21, "[6.5,3,0]", "[1,6,13]", "[0.1,0.8,0.1,1]"),
+        wall(22, "[0,3,-6.5]", "[13,6,1]", "[0.1,0.1,0.9,1]"),
+        wall(23, "[0,3,6.5]", "[13,6,1]", "[0.9,0.9,0.9,1]"),
+        wall(24, "[0,-0.5,0]", "[13,1,13]", "[0.5,0.5,0.5,1]"),
+        wall(25, "[0,6.5,0]", "[13,1,13]", "[0.5,0.5,0.5,1]"),
+        r#"{"uid":30,"components":{"Transform":{"pos":[0,1.5,0],"scale":[3,3,3]},"MeshRenderer":{"mesh":"sphere","color":[1,1,1,1],"metallic":1.0,"roughness":0.05}}}"#.to_string(),
+        r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"sky_top":[0.1,0.25,0.6],"sky_horizon":[0.4,0.5,0.7],"shadows":false,"ssao":0,"bloom":0,"vignette":0}}}"#.to_string(),
+    ];
+    if !size.is_empty() {
+        v.push(format!(r#"{{"uid":40,"components":{{"Transform":{{"pos":[0,1.5,0]}},"ReflectionProbe":{{"size":{size},"resolution":64}}}}}}"#));
+    }
+    v
+}
+
+fn sim_of(entities: &[String]) -> Sim {
+    let text = format!(r#"{{"lunaris":1,"entities":[{}]}}"#, entities.join(","));
+    let mut sim = Sim::new(1);
+    sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+    sim
+}
+
+#[test]
+fn a_reflection_probe_gives_a_mirror_ball_the_room_around_it_and_is_baked_once() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let q = Quality::high();
+    let opts = RenderOptions { width: 480, height: 270, ..RenderOptions::default() };
+    let mut tex = TextureCache::new(None);
+    let render = |gpu: &mut GpuRenderer, sim: &mut Sim, tex: &mut TextureCache| gpu.render_to_image(&mut sim.world, tex, &opts, &q).expect("render");
+    // the ball is about 170 pixels across around (240, 190): its left side reflects the left wall, its right side the right wall
+    let (left_at, right_at) = ((190u32, 190u32), (290u32, 190u32));
+    let red = "[0.9,0.1,0.1,1]";
+    let mut plain = sim_of(&probe_room(red, ""));
+    let without = render(&mut gpu, &mut plain, &mut tex);
+    let mut probed = sim_of(&probe_room(red, "[13,6,13]"));
+    let with = render(&mut gpu, &mut probed, &mut tex);
+    let (wl, wr, pl, pr) = (px(&without, left_at.0, left_at.1), px(&without, right_at.0, right_at.1), px(&with, left_at.0, left_at.1), px(&with, right_at.0, right_at.1));
+    eprintln!("without a probe: left {wl:?} right {wr:?}; with one: left {pl:?} right {pr:?}");
+    // without a probe the ball reflects the (blue) sky on both sides; with one it shows the red wall on the left and the green one on the right
+    assert!(wl[2] >= wl[0] && wr[2] >= wr[1], "the plain ball reflects the sky: {wl:?} {wr:?}");
+    assert!(pl[0] as i32 > pl[2] as i32 + 25 && pl[0] as i32 > pl[1] as i32 + 25, "the left of the ball should show the red wall: {pl:?}");
+    assert!(pr[1] as i32 > pr[0] as i32 + 15 && pr[1] as i32 > pr[2] as i32 + 15, "the right of the ball should show the green wall: {pr:?}");
+    // the same picture twice, and a probe is a high-quality effect only
+    assert_eq!(with.rgba, render(&mut gpu, &mut probed, &mut tex).rgba);
+    let classic = |gpu: &mut GpuRenderer, sim: &mut Sim, tex: &mut TextureCache| gpu.render_to_image(&mut sim.world, tex, &opts, &Quality::classic()).expect("render").rgba;
+    assert_eq!(classic(&mut gpu, &mut plain, &mut tex), classic(&mut gpu, &mut probed, &mut tex), "classic has no probes");
+
+    // baked once: the left wall turns yellow, and the ball still shows the red it was captured with until the probe is captured again
+    let mut moved = sim_of(&probe_room("[0.9,0.9,0.1,1]", "[13,6,13]"));
+    let stale = render(&mut gpu, &mut moved, &mut tex);
+    let s = px(&stale, left_at.0, left_at.1);
+    assert!(s[0] as i32 > s[2] as i32 + 25 && s[1] < s[0] - 20, "the probe still holds the red wall: {s:?}");
+    let baked = gpu.bake_probes(&mut moved.world, &mut tex, None).expect("bake");
+    assert_eq!(baked, vec![40]);
+    let fresh = render(&mut gpu, &mut moved, &mut tex);
+    let f = px(&fresh, left_at.0, left_at.1);
+    assert!(f[1] as i32 > f[2] as i32 + 40 && f[0] as i32 > f[2] as i32 + 40, "the ball shows the yellow wall after the probe was captured again: {f:?}");
+    assert_eq!(gpu.bake_probes(&mut moved.world, &mut tex, Some(99)).expect("bake"), Vec::<u64>::new(), "no such probe: nothing captured");
+
+    // a box too small to hold the ball's surface changes nothing: the sky is what the ball reflects (to within rounding)
+    let mut tiny = sim_of(&probe_room(red, "[0.5,0.5,0.5]"));
+    let small = render(&mut gpu, &mut tiny, &mut tex);
+    let (_, _, same) = compare_pictures(&without, &small, 1.0);
+    assert!(same > 480 * 270 * 99 / 100, "a probe whose box holds nothing changes nothing: {same} of {} the same", 480 * 270);
+}
+
+// ------------------------------------------------------------------------------------------------ lens flare
+
+#[test]
+fn a_lens_flare_appears_with_the_sun_in_view_and_vanishes_when_a_cube_covers_it() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // the camera looks along -z, tilted up a little; the sun stands 30 degrees above the horizon straight ahead (near the top of the picture)
+    let cam = |rot: &str| format!(r#"{{"uid":1,"components":{{"Camera":{{"fov_y":50,"clear":[0.1,0.1,0.15,1]}},"Transform":{{"pos":[0,2,9],"rot":{rot}}}}}}}"#);
+    let sun = r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3},"Transform":{"rot":[-0.9659,0,0,0.2588]}}}"#;
+    let flare = |numbers: &str| format!(r#"{{"uid":10,"components":{{"LensFlare":{numbers}}}}}"#);
+    // a wall of a cube between the camera and the sun
+    let cover = r#"{"uid":11,"components":{"Transform":{"pos":[0,7,0],"scale":[6,6,1]},"MeshRenderer":{"mesh":"cube","color":[0.2,0.2,0.2,1]}}}"#;
+    let q = Quality::high();
+    let (w, h) = (480u32, 270u32);
+    let ahead = cam("[0.1,0,0,0.995]");
+    let scene = |camera: &str, extra: &[&str]| {
+        let mut v: Vec<String> = vec![camera.to_string(), sun.to_string(), FLOOR.to_string(), BLUE_SKY.to_string()];
+        v.extend(extra.iter().map(|s| s.to_string()));
+        v
+    };
+    let plain = draw_owned(&mut gpu, &scene(&ahead, &[]), &q, w, h);
+    let flared = draw_owned(&mut gpu, &scene(&ahead, &[&flare("{}")]), &q, w, h);
+    let (brighter, darker, _) = compare_pictures(&plain, &flared, 6.0);
+    eprintln!("sun in view: {brighter} pixels brighter, {darker} darker");
+    assert!(brighter > 500 && darker == 0, "the flare should light up the picture: {brighter} brighter, {darker} darker");
+    // the same picture twice
+    assert_eq!(flared.rgba, draw_owned(&mut gpu, &scene(&ahead, &[&flare("{}")]), &q, w, h).rgba);
+    // ghosts and the halo are parts of it: without them there is much less
+    let bare = draw_owned(&mut gpu, &scene(&ahead, &[&flare(r#"{"ghosts":0,"halo":0}"#)]), &q, w, h);
+    let (ghostly, _, _) = compare_pictures(&bare, &flared, 6.0);
+    eprintln!("ghosts and halo: {ghostly} pixels brighter than the glare alone");
+    assert!(ghostly > 300, "the ghosts and the halo are most of the flare: {ghostly} pixels more than the glare alone");
+    // a stronger flare is brighter, a flare of intensity 0 is nothing
+    let strong = draw_owned(&mut gpu, &scene(&ahead, &[&flare(r#"{"intensity":2.5}"#)]), &q, w, h);
+    assert!(mean_lum(&strong) > mean_lum(&flared) + 0.2, "{} vs {}", mean_lum(&strong), mean_lum(&flared));
+    let none = draw_owned(&mut gpu, &scene(&ahead, &[&flare(r#"{"intensity":0}"#)]), &q, w, h);
+    assert_eq!(compare_pictures(&plain, &none, 1.0).2, (w * h) as usize, "intensity 0 draws nothing");
+    // a cube between the camera and the sun: the sun is hidden and so is the flare
+    let (hidden_plain, hidden_flared) = (draw_owned(&mut gpu, &scene(&ahead, &[cover]), &q, w, h), draw_owned(&mut gpu, &scene(&ahead, &[cover, &flare("{}")]), &q, w, h));
+    let (brighter_hidden, _, _) = compare_pictures(&hidden_plain, &hidden_flared, 6.0);
+    eprintln!("sun hidden: {brighter_hidden} pixels brighter");
+    assert!(brighter_hidden < 30, "the cube covers the sun, so the flare goes: {brighter_hidden} pixels still brighter");
+    // the camera turned away: the sun is behind it
+    let behind = cam("[0,1,0,0]");
+    let (a, b) = (draw_owned(&mut gpu, &scene(&behind, &[]), &q, w, h), draw_owned(&mut gpu, &scene(&behind, &[&flare("{}")]), &q, w, h));
+    assert_eq!(compare_pictures(&a, &b, 1.0).2, (w * h) as usize, "no flare with the sun behind the camera");
+    // the lower qualities and classic do not draw it
+    for quality in [Quality::classic(), Quality::low(), Quality::medium()] {
+        let (a, b) = (draw_owned(&mut gpu, &scene(&ahead, &[]), &quality, 240, 135), draw_owned(&mut gpu, &scene(&ahead, &[&flare("{}")]), &quality, 240, 135));
+        assert_eq!(a.rgba, b.rgba, "{quality:?} has no lens flare");
+    }
+}

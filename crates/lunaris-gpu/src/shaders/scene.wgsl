@@ -9,6 +9,9 @@
 @group(0) @binding(4) var ao_tex: texture_2d<f32>;
 @group(0) @binding(5) var lin_samp: sampler;
 @group(0) @binding(6) var point_map: texture_depth_2d_array;
+// the faces of the reflection probes (see sky.wgsl) and how to sample them
+@group(0) @binding(7) var probe_tex: texture_2d_array<f32>;
+@group(0) @binding(8) var probe_samp: sampler;
 
 @group(1) @binding(0) var tex: texture_2d<f32>;
 @group(1) @binding(1) var tex_samp: sampler;
@@ -78,108 +81,6 @@ fn vs_mesh(in: VsIn) -> MeshOut {
     out.tw = in.tw;
     out.inst = in.inst;
     return out;
-}
-
-// ------------------------------------------------------------------------------------------------ the sky
-
-fn hash21(p: vec2<f32>) -> f32 {
-    var q = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
-    q = q + dot(q, q.yzx + 33.33);
-    return fract((q.x + q.y) * q.z);
-}
-
-fn value_noise(p: vec2<f32>) -> f32 {
-    let i = floor(p);
-    let f = fract(p);
-    let u = f * f * (3.0 - 2.0 * f);
-    let a = hash21(i);
-    let b = hash21(i + vec2<f32>(1.0, 0.0));
-    let c = hash21(i + vec2<f32>(0.0, 1.0));
-    let d = hash21(i + vec2<f32>(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-
-fn hash31(p: vec3<f32>) -> f32 {
-    var q = fract(p * 0.1031);
-    q = q + dot(q, q.zyx + 31.32);
-    return fract((q.x + q.y) * q.z);
-}
-
-// Stars on a dark sky: a grid of cells on the sphere, a few with a star at a random spot, a few of those bright.
-fn stars(dir: vec3<f32>) -> vec3<f32> {
-    let night = 1.0 - smoothstep(0.015, 0.2, luminance(frame.sky_top.rgb));
-    if (night <= 0.0 || dir.y <= 0.0) {
-        return vec3<f32>(0.0);
-    }
-    let g = dir * 90.0;
-    let cell = floor(g);
-    let h = hash31(cell);
-    if (h < 0.985) {
-        return vec3<f32>(0.0);
-    }
-    let center = vec3<f32>(hash31(cell + 17.0), hash31(cell + 41.0), hash31(cell + 73.0));
-    let d = length(fract(g) - center);
-    let mag = (h - 0.985) / 0.015;
-    let tint = mix(vec3<f32>(1.0, 0.85, 0.75), vec3<f32>(0.8, 0.9, 1.0), hash31(cell + 5.0));
-    return tint * smoothstep(0.2, 0.0, d) * (0.1 + 1.8 * mag * mag) * night * smoothstep(0.0, 0.3, dir.y);
-}
-
-fn cloud_fbm(p_in: vec2<f32>) -> f32 {
-    var s = 0.0;
-    var a = 0.5;
-    var p = p_in;
-    for (var i = 0; i < 5; i = i + 1) {
-        s = s + a * value_noise(p);
-        p = p * 2.03 + vec2<f32>(1.7, 9.2);
-        a = a * 0.5;
-    }
-    return s;
-}
-
-// A layer of clouds on a plane high above the viewer: rgb colour, a coverage.
-fn cloud_layer(dir: vec3<f32>) -> vec4<f32> {
-    let cover = frame.p5.x;
-    if (cover <= 0.001 || dir.y < 0.012) {
-        return vec4<f32>(0.0);
-    }
-    let p = dir.xz / (dir.y + 0.2) * 1.5;
-    let n = cloud_fbm(p);
-    let d = smoothstep(0.66 - cover * 0.4, 0.9, n);
-    // the side facing the sun is bright, the far side grey
-    let toward = cloud_fbm(p + frame.sun_dir.xz * 0.12);
-    let lit = clamp(0.55 + (n - toward) * 5.0, 0.0, 1.0);
-    let bright = frame.sun_color.rgb * 0.35 + frame.sky_horizon.rgb * 0.75 + vec3<f32>(0.12);
-    let dark = frame.sky_top.rgb * 0.35 + frame.sky_horizon.rgb * 0.3 + frame.ground.rgb * 0.15;
-    let fade = smoothstep(0.012, 0.25, dir.y);
-    return vec4<f32>(mix(dark, bright, lit), d * fade);
-}
-
-fn sky_color(dir: vec3<f32>, with_sun: bool) -> vec3<f32> {
-    let t = dir.y;
-    var c: vec3<f32>;
-    if (t >= 0.0) {
-        c = mix(frame.sky_horizon.rgb, frame.sky_top.rgb, pow(clamp(t, 0.0, 1.0), 0.36));
-    } else {
-        c = mix(frame.sky_horizon.rgb, frame.ground.rgb, clamp(-t * 6.0, 0.0, 1.0));
-    }
-    if (with_sun && frame.sun_dir.w > 0.5 && t > -0.02) {
-        let cs = max(dot(dir, frame.sun_dir.xyz), 0.0);
-        let disc = smoothstep(0.99900, 0.99935, cs);
-        let glow = pow(cs, 16.0) * 0.10 + pow(cs, 300.0) * 0.5;
-        c = c + frame.sun_color.rgb * (disc * 14.0 + glow);
-    }
-    if (with_sun) {
-        c = c + stars(dir);
-        let cl = cloud_layer(dir);
-        c = mix(c, cl.rgb, cl.a * 0.92);
-    }
-    return c;
-}
-
-// The light the sky sends to a surface that faces `n`: the lower hemisphere is the ground, the upper one the sky.
-fn sky_irradiance(n: vec3<f32>) -> vec3<f32> {
-    let up = mix(frame.sky_horizon.rgb, frame.sky_top.rgb, 0.5);
-    return mix(frame.ground.rgb, up, smoothstep(-0.6, 0.8, n.y)) * frame.p0.x;
 }
 
 struct SkyOut {
@@ -360,20 +261,6 @@ fn fresnel(f0: vec3<f32>, vh: f32) -> vec3<f32> {
     return f0 + (vec3<f32>(1.0) - f0) * pow(1.0 - vh, 5.0);
 }
 
-// Karis' analytic fit of the split-sum environment BRDF: the scale and bias applied to the specular colour.
-fn env_brdf(f0: vec3<f32>, rough: f32, nv: f32) -> vec3<f32> {
-    let c0 = vec4<f32>(-1.0, -0.0275, -0.572, 0.022);
-    let c1 = vec4<f32>(1.0, 0.0425, 1.04, -0.04);
-    let r = rough * c0 + c1;
-    let a004 = min(r.x * r.x, exp2(-9.28 * nv)) * r.x + r.y;
-    let ab = vec2<f32>(-1.04, 1.04) * a004 + r.zw;
-    return f0 * ab.x + vec3<f32>(ab.y);
-}
-
-fn specular_occlusion(nv: f32, ao: f32, rough: f32) -> f32 {
-    return clamp(pow(nv + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0);
-}
-
 struct Pbr {
     diffuse: vec3<f32>,
     spec: vec3<f32>,
@@ -438,6 +325,20 @@ fn shade_pbr(albedo: vec3<f32>, metallic: f32, rough_in: f32, world: vec3<f32>, 
     env = mix(env, sky_irradiance(r), smoothstep(0.15, 0.95, rough));
     let amb_spec = env * env_brdf(f0, rough, nv) * specular_occlusion(nv, ao, rough) * frame.p0.x;
     return Pbr(lo_diff + amb_diff, lo_spec + amb_spec);
+}
+
+// What a reflection probe changes about `shade_pbr`'s result: inside its box what it captured takes the place of the sky's reflection and of the sky's ambient light (the probe holds the light of the
+// world as it was, so the `ambient` strength is not applied to it), by the weight `w` of the probe. It is added to the result, so that `shade_pbr` itself stays as it was for a picture without probes.
+fn shade_probe_change(albedo: vec3<f32>, metallic: f32, rough_in: f32, world: vec3<f32>, n: vec3<f32>, v: vec3<f32>, ao: f32) -> Pbr {
+    let rough = clamp(rough_in, 0.045, 1.0);
+    let f0 = mix(vec3<f32>(0.04), albedo, metallic);
+    let diff_col = albedo * (1.0 - metallic);
+    let nv = max(dot(n, v), 1e-4);
+    let r = reflect(-v, n);
+    var env = sky_color(r, rough < 0.3);
+    env = mix(env, sky_irradiance(r), smoothstep(0.15, 0.95, rough));
+    let ph = probe_light(world, n, r, rough);
+    return Pbr((ph.irr - sky_irradiance(n)) * (diff_col * ao * ph.w), (ph.env - env * frame.p0.x) * (env_brdf(f0, rough, nv) * specular_occlusion(nv, ao, rough) * ph.w));
 }
 
 // What a mesh pixel looks like, in parts: the light the surface scatters (`diffuse`), the glints and reflections on top (`spec`), how
@@ -506,6 +407,10 @@ fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool
     // glass is more mirror-like at grazing angles
     let nv = clamp(dot(n, v), 0.0, 1.0);
     let alpha = o.color.a + (1.0 - o.color.a) * pow(1.0 - nv, 5.0);
+    if (frame.p18.x > 0.5) {
+        let change = shade_probe_change(base, o.mat.z, o.mat.w, in.world, n, v, ao);
+        return Lit(pbr.diffuse + change.diffuse + base * o.mat.y, pbr.spec + change.spec, fog, alpha);
+    }
     return Lit(pbr.diffuse + base * o.mat.y, pbr.spec, fog, alpha);
 }
 
@@ -583,26 +488,6 @@ fn lit_splat(in: MeshOut) -> Lit {
     return lit_tail(in, o, base, n, classic);
 }
 
-// How much of the way to `world` is fog: the uniform fog of the Environment plus the height fog (a density that thins out upwards, summed exactly along the ray).
-fn fog_amount(world: vec3<f32>) -> f32 {
-    let to = world - frame.eye.xyz;
-    let dist = length(to);
-    var depth = 0.0;
-    if (frame.fog.w > 0.0) {
-        depth = frame.fog.w * dist;
-    }
-    if (frame.p13.x > 0.0) {
-        let k = max(frame.p13.y, 0.0001);
-        let a = clamp(k * to.y, -20.0, 20.0);
-        var avg = exp(min(-k * (frame.eye.y - frame.p13.z), 20.0));
-        if (abs(a) > 0.0001) {
-            avg = avg * (1.0 - exp(-a)) / a;
-        }
-        depth = depth + frame.p13.x * dist * avg;
-    }
-    return clamp(1.0 - exp(-depth), 0.0, 1.0);
-}
-
 @fragment
 fn fs_mesh(in: MeshOut) -> @location(0) vec4<f32> {
     let l = lit_mesh(in);
@@ -625,6 +510,50 @@ fn fs_mesh_blend(in: MeshOut) -> @location(0) vec4<f32> {
     let body = (l.diffuse * (1.0 - l.fog) + frame.fog.rgb * l.fog) * l.alpha;
     let c = body + l.spec * (1.0 - l.fog);
     return vec4<f32>(min(c, vec3<f32>(60000.0)), l.alpha);
+}
+
+// ------------------------------------------------------------------------------------------------ screen-space reflections
+
+// What the reflection pass needs to know about every mesh pixel, drawn once for the opaque and the see-through meshes (the nearest wins): where the surface points (xyz, in the world,
+// with the relief of its material and the ripples of water) and how rough it is (w), and how much it reflects when seen head on (rgb: 0.04 for a plastic, the colour for a metal) and a 1 in w
+// where there is a surface. The base colour and the normal are worked out as `lit_mesh` does it: keep the two in step.
+struct GbufOut {
+    @location(0) a: vec4<f32>,
+    @location(1) b: vec4<f32>,
+};
+
+@fragment
+fn fs_gbuf(in: MeshOut) -> GbufOut {
+    let o = objects[in.inst];
+    var n = normalize(in.nrm);
+    if (o.ids.y == 1u) {
+        n = normalize(wave_normal(in.world.xz, o.uvrect.y, o.uvrect.z, o.uvrect.w) + (n - vec3<f32>(0.0, 1.0, 0.0)));
+    }
+    var base = o.color.rgb;
+    if (o.misc.w > 0.5) {
+        base = base * in.col;
+    }
+    let uvs = in.uv * o.misc.xy;
+    let tuv = vec2<f32>(uvs.x, 1.0 - uvs.y);
+    let t = textureSample(tex, tex_samp, tuv);
+    let relief = textureSample(height_tex, tex_samp, tuv).r * o.uvrect.x;
+    let dpx = dpdx(in.world);
+    let dpy = dpdy(in.world);
+    let dhx = dpdx(relief);
+    let dhy = dpdy(relief);
+    if (o.uvrect.x > 0.0) {
+        n = bump_normal(n, dpx, dpy, dhx, dhy);
+    }
+    if (o.misc.z > 0.5 && in.tw > 0.001) {
+        if (in.tw > 0.999 && t.a < 0.5) {
+            discard;
+        }
+        base = base * (vec3<f32>(1.0) + in.tw * (t.rgb - vec3<f32>(1.0)));
+    }
+    var out: GbufOut;
+    out.a = vec4<f32>(n, clamp(o.mat.w, 0.045, 1.0));
+    out.b = vec4<f32>(mix(vec3<f32>(0.04), base, o.mat.z), 1.0);
+    return out;
 }
 
 // ------------------------------------------------------------------------------------------------ entity ids

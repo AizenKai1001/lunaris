@@ -18,6 +18,7 @@ examples/dungeon.lunaris.json            state 44e93cbceb12277b  frame 704c5064d
 examples/echo_tour.lunaris.json          state b59f640dbb20c41d  frame 1c9e0f7690b3b80a
 examples/first_person.lunaris.json       state fdbd80d62dda216b  frame fe1ae64c85549fd3
 examples/flock.lunaris.json              state 69584df9913dad9d  frame 30cc1c5d22ad54b8
+examples/lighting_showcase.lunaris.json  state 94f7c00af5e6f6b9  frame 0d4d36215cf6ade0
 examples/maze.lunaris.json               state 5ba7d47903f46ec1  frame 1ef6fe6cbb659130
 examples/menu.lunaris.json               state 2449973e4fe2f6f9  frame 03dbaef83881600d
 examples/mesh_level.lunaris.json         state 1081251f9fd052b0  frame a1e73dce62fa2ab1

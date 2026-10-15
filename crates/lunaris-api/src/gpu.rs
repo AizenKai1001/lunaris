@@ -11,6 +11,10 @@ pub trait GpuBackend: Send {
     /// Draw `world` with a quality named `classic`, `low`, `medium`, `high` or `ultra`. The frame has the picture and the entity at
     /// each pixel (`ids`); it may leave `depth` at infinity.
     fn render(&mut self, world: &mut World, textures: &mut TextureCache, opts: &RenderOptions, quality: &str) -> Result<Frame, String>;
+    /// Capture the world's reflection probes (`ReflectionProbe`) again now (`uid`: only that probe, `None`: all of them) and say which were captured. A renderer without probes says so.
+    fn bake_probes(&mut self, _world: &mut World, _textures: &mut TextureCache, _uid: Option<u64>) -> Result<Vec<u64>, String> {
+        Err("this renderer has no reflection probes".to_string())
+    }
 }
 
 pub type GpuFactory = Box<dyn FnOnce() -> Result<Box<dyn GpuBackend>, String> + Send>;

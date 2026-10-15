@@ -12,6 +12,7 @@ mod draw_order;
 mod language;
 mod layers;
 mod menus;
+mod render_fx;
 mod terrain_layers;
 mod ui_kit3;
 mod vehicle;
@@ -686,6 +687,7 @@ impl Engine {
         ui_kit3::run(&mut self.sim.world, &mut problems)?;
         terrain_layers::run(&mut self.sim.world, &mut self.textures, &root, &mut problems)?;
         water::run(&mut self.sim, &mut problems)?;
+        render_fx::run(&mut self.sim.world, &mut problems)?;
         // raycast vehicles: the chassis, the wheel table, the numbers; gravity (the lowest-uid PhysicsSettings, like the physics) tells how much weight a spring carries
         {
             let mut gravity = 9.8f32;

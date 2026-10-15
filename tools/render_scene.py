@@ -62,7 +62,7 @@ for line in p.stdout.splitlines():
 if last:
     try:
         r = json.loads(last)
-        print(r.get("renderer"), r.get("hash"), "warnings:", r.get("warnings"))
+        print(r.get("renderer"), r.get("hash"), "warnings:", r.get("warnings"), *(["measured:", r["measured"]] if r.get("measured") else []))
     except ValueError:
         print(last[:300])
 print("wrote", a.out)

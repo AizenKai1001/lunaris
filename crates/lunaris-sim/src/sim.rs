@@ -847,6 +847,10 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::WaterBody>().expect("standard component");
     world.register_native::<crate::components::InWater>().expect("standard component");
     world.register_native::<crate::components::Buoyant>().expect("standard component");
+    world.register_native::<crate::components::AutoExposure>().expect("standard component");
+    world.register_native::<crate::components::Ssr>().expect("standard component");
+    world.register_native::<crate::components::LensFlare>().expect("standard component");
+    world.register_native::<crate::components::ReflectionProbe>().expect("standard component");
 }
 
 impl RecordedRead {

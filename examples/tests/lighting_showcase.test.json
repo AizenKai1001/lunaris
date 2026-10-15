@@ -1,0 +1,139 @@
+{
+  "name": "Lighting showcase: the camera walks from the bright courtyard through the door into the dark cellar and back; the scene has no mistakes (the eye adaptation, reflections, flare and probes are drawn by the GPU renderer: docs/GPU.md)",
+  "scene": "examples/lighting_showcase.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0,
+        "message": "the scene has no mistakes"
+      }
+    },
+    {
+      "expect": {
+        "name": "Camera",
+        "field": "Transform.pos[2]",
+        "eq": 9,
+        "message": "the camera starts in the courtyard"
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "resource": "scene.indoors",
+        "eq": 0,
+        "message": "outdoors, in the sun"
+      }
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "ReflectionProbe"
+          ]
+        },
+        "eq": 2,
+        "message": "two reflection probes: the courtyard and the cellar"
+      }
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "Light"
+          ]
+        },
+        "eq": 7,
+        "message": "the sun, two lanterns and four torches: seven lights"
+      }
+    },
+    {
+      "note": "walk to the door and in"
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "resource": "scene.indoors",
+        "eq": 1,
+        "max_ticks": 900
+      }
+    },
+    {
+      "expect": {
+        "name": "Camera",
+        "field": "Transform.pos[2]",
+        "between": [
+          -20.65,
+          -20.5
+        ],
+        "message": "the camera has just passed the door"
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "expect": {
+        "name": "Camera",
+        "field": "Transform.pos[2]",
+        "between": [
+          -34.5,
+          -26.0
+        ],
+        "message": "deeper in the cellar"
+      }
+    },
+    {
+      "expect": {
+        "resource": "scene.indoors",
+        "eq": 1
+      }
+    },
+    {
+      "note": "and back out into the sun"
+    },
+    {
+      "input": {
+        "w": false,
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "resource": "scene.indoors",
+        "eq": 0,
+        "max_ticks": 1200
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "expect": {
+        "name": "Camera",
+        "field": "Transform.pos[2]",
+        "between": [
+          -20.5,
+          -20.35
+        ],
+        "message": "out of the door again"
+      }
+    },
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    }
+  ]
+}

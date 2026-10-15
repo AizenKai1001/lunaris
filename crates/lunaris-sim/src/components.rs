@@ -1761,3 +1761,63 @@ component! {
         pub submerged: f32 = 0.0,
     }
 }
+
+// ------------------------------------------------------------------------------------------------ lighting effects of the GPU renderer
+// Eye adaptation, screen-space reflections, lens flare and reflection probes (docs/GPU.md). Each is its own component beside the `Environment`, never a field of an
+// existing one, and only the GPU renderer's high qualities draw them (the reference renderer and `classic` ignore them). Kept together at the end of the file.
+
+component! {
+    /// Eye adaptation (auto exposure) for the GPU renderer's high qualities (the first `AutoExposure` counts; the reference renderer and `classic` ignore it): the renderer measures how bright
+    /// the picture is on average (the geometric mean of the luminance, the middle of the picture counting a little more) and brings it to `target` by multiplying the light by an exposure,
+    /// which it multiplies with `Environment.exposure` (that one stays the compensation you choose: 2 = always a stop brighter). The exposure never goes below `min` or above `max`
+    /// (multipliers: 0.05 to 16 by default, a cave next to open sunlight is about 30 times apart). `speed` is how fast the eye adapts: each second it covers `1 - e^-speed` of the remaining way in
+    /// stops (1.5 takes about a second to settle); in `lunaris play` the pictures follow each other and the exposure glides, while one picture asked for by a tool is measured and
+    /// applied at once (the same world always draws the same picture). The flat background colour is not exposed, bloom and light shafts are.
+    pub struct AutoExposure {
+        pub min: f32 = 0.05,
+        pub max: f32 = 16.0,
+        pub speed: f32 = 1.5,
+        pub target: f32 = 0.18,
+    }
+}
+
+component! {
+    /// Screen-space reflections for the GPU renderer's high and ultra qualities (the first `Ssr` counts; the reference renderer and `classic` ignore it): smooth and metallic surfaces, and `Water`,
+    /// mirror what is on the screen instead of only the sky. A ray from every glossy pixel is marched through the depth of the picture; where it meets something the surface shows that
+    /// something's colour, where it leaves the screen, finds nothing or is too far the sky's reflection that was always there stays. `strength` (0 to 2, 1 = a full mirror image where the surface
+    /// would reflect) scales it, `max_distance` is how far in metres a ray may travel, `thickness` how thick (in metres of depth) things are taken to be, so that a ray passes behind a thin
+    /// object instead of hitting it. Surfaces rougher than about 0.6 do not use it (the blurred sky is right for them). Only what is in the picture can be reflected: not what is behind the
+    /// camera, not what a nearer object hides, not sprites or particles.
+    pub struct Ssr {
+        pub strength: f32 = 1.0,
+        pub max_distance: f32 = 40.0,
+        pub thickness: f32 = 0.5,
+    }
+}
+
+component! {
+    /// Lens flare for the GPU renderer's high and ultra qualities (the first `LensFlare` counts; the reference renderer and `classic` ignore it): while the sun (the first directional light) is in
+    /// front of the camera and in view, a glare around it, `ghosts` (0 to 8) soft coloured discs strung out along the line from the sun through the middle of the picture and a `halo` ring around
+    /// the middle appear, as in a camera lens. `intensity` (0 to 4, 1 = a sunny day) scales all of it. The depth of the picture is looked at where the sun's disc is: the flare fades out as
+    /// what is drawn (a cube, a hill, a wall) covers the sun, and as the sun leaves the picture. It is added to the light before exposure and tone mapping, so it glows with the rest.
+    /// Only opaque meshes hide the sun (not sprites, particles or see-through meshes).
+    pub struct LensFlare {
+        pub intensity: f32 = 1.0,
+        pub ghosts: u32 = 5,
+        pub halo: f32 = 0.5,
+    }
+}
+
+component! {
+    /// A reflection probe for the GPU renderer's high qualities (the reference renderer and `classic` ignore it): at its entity's position it captures the world around it into a cube of pictures
+    /// (six views, at `resolution` pixels a side, 16 to 256; all the probes of a world share the biggest one asked for) the first time it is drawn, and the surfaces inside its box
+    /// use that instead of the plain sky for what they reflect and for the ambient light they get: a metal ball in a red room shows the red room, a cave's walls are lit by the cave and not by the sky
+    /// outside. `size` is the box of the probe's influence in metres (x, y, z, centred on the entity; the box is not turned by the entity's rotation): inside it, it takes over from the sky
+    /// (fading out over the outer third of the way to its walls), a reflection is bent to come from where the walls are (box projection, so a floor's reflection of a wall is in the right place),
+    /// and where boxes overlap the smaller wins. It is **baked**: it shows the world as it was when it was captured. It is captured again when its position, `size` or `resolution` change, and on demand
+    /// with the `bake_probe` tool (after you moved things, or loaded another scene). At most four probes work at once (the four with the lowest uids). A probe does not see other probes.
+    pub struct ReflectionProbe {
+        pub size: [f32; 3] = [20.0, 10.0, 20.0],
+        pub resolution: u32 = 128,
+    }
+}

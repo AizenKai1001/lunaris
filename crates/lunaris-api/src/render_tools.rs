@@ -196,6 +196,10 @@ impl Engine {
             ("png_bytes", Json::from(png.len())),
             ("timing_ms", Json::obj([("render", Json::from((t_render.as_secs_f64() * 1e5).round() / 100.0)), ("png", Json::from((t_png.as_secs_f64() * 1e5).round() / 100.0)), ("total", Json::from((t0.elapsed().as_secs_f64() * 1e5).round() / 100.0))])),
         ]);
+        // what the GPU renderer measured for this picture (eye adaptation): information about the picture only, never written into the world
+        if !frame.info.is_empty() {
+            out.set("measured", Json::obj(frame.info.iter().map(|(k, v)| (k.as_str(), Json::from((v * 10000.0).round() / 10000.0)))));
+        }
         if let Some(path) = a.opt_str("path")? {
             let p = self.write_bytes(path, &png)?;
             out.set("saved_to", Json::str(p.display().to_string()));
@@ -205,6 +209,40 @@ impl Engine {
             out.set("image", Json::obj([("mime", Json::str("image/png")), ("data", Json::Str(base64::encode(&png)))]));
         }
         Ok(out)
+    }
+
+    /// `bake_probe`: capture the world's reflection probes now (the GPU renderer's, docs/GPU.md "Reflection probes"). A picture of the high qualities captures a probe by itself the first time it draws it and when
+    /// its position or box changes; this is for after the world around it changed or another scene was loaded. It changes nothing in the world.
+    pub(crate) fn bake_probe_tool(&mut self, a: &Args) -> Result<Json> {
+        let uid = a.opt_u64("uid")?;
+        let mut probes: Vec<u64> = Vec::new();
+        self.sim.world.for_each_uid::<(&lunaris_sim::components::ReflectionProbe,), _>(|_, u, _| probes.push(u))?;
+        probes.sort();
+        if probes.is_empty() {
+            return Err(EcsError::new("no_probe", "the world has no ReflectionProbe to capture").hint("add an entity with a Transform and `ReflectionProbe {size, resolution}` in the middle of a room or a cave"));
+        }
+        if let Some(u) = uid {
+            if !probes.contains(&u) {
+                return Err(EcsError::new("no_such_probe", format!("entity {u} has no ReflectionProbe")).at("uid").hint(format!("the probes are {probes:?}")));
+            }
+        }
+        if !self.gpu_ready() {
+            return Err(EcsError::new("no_gpu", "capturing a reflection probe needs the GPU renderer, and this host has none").hint("only the GPU renderer's high qualities draw probes; the reference renderer ignores them"));
+        }
+        let crate::gpu::GpuState::Ready(b) = &mut self.gpu else {
+            return Err(EcsError::new("no_gpu", "the GPU renderer is not available"));
+        };
+        let name = b.name();
+        match b.bake_probes(&mut self.sim.world, &mut self.textures, uid) {
+            Ok(done) => {
+                let mut out = Json::obj([("baked", Json::arr(done.iter().map(|u| uid_json(*u)))), ("probes", Json::from(probes.len())), ("renderer", Json::str(format!("gpu: {name}")))]);
+                if probes.len() > 4 {
+                    out.set("note", Json::str("only the four probes with the lowest uids work at once"));
+                }
+                Ok(out)
+            }
+            Err(e) => Err(EcsError::new("bake_failed", e)),
+        }
     }
 
     /// A text picture of the world around a point: a grid of characters a language model can read at a glance.

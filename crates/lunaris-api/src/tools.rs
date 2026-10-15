@@ -172,6 +172,12 @@ pub fn tool_defs() -> Vec<ToolDef> {
             &["x", "z"],
         ),
         tool(
+            "bake_probe",
+            "Capture the world's reflection probes now (`ReflectionProbe`, docs/GPU.md \"Reflection probes\"): six pictures of what is around each one, which the surfaces inside its box then reflect and are lit by instead of the plain sky (GPU renderer, high qualities). A picture of those qualities captures a probe by itself the first time it draws it and when its position or box changes; call this after the world around it changed (things moved, another scene loaded). With `uid`, only that probe; without, all of them (the four with the lowest uids work at once). It changes nothing in the world. Needs the GPU renderer.",
+            vec![("uid", uid())],
+            &[],
+        ),
+        tool(
             "scatter",
             "Put many copies of something on a terrain in one undoable step: trees, rocks, tufts of grass. Give either `prefab` (a prefab name) or `components` (what each copy has; its Transform scale is multiplied by the random scale). Copies go where the ground suits: slope within `slope` degrees, height within `height`, at least `min_distance` apart, inside `area`; the same `seed` gives the same forest. Returns how many fit (`placed`) and a `note` when fewer than `count` did. See docs/TERRAIN.md.",
             vec![

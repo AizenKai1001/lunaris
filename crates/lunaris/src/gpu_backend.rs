@@ -18,6 +18,10 @@ impl GpuBackend for Backend {
         let q = Quality::from_name(quality).ok_or_else(|| format!("unknown quality `{quality}`"))?;
         self.renderer.render_to_image(world, textures, opts, &q)
     }
+
+    fn bake_probes(&mut self, world: &mut World, textures: &mut TextureCache, uid: Option<u64>) -> Result<Vec<u64>, String> {
+        self.renderer.bake_probes(world, textures, uid)
+    }
 }
 
 /// Offer the GPU renderer to `engine` (unless `--no-gpu` or `LUNARIS_NO_GPU=1` says otherwise). `quality` is what `render` draws with

@@ -69,6 +69,18 @@ struct Frame {
     p12: vec4<f32>,
     // height fog: density, falloff, the level of the thickest fog
     p13: vec4<f32>,
+    // eye adaptation: the lowest and the highest exposure, how fast it adapts, the brightness it aims at
+    p14: vec4<f32>,
+    // eye adaptation: on (0/1), the seconds since the last picture, start from the measured value (0/1)
+    p15: vec4<f32>,
+    // screen-space reflections: strength, the farthest a ray goes, how thick things are taken to be, on (0/1)
+    p16: vec4<f32>,
+    // lens flare: intensity, how many ghosts, the halo's strength, on (0/1)
+    p17: vec4<f32>,
+    // reflection probes: how many are baked, how many mip levels their faces have
+    p18: vec4<f32>,
+    // each probe: its centre (xyz), then half the size of its box (xyz)
+    probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)
     prev_view_proj: mat4x4<f32>,
     psh: array<PointShadow, 2>,

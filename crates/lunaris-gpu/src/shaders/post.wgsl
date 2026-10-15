@@ -10,6 +10,17 @@
 @group(0) @binding(4) var bloom_tex: texture_2d<f32>;
 @group(0) @binding(5) var post_samp: sampler;
 @group(0) @binding(6) var ao_in: texture_2d<f32>;
+// the reflections the screen-space pass found (composite), and what that pass reads besides the picture and the opaque depth: the depth of the nearest surface of every pixel
+// (see-through ones included), where it points and how rough it is (xyz, w), how much it reflects head on and whether there is a surface (rgb, w)
+@group(0) @binding(7) var ssr_tex: texture_2d<f32>;
+@group(0) @binding(9) var surf_depth: texture_depth_2d;
+@group(0) @binding(10) var gbuf_a: texture_2d<f32>;
+@group(0) @binding(11) var gbuf_b: texture_2d<f32>;
+// the faces of the reflection probes (see sky.wgsl) and how to sample them
+@group(0) @binding(12) var probe_tex: texture_2d_array<f32>;
+@group(0) @binding(13) var probe_samp: sampler;
+// the state of the eye adaptation (see exposure.wgsl): x is the exposure it has settled on
+@group(0) @binding(8) var<storage, read> ae_state: array<vec4<f32>>;
 
 struct FullOut {
     @builtin(position) pos: vec4<f32>,
@@ -144,6 +155,314 @@ fn fs_ssao_blur(in: FullOut) -> @location(0) vec4<f32> {
     return vec4<f32>(sum / max(wsum, 1.0e-4), 0.0, 0.0, 1.0);
 }
 
+// ------------------------------------------------------------------------------------------------ screen-space reflections
+
+fn view_depth(p: vec3<f32>) -> f32 {
+    return -(frame.view * vec4<f32>(p, 1.0)).z;
+}
+
+// How far in front of the camera (along its view) the nearest opaque thing at a pixel is; a huge number where nothing was drawn (the sky).
+fn scene_view_depth(px: vec2<i32>) -> f32 {
+    let d = depth_at(px);
+    if (d <= 0.0) {
+        return 1.0e9;
+    }
+    return view_depth(world_at(px));
+}
+
+// The way along a ray in the picture: the part (0 to 1) of the ray's length reached when a fraction `u` of the ray's length on the screen is done. The screen is not linear in the
+// world (perspective), 1 / w is: that is what makes the steps of the march the same size on the screen.
+fn ray_part(u: f32, w0: f32, w1: f32) -> f32 {
+    if (abs(w1 - w0) > 1.0e-4) {
+        return (1.0 / mix(1.0 / w0, 1.0 / w1, u) - w0) / (w1 - w0);
+    }
+    return u;
+}
+
+// The light a glossy pixel gets from what the picture shows in its mirror direction, minus the sky's reflection the mesh shader already put there: the composite adds it. A ray is
+// marched through the depth of the picture in steps of a couple of pixels (at most 96), a hit is a ray that passes from in front of the surface to behind it within `thickness`
+// (a surface seen from behind, one that faces away from the ray, is no hit), and the place is found to a fraction of a step by halving.
+@fragment
+fn fs_ssr(in: FullOut) -> @location(0) vec4<f32> {
+    let px = vec2<i32>(in.pos.xy);
+    let gb = textureLoad(gbuf_b, px, 0);
+    if (gb.a < 0.5) {
+        return vec4<f32>(0.0);
+    }
+    let ga = textureLoad(gbuf_a, px, 0);
+    let rough = ga.w;
+    let strength = frame.p16.x * (1.0 - smoothstep(0.3, 0.7, rough));
+    if (strength <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    let d0 = textureLoad(surf_depth, px, 0);
+    if (d0 <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    let size = frame.p1.xy;
+    let uv0 = (vec2<f32>(px) + 0.5) * frame.p1.zw;
+    let ndc0 = vec2<f32>(uv0.x * 2.0 - 1.0, 1.0 - uv0.y * 2.0);
+    let wp = frame.inv_view_proj * vec4<f32>(ndc0, d0, 1.0);
+    let p0 = wp.xyz / wp.w;
+    let n = normalize(ga.xyz);
+    var v = normalize(p0 - frame.eye.xyz);
+    if (frame.p4.w > 0.5) {
+        // an orthographic camera: every ray of sight runs along the camera's own forward
+        v = -normalize(vec3<f32>(frame.view[0][2], frame.view[1][2], frame.view[2][2]));
+    }
+    let r = reflect(v, n);
+    // the ray: from the surface, at most `max_distance` long, and not past the camera's near plane
+    let z0 = view_depth(p0);
+    let rz = -(frame.view * vec4<f32>(r, 0.0)).z;
+    var len = max(frame.p16.y, 0.1);
+    if (rz < 0.0) {
+        len = min(len, max(z0 - frame.eye.w - 0.02, 0.0) / -rz);
+    }
+    if (len < 0.05) {
+        return vec4<f32>(0.0);
+    }
+    let h0 = frame.view_proj * vec4<f32>(p0, 1.0);
+    let h1 = frame.view_proj * vec4<f32>(p0 + r * len, 1.0);
+    if (h0.w <= 0.0 || h1.w <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    let s0 = vec2<f32>(h0.x / h0.w * 0.5 + 0.5, 0.5 - h0.y / h0.w * 0.5) * size;
+    let s1 = vec2<f32>(h1.x / h1.w * 0.5 + 0.5, 0.5 - h1.y / h1.w * 0.5) * size;
+    let dir = s1 - s0;
+    // only the part of the ray that stays on the screen
+    var u_end = 1.0;
+    if (dir.x > 0.0) { u_end = min(u_end, (size.x - 1.0 - s0.x) / dir.x); }
+    if (dir.x < 0.0) { u_end = min(u_end, -s0.x / dir.x); }
+    if (dir.y > 0.0) { u_end = min(u_end, (size.y - 1.0 - s0.y) / dir.y); }
+    if (dir.y < 0.0) { u_end = min(u_end, -s0.y / dir.y); }
+    let span = length(dir) * u_end;
+    if (span < 2.0) {
+        return vec4<f32>(0.0);
+    }
+    let steps = clamp(i32(span * 0.5), 12, 96);
+    let jitter = interleaved_noise(in.pos.xy);
+    let bias = 0.03 + 0.01 * z0;
+    let thick = max(frame.p16.z, 0.01);
+    let rzl = rz * len;
+    var hit = false;
+    var lo = 0.0;
+    var hi = 0.0;
+    var prev_u = 0.0;
+    var prev_diff = -1.0;
+    var prev_z = z0;
+    for (var i = 0; i < steps; i = i + 1) {
+        let u = (f32(i) + 0.25 + 0.75 * jitter) / f32(steps) * u_end;
+        let zr = z0 + rzl * ray_part(u, h0.w, h1.w);
+        let diff = zr - scene_view_depth(vec2<i32>(s0 + dir * u));
+        // from in front of the surface to behind it, and not far behind it (a thin thing the ray passes behind is no mirror)
+        if (diff > bias && prev_diff <= bias && diff < thick + (zr - prev_z) + 0.02 * zr) {
+            hit = true;
+            lo = prev_u;
+            hi = u;
+            break;
+        }
+        prev_u = u;
+        prev_diff = diff;
+        prev_z = zr;
+    }
+    if (!hit) {
+        return vec4<f32>(0.0);
+    }
+    for (var k = 0; k < 6; k = k + 1) {
+        let mid = 0.5 * (lo + hi);
+        let diff = z0 + rzl * ray_part(mid, h0.w, h1.w) - scene_view_depth(vec2<i32>(s0 + dir * mid));
+        if (diff > bias) {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    let hit_px = s0 + dir * hi;
+    let hq = vec2<i32>(hit_px);
+    let huv = hit_px / size;
+    let hit_z = z0 + rzl * ray_part(hi, h0.w, h1.w);
+    if (hit_z - scene_view_depth(hq) > thick + 0.02 * hit_z) {
+        return vec4<f32>(0.0);
+    }
+    let seen = textureSampleLevel(hdr_tex, post_samp, huv, 0.0);
+    if (seen.a < 0.5) {
+        return vec4<f32>(0.0);
+    }
+    // a surface that faces away from the ray is seen from behind: no reflection
+    let nh = textureLoad(gbuf_a, hq, 0).xyz;
+    var facing = 1.0;
+    if (dot(nh, nh) > 0.25) {
+        facing = smoothstep(0.35, -0.1, dot(normalize(nh), r));
+    }
+    let edge = smoothstep(0.0, 0.08, min(min(huv.x, 1.0 - huv.x), min(huv.y, 1.0 - huv.y)));
+    let reach = 1.0 - smoothstep(0.65, 1.0, len * ray_part(hi, h0.w, h1.w) / max(frame.p16.y, 0.1));
+    let conf = strength * edge * reach * facing;
+    // swap the sky's reflection for what was seen, as the mesh shader weighs it (the environment BRDF, fog)
+    let rr = clamp(rough, 0.045, 1.0);
+    let nv = max(dot(n, -v), 1.0e-4);
+    let brdf = env_brdf(gb.rgb, rr, nv);
+    var env = sky_color(r, rr < 0.3);
+    env = mix(env, sky_irradiance(r), smoothstep(0.15, 0.95, rr));
+    var old = env * frame.p0.x;
+    if (frame.p18.x > 0.5) {
+        // inside a probe's box the reflection that was there is the probe's
+        let ph = probe_light(p0, n, r, rr);
+        old = mix(old, ph.env, ph.w);
+    }
+    let add = (min(seen.rgb / seen.a, vec3<f32>(200.0)) - old) * brdf * conf * (1.0 - fog_amount(p0));
+    return vec4<f32>(add, 1.0);
+}
+
+// A face of a reflection probe, finished: the picture drawn into `hdr_tex` as plain light (the flat background colour shows behind what is not drawn).
+@fragment
+fn fs_probe_resolve(in: FullOut) -> @location(0) vec4<f32> {
+    let c = textureLoad(hdr_tex, vec2<i32>(in.pos.xy), 0);
+    let a = clamp(c.a, 0.0, 1.0);
+    return vec4<f32>(min(c.rgb + frame.clear.rgb * (1.0 - a), vec3<f32>(60000.0)), 1.0);
+}
+
+// The next, smaller mip level of a face: the average of four texels of the one above (a bilinear lookup in the middle of them).
+@fragment
+fn fs_probe_mip(in: FullOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb, 1.0);
+}
+
+// The reflection layer at a pixel (nothing when the effect is off).
+fn ssr_at(q: vec2<i32>) -> vec3<f32> {
+    if (frame.p16.w < 0.5) {
+        return vec3<f32>(0.0);
+    }
+    return textureLoad(ssr_tex, clamp(q, vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1)), 0).rgb;
+}
+
+// ------------------------------------------------------------------------------------------------ lens flare
+
+// Where the sun is on the screen (xy: in uv units, z: 1 when it is in front of the camera) and the radius of its disc there in pixels (w).
+fn sun_on_screen() -> vec4<f32> {
+    let dir = normalize(frame.sun_dir.xyz);
+    let clip = frame.view_proj * vec4<f32>(frame.eye.xyz + dir * 1000.0, 1.0);
+    if (clip.w <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    let ndc = clip.xy / clip.w;
+    // the sun's disc in the sky shader is about 2.1 degrees across: where its upper edge lands says how big it is on the screen
+    let up = vec3<f32>(frame.view[0][1], frame.view[1][1], frame.view[2][1]);
+    let edge = frame.view_proj * vec4<f32>(frame.eye.xyz + normalize(dir + up * 0.0375) * 1000.0, 1.0);
+    let radius = length((edge.xy / max(edge.w, 1.0e-4) - ndc) * 0.5 * frame.p1.xy);
+    return vec4<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5, 1.0, radius);
+}
+
+// The share of the sun's disc that is not hidden: depth taps on the disc (nothing drawn there is sky; the part outside the picture counts as open).
+fn sun_open(sun: vec4<f32>) -> f32 {
+    let size = frame.p1.xy;
+    let c = sun.xy * size;
+    let rad = max(sun.w, 3.0);
+    var open = 0.0;
+    for (var i = 0; i < 16; i = i + 1) {
+        let a = f32(i) * GOLDEN_ANGLE;
+        let p = c + vec2<f32>(cos(a), sin(a)) * (sqrt((f32(i) + 0.5) / 16.0) * rad);
+        if (p.x < 0.0 || p.y < 0.0 || p.x >= size.x || p.y >= size.y) {
+            open = open + 1.0;
+        } else if (textureLoad(depth_tex, vec2<i32>(p), 0) <= 0.0) {
+            open = open + 1.0;
+        }
+    }
+    return open / 16.0;
+}
+
+// The eight ghosts: where each lies on the line through the middle of the picture (1 is the sun, 0 the middle, -1 the sun's mirror image), its size (a share of the picture's height),
+// its colour and how bright it is.
+fn ghost_along(i: i32) -> f32 {
+    if (i == 0) { return 0.5; }
+    if (i == 1) { return -0.35; }
+    if (i == 2) { return -0.8; }
+    if (i == 3) { return 0.25; }
+    if (i == 4) { return -1.3; }
+    if (i == 5) { return 0.75; }
+    if (i == 6) { return -1.8; }
+    return -0.1;
+}
+
+fn ghost_radius(i: i32) -> f32 {
+    if (i == 0) { return 0.05; }
+    if (i == 1) { return 0.09; }
+    if (i == 2) { return 0.035; }
+    if (i == 3) { return 0.12; }
+    if (i == 4) { return 0.06; }
+    if (i == 5) { return 0.045; }
+    if (i == 6) { return 0.15; }
+    return 0.03;
+}
+
+fn ghost_tint(i: i32) -> vec3<f32> {
+    if (i == 0) { return vec3<f32>(1.0, 0.7, 0.35); }
+    if (i == 1) { return vec3<f32>(0.35, 0.65, 1.0); }
+    if (i == 2) { return vec3<f32>(0.45, 1.0, 0.55); }
+    if (i == 3) { return vec3<f32>(1.0, 0.45, 0.4); }
+    if (i == 4) { return vec3<f32>(0.65, 0.45, 1.0); }
+    if (i == 5) { return vec3<f32>(1.0, 0.9, 0.55); }
+    if (i == 6) { return vec3<f32>(0.35, 0.9, 0.95); }
+    return vec3<f32>(1.0, 0.65, 0.85);
+}
+
+fn ghost_weight(i: i32) -> f32 {
+    if (i == 0) { return 0.6; }
+    if (i == 1) { return 0.5; }
+    if (i == 2) { return 0.4; }
+    if (i == 3) { return 0.4; }
+    if (i == 4) { return 0.3; }
+    if (i == 5) { return 0.3; }
+    if (i == 6) { return 0.2; }
+    return 0.35;
+}
+
+// The light the lens adds at a pixel (uv): a glare around the sun, soft coloured discs along the line from the sun through the middle, a ring around the middle. Nothing without a sun
+// in front of the camera; it fades out as the sun leaves the picture and as what is drawn covers the sun (the depth is read only where the flare is not zero).
+fn flare_at(uv: vec2<f32>) -> vec3<f32> {
+    if (frame.p4.w > 0.5 || frame.sun_dir.w < 0.5) {
+        return vec3<f32>(0.0);
+    }
+    let sun = sun_on_screen();
+    if (sun.z < 0.5) {
+        return vec3<f32>(0.0);
+    }
+    let off = max(abs(sun.x - 0.5), abs(sun.y - 0.5)) * 2.0;
+    let fade = 1.0 - smoothstep(0.95, 1.4, off);
+    if (fade <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    // the picture with its middle at 0 and its height 1 (so that the discs are round)
+    let k = vec2<f32>(frame.p1.x / frame.p1.y, 1.0);
+    let p = (uv - vec2<f32>(0.5)) * k;
+    let s = (sun.xy - vec2<f32>(0.5)) * k;
+    var col = vec3<f32>(0.0);
+    let d = length(p - s);
+    col = col + vec3<f32>(1.0, 0.92, 0.8) * (0.55 * exp(-d * d / 0.004) + 0.16 * exp(-d / 0.12));
+    let n = i32(frame.p17.y);
+    for (var i = 0; i < 8; i = i + 1) {
+        if (i >= n) {
+            break;
+        }
+        let gd = length(p - s * ghost_along(i)) / ghost_radius(i);
+        // a soft disc, brighter at its rim
+        let body = (1.0 - smoothstep(0.85, 1.0, gd)) * (0.25 + 0.75 * smoothstep(0.3, 0.92, gd));
+        col = col + ghost_tint(i) * (body * ghost_weight(i));
+    }
+    // the halo: a ring around the middle of the picture, brightest on the side away from the sun
+    let ring_t = (length(p) - 0.38) / 0.025;
+    var away = 1.0;
+    if (length(s) > 1.0e-3 && length(p) > 1.0e-3) {
+        away = max(dot(normalize(p), -normalize(s)), 0.0);
+    }
+    col = col + vec3<f32>(0.8, 0.85, 1.0) * (exp(-ring_t * ring_t) * (0.5 + 1.0 * away * away) * frame.p17.z);
+    if (max(col.r, max(col.g, col.b)) < 0.002) {
+        return vec3<f32>(0.0);
+    }
+    let sc = frame.sun_color.rgb;
+    let top = max(sc.r, max(sc.g, sc.b));
+    return col * (sc / max(top, 1.0e-3)) * (frame.p17.x * 0.2 * clamp(top, 0.25, 6.0) * fade * sun_open(sun));
+}
+
 // ------------------------------------------------------------------------------------------------ bloom
 
 fn karis(c: vec3<f32>) -> f32 {
@@ -159,6 +478,15 @@ fn prefilter(c: vec3<f32>) -> vec3<f32> {
     soft = soft * soft / (4.0 * knee);
     let contrib = max(soft, br - th) / max(br, 1.0e-4);
     return c * contrib;
+}
+
+// The exposure the eye adaptation has settled on, a multiplier of the light of the scene (1 when there is none). Without the effect the passes below keep their old arithmetic
+// in a branch of their own (the graphics driver compiles `x * (e * 1.0)` differently from `x * e`, and a picture must not change when none of the new effects is in the world).
+fn ae_factor() -> f32 {
+    if (frame.p15.x > 0.5) {
+        return ae_state[0].x;
+    }
+    return 1.0;
 }
 
 // The first step: from the full-size picture to half size, thresholded, weighted so that single very bright pixels do not flicker.
@@ -191,7 +519,12 @@ fn fs_bloom_first(in: FullOut) -> @location(0) vec4<f32> {
     let w3 = karis(g3);
     let w4 = karis(g4);
     let c0 = (g0 * w0 * 0.125 + g1 * w1 * 0.125 + g2 * w2 * 0.125 + g3 * w3 * 0.125 + g4 * w4 * 0.5) / (w0 * 0.125 + w1 * 0.125 + w2 * 0.125 + w3 * 0.125 + w4 * 0.5);
-    return vec4<f32>(prefilter(c0), 1.0);
+    // what glows is judged after the eye has adapted (a lamp in a dark room glows, the same lamp in the sun does not)
+    var lit = c0;
+    if (frame.p15.x > 0.5) {
+        lit = c0 * ae_factor();
+    }
+    return vec4<f32>(prefilter(lit), 1.0);
 }
 
 @fragment
@@ -331,14 +664,22 @@ fn finish(c_in: vec3<f32>, uv: vec2<f32>, frag: vec2<f32>) -> vec4<f32> {
 
 // One sample of the HDR picture: what was drawn is tone mapped, the flat background (alpha 0) keeps the colour the user chose, and
 // bloom glows over both.
-fn resolve_sample(c: vec4<f32>, bloom: vec3<f32>) -> vec3<f32> {
+fn resolve_sample(c: vec4<f32>, bloom: vec3<f32>, ae: f32, ssr: vec3<f32>) -> vec3<f32> {
     let a = clamp(c.a, 0.0, 1.0);
     let glow = bloom * frame.p0.y;
     let bg = frame.clear.rgb + tonemap(glow);
     if (a <= 0.0) {
         return bg;
     }
-    let fg = tonemap(c.rgb / a * frame.p0.y + glow);
+    var fg: vec3<f32>;
+    if (frame.p16.w > 0.5) {
+        // the reflections found on the screen are scene light too: they are exposed with it
+        fg = tonemap((c.rgb / a + ssr) * (frame.p0.y * ae) + glow);
+    } else if (frame.p15.x > 0.5) {
+        fg = tonemap(c.rgb / a * (frame.p0.y * ae) + glow);
+    } else {
+        fg = tonemap(c.rgb / a * frame.p0.y + glow);
+    }
     return mix(bg, fg, a);
 }
 
@@ -410,7 +751,15 @@ fn velocity_px(px: vec2<i32>) -> vec2<f32> {
 @fragment
 fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.pos.xy);
-    let bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + shafts_at(in.uv, in.pos.xy);
+    let ae = ae_factor();
+    var rays = shafts_at(in.uv, in.pos.xy);
+    if (frame.p17.w > 0.5) {
+        rays = rays + flare_at(in.uv);
+    }
+    var bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays;
+    if (frame.p15.x > 0.5) {
+        bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays * ae;
+    }
     var c = textureLoad(hdr_tex, px, 0);
     if (frame.p7.w > 0.0) {
         let v = velocity_px(px);
@@ -437,24 +786,32 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
             c = acc / 16.0;
         }
     }
-    return finish(resolve_sample(c, bloom), in.uv, in.pos.xy);
+    return finish(resolve_sample(c, bloom, ae, ssr_at(px)), in.uv, in.pos.xy);
 }
 
 // With multisampling: tone map every sample before averaging, so that bright edges stay anti-aliased.
 @fragment
 fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.pos.xy);
-    let bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + shafts_at(in.uv, in.pos.xy);
+    let ae = ae_factor();
+    var rays = shafts_at(in.uv, in.pos.xy);
+    if (frame.p17.w > 0.5) {
+        rays = rays + flare_at(in.uv);
+    }
+    var bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays;
+    if (frame.p15.x > 0.5) {
+        bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays * ae;
+    }
     let n = i32(frame.p4.z);
     if (frame.p7.w > 0.0) {
         let v = velocity_px(px);
         if (length(v) > 0.75) {
             // moving: one sample of each of eight taps along the movement (the blur is its own anti-aliasing)
-            var acc = resolve_sample(textureLoad(hdr_ms, px, 0), bloom);
+            var acc = resolve_sample(textureLoad(hdr_ms, px, 0), bloom, ae, ssr_at(px));
             for (var k = 1; k < 8; k = k + 1) {
                 let t = f32(k) / 7.0 - 0.5;
                 let q = clamp(px + vec2<i32>(round(v * t)), vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1));
-                acc = acc + resolve_sample(textureLoad(hdr_ms, q, k % n), bloom);
+                acc = acc + resolve_sample(textureLoad(hdr_ms, q, k % n), bloom, ae, ssr_at(q));
             }
             return finish(acc / 8.0, in.uv, in.pos.xy);
         }
@@ -463,19 +820,19 @@ fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
         let r = coc_at(px);
         if (r > 0.5) {
             // out of focus: gather a ring of taps (one sample each, so the blur itself is the anti-aliasing), tone map each
-            var acc = resolve_sample(textureLoad(hdr_ms, px, 0), bloom);
+            var acc = resolve_sample(textureLoad(hdr_ms, px, 0), bloom, ae, ssr_at(px));
             for (var k = 0; k < 15; k = k + 1) {
                 let a = f32(k) * GOLDEN_ANGLE;
                 let rad = sqrt((f32(k) + 0.5) / 15.0) * r;
                 let q = clamp(px + vec2<i32>(i32(round(cos(a) * rad)), i32(round(sin(a) * rad))), vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1));
-                acc = acc + resolve_sample(textureLoad(hdr_ms, q, k % n), bloom);
+                acc = acc + resolve_sample(textureLoad(hdr_ms, q, k % n), bloom, ae, ssr_at(q));
             }
             return finish(acc / 16.0, in.uv, in.pos.xy);
         }
     }
     var acc = vec3<f32>(0.0);
     for (var i = 0; i < n; i = i + 1) {
-        acc = acc + resolve_sample(textureLoad(hdr_ms, px, i), bloom);
+        acc = acc + resolve_sample(textureLoad(hdr_ms, px, i), bloom, ae, ssr_at(px));
     }
     return finish(acc / f32(n), in.uv, in.pos.xy);
 }

@@ -872,6 +872,12 @@ pub struct EnvData {
     pub fade: [f32; 4],
     /// `HeightFog`: density, falloff, height (all 0 when there is none).
     pub hfog: [f32; 3],
+    /// `AutoExposure`: min, max, speed, target (None without the component).
+    pub auto_exposure: Option<[f32; 4]>,
+    /// `Ssr`: strength, max distance, thickness (None without the component).
+    pub ssr: Option<[f32; 3]>,
+    /// `LensFlare`: intensity, ghosts, halo (None without the component).
+    pub lens_flare: Option<[f32; 3]>,
 }
 
 impl EnvData {
@@ -882,7 +888,7 @@ impl EnvData {
         let c = [clear[0], clear[1], clear[2]];
         let mix = |a: V3, b: V3, t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
         let sky = mix(c, [0.52, 0.55, 0.62], 0.7);
-        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3] }
+        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
     }
 
     fn from_component(e: &Environment) -> EnvData {
@@ -920,8 +926,20 @@ impl EnvData {
             grade_c: [1.0, 1.0, 1.0, 0.0],
             fade: [0.0; 4],
             hfog: [0.0; 3],
+            auto_exposure: None,
+            ssr: None,
+            lens_flare: None,
         }
     }
+}
+
+/// A `ReflectionProbe`: where it stands, half the size of its box of influence and the size of the pictures it captures.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SceneProbe {
+    pub uid: u64,
+    pub pos: V3,
+    pub half: V3,
+    pub resolution: u32,
 }
 
 /// Everything needed to draw one picture, gathered once and sorted so the result never depends on how the world is stored. Both the
@@ -938,6 +956,8 @@ pub struct Scene {
     pub texts: Vec<SceneText>,
     pub rects: Vec<SceneRect>,
     pub env: EnvData,
+    /// The reflection probes, lowest uid first (only the GPU renderer's high qualities use them).
+    pub probes: Vec<SceneProbe>,
     pub warnings: Vec<String>,
 }
 
@@ -1096,6 +1116,28 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             let nz = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
             env.hfog = [nz(f.density, 0.0, 10.0, 0.0), nz(f.falloff, 0.0001, 10.0, 0.15), nz(f.height, -100_000.0, 100_000.0, 0.0)];
             env.fog_color = [nz(f.color[0], 0.0, 1.0, 0.72), nz(f.color[1], 0.0, 1.0, 0.82), nz(f.color[2], 0.0, 1.0, 0.95)];
+        }
+    }
+    {
+        let mut found: Vec<(u64, lunaris_sim::components::AutoExposure)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::AutoExposure,), _>(|_, uid, (a,)| found.push((uid, *a)))?;
+        if let Some((_, a)) = found.into_iter().min_by_key(|x| x.0) {
+            let nz = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+            let min = nz(a.min, 0.001, 1000.0, 0.05);
+            let max = nz(a.max, 0.001, 1000.0, 16.0).max(min);
+            env.auto_exposure = Some([min, max, nz(a.speed, 0.0, 100.0, 1.5), nz(a.target, 0.01, 4.0, 0.18)]);
+        }
+        let mut found: Vec<(u64, lunaris_sim::components::Ssr)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::Ssr,), _>(|_, uid, (s,)| found.push((uid, *s)))?;
+        if let Some((_, s)) = found.into_iter().min_by_key(|x| x.0) {
+            let nz = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+            env.ssr = Some([nz(s.strength, 0.0, 2.0, 1.0), nz(s.max_distance, 0.1, 2000.0, 40.0), nz(s.thickness, 0.01, 50.0, 0.5)]);
+        }
+        let mut found: Vec<(u64, lunaris_sim::components::LensFlare)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::LensFlare,), _>(|_, uid, (f,)| found.push((uid, *f)))?;
+        if let Some((_, f)) = found.into_iter().min_by_key(|x| x.0) {
+            let nz = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+            env.lens_flare = Some([nz(f.intensity, 0.0, 4.0, 1.0), f.ghosts.min(8) as f32, nz(f.halo, 0.0, 4.0, 0.5)]);
         }
     }
     let aspect = opts.width as f32 / opts.height as f32;
@@ -1612,7 +1654,21 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         on_top.append(&mut among);
         scene_particles = on_top;
     }
-    Ok(Scene { cam, view, proj, view_proj, lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, warnings })
+    // reflection probes (GPU high qualities): by uid, the numbers made sane
+    let mut probes: Vec<SceneProbe> = Vec::new();
+    {
+        let mut found: Vec<(u64, lunaris_sim::components::ReflectionProbe, Transform)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::ReflectionProbe, &Transform), _>(|_, uid, (p, t)| found.push((uid, *p, *t)))?;
+        found.sort_by_key(|f| f.0);
+        for (uid, p, t) in found {
+            if !t.pos.iter().all(|v| v.is_finite()) {
+                continue;
+            }
+            let half = |v: f32| if v.is_finite() { (v.abs() * 0.5).clamp(0.05, 5000.0) } else { 10.0 };
+            probes.push(SceneProbe { uid, pos: t.pos, half: [half(p.size[0]), half(p.size[1]), half(p.size[2])], resolution: p.resolution.clamp(16, 256) });
+        }
+    }
+    Ok(Scene { cam, view, proj, view_proj, lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, probes, warnings })
 }
 
 pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptions) -> Result<Frame> {
@@ -1771,5 +1827,5 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
             }
         });
     }
-    Ok(Frame { width: opts.width, height: opts.height, rgba, ids, depth, view_proj, camera: cam.desc.clone(), warnings })
+    Ok(Frame { width: opts.width, height: opts.height, rgba, ids, depth, view_proj, camera: cam.desc.clone(), warnings, info: Vec::new() })
 }

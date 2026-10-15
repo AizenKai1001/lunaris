@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use lunaris_ecs::World;
 use lunaris_render::math::{length, sub, V3};
 use lunaris_render::mesh::Mesh;
-use lunaris_render::render::{gather_scene, MeshRef, RenderOptions, Scene, SceneParticles};
+use lunaris_render::render::{gather_scene, ExplicitCamera, MeshRef, RenderOptions, Scene, SceneParticles, SceneProbe, View};
 use lunaris_render::terrain_layers::{Splat, SplatLayers};
 use lunaris_render::Frame;
 use lunaris_render::texture::Texture;
@@ -15,6 +15,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 const MAX_LIGHTS: usize = 16;
+/// How many reflection probes work at once (the four with the lowest uids); each has six faces.
+const MAX_PROBES: usize = 4;
 const OUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -141,6 +143,12 @@ struct FrameU {
     p11: [f32; 4],
     p12: [f32; 4],
     p13: [f32; 4],
+    p14: [f32; 4],
+    p15: [f32; 4],
+    p16: [f32; 4],
+    p17: [f32; 4],
+    p18: [f32; 4],
+    probes: [[f32; 4]; 8],
     prev_view_proj: [f32; 16],
     psh: [PointShadowU; 2],
     lights: [[f32; 4]; MAX_LIGHTS * 4],
@@ -194,6 +202,8 @@ struct Samplers {
     aniso: wgpu::Sampler,
     linear_clamp: wgpu::Sampler,
     shadow: wgpu::Sampler,
+    /// The faces of the reflection probes: smooth, between mip levels too.
+    probe: wgpu::Sampler,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -234,7 +244,36 @@ struct Targets {
     bg_resolve: wgpu::BindGroup,
     bg_ssao: Option<wgpu::BindGroup>,
     bg_blur: Option<wgpu::BindGroup>,
-    bg_composite: Option<wgpu::BindGroup>,
+}
+
+/// What a reflection probe was captured of: where it stood and how big its box was (when either changes it is captured again).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ProbeKey {
+    uid: u64,
+    pos: V3,
+    half: V3,
+}
+
+/// The captured faces of up to four reflection probes: one array of 24 layers (six per probe), each with a full chain of mip levels.
+struct ProbeSet {
+    /// The side of a face in texels, and how many mip levels it has.
+    size: u32,
+    levels: u32,
+    array_view: wgpu::TextureView,
+    /// By layer, then mip level: one face at one level, to draw into and to read from.
+    faces: Vec<Vec<wgpu::TextureView>>,
+    baked: [Option<ProbeKey>; MAX_PROBES],
+}
+
+/// What the screen-space reflections draw into and read: where each pixel points and how rough it is, how much it reflects, the depth of the nearest surface (see-through ones
+/// included), and the layer of reflections the composite adds.
+struct SsrTargets {
+    w: u32,
+    h: u32,
+    gbuf_a: wgpu::TextureView,
+    gbuf_b: wgpu::TextureView,
+    depth: wgpu::TextureView,
+    out: wgpu::TextureView,
 }
 
 /// The integer picture of which entity covers each pixel, and the depth it is tested with.
@@ -267,6 +306,8 @@ struct Batch {
 enum Out<'a> {
     Image,
     Surface { view: &'a wgpu::TextureView, format: wgpu::TextureFormat },
+    /// One face of a reflection probe: the HDR picture as plain light, into this layer of the probes' array.
+    Probe { view: &'a wgpu::TextureView },
 }
 
 pub struct GpuRenderer {
@@ -298,6 +339,12 @@ pub struct GpuRenderer {
     shadow_dummy: wgpu::TextureView,
     ao_white: wgpu::TextureView,
     targets: Option<Targets>,
+    ssr_targets: Option<SsrTargets>,
+    /// A black stand-in for the reflection layer of a picture without reflections.
+    ssr_dummy: wgpu::TextureView,
+    /// The reflection probes' faces, once there are probes, and a stand-in for a picture without any.
+    probe_set: Option<ProbeSet>,
+    probe_dummy: wgpu::TextureView,
     /// The view-projection of the previous picture, for motion blur.
     prev_vp: Option<[f32; 16]>,
     fx_frame: u32,
@@ -311,6 +358,18 @@ pub struct GpuRenderer {
     frame_no: u64,
     /// How many pictures were presented to the window (a hidden or minimised window skips them).
     pub frames_presented: u64,
+    /// The eye adaptation: its state on the card (exposure, average luminance, the exposure aimed at), a copy of it the CPU can read, and the compute pipeline that updates it.
+    exposure_buf: wgpu::Buffer,
+    exposure_read: wgpu::Buffer,
+    ae_pipe: wgpu::ComputePipeline,
+    /// The last picture adapted (so that the next one can glide from its exposure instead of starting from the measured value).
+    ae_valid: bool,
+    /// The last picture copied the adaptation state into `exposure_read` (a picture read back as an image does).
+    ae_copied: bool,
+    /// Seconds a picture drawn into an image advances the eye adaptation by (`None`: it measures and applies at once).
+    adapt_dt: Option<f32>,
+    /// When the last picture reached the window.
+    last_window_pic: Option<std::time::Instant>,
 }
 
 fn depth_pass<'e>(enc: &'e mut wgpu::CommandEncoder, label: &str, view: &wgpu::TextureView, clear: f32) -> wgpu::RenderPass<'e> {
@@ -361,6 +420,7 @@ impl GpuRenderer {
             aniso: device.create_sampler(&wgpu::SamplerDescriptor { label: Some("aniso"), address_mode_u: wgpu::AddressMode::Repeat, address_mode_v: wgpu::AddressMode::Repeat, mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, mipmap_filter: wgpu::MipmapFilterMode::Linear, anisotropy_clamp: 16, ..Default::default() }),
             linear_clamp: device.create_sampler(&wgpu::SamplerDescriptor { label: Some("linear-clamp"), address_mode_u: wgpu::AddressMode::ClampToEdge, address_mode_v: wgpu::AddressMode::ClampToEdge, mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, mipmap_filter: wgpu::MipmapFilterMode::Nearest, ..Default::default() }),
             shadow: device.create_sampler(&wgpu::SamplerDescriptor { label: Some("shadow"), address_mode_u: wgpu::AddressMode::ClampToEdge, address_mode_v: wgpu::AddressMode::ClampToEdge, mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, mipmap_filter: wgpu::MipmapFilterMode::Nearest, compare: Some(wgpu::CompareFunction::LessEqual), ..Default::default() }),
+            probe: device.create_sampler(&wgpu::SamplerDescriptor { label: Some("probe"), address_mode_u: wgpu::AddressMode::ClampToEdge, address_mode_v: wgpu::AddressMode::ClampToEdge, mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, mipmap_filter: wgpu::MipmapFilterMode::Linear, ..Default::default() }),
         };
         let buf = |label: &str, size: u64, usage: wgpu::BufferUsages| device.create_buffer(&wgpu::BufferDescriptor { label: Some(label), size, usage, mapped_at_creation: false });
         let frame_buf = buf("frame", std::mem::size_of::<FrameU>() as u64, wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST);
@@ -389,6 +449,8 @@ impl GpuRenderer {
             gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(1), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
             t.create_view(&wgpu::TextureViewDescriptor::default())
         };
+        let probe_dummy = make_tex("probe-dummy", 1, 1, 1, HDR, wgpu::TextureUsages::TEXTURE_BINDING).create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
+        let ssr_dummy = make_tex("ssr-dummy", 1, 1, 1, HDR, wgpu::TextureUsages::TEXTURE_BINDING).create_view(&wgpu::TextureViewDescriptor::default());
         let shadow_dummy = make_tex("shadow-dummy", 1, 1, 1, DEPTH, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT).create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
 
         // the font: one texel per font pixel, 95 glyphs of 5 x 8 side by side; 255 where the pixel is lit
@@ -412,6 +474,9 @@ impl GpuRenderer {
             layout: &layouts.text0,
             entries: &[wgpu::BindGroupEntry { binding: 0, resource: text_u.as_entire_binding() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&atlas) }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&samplers.nearest_clamp) }],
         });
+        let exposure_buf = buf("exposure", 16, wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST);
+        let exposure_read = buf("exposure-read", 16, wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ);
+        let ae_pipe = build_exposure(device, &shaders, &layouts);
         if let Some(e) = pollster::block_on(scope.pop()) {
             return Err(format!("the renderer's resources are not valid on this GPU: {e}"));
         }
@@ -443,6 +508,10 @@ impl GpuRenderer {
             shadow_dummy,
             ao_white,
             targets: None,
+            ssr_targets: None,
+            ssr_dummy,
+            probe_set: None,
+            probe_dummy,
             prev_vp: None,
             fx_frame: 0,
             out_image: None,
@@ -453,11 +522,25 @@ impl GpuRenderer {
             surface,
             frame_no: 0,
             frames_presented: 0,
+            exposure_buf,
+            exposure_read,
+            ae_pipe,
+            ae_valid: false,
+            ae_copied: false,
+            adapt_dt: None,
+            last_window_pic: None,
         })
     }
 
     pub fn adapter_name(&self) -> String {
         self.gpu.name()
+    }
+
+    /// How the eye adaptation (`AutoExposure`) treats the pictures drawn into images (`render_to_image`, `render_frame`): `None` (the default) measures the picture and
+    /// applies the exposure at once, so that the same world always draws the same picture (what a tool wants); `Some(seconds)` treats every picture as that many seconds after
+    /// the one before and glides from its exposure (a test, or a program that films the world into images). A window always follows the clock.
+    pub fn set_adaptation_step(&mut self, seconds: Option<f32>) {
+        self.adapt_dt = seconds.filter(|s| s.is_finite() && *s >= 0.0);
     }
 
     // ------------------------------------------------------------------------------------------ pipelines
@@ -838,7 +921,7 @@ impl GpuRenderer {
         let hdr_ms = if samples > 1 { Some(view(&self.texture("hdr-ms", w, h, 1, 1, samples, HDR, rt))) } else { None };
         let depth = view(&self.texture("depth", w, h, 1, 1, samples, DEPTH, wgpu::TextureUsages::RENDER_ATTACHMENT));
         let bg_resolve = self.group("resolve", &self.layouts.resolve, &[wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&hdr) }]);
-        let mut t = Targets { w, h, mode, msaa, hdr, hdr_ms, depth, pre_depth: None, ao: None, ao_raw: None, bloom: None, bg_resolve, bg_ssao: None, bg_blur: None, bg_composite: None };
+        let mut t = Targets { w, h, mode, msaa, hdr, hdr_ms, depth, pre_depth: None, ao: None, ao_raw: None, bloom: None, bg_resolve, bg_ssao: None, bg_blur: None };
         if high {
             let pre = view(&self.texture("pre-depth", w, h, 1, 1, 1, DEPTH, rt));
             let ao_raw = view(&self.texture("ao-raw", w, h, 1, 1, 1, AO_RAW, rt));
@@ -851,22 +934,33 @@ impl GpuRenderer {
             let levels = ((bw.min(bh) as f32).log2().floor() as usize).clamp(1, 6);
             let chain = self.texture("bloom", bw, bh, 1, levels as u32, 1, HDR, rt);
             let views: Vec<wgpu::TextureView> = (0..levels).map(|l| chain.create_view(&wgpu::TextureViewDescriptor { base_mip_level: l as u32, mip_level_count: Some(1), ..Default::default() })).collect();
-            let first = self.group("bloom-first", &self.layouts.bloom_first, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&t.hdr) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }]);
+            let first = self.group("bloom-first", &self.layouts.bloom_first, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&t.hdr) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }, wgpu::BindGroupEntry { binding: 8, resource: self.exposure_buf.as_entire_binding() }]);
             let chain_bg = |src: &wgpu::TextureView| self.group("bloom-chain", &self.layouts.bloom_chain, &[wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(src) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }]);
             let down: Vec<wgpu::BindGroup> = (0..levels - 1).map(|l| chain_bg(&views[l])).collect();
             let up: Vec<wgpu::BindGroup> = (0..levels - 1).map(|l| chain_bg(&views[l + 1])).collect();
-            let composite = if samples > 1 {
-                self.group("composite-ms", &self.layouts.composite_ms, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&pre) }, wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(t.hdr_ms.as_ref().expect("multisampled target")) }, wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&views[0]) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }])
-            } else {
-                self.group("composite", &self.layouts.composite, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&pre) }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&t.hdr) }, wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&views[0]) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }])
-            };
-            t.bg_composite = Some(composite);
             t.bloom = Some(Bloom { levels, first, down, up, views });
             t.pre_depth = Some(pre);
             t.ao_raw = Some(ao_raw);
             t.ao = Some(ao);
         }
         self.targets = Some(t);
+    }
+
+    fn ensure_ssr_targets(&mut self, w: u32, h: u32) {
+        if self.ssr_targets.as_ref().is_some_and(|s| s.w == w && s.h == h) {
+            return;
+        }
+        let rt = wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING;
+        let view = |t: wgpu::Texture| t.create_view(&wgpu::TextureViewDescriptor::default());
+        let st = SsrTargets {
+            w,
+            h,
+            gbuf_a: view(self.texture("ssr-surface", w, h, 1, 1, 1, GBUF_A, rt)),
+            gbuf_b: view(self.texture("ssr-reflectance", w, h, 1, 1, 1, GBUF_B, rt)),
+            depth: view(self.texture("ssr-depth", w, h, 1, 1, 1, DEPTH, rt)),
+            out: view(self.texture("ssr-layer", w, h, 1, 1, 1, HDR, rt)),
+        };
+        self.ssr_targets = Some(st);
     }
 
     fn ensure_shadow(&mut self, size: u32) {
@@ -941,7 +1035,7 @@ impl GpuRenderer {
 
     // ------------------------------------------------------------------------------------------ drawing
 
-    fn draw(&mut self, scene: &Scene, w: u32, h: u32, out: Out<'_>, q: &Quality, want_ids: bool) -> Result<(), String> {
+    fn draw(&mut self, scene: &Scene, w: u32, h: u32, out: Out<'_>, q: &Quality, want_ids: bool, adapt: Option<f32>) -> Result<(), String> {
         let mode = q.mode;
         let high = mode == Mode::High;
         let samples = if high { if q.msaa >= 4 { 4 } else { 1 } } else { 1 };
@@ -952,7 +1046,10 @@ impl GpuRenderer {
         let out_format = match &out {
             Out::Image => OUT_FORMAT,
             Out::Surface { format, .. } => *format,
+            Out::Probe { .. } => HDR,
         };
+        // a face of a reflection probe: only the light, none of the picture effects (and no probes of its own)
+        let probe_out = matches!(out, Out::Probe { .. });
 
         // ---- the object list: meshes sorted into instanced runs, then the sprite and tile layers in drawing order
         struct MeshItem {
@@ -1144,8 +1241,17 @@ impl GpuRenderer {
         // picture effects that look at the depth: light shafts (through the sky) and motion blur (from the camera's own movement)
         let shafts_on = high && q.dof && env.shafts > 0.0 && have_meshes && sun.is_some();
         let blur_on = high && q.dof && env.motion_blur > 0.0 && have_meshes && self.prev_vp.is_some();
-        let need_depth = ssao_on || dof_on || shafts_on || blur_on;
+        // screen-space reflections look at the depth and the finished picture: the same tier as the other picture effects (high and ultra)
+        let refl_on = high && q.dof && have_meshes && env.ssr.is_some();
+        if refl_on {
+            self.ensure_ssr_targets(w, h);
+        }
+        // the lens flare looks at the depth where the sun is, to see whether something covers it
+        let flare_on = high && q.dof && have_meshes && sun.is_some() && env.lens_flare.is_some();
+        let need_depth = ssao_on || dof_on || shafts_on || blur_on || refl_on || flare_on;
         let bloom_on = high && q.bloom && env.bloom > 0.0;
+        // eye adaptation needs something to measure: a flat 2D scene keeps its authored colours
+        let ae_on = high && have_meshes && env.auto_exposure.is_some() && !probe_out;
         let aspect = w as f32 / h as f32;
 
         // ---- the frame uniform
@@ -1224,6 +1330,34 @@ impl GpuRenderer {
         fu.p12 = if high { v4(lin([env.fade[0], env.fade[1], env.fade[2]]), env.fade[3]) } else { [0.0; 4] };
         // height fog: density, falloff, the level of the thickest fog
         fu.p13 = if high { [env.hfog[0], env.hfog[1], env.hfog[2], 0.0] } else { [0.0; 4] };
+        // eye adaptation: min, max, speed, target; then on, seconds since the last picture, start from the measured value
+        let ae_reset = adapt.is_none() || !self.ae_valid;
+        fu.p14 = if ae_on { env.auto_exposure.unwrap_or([0.0; 4]) } else { [0.0; 4] };
+        fu.p15 = [if ae_on { 1.0 } else { 0.0 }, adapt.unwrap_or(0.0), if ae_reset { 1.0 } else { 0.0 }, 0.0];
+        // screen-space reflections: strength, the farthest a ray goes, how thick things are taken to be, on
+        fu.p16 = match env.ssr {
+            Some(s) if refl_on => [s[0], s[1], s[2], 1.0],
+            _ => [0.0; 4],
+        };
+        // lens flare: intensity, ghosts, halo, on
+        fu.p17 = match env.lens_flare {
+            Some(f) if flare_on => [f[0], f[1], f[2], 1.0],
+            _ => [0.0; 4],
+        };
+        // reflection probes: how many are baked and how many levels their faces have; then each one's middle and half its box
+        let mut probes_baked = 0usize;
+        if high && !probe_out {
+            if let Some(set) = &self.probe_set {
+                for (k, key) in set.baked.iter().enumerate() {
+                    if let Some(key) = key {
+                        fu.probes[k * 2] = v4(key.pos, 0.0);
+                        fu.probes[k * 2 + 1] = v4(key.half, 0.0);
+                        probes_baked = k + 1;
+                    }
+                }
+                fu.p18 = [probes_baked as f32, set.levels as f32, 0.0, 0.0];
+            }
+        }
         fu.prev_view_proj = self.prev_vp.unwrap_or(vp.0);
         self.prev_vp = Some(vp.0);
         fu.p4 = [if shadows_on { sun.expect("checked") as f32 } else { -1.0 }, 1.0, samples as f32, if scene.cam.ortho.is_some() { 1.0 } else { 0.0 }];
@@ -1277,11 +1411,15 @@ impl GpuRenderer {
         }
         if high {
             self.need(PipeId::Sky, samples, None)?;
-            self.need(PipeId::Composite, samples, Some(out_format))?;
-            if nverts > ui_n {
+            if probe_out {
+                self.need(PipeId::ProbeResolve, 1, None)?;
+            } else {
+                self.need(PipeId::Composite, samples, Some(out_format))?;
+            }
+            if nverts > ui_n && !probe_out {
                 self.need(PipeId::TextOut, 1, Some(out_format))?;
             }
-            if ui_n > 0 {
+            if ui_n > 0 && !probe_out {
                 self.need(PipeId::UiOut, 1, Some(out_format))?;
             }
             if shadows_on || !point_sel.is_empty() {
@@ -1289,6 +1427,10 @@ impl GpuRenderer {
             }
             if need_depth {
                 self.need(PipeId::DepthPre, 1, None)?;
+            }
+            if refl_on {
+                self.need(PipeId::SsrGbuf, 1, None)?;
+                self.need(PipeId::Ssr, 1, None)?;
             }
             if ssao_on {
                 self.need(PipeId::Ssao, 1, None)?;
@@ -1322,6 +1464,10 @@ impl GpuRenderer {
             (Some(s), false) => &s.array_view,
             _ => &self.shadow_dummy,
         };
+        let probe_view = match (&self.probe_set, probes_baked > 0) {
+            (Some(s), true) => &s.array_view,
+            _ => &self.probe_dummy,
+        };
         let scene_bg = self.group(
             "scene",
             &self.layouts.scene0,
@@ -1333,6 +1479,8 @@ impl GpuRenderer {
                 wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(ao_view) },
                 wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) },
                 wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(point_view) },
+                wgpu::BindGroupEntry { binding: 7, resource: wgpu::BindingResource::TextureView(probe_view) },
+                wgpu::BindGroupEntry { binding: 8, resource: wgpu::BindingResource::Sampler(&self.samplers.probe) },
             ],
         );
         let depth_bgs: Vec<wgpu::BindGroup> = (0..16).map(|i| self.group("depth", &self.layouts.depth0, &[wgpu::BindGroupEntry { binding: 0, resource: self.pass_bufs[i].as_entire_binding() }, wgpu::BindGroupEntry { binding: 1, resource: self.objects.as_entire_binding() }])).collect();
@@ -1347,6 +1495,7 @@ impl GpuRenderer {
                 &image_view
             }
             Out::Surface { view, .. } => view,
+            Out::Probe { view } => view,
         };
 
         // ---- encode
@@ -1433,6 +1582,25 @@ impl GpuRenderer {
                 draw_batches(&mut pass, &mesh_batches, false, false);
             }
         }
+        if refl_on {
+            // every mesh pixel's normal, roughness and reflectance, and the depth of the nearest surface (the water included), for the reflection pass after the main pass
+            let st = self.ssr_targets.as_ref().expect("reflection targets");
+            fn attach(view: &wgpu::TextureView) -> Option<wgpu::RenderPassColorAttachment<'_>> {
+                Some(wgpu::RenderPassColorAttachment { view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store } })
+            }
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("ssr-surfaces"),
+                color_attachments: &[attach(&st.gbuf_a), attach(&st.gbuf_b)],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment { view: &st.depth, depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Store }), stencil_ops: None }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_bind_group(0, &scene_bg, &[]);
+            pass.set_pipeline(self.pipe(PipeId::SsrGbuf, 1, None));
+            draw_batches(&mut pass, &mesh_batches, false, true);
+            draw_batches(&mut pass, &clear_batches, false, true);
+        }
         if ssao_on {
             let pre = t.pre_depth.as_ref().expect("high targets");
             let _ = pre;
@@ -1516,6 +1684,93 @@ impl GpuRenderer {
             }
         }
 
+        // reflections: from every glossy pixel a ray through the depth of the finished picture, into a layer the composite adds
+        if refl_on {
+            let st = self.ssr_targets.as_ref().expect("reflection targets");
+            let probe_view = match (&self.probe_set, probes_baked > 0) {
+                (Some(s), true) => &s.array_view,
+                _ => &self.probe_dummy,
+            };
+            let bg = self.group(
+                "ssr",
+                &self.layouts.ssr,
+                &[
+                    wgpu::BindGroupEntry { binding: 0, resource: self.frame_buf.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(t.pre_depth.as_ref().expect("high targets")) },
+                    wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&t.hdr) },
+                    wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) },
+                    wgpu::BindGroupEntry { binding: 9, resource: wgpu::BindingResource::TextureView(&st.depth) },
+                    wgpu::BindGroupEntry { binding: 10, resource: wgpu::BindingResource::TextureView(&st.gbuf_a) },
+                    wgpu::BindGroupEntry { binding: 11, resource: wgpu::BindingResource::TextureView(&st.gbuf_b) },
+                    wgpu::BindGroupEntry { binding: 12, resource: wgpu::BindingResource::TextureView(probe_view) },
+                    wgpu::BindGroupEntry { binding: 13, resource: wgpu::BindingResource::Sampler(&self.samplers.probe) },
+                ],
+            );
+            fullscreen(&mut enc, "ssr", &st.out, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Ssr, 1, None), &bg);
+        }
+        // the composite of this picture: its depth, glow, reflection layer (a black stand-in without reflections) and the state of the eye adaptation
+        let composite_bg = if high && !probe_out {
+            let b = t.bloom.as_ref().expect("high targets");
+            let pre = t.pre_depth.as_ref().expect("high targets");
+            let reflections = match (&self.ssr_targets, refl_on) {
+                (Some(s), true) => &s.out,
+                _ => &self.ssr_dummy,
+            };
+            let tv = wgpu::BindingResource::TextureView;
+            Some(if samples > 1 {
+                self.group(
+                    "composite-ms",
+                    &self.layouts.composite_ms,
+                    &[
+                        wgpu::BindGroupEntry { binding: 0, resource: self.frame_buf.as_entire_binding() },
+                        wgpu::BindGroupEntry { binding: 1, resource: tv(pre) },
+                        wgpu::BindGroupEntry { binding: 3, resource: tv(t.hdr_ms.as_ref().expect("multisampled target")) },
+                        wgpu::BindGroupEntry { binding: 4, resource: tv(&b.views[0]) },
+                        wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) },
+                        wgpu::BindGroupEntry { binding: 7, resource: tv(reflections) },
+                        wgpu::BindGroupEntry { binding: 8, resource: self.exposure_buf.as_entire_binding() },
+                    ],
+                )
+            } else {
+                self.group(
+                    "composite",
+                    &self.layouts.composite,
+                    &[
+                        wgpu::BindGroupEntry { binding: 0, resource: self.frame_buf.as_entire_binding() },
+                        wgpu::BindGroupEntry { binding: 1, resource: tv(pre) },
+                        wgpu::BindGroupEntry { binding: 2, resource: tv(&t.hdr) },
+                        wgpu::BindGroupEntry { binding: 4, resource: tv(&b.views[0]) },
+                        wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) },
+                        wgpu::BindGroupEntry { binding: 7, resource: tv(reflections) },
+                        wgpu::BindGroupEntry { binding: 8, resource: self.exposure_buf.as_entire_binding() },
+                    ],
+                )
+            })
+        } else {
+            None
+        };
+        // the eye adapts to the finished picture before the glow is built from it and the picture is exposed
+        let ae_read = ae_on && matches!(out, Out::Image);
+        if ae_on {
+            let bg = self.group(
+                "eye-adaptation",
+                &self.layouts.ae0,
+                &[
+                    wgpu::BindGroupEntry { binding: 0, resource: self.frame_buf.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&t.hdr) },
+                    wgpu::BindGroupEntry { binding: 2, resource: self.exposure_buf.as_entire_binding() },
+                ],
+            );
+            {
+                let mut pass = enc.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("eye-adaptation"), timestamp_writes: None });
+                pass.set_pipeline(&self.ae_pipe);
+                pass.set_bind_group(0, &bg, &[]);
+                pass.dispatch_workgroups(1, 1, 1);
+            }
+            if ae_read {
+                enc.copy_buffer_to_buffer(&self.exposure_buf, 0, &self.exposure_read, 0, 16);
+            }
+        }
         if high {
             if bloom_on {
                 let b = t.bloom.as_ref().expect("high targets");
@@ -1527,8 +1782,18 @@ impl GpuRenderer {
                     fullscreen(&mut enc, "bloom-up", &b.views[l], wgpu::LoadOp::Load, self.pipe(PipeId::BloomUp, 1, None), &b.up[l]);
                 }
             }
-            fullscreen(&mut enc, "composite", out_view, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Composite, samples, Some(out_format)), t.bg_composite.as_ref().expect("high targets"));
-            if nverts > 0 {
+            if probe_out {
+                // a face of a reflection probe: the picture as plain light, no exposure, tone mapping or text
+                let bg = self.group(
+                    "probe-face",
+                    &self.layouts.probe_resolve,
+                    &[wgpu::BindGroupEntry { binding: 0, resource: self.frame_buf.as_entire_binding() }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&t.hdr) }],
+                );
+                fullscreen(&mut enc, "probe-face", out_view, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::ProbeResolve, 1, None), &bg);
+            } else {
+                fullscreen(&mut enc, "composite", out_view, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Composite, samples, Some(out_format)), composite_bg.as_ref().expect("high composite"));
+            }
+            if nverts > 0 && !probe_out {
                 let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("text"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: out_view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
@@ -1596,6 +1861,8 @@ impl GpuRenderer {
             );
         }
         self.gpu.queue.submit([enc.finish()]);
+        self.ae_valid = ae_on;
+        self.ae_copied = ae_read;
         if frame_no % 64 == 0 {
             self.evict_old(frame_no);
         }
@@ -1604,6 +1871,130 @@ impl GpuRenderer {
             return Err(format!("the GPU reported: {}", errors.join("; ")));
         }
         Ok(())
+    }
+
+    // ------------------------------------------------------------------------------------------ reflection probes
+
+    fn make_probe_set(&self, size: u32) -> ProbeSet {
+        let levels = size.ilog2() + 1;
+        let layers = (MAX_PROBES * 6) as u32;
+        let tex = self.texture("probes", size, size, layers, levels, 1, HDR, wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING);
+        let array_view = tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
+        let faces = (0..layers)
+            .map(|l| {
+                (0..levels)
+                    .map(|m| tex.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2), base_mip_level: m, mip_level_count: Some(1), base_array_layer: l, array_layer_count: Some(1), ..Default::default() }))
+                    .collect()
+            })
+            .collect();
+        ProbeSet { size, levels, array_view, faces, baked: [None; MAX_PROBES] }
+    }
+
+    /// Draw the six faces of the probe `p` into its slot (what the world looks like from where it stands, with the main picture's shadows but none of its effects) and build their mip levels.
+    fn bake_probe_slot(&mut self, world: &mut World, textures: &mut TextureCache, slot: usize, p: &SceneProbe, clear: [f32; 4], base: &Quality) -> Result<(), String> {
+        let (size, levels) = {
+            let s = self.probe_set.as_ref().expect("probe set");
+            (s.size, s.levels)
+        };
+        let q = Quality { mode: Mode::High, msaa: 1, shadow_size: base.shadow_size, point_shadow_size: base.point_shadow_size, shadows: true, ssao: false, bloom: false, dof: false };
+        let dirs: [(V3, V3); 6] = [([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]), ([-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]), ([0.0, 1.0, 0.0], [0.0, 0.0, -1.0]), ([0.0, -1.0, 0.0], [0.0, 0.0, 1.0]), ([0.0, 0.0, 1.0], [0.0, 1.0, 0.0]), ([0.0, 0.0, -1.0], [0.0, 1.0, 0.0])];
+        // what the pictures of the main view keep from one to the next is put back afterwards
+        let (ae_valid, prev_vp, nested) = (self.ae_valid, self.prev_vp, textures.nested);
+        textures.nested = true;
+        let mut result: Result<(), String> = Ok(());
+        for (f, (fwd, up)) in dirs.iter().enumerate() {
+            let camera = ExplicitCamera { eye: p.pos, target: [p.pos[0] + fwd[0], p.pos[1] + fwd[1], p.pos[2] + fwd[2]], up: *up, fov_y: 94.0, ortho_height: None, near: 0.05, far: 1000.0, clear };
+            let opts = RenderOptions { width: size, height: size, view: View::Explicit(camera), supersample: 1, threads: 1 };
+            let drawn = gather_scene(world, textures, &opts).map_err(|e| e.message).and_then(|scene| {
+                let view = self.probe_set.as_ref().expect("probe set").faces[slot * 6 + f][0].clone();
+                self.draw(&scene, size, size, Out::Probe { view: &view }, &q, false, None)
+            });
+            if drawn.is_err() {
+                result = drawn;
+                break;
+            }
+        }
+        textures.nested = nested;
+        textures.warnings.clear();
+        self.ae_valid = ae_valid;
+        self.prev_vp = prev_vp;
+        result?;
+        // mip levels: the next level of a face is the average of four texels of the one above it
+        self.need(PipeId::ProbeMip, 1, None)?;
+        let mut enc = self.gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("probe-mips") });
+        {
+            let set = self.probe_set.as_ref().expect("probe set");
+            for f in 0..6 {
+                let layer = slot * 6 + f;
+                for m in 1..levels as usize {
+                    let bg = self.group(
+                        "probe-mip",
+                        &self.layouts.bloom_chain,
+                        &[wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&set.faces[layer][m - 1]) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }],
+                    );
+                    let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("probe-mip"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: &set.faces[layer][m], depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store } })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    });
+                    pass.set_pipeline(self.pipe(PipeId::ProbeMip, 1, None));
+                    pass.set_bind_group(0, &bg, &[]);
+                    pass.draw(0..3, 0..1);
+                }
+            }
+        }
+        self.gpu.queue.submit([enc.finish()]);
+        let errors = self.gpu.take_errors();
+        if !errors.is_empty() {
+            return Err(format!("the GPU reported: {}", errors.join("; ")));
+        }
+        Ok(())
+    }
+
+    /// Capture the probes that need it: the first four by uid, those whose position or box changed since they were captured, or (`force`) all of them or one. Returns the uids that were captured.
+    fn sync_probes(&mut self, world: &mut World, textures: &mut TextureCache, probes: &[SceneProbe], clear: [f32; 4], base: &Quality, force: Option<Option<u64>>) -> Result<Vec<u64>, String> {
+        let used: Vec<&SceneProbe> = probes.iter().take(MAX_PROBES).collect();
+        let Some(biggest) = used.iter().map(|p| p.resolution).max() else {
+            if let Some(set) = &mut self.probe_set {
+                set.baked = [None; MAX_PROBES];
+            }
+            return Ok(Vec::new());
+        };
+        let size = biggest.next_power_of_two().clamp(16, 256);
+        if self.probe_set.as_ref().is_none_or(|s| s.size != size) {
+            self.probe_set = Some(self.make_probe_set(size));
+        }
+        let mut done = Vec::new();
+        for (k, p) in used.iter().enumerate() {
+            let key = ProbeKey { uid: p.uid, pos: p.pos, half: p.half };
+            let wanted = match force {
+                None => false,
+                Some(None) => true,
+                Some(Some(uid)) => uid == p.uid,
+            };
+            if wanted || self.probe_set.as_ref().expect("probe set").baked[k] != Some(key) {
+                self.probe_set.as_mut().expect("probe set").baked[k] = None;
+                self.bake_probe_slot(world, textures, k, p, clear, base)?;
+                self.probe_set.as_mut().expect("probe set").baked[k] = Some(key);
+                done.push(p.uid);
+            }
+        }
+        for k in used.len()..MAX_PROBES {
+            self.probe_set.as_mut().expect("probe set").baked[k] = None;
+        }
+        Ok(done)
+    }
+
+    /// Capture the reflection probes of the world again now (`uid`: only that probe; `None`: all of them) and return the uids that were captured. Pictures of the high qualities capture a probe by themselves
+    /// the first time they draw it and when its position or box changes; this is for after the world around it changed.
+    pub fn bake_probes(&mut self, world: &mut World, textures: &mut TextureCache, uid: Option<u64>) -> Result<Vec<u64>, String> {
+        let scene = gather_scene(world, textures, &RenderOptions { width: 64, height: 36, ..RenderOptions::default() }).map_err(|e| e.message)?;
+        let done = self.sync_probes(world, textures, &scene.probes, scene.cam.clear, &Quality::high(), Some(uid));
+        textures.warnings.clear();
+        done
     }
 
     // ------------------------------------------------------------------------------------------ public entry points
@@ -1621,8 +2012,12 @@ impl GpuRenderer {
         }
         let mut scene = gather_scene(world, textures, opts).map_err(|e| e.message)?;
         scene.warnings.append(&mut textures.warnings);
+        if quality.mode == Mode::High {
+            self.sync_probes(world, textures, &scene.probes, scene.cam.clear, quality, None)?;
+        }
         let (w, h) = (opts.width, opts.height);
-        self.draw(&scene, w, h, Out::Image, quality, want_ids)?;
+        let adapt = self.adapt_dt;
+        self.draw(&scene, w, h, Out::Image, quality, want_ids, adapt)?;
         let bpr = (w * 4).div_ceil(256) * 256;
         let buf = &self.readback.as_ref().expect("the picture was copied").1;
         let slice = buf.slice(..(bpr as u64 * h as u64));
@@ -1641,6 +2036,24 @@ impl GpuRenderer {
             }
         }
         buf.unmap();
+        // what the eye adaptation measured and did, read from the small buffer the picture copied it into
+        let mut info: Vec<(String, f64)> = Vec::new();
+        if self.ae_copied {
+            let slice = self.exposure_read.slice(..16);
+            let (tx, rx) = std::sync::mpsc::channel();
+            slice.map_async(wgpu::MapMode::Read, move |r| {
+                let _ = tx.send(r);
+            });
+            self.gpu.device.poll(wgpu::PollType::wait_indefinitely()).map_err(|e| format!("the GPU did not finish: {e}"))?;
+            rx.recv().map_err(|_| "the GPU readback was lost".to_string())?.map_err(|e| format!("cannot read the exposure back: {e}"))?;
+            {
+                let data = slice.get_mapped_range().map_err(|e| format!("cannot read the exposure back: {e}"))?;
+                let f: Vec<f32> = data.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+                info.push(("exposure".to_string(), f[0] as f64));
+                info.push(("average_luminance".to_string(), f[1] as f64));
+            }
+            self.exposure_read.unmap();
+        }
         // the picture is opaque
         for px in rgba.chunks_exact_mut(4) {
             px[3] = 255;
@@ -1669,7 +2082,7 @@ impl GpuRenderer {
             }
             buf.unmap();
         }
-        Ok(Frame { width: w, height: h, rgba, ids, depth: vec![f32::INFINITY; (w * h) as usize], view_proj: scene.view_proj, camera: scene.cam.desc.clone(), warnings: scene.warnings })
+        Ok(Frame { width: w, height: h, rgba, ids, depth: vec![f32::INFINITY; (w * h) as usize], view_proj: scene.view_proj, camera: scene.cam.desc.clone(), warnings: scene.warnings, info })
     }
 
     /// Resize the window surface (call when the window changes size).
@@ -1693,6 +2106,9 @@ impl GpuRenderer {
         let opts = RenderOptions { width, height, ..RenderOptions::default() };
         let mut scene = gather_scene(world, textures, &opts).map_err(|e| e.message)?;
         scene.warnings.append(&mut textures.warnings);
+        if quality.mode == Mode::High {
+            self.sync_probes(world, textures, &scene.probes, scene.cam.clear, quality, None)?;
+        }
         let frame = {
             let s = self.surface.as_ref().ok_or("this renderer has no window")?;
             let mut got = None;
@@ -1714,7 +2130,11 @@ impl GpuRenderer {
         };
         let format = self.surface.as_ref().expect("checked").config.format;
         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        self.draw(&scene, width, height, Out::Surface { view: &view, format }, quality, false)?;
+        // pictures of a window follow each other: the eye adapts by the time between them (it starts from the measured value after a long pause)
+        let now = std::time::Instant::now();
+        let adapt = self.last_window_pic.map(|t| now.duration_since(t).as_secs_f32()).filter(|d| *d < 2.0).map(|d| d.min(0.25));
+        self.last_window_pic = Some(now);
+        self.draw(&scene, width, height, Out::Surface { view: &view, format }, quality, false, adapt)?;
         self.gpu.queue.present(frame);
         self.frames_presented += 1;
         Ok(scene.warnings)

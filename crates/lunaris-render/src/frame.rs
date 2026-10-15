@@ -26,6 +26,8 @@ pub struct Frame {
     /// Which camera was used, in words.
     pub camera: String,
     pub warnings: Vec<String>,
+    /// What the renderer measured while drawing this picture (the GPU renderer's eye adaptation: `exposure`, `average_luminance`), by name. Never written into the simulation.
+    pub info: Vec<(String, f64)>,
 }
 
 impl Frame {

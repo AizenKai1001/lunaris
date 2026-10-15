@@ -9,6 +9,9 @@ pub const DEPTH: TextureFormat = TextureFormat::Depth32Float;
 pub const AO_RAW: TextureFormat = TextureFormat::Rg16Float;
 pub const AO: TextureFormat = TextureFormat::R8Unorm;
 pub const IDS: TextureFormat = TextureFormat::R32Uint;
+/// The surface pictures of the screen-space reflections: where each pixel points and how rough it is, how much it reflects head on.
+pub const GBUF_A: TextureFormat = TextureFormat::Rgba16Float;
+pub const GBUF_B: TextureFormat = TextureFormat::Rgba8Unorm;
 /// Bytes of one interleaved mesh vertex: position 3, normal 3, uv 2, colour 3, texture weight 1 (floats).
 pub const MESH_STRIDE: u64 = 48;
 
@@ -44,6 +47,14 @@ pub enum PipeId {
     BloomDown,
     BloomUp,
     Composite,
+    /// The mesh pixels' normals, roughness and reflectance for the screen-space reflections (two colour targets, one sample).
+    SsrGbuf,
+    /// The screen-space reflections themselves (full screen).
+    Ssr,
+    /// A face of a reflection probe: the finished HDR picture as plain light.
+    ProbeResolve,
+    /// The next mip level of a face of a probe.
+    ProbeMip,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,6 +70,8 @@ pub struct Shaders {
     pub post: ShaderModule,
     pub post_ms: ShaderModule,
     pub text: ShaderModule,
+    /// The compute shader of the eye adaptation.
+    pub exposure: ShaderModule,
 }
 
 pub struct Layouts {
@@ -74,9 +87,17 @@ pub struct Layouts {
     pub bloom_chain: BindGroupLayout,
     pub composite: BindGroupLayout,
     pub composite_ms: BindGroupLayout,
+    /// The screen-space reflections: the frame, the opaque depth, the picture, a sampler, the depth of the nearest surface, the two surface pictures, the probes' faces and their sampler.
+    pub ssr: BindGroupLayout,
+    /// A face of a reflection probe being finished: the frame (for the background colour) and the picture.
+    pub probe_resolve: BindGroupLayout,
+    /// The eye adaptation (compute): the frame uniform, the picture, the state it keeps.
+    pub ae0: BindGroupLayout,
 }
 
 const COMMON: &str = include_str!("shaders/common.wgsl");
+/// The sky, the environment BRDF and the fog along a ray: what the mesh shader and the post-processing passes share.
+const SKY: &str = include_str!("shaders/sky.wgsl");
 
 fn module(device: &Device, label: &str, source: &str) -> ShaderModule {
     device.create_shader_module(ShaderModuleDescriptor { label: Some(label), source: ShaderSource::Wgsl(Cow::Owned(source.to_string())) })
@@ -85,14 +106,16 @@ fn module(device: &Device, label: &str, source: &str) -> ShaderModule {
 impl Shaders {
     pub fn new(device: &Device) -> Shaders {
         let with_common = |s: &str| format!("{COMMON}\n{s}");
+        let with_sky = |s: &str| format!("{COMMON}\n{SKY}\n{s}");
         Shaders {
-            scene: module(device, "scene", &with_common(include_str!("shaders/scene.wgsl"))),
+            scene: module(device, "scene", &with_sky(include_str!("shaders/scene.wgsl"))),
             depth: module(device, "depth", &with_common(include_str!("shaders/depth.wgsl"))),
-            post: module(device, "post", &with_common(include_str!("shaders/post.wgsl"))),
+            post: module(device, "post", &with_sky(include_str!("shaders/post.wgsl"))),
             // the multisampled composite is the same file; only the entry point differs, so one module is enough, but a second one
             // keeps the single-sample layout free of the multisampled binding
-            post_ms: module(device, "post-ms", &with_common(include_str!("shaders/post.wgsl"))),
+            post_ms: module(device, "post-ms", &with_sky(include_str!("shaders/post.wgsl"))),
             text: module(device, "text", include_str!("shaders/text.wgsl")),
+            exposure: module(device, "exposure", &with_common(include_str!("shaders/exposure.wgsl"))),
         }
     }
 }
@@ -111,6 +134,10 @@ fn storage_ro() -> BindingType {
 
 fn tex_float() -> BindingType {
     BindingType::Texture { sample_type: TextureSampleType::Float { filterable: true }, view_dimension: TextureViewDimension::D2, multisampled: false }
+}
+
+fn tex_float_array() -> BindingType {
+    BindingType::Texture { sample_type: TextureSampleType::Float { filterable: true }, view_dimension: TextureViewDimension::D2Array, multisampled: false }
 }
 
 fn tex_depth() -> BindingType {
@@ -137,7 +164,7 @@ impl Layouts {
     pub fn new(device: &Device) -> Layouts {
         let make = |label: &str, entries: &[BindGroupLayoutEntry]| device.create_bind_group_layout(&BindGroupLayoutDescriptor { label: Some(label), entries });
         Layouts {
-            scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array())]),
+            scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering())]),
             tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float())]),
             // a painted terrain: its numbers, the splat map and its sampler, the layers' sampler, four colour textures and four relief maps
             splat2: make("splat2", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering()), entry(3, sampler_filtering()), entry(4, tex_float()), entry(5, tex_float()), entry(6, tex_float()), entry(7, tex_float()), entry(8, tex_float()), entry(9, tex_float()), entry(10, tex_float()), entry(11, tex_float())]),
@@ -146,10 +173,20 @@ impl Layouts {
             resolve: make("resolve", &[entry(2, tex_float())]),
             ssao: make("ssao", &[entry(0, uniform()), entry(1, tex_depth())]),
             blur: make("ssao-blur", &[entry(0, uniform()), entry(6, tex_float())]),
-            bloom_first: make("bloom-first", &[entry(0, uniform()), entry(2, tex_float()), entry(5, sampler_filtering())]),
+            bloom_first: make("bloom-first", &[entry(0, uniform()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(8, storage_ro())]),
             bloom_chain: make("bloom-chain", &[entry(4, tex_float()), entry(5, sampler_filtering())]),
-            composite: make("composite", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(4, tex_float()), entry(5, sampler_filtering())]),
-            composite_ms: make("composite-ms", &[entry(0, uniform()), entry(1, tex_depth()), entry(3, tex_ms()), entry(4, tex_float()), entry(5, sampler_filtering())]),
+            composite: make("composite", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(7, tex_float()), entry(8, storage_ro())]),
+            composite_ms: make("composite-ms", &[entry(0, uniform()), entry(1, tex_depth()), entry(3, tex_ms()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(7, tex_float()), entry(8, storage_ro())]),
+            ssr: make("ssr", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(9, tex_depth()), entry(10, tex_float()), entry(11, tex_float()), entry(12, tex_float_array()), entry(13, sampler_filtering())]),
+            probe_resolve: make("probe-resolve", &[entry(0, uniform()), entry(2, tex_float())]),
+            ae0: make(
+                "ae0",
+                &[
+                    BindGroupLayoutEntry { binding: 0, visibility: ShaderStages::COMPUTE, ty: uniform(), count: None },
+                    BindGroupLayoutEntry { binding: 1, visibility: ShaderStages::COMPUTE, ty: tex_float(), count: None },
+                    BindGroupLayoutEntry { binding: 2, visibility: ShaderStages::COMPUTE, ty: BindingType::Buffer { ty: BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
+                ],
+            ),
         }
     }
 }
@@ -203,6 +240,12 @@ impl PipelineCache2 {
     pub fn insert(&mut self, key: PipeKey, p: RenderPipeline) {
         self.map.insert(key, p);
     }
+}
+
+/// The compute pipeline of the eye adaptation.
+pub fn build_exposure(device: &Device, sh: &Shaders, ly: &Layouts) -> ComputePipeline {
+    let pl = device.create_pipeline_layout(&PipelineLayoutDescriptor { label: Some("ae"), bind_group_layouts: &[Some(&ly.ae0)], immediate_size: 0 });
+    device.create_compute_pipeline(&ComputePipelineDescriptor { label: Some("eye-adaptation"), layout: Some(&pl), module: &sh.exposure, entry_point: Some("cs_adapt"), compilation_options: Default::default(), cache: None })
 }
 
 /// Build the pipeline for `key`.
@@ -376,6 +419,20 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 cache: None,
             })
         }
+        PipeId::SsrGbuf => {
+            let pl = layout("ssr-gbuf", &[&ly.scene0, &ly.tex1]);
+            device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("ssr-gbuf"),
+                layout: Some(&pl),
+                vertex: VertexState { module: &sh.scene, entry_point: Some("vs_mesh"), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
+                primitive: tri(Some(Face::Back)),
+                depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
+                multisample: none,
+                fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_gbuf"), compilation_options: Default::default(), targets: &[target(GBUF_A, None), target(GBUF_B, None)] }),
+                multiview_mask: None,
+                cache: None,
+            })
+        }
         PipeId::DepthPre | PipeId::DepthShadow => {
             let shadow = key.id == PipeId::DepthShadow;
             let pl = layout("depth", &[&ly.depth0]);
@@ -393,7 +450,7 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 cache: None,
             })
         }
-        PipeId::Resolve | PipeId::Ssao | PipeId::SsaoBlur | PipeId::BloomFirst | PipeId::BloomDown | PipeId::BloomUp | PipeId::Composite => {
+        PipeId::Resolve | PipeId::Ssao | PipeId::SsaoBlur | PipeId::BloomFirst | PipeId::BloomDown | PipeId::BloomUp | PipeId::Composite | PipeId::Ssr | PipeId::ProbeResolve | PipeId::ProbeMip => {
             let (module, bgl, fs, format, blend): (&ShaderModule, &BindGroupLayout, &str, TextureFormat, Option<BlendState>) = match key.id {
                 PipeId::Resolve => (&sh.post, &ly.resolve, "fs_resolve", key.format.expect("format"), None),
                 PipeId::Ssao => (&sh.post, &ly.ssao, "fs_ssao", AO_RAW, None),
@@ -401,6 +458,9 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 PipeId::BloomFirst => (&sh.post, &ly.bloom_first, "fs_bloom_first", HDR, None),
                 PipeId::BloomDown => (&sh.post, &ly.bloom_chain, "fs_bloom_down", HDR, None),
                 PipeId::BloomUp => (&sh.post, &ly.bloom_chain, "fs_bloom_up", HDR, Some(ADD_BLEND)),
+                PipeId::Ssr => (&sh.post, &ly.ssr, "fs_ssr", HDR, None),
+                PipeId::ProbeResolve => (&sh.post, &ly.probe_resolve, "fs_probe_resolve", HDR, None),
+                PipeId::ProbeMip => (&sh.post, &ly.bloom_chain, "fs_probe_mip", HDR, None),
                 _ => {
                     if key.samples > 1 {
                         (&sh.post_ms, &ly.composite_ms, "fs_composite_ms", key.format.expect("format"), None)

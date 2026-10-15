@@ -50,6 +50,8 @@ mod terrain_layers_tests;
 #[cfg(test)]
 mod water_tests;
 #[cfg(test)]
+mod render_fx_tests;
+#[cfg(test)]
 mod ui_tests;
 #[cfg(test)]
 mod draw_order_tests;
