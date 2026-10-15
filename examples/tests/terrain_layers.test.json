@@ -1,0 +1,254 @@
+{
+  "name": "Terrain layers and water: crates and a ball float on the lake at the depth their density says, the hero wades in (InWater appears with its depth, and the wade system slows it) and out again",
+  "scene": "examples/terrain_layers.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "InWater"
+          ]
+        },
+        "eq": 0,
+        "message": "nobody is in the water yet"
+      }
+    },
+    {
+      "step": 480
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "CharacterBody.grounded",
+        "eq": true,
+        "message": "the hero stands on the ground"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[1]",
+        "approx": [
+          5.54,
+          0.05
+        ],
+        "message": "with its feet on the grass"
+      }
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "InWater"
+          ]
+        },
+        "eq": 0,
+        "message": "dry on the bank"
+      }
+    },
+    {
+      "expect": {
+        "name": "Crate 1",
+        "field": "Transform.pos[1]",
+        "approx": [
+          4.065,
+          0.12
+        ],
+        "message": "Crate 1 floats: density 450 of 1000, so 0.59 m of it is under the surface of the lake at 4.0 m"
+      }
+    },
+    {
+      "expect": {
+        "name": "Crate 2",
+        "field": "Transform.pos[1]",
+        "approx": [
+          3.9,
+          0.12
+        ],
+        "message": "Crate 2 floats: density 600 of 1000, so 0.60 m of it is under the surface of the lake at 4.0 m"
+      }
+    },
+    {
+      "expect": {
+        "name": "Crate 3",
+        "field": "Transform.pos[1]",
+        "approx": [
+          4.24,
+          0.12
+        ],
+        "message": "Crate 3 floats: density 350 of 1000, so 0.56 m of it is under the surface of the lake at 4.0 m"
+      }
+    },
+    {
+      "expect": {
+        "name": "Buoy",
+        "field": "Transform.pos[1]",
+        "approx": [
+          4.156,
+          0.12
+        ],
+        "message": "Buoy floats: density 250 of 1000, so 0.29 m of it is under the surface of the lake at 4.0 m"
+      }
+    },
+    {
+      "call": {
+        "tool": "water_depth",
+        "args": {
+          "x": -30.0,
+          "z": 28.0
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "terrain_layer",
+        "args": {
+          "x": 2.0,
+          "z": 28.0
+        }
+      }
+    },
+    {
+      "note": "west into the lake"
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "count": {
+          "with": [
+            "InWater"
+          ]
+        },
+        "eq": 1,
+        "max_ticks": 900
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "approx": [
+          -8.01,
+          0.6
+        ],
+        "message": "the water closed over its feet where the ground falls under the lake's surface"
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "resource": "hero.wet",
+        "eq": 1,
+        "message": "the wade system saw it"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "InWater.surface",
+        "approx": [
+          4.0,
+          0.02
+        ]
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "InWater.depth",
+        "between": [
+          0.0,
+          0.5
+        ],
+        "message": "just wet"
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "InWater.depth",
+        "between": [
+          0.5,
+          3.0
+        ],
+        "message": "deeper in"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "between": [
+          -17.01,
+          -10.01
+        ],
+        "message": "wading slowed it: two seconds at 6 m/s would be 12 m"
+      }
+    },
+    {
+      "note": "and back to the bank"
+    },
+    {
+      "input": {
+        "a": false,
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "count": {
+          "with": [
+            "InWater"
+          ]
+        },
+        "eq": 0,
+        "max_ticks": 1500
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "resource": "hero.wet",
+        "eq": 0,
+        "message": "the hero is out of the water"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "CharacterBody.grounded",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "between": [
+          -10.01,
+          -6.01
+        ],
+        "message": "out where it went in"
+      }
+    }
+  ]
+}

@@ -453,7 +453,8 @@ fn lit_mesh(in: MeshOut) -> Lit {
     let o = objects[in.inst];
     var n = normalize(in.nrm);
     if (o.ids.y == 1u) {
-        n = wave_normal(in.world.xz, o.uvrect.y, o.uvrect.z, o.uvrect.w);
+        // the ripples tilt the surface's own normal (flat for a sheet, leaning downstream for a river)
+        n = normalize(wave_normal(in.world.xz, o.uvrect.y, o.uvrect.z, o.uvrect.w) + (n - vec3<f32>(0.0, 1.0, 0.0)));
     }
     var base = o.color.rgb;
     if (o.misc.w > 0.5) {
@@ -481,6 +482,11 @@ fn lit_mesh(in: MeshOut) -> Lit {
         let lin = select(t.rgb, t.rgb * t.rgb, classic);
         base = base * (vec3<f32>(1.0) + in.tw * (lin - vec3<f32>(1.0)));
     }
+    return lit_tail(in, o, base, n, classic);
+}
+
+// The shading every mesh pixel ends with once its colour and normal are known: the classic lighting, or the physically based one with shadows, ambient occlusion, sky and fog.
+fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool) -> Lit {
     if (classic) {
         var col = shade_classic(base, o.mat.x, in.world, n);
         if (o.mat.y > 0.0) {
@@ -501,6 +507,80 @@ fn lit_mesh(in: MeshOut) -> Lit {
     let nv = clamp(dot(n, v), 0.0, 1.0);
     let alpha = o.color.a + (1.0 - o.color.a) * pow(1.0 - nv, 5.0);
     return Lit(pbr.diffuse + base * o.mat.y, pbr.spec, fog, alpha);
+}
+
+// ------------------------------------------------------------------------------------------------ painted terrain
+
+// A terrain with `TerrainLayers`: a splat map (an RGBA picture over the whole ground) weights up to four layer textures, each repeating over the ground at its own rate.
+struct SplatU {
+    // the repeats of layers 0 and 1 (xy, zw), then of layers 2 and 3
+    scales: array<vec4<f32>, 2>,
+    // the depth of each layer's relief in metres
+    bump: vec4<f32>,
+    // each layer's tint, in the working space
+    tint: array<vec4<f32>, 4>,
+    // x: how many layers there are, y: 1 when any layer has a relief
+    info: vec4<f32>,
+};
+
+@group(2) @binding(0) var<uniform> splat: SplatU;
+@group(2) @binding(1) var splat_map: texture_2d<f32>;
+@group(2) @binding(2) var splat_samp: sampler;
+@group(2) @binding(3) var layer_samp: sampler;
+@group(2) @binding(4) var lay0: texture_2d<f32>;
+@group(2) @binding(5) var lay1: texture_2d<f32>;
+@group(2) @binding(6) var lay2: texture_2d<f32>;
+@group(2) @binding(7) var lay3: texture_2d<f32>;
+@group(2) @binding(8) var hgt0: texture_2d<f32>;
+@group(2) @binding(9) var hgt1: texture_2d<f32>;
+@group(2) @binding(10) var hgt2: texture_2d<f32>;
+@group(2) @binding(11) var hgt3: texture_2d<f32>;
+
+// How much of each layer there is at this place of the ground (`uv` runs 0 to 1 over it, the first row of the map at v = 0): the map's channels, blended between texels
+// that lie on the corners of the cells, and normalised. The reference renderer does the same sum (`Splat::weights`).
+fn splat_weights(uv: vec2<f32>) -> vec4<f32> {
+    let dim = vec2<f32>(textureDimensions(splat_map));
+    let suv = (clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)) * (dim - vec2<f32>(1.0)) + vec2<f32>(0.5)) / dim;
+    let r = textureSampleLevel(splat_map, splat_samp, suv, 0.0);
+    let n = splat.info.x;
+    let w = vec4<f32>(r.x, select(0.0, r.y, n > 1.5), select(0.0, r.z, n > 2.5), select(0.0, r.w, n > 3.5));
+    let s = w.x + w.y + w.z + w.w;
+    if (s > 0.0001) {
+        return w / s;
+    }
+    return vec4<f32>(1.0, 0.0, 0.0, 0.0);
+}
+
+// One layer at this place: its colour (in the working space) and the height of its relief, 0 to 1.
+fn splat_layer(tex: texture_2d<f32>, hgt: texture_2d<f32>, uv: vec2<f32>, scale: vec2<f32>, classic: bool) -> vec4<f32> {
+    let s = uv * scale;
+    let tuv = vec2<f32>(s.x, 1.0 - s.y);
+    let t = textureSample(tex, layer_samp, tuv);
+    let h = textureSample(hgt, layer_samp, tuv).r;
+    return vec4<f32>(select(t.rgb, t.rgb * t.rgb, classic), h);
+}
+
+fn lit_splat(in: MeshOut) -> Lit {
+    let o = objects[in.inst];
+    var n = normalize(in.nrm);
+    let classic = frame.p2.x < 0.5;
+    let w = splat_weights(in.uv);
+    let a0 = splat_layer(lay0, hgt0, in.uv, splat.scales[0].xy, classic);
+    let a1 = splat_layer(lay1, hgt1, in.uv, splat.scales[0].zw, classic);
+    let a2 = splat_layer(lay2, hgt2, in.uv, splat.scales[1].xy, classic);
+    let a3 = splat_layer(lay3, hgt3, in.uv, splat.scales[1].zw, classic);
+    let albedo = a0.rgb * splat.tint[0].rgb * w.x + a1.rgb * splat.tint[1].rgb * w.y + a2.rgb * splat.tint[2].rgb * w.z + a3.rgb * splat.tint[3].rgb * w.w;
+    let base = o.color.rgb * albedo;
+    // the relief of the built-in materials, as in `lit_mesh`: the slope of the blended height map tilts the normal (centred on a middle height, so that a change of layer is no ridge)
+    let relief = (a0.a - 0.5) * splat.bump.x * w.x + (a1.a - 0.5) * splat.bump.y * w.y + (a2.a - 0.5) * splat.bump.z * w.z + (a3.a - 0.5) * splat.bump.w * w.w;
+    let dpx = dpdx(in.world);
+    let dpy = dpdy(in.world);
+    let dhx = dpdx(relief);
+    let dhy = dpdy(relief);
+    if (!classic && splat.info.y > 0.5) {
+        n = bump_normal(n, dpx, dpy, dhx, dhy);
+    }
+    return lit_tail(in, o, base, n, classic);
 }
 
 // How much of the way to `world` is fog: the uniform fog of the Environment plus the height fog (a density that thins out upwards, summed exactly along the ray).
@@ -526,6 +606,14 @@ fn fog_amount(world: vec3<f32>) -> f32 {
 @fragment
 fn fs_mesh(in: MeshOut) -> @location(0) vec4<f32> {
     let l = lit_mesh(in);
+    let c = (l.diffuse + l.spec) * (1.0 - l.fog) + frame.fog.rgb * l.fog;
+    return vec4<f32>(min(c, vec3<f32>(60000.0)), 1.0);
+}
+
+// A painted terrain: always opaque.
+@fragment
+fn fs_mesh_splat(in: MeshOut) -> @location(0) vec4<f32> {
+    let l = lit_splat(in);
     let c = (l.diffuse + l.spec) * (1.0 - l.fog) + frame.fog.rgb * l.fog;
     return vec4<f32>(min(c, vec3<f32>(60000.0)), 1.0);
 }

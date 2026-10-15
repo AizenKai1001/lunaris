@@ -76,6 +76,21 @@ A sheet of water at the entity's height, `size` metres wide and deep. In the hig
 `time.scale`). The reference renderer and `classic` draw a flat sheet of its colour. Water does not push anything: a trigger `Collider` of the same size tells which things are in it, and the height of the surface at a point is
 `Transform.y` plus the waves (about `wave_height` at most) for floating things. For rivers and lakes use several sheets; a very large sheet gets a coarser mesh (up to 400 x 400 cells).
 
+## Painted terrain: `TerrainLayers`
+
+A `Terrain` with a `TerrainLayers` beside it is drawn with up to four materials weighed by an RGBA splat map (`docs/TERRAIN.md`, "Layers"). In `classic` the pixel is the reference renderer's: the layers' textures sampled nearest-neighbour and repeated across the ground at their own rates,
+weighed by the splat map (blended bilinearly between texels that lie on the corners of the grid, then normalised), multiplied by `Terrain.color`. In the high qualities the textures are sRGB, mip-mapped and filtered 16 times at a slant, the blend is done in true linear light, and the built-in materials
+add their relief: the slope of the weighed height maps (centred, so that a change of layer is no ridge) tilts the normal by each layer's `bump` metres. It is one more pipeline (`MeshSplat`, `fs_mesh_splat`) with a third bind group of nine textures (the splat map, four colours, four reliefs; the whole shader stage uses
+14 of the 16 a portable device has) and a small uniform; the ground still takes part in shadows, the depth prepass and the entity-id picture as the plain mesh it is. A test (`a_painted_terrain_is_blended_the_same_way_in_both_renderers`) draws hills painted with four materials with both renderers
+(mean error 0.11 of 255, fewer than 0.005% of the pixels off by more than 40), another puts four solid colours on the four quarters of the ground and checks each is in its place in every quality, with the first row of the map at the north. The example `examples/terrain_layers.lunaris.json` (painted valley, lake, river, floating crates, trees)
+is in the list of scenes the classic test compares: mean error 0.25 of 255, fewer than 0.005% of pixels off by more than 40. `examples/terrain_layers/shot.png` is its `high` picture at 1280 x 720.
+
+## Water that follows a picture: `WaterBody`
+
+`WaterBody` (`docs/TERRAIN.md`, "Water bodies") draws the surface a 16-bit picture of water heights describes: rivers at their own slopes, lakes at their own levels, only where the picture has water. It is the `Water` sheet's material and waves on another mesh (the cells that have water, built once and kept):
+the same see-through, sky-reflecting, sun-glinting surface in the high qualities (the ripples tilt the surface's own normal, so a river leans downstream), flat and solid in `classic` and in the reference renderer. A test (`a_water_body_follows_its_picture_in_both_renderers`) draws two lakes at different levels with both renderers (mean error 0.04 of 255), checks the id
+pictures agree on where the water is and that the high quality shows both blue, steady between pictures and moving with the clock `phase`.
+
 ## Picture effects: `PostFx`
 
 Beside the `Environment`, one `PostFx` entity adds effects to the high qualities (the reference renderer and `classic` ignore it): `shafts` (0 to 2) rays of light fanning out from the sun through whatever stands in front of it (it needs a directional

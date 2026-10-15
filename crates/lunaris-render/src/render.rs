@@ -7,6 +7,7 @@
 use crate::frame::Frame;
 use crate::math::*;
 use crate::mesh::{builtin, Mesh};
+use crate::terrain_layers::SplatLayers;
 use crate::texture::{Texture, TextureCache};
 use lunaris_ecs::{EcsError, Result, World};
 use lunaris_sim::components::{Water, AnimLayers, Animator, Camera, DrawLayer, Environment, Joint, Light, Localization, MeshRenderer, Sprite, Terrain, CameraView, Decal, Ik, Parallax, Particles, Text, TextFont, Tilemap, Transform, Ui, UiAnchor, UiEdge, UiStyle};
@@ -128,7 +129,7 @@ pub struct LightData {
 }
 
 enum Shade<'a> {
-    Lit { color: V3, shininess: u32, emissive: f32, tex: Option<&'a Texture>, vcol: bool, uv_scale: [f32; 2] },
+    Lit { color: V3, shininess: u32, emissive: f32, tex: Option<&'a Texture>, vcol: bool, uv_scale: [f32; 2], splat: Option<&'a SplatLayers> },
     /// `uv` is the part of the texture to show: (u0, v0, du, dv), v counted from the bottom.
     Sprite { color: [f32; 4], tex: Option<&'a Texture>, uv: [f32; 4] },
     /// A particle cloud: colour from the vertices, opacity from the vertex texture weight, the picture (bilinear) on top.
@@ -249,12 +250,17 @@ fn raster_triangle(t: &mut Target<'_>, v: [Vtx; 3], shade: &Shade, lights: &[Lig
             let (q0, q1, q2) = ((p0 * norm) as f32, (p1 * norm) as f32, (p2 * norm) as f32);
             let (va, vb, vc) = (&v[i0], &v[i1], &v[i2]);
             match shade {
-                Shade::Lit { color, shininess, emissive, tex, vcol, uv_scale } => {
+                Shade::Lit { color, shininess, emissive, tex, vcol, uv_scale, splat } => {
                     let world = [q0 * va.world[0] + q1 * vb.world[0] + q2 * vc.world[0], q0 * va.world[1] + q1 * vb.world[1] + q2 * vc.world[1], q0 * va.world[2] + q1 * vb.world[2] + q2 * vc.world[2]];
                     let n = normalize([q0 * va.nrm[0] + q1 * vb.nrm[0] + q2 * vc.nrm[0], q0 * va.nrm[1] + q1 * vb.nrm[1] + q2 * vc.nrm[1], q0 * va.nrm[2] + q1 * vb.nrm[2] + q2 * vc.nrm[2]]);
                     // vertex colours only for imported models: multiplying by an interpolated white would change the last bit of every pixel
                     let mut base = if *vcol { [color[0] * (q0 * va.col[0] + q1 * vb.col[0] + q2 * vc.col[0]), color[1] * (q0 * va.col[1] + q1 * vb.col[1] + q2 * vc.col[1]), color[2] * (q0 * va.col[2] + q1 * vb.col[2] + q2 * vc.col[2])] } else { *color };
-                    if let Some(tx) = tex {
+                    if let Some(sp) = splat {
+                        // painted terrain: the layers' textures weighted by the splat map at this place of the ground (`uv` runs over the whole ground)
+                        let uv = [q0 * va.uv[0] + q1 * vb.uv[0] + q2 * vc.uv[0], q0 * va.uv[1] + q1 * vb.uv[1] + q2 * vc.uv[1]];
+                        let c = sp.colour(uv[0], uv[1]);
+                        base = [base[0] * c[0], base[1] * c[1], base[2] * c[2]];
+                    } else if let Some(tx) = tex {
                         let w = q0 * va.tw + q1 * vb.tw + q2 * vc.tw;
                         if w > 0.001 {
                             let uv = [q0 * va.uv[0] + q1 * vb.uv[0] + q2 * vc.uv[0], q0 * va.uv[1] + q1 * vb.uv[1] + q2 * vc.uv[1]];
@@ -558,7 +564,7 @@ struct Draw<'a> {
 }
 
 enum DrawKind<'a> {
-    Mesh { mesh: &'a Mesh, model: M4, color: V3, shininess: u32, emissive: f32, tex: Option<&'a Texture>, uv_scale: [f32; 2] },
+    Mesh { mesh: &'a Mesh, model: M4, color: V3, shininess: u32, emissive: f32, tex: Option<&'a Texture>, uv_scale: [f32; 2], splat: Option<&'a SplatLayers> },
     Sprite { mesh: &'a Mesh, model: M4, color: [f32; 4], tex: Option<&'a Texture>, uv: [f32; 4] },
     Particles { mesh: &'a Mesh, tex: Option<&'a Texture>, additive: bool },
     Text { text: String, tx: Text, clip: Option<[f32; 4]> },
@@ -611,8 +617,8 @@ fn draw_band(t: &mut Target<'_>, draws: &[Draw<'_>], view_proj: &M4, lights: &[L
             }
         }
         match &d.kind {
-            DrawKind::Mesh { mesh, model, color, shininess, emissive, tex, uv_scale } => {
-                let shade = Shade::Lit { color: *color, shininess: *shininess, emissive: *emissive, tex: tex.or(mesh.tex.as_deref()), vcol: !mesh.col.is_empty(), uv_scale: *uv_scale };
+            DrawKind::Mesh { mesh, model, color, shininess, emissive, tex, uv_scale, splat } => {
+                let shade = Shade::Lit { color: *color, shininess: *shininess, emissive: *emissive, tex: tex.or(mesh.tex.as_deref()), vcol: !mesh.col.is_empty(), uv_scale: *uv_scale, splat: *splat };
                 draw_mesh(t, mesh, model, view_proj, &shade, lights, eye, d.uid, true);
             }
             DrawKind::Sprite { mesh, model, color, tex, uv } => {
@@ -678,6 +684,8 @@ pub struct SceneMesh {
     /// A base colour texture chosen on the component (it replaces the model's own), repeated `uv_scale` times.
     pub tex: Option<Arc<Texture>>,
     pub uv_scale: [f32; 2],
+    /// A painted terrain (`TerrainLayers`): the splat map and its layers replace `tex`. Both renderers blend them per pixel; `None` for everything else.
+    pub splat: Option<Arc<SplatLayers>>,
 }
 
 /// A sprite or a tile map: a flat textured mesh, alpha blended, drawn after the 3D meshes, far to near.
@@ -965,6 +973,15 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     let mut terrains_raw: Vec<(u64, Terrain, Transform)> = Vec::new();
     world.for_each_uid::<(&Terrain, &Transform), _>(|_, uid, (g, t)| terrains_raw.push((uid, *g, *t)))?;
     terrains_raw.sort_by_key(|c| c.0);
+    let mut water_bodies_raw: Vec<(u64, lunaris_sim::components::WaterBody, Transform)> = Vec::new();
+    world.for_each_uid::<(&lunaris_sim::components::WaterBody, &Transform), _>(|_, uid, (w, t)| water_bodies_raw.push((uid, *w, *t)))?;
+    water_bodies_raw.sort_by_key(|c| c.0);
+    let mut terrain_layers_raw: std::collections::BTreeMap<u64, lunaris_sim::components::TerrainLayers> = std::collections::BTreeMap::new();
+    if !terrains_raw.is_empty() {
+        world.for_each_uid::<(&lunaris_sim::components::TerrainLayers,), _>(|_, uid, (l,)| {
+            terrain_layers_raw.insert(uid, *l);
+        })?;
+    }
 
     let mut tilemaps_raw: Vec<(u64, Tilemap, Transform)> = Vec::new();
     world.for_each_uid::<(&Tilemap, &Transform), _>(|_, uid, (m, t)| tilemaps_raw.push((uid, *m, *t)))?;
@@ -1352,6 +1369,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             bump: if m.bump.is_finite() { m.bump.clamp(0.0, 1.0) } else { 0.0 },
             tex,
             uv_scale,
+            splat: None,
         });
     }
     // water: a flat grid scaled to the sheet, see-through, with the wave numbers for the GPU renderer
@@ -1381,6 +1399,37 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             bump: 0.0,
             tex: None,
             uv_scale: [1.0, 1.0],
+            splat: None,
+        });
+    }
+    // water that follows a heightmap: the surface of the picture, see-through and rolling with waves in the GPU renderer's high qualities like a `Water` sheet
+    for (uid, w, tr) in &water_bodies_raw {
+        if !w.visible {
+            continue;
+        }
+        let name = world.strings().get(w.heightmap.0).to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let Some(mesh) = textures.water_mesh(&name, w) else { continue };
+        let c = display_to_linear(w.color);
+        scene_meshes.push(SceneMesh {
+            water: if w.wave_height > 0.0 && w.wave_height.is_finite() { Some([w.wave_height.min(10.0), w.wave_length.max(0.2), w.phase]) } else { None },
+            sway: None,
+            uid: *uid,
+            mesh: MeshRef::Shared(mesh),
+            model: M4::from_trs(tr.pos, [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0]),
+            color: [c[0], c[1], c[2]],
+            shininess: 90,
+            emissive: 0.0,
+            metallic: 0.0,
+            roughness: 0.04,
+            cast_shadow: false,
+            alpha: if w.color[3].is_finite() { w.color[3].clamp(0.0, 1.0) } else { 0.8 },
+            bump: 0.0,
+            tex: None,
+            uv_scale: [1.0, 1.0],
+            splat: None,
         });
     }
     // terrain: the mesh of each heightmap, drawn like any model (the ground lies flat: the entity's rotation and scale are not used)
@@ -1394,8 +1443,13 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         }
         let Some(mesh) = textures.terrain_mesh(&name, g) else { continue };
         let c = display_to_linear(g.color);
+        // painted with layers (`TerrainLayers`): the splat map and the layers' textures take the place of the terrain's own texture, and the ground is drawn opaque
+        let splat = terrain_layers_raw.get(uid).and_then(|l| {
+            let (map, text) = (world.strings().get(l.splat.0).to_string(), world.strings().get(l.layers.0).to_string());
+            crate::terrain_layers::gather(textures, *uid, g.uv_scale, &map, &text, &mut warnings)
+        });
         let tex_name = world.strings().get(g.texture.0).to_string();
-        let tex = if tex_name.is_empty() { None } else { Some(textures.get(&tex_name)) };
+        let tex = if tex_name.is_empty() || splat.is_some() { None } else { Some(textures.get(&tex_name)) };
         scene_meshes.push(SceneMesh {
             water: None,
             sway: None,
@@ -1408,10 +1462,11 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             metallic: 0.0,
             roughness: 0.92,
             cast_shadow: true,
-            alpha: if g.color[3].is_finite() { g.color[3].clamp(0.0, 1.0) } else { 1.0 },
+            alpha: if splat.is_none() && g.color[3].is_finite() { g.color[3].clamp(0.0, 1.0) } else { 1.0 },
             bump: 0.0,
             tex,
             uv_scale: if g.uv_scale[0].is_finite() && g.uv_scale[1].is_finite() { g.uv_scale } else { [1.0, 1.0] },
+            splat,
         });
     }
     for (uid, j, from) in &cords {
@@ -1442,6 +1497,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             bump: 0.0,
             tex: None,
             uv_scale: [1.0, 1.0],
+            splat: None,
         });
     }
     let mut scene_layers: Vec<SceneLayer> = Vec::with_capacity(layers.len());
@@ -1582,7 +1638,7 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
     for m in &scene.meshes {
         let mesh = m.mesh.get();
         let rows = screen_rows(mesh, &mvp_of(&m.model), rh);
-        draws.push(Draw { uid: m.uid, rows, kind: DrawKind::Mesh { mesh, model: m.model, color: m.color, shininess: m.shininess, emissive: m.emissive, tex: m.tex.as_deref(), uv_scale: m.uv_scale } });
+        draws.push(Draw { uid: m.uid, rows, kind: DrawKind::Mesh { mesh, model: m.model, color: m.color, shininess: m.shininess, emissive: m.emissive, tex: m.tex.as_deref(), uv_scale: m.uv_scale, splat: m.splat.as_deref() } });
     }
     fn cloud<'a>(p: &'a SceneParticles, view_proj: &M4, rh: usize) -> Draw<'a> {
         let mesh = p.mesh.get();

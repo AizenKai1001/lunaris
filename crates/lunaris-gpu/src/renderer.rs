@@ -7,6 +7,7 @@ use lunaris_ecs::World;
 use lunaris_render::math::{length, sub, V3};
 use lunaris_render::mesh::Mesh;
 use lunaris_render::render::{gather_scene, MeshRef, RenderOptions, Scene, SceneParticles};
+use lunaris_render::terrain_layers::{Splat, SplatLayers};
 use lunaris_render::Frame;
 use lunaris_render::texture::Texture;
 use lunaris_render::{font, TextureCache};
@@ -91,6 +92,17 @@ struct ObjectData {
     ids: [u32; 4],
 }
 
+/// What the shader of a painted terrain (`TerrainLayers`) needs besides its textures: each layer's repeat, relief depth and tint. Matches `SplatU` in `scene.wgsl`.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct SplatU {
+    scales: [[f32; 4]; 2],
+    bump: [f32; 4],
+    tint: [[f32; 4]; 4],
+    /// x: how many layers, y: 1 when any layer has relief to show
+    info: [f32; 4],
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct PointShadowU {
@@ -158,6 +170,13 @@ struct GpuTex {
     view: wgpu::TextureView,
     height: Option<wgpu::TextureView>,
     _keep: Option<Arc<Texture>>,
+    last_used: u64,
+}
+
+/// A splat map on the card: weights in an 8-bit texture (not a colour: no sRGB, no mips).
+struct GpuSplat {
+    view: wgpu::TextureView,
+    _keep: Arc<Splat>,
     last_used: u64,
 }
 
@@ -233,12 +252,15 @@ struct SurfaceState {
 }
 
 /// One run of identical draws: instances `first .. first + count` of the object list.
+#[derive(Clone)]
 struct Batch {
     mesh: MeshId,
     tex: (usize, bool, SamplerKind),
     first: u32,
     count: u32,
     cast: bool,
+    /// A painted terrain: the index of its bind group (splat map and layers) among the picture's `splat_bgs`.
+    splat: Option<usize>,
 }
 
 /// Where a picture goes.
@@ -257,6 +279,7 @@ pub struct GpuRenderer {
     tile_meshes: HashMap<u64, GpuMesh>,
     dyn_meshes: HashMap<u64, GpuMesh>,
     textures: HashMap<(usize, bool), GpuTex>,
+    splat_textures: HashMap<usize, GpuSplat>,
     tex_bgs: HashMap<(usize, bool, SamplerKind), wgpu::BindGroup>,
     /// Bind groups of interface pictures: (texture address, filtered), the texture in its display-colour form.
     ui_bgs: HashMap<(usize, bool), wgpu::BindGroup>,
@@ -402,6 +425,7 @@ impl GpuRenderer {
             tile_meshes: HashMap::new(),
             dyn_meshes: HashMap::new(),
             textures: HashMap::new(),
+            splat_textures: HashMap::new(),
             tex_bgs: HashMap::new(),
             ui_bgs: HashMap::new(),
             white,
@@ -566,7 +590,7 @@ impl GpuRenderer {
             uvrect: [0.0, 0.0, 1.0, 1.0],
             ids: [0, 0, 0, 0],
         };
-        let batch = Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false };
+        let batch = Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false, splat: None };
         objects.push(data);
         batch
     }
@@ -634,6 +658,91 @@ impl GpuRenderer {
         self.textures.insert(key, GpuTex { view, height, _keep: Some(tex.clone()), last_used: frame });
     }
 
+    /// Upload a splat map (once; it is kept while it is used): its four weights per texel as a plain 8-bit RGBA texture. A map bigger than the card's largest texture is
+    /// thinned out (every other texel, or every third...) to fit.
+    fn ensure_splat_texture(&mut self, s: &Arc<Splat>, frame: u64) -> usize {
+        let key = Arc::as_ptr(s) as usize;
+        if let Some(g) = self.splat_textures.get_mut(&key) {
+            g.last_used = frame;
+            return key;
+        }
+        let limit = self.gpu.device.limits().max_texture_dimension_2d.max(256) as usize;
+        let step = s.cols.max(s.rows).div_ceil(limit).max(1);
+        let (w, h) = (s.cols.div_ceil(step), s.rows.div_ceil(step));
+        let mut bytes = Vec::with_capacity(w * h * 4);
+        for y in 0..h {
+            for x in 0..w {
+                bytes.extend_from_slice(&s.texels[(y * step).min(s.rows - 1) * s.cols + (x * step).min(s.cols - 1)]);
+            }
+        }
+        let t = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("splat-map"),
+            size: wgpu::Extent3d { width: w as u32, height: h as u32, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        self.gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &bytes, wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w as u32 * 4), rows_per_image: Some(h as u32) }, wgpu::Extent3d { width: w as u32, height: h as u32, depth_or_array_layers: 1 });
+        let view = t.create_view(&wgpu::TextureViewDescriptor::default());
+        self.splat_textures.insert(key, GpuSplat { view, _keep: s.clone(), last_used: frame });
+        key
+    }
+
+    /// The bind group of one painted terrain (`TerrainLayers`): the splat map, up to four layer textures with their relief maps, and the numbers of `SplatU`. Made for
+    /// this picture and pushed on `bgs`; the index comes back.
+    fn splat_group(&mut self, sp: &SplatLayers, high: bool, frame: u64, bgs: &mut Vec<wgpu::BindGroup>) -> usize {
+        let skey = self.ensure_splat_texture(&sp.splat, frame);
+        let mut keys: [Option<(usize, bool)>; 4] = [None; 4];
+        let mut u: SplatU = Zeroable::zeroed();
+        u.tint = [[1.0; 4]; 4];
+        for (i, l) in sp.layers.iter().take(4).enumerate() {
+            self.ensure_texture(&l.tex, high, frame);
+            keys[i] = Some((Arc::as_ptr(&l.tex) as usize, high));
+            u.scales[i / 2][(i % 2) * 2] = l.uv_scale[0];
+            u.scales[i / 2][(i % 2) * 2 + 1] = l.uv_scale[1];
+            // only a built-in material has a relief to show
+            u.bump[i] = if l.tex.heights.is_some() { l.bump } else { 0.0 };
+            let t = if high { display_to_linear(gamma2_to_display(l.tint)) } else { l.tint };
+            u.tint[i] = [t[0], t[1], t[2], 0.0];
+        }
+        u.info = [sp.layers.len().min(4) as f32, if u.bump.iter().any(|b| *b > 0.0) { 1.0 } else { 0.0 }, 0.0, 0.0];
+        let buf = self.gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some("splat-uniform"), size: std::mem::size_of::<SplatU>() as u64, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        self.gpu.queue.write_buffer(&buf, 0, bytemuck::bytes_of(&u));
+        let colour = |i: usize| match keys[i] {
+            Some(k) => &self.textures[&k].view,
+            None => &self.white[high as usize],
+        };
+        let relief = |i: usize| match keys[i] {
+            Some(k) => self.textures[&k].height.as_ref().unwrap_or(&self.white_height),
+            None => &self.white_height,
+        };
+        let layer_sampler = if high { &self.samplers.aniso } else { &self.samplers.nearest_repeat };
+        let tv = wgpu::BindingResource::TextureView;
+        let bg = self.group(
+            "splat",
+            &self.layouts.splat2,
+            &[
+                wgpu::BindGroupEntry { binding: 0, resource: buf.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: tv(&self.splat_textures[&skey].view) },
+                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) },
+                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(layer_sampler) },
+                wgpu::BindGroupEntry { binding: 4, resource: tv(colour(0)) },
+                wgpu::BindGroupEntry { binding: 5, resource: tv(colour(1)) },
+                wgpu::BindGroupEntry { binding: 6, resource: tv(colour(2)) },
+                wgpu::BindGroupEntry { binding: 7, resource: tv(colour(3)) },
+                wgpu::BindGroupEntry { binding: 8, resource: tv(relief(0)) },
+                wgpu::BindGroupEntry { binding: 9, resource: tv(relief(1)) },
+                wgpu::BindGroupEntry { binding: 10, resource: tv(relief(2)) },
+                wgpu::BindGroupEntry { binding: 11, resource: tv(relief(3)) },
+            ],
+        );
+        bgs.push(bg);
+        bgs.len() - 1
+    }
+
     /// The bind group (texture + sampler) for drawing with `tex` (None = plain white).
     fn texture_group(&mut self, tex: Option<&Arc<Texture>>, high: bool, kind: SamplerKind, frame: u64) -> (usize, bool, SamplerKind) {
         let ptr = match tex {
@@ -669,6 +778,7 @@ impl GpuRenderer {
         self.meshes.retain(|_, g| !dead(g.last_used));
         self.tile_meshes.retain(|_, g| !dead(g.last_used));
         self.dyn_meshes.retain(|_, g| !dead(g.last_used));
+        self.splat_textures.retain(|_, g| !dead(g.last_used));
         let gone: Vec<(usize, bool)> = self.textures.iter().filter(|(_, t)| dead(t.last_used)).map(|(k, _)| *k).collect();
         for k in gone {
             self.textures.remove(&k);
@@ -857,7 +967,10 @@ impl GpuRenderer {
             depth: f32,
             data: ObjectData,
             sphere: (V3, f32),
+            /// A painted terrain's bind group (see `Batch::splat`).
+            splat: Option<usize>,
         }
+        let mut splat_bgs: Vec<wgpu::BindGroup> = Vec::new();
         let mut items: Vec<MeshItem> = Vec::with_capacity(scene.meshes.len());
         let mut slots: Vec<u64> = Vec::with_capacity(scene.meshes.len() + scene.layers.len());
         for m in &scene.meshes {
@@ -868,6 +981,7 @@ impl GpuRenderer {
                 (g.use_vcol, g.texture.clone(), g.center, g.radius)
             };
             let tex = m.tex.clone().or(model_tex);
+            let splat = m.splat.as_ref().map(|sp| self.splat_group(sp, high, frame_no, &mut splat_bgs));
             let tkey = self.texture_group(tex.as_ref(), high, if high { SamplerKind::Aniso } else { SamplerKind::NearestRepeat }, frame_no);
             let color = if high { display_to_linear(gamma2_to_display(m.color)) } else { m.color };
             let nm = m.model.normal_matrix();
@@ -892,19 +1006,19 @@ impl GpuRenderer {
             };
             let see_through = high && m.alpha < 0.999;
             let depth = -scene.view.transform_point(m.model.transform_point(center))[2];
-            items.push(MeshItem { id, tex: tkey, cast: m.cast_shadow && !see_through, glows: m.emissive > 0.0, clear: see_through, depth, data, sphere: (m.model.transform_point(center), radius * scale) });
+            items.push(MeshItem { id, tex: tkey, cast: m.cast_shadow && !see_through, glows: m.emissive > 0.0, clear: see_through, depth, data, sphere: (m.model.transform_point(center), radius * scale), splat });
         }
         let mut order: Vec<usize> = (0..items.len()).filter(|&i| !items[i].clear).collect();
-        order.sort_by_key(|&i| (items[i].id, items[i].tex.0, items[i].tex.2 as u8, items[i].cast));
+        order.sort_by_key(|&i| (items[i].id, items[i].tex.0, items[i].tex.2 as u8, items[i].cast, items[i].splat));
         let mut objects: Vec<ObjectData> = Vec::with_capacity(items.len() + scene.layers.len());
         let mut mesh_batches: Vec<Batch> = Vec::new();
         for &i in &order {
             let it = &items[i];
-            let same = mesh_batches.last().is_some_and(|b| b.mesh == it.id && b.tex == it.tex && b.cast == it.cast);
+            let same = mesh_batches.last().is_some_and(|b| b.mesh == it.id && b.tex == it.tex && b.cast == it.cast && b.splat == it.splat);
             if same {
                 mesh_batches.last_mut().expect("checked").count += 1;
             } else {
-                mesh_batches.push(Batch { mesh: it.id, tex: it.tex, first: objects.len() as u32, count: 1, cast: it.cast });
+                mesh_batches.push(Batch { mesh: it.id, tex: it.tex, first: objects.len() as u32, count: 1, cast: it.cast, splat: it.splat });
             }
             objects.push(it.data);
         }
@@ -917,7 +1031,7 @@ impl GpuRenderer {
             if clear_batches.last().is_some_and(|b| b.mesh == it.id && b.tex == it.tex) {
                 clear_batches.last_mut().expect("checked").count += 1;
             } else {
-                clear_batches.push(Batch { mesh: it.id, tex: it.tex, first: objects.len() as u32, count: 1, cast: false });
+                clear_batches.push(Batch { mesh: it.id, tex: it.tex, first: objects.len() as u32, count: 1, cast: false, splat: None });
             }
             objects.push(it.data);
         }
@@ -950,7 +1064,7 @@ impl GpuRenderer {
             if same {
                 layer_steps.last_mut().expect("checked").1.count += 1;
             } else {
-                layer_steps.push((PipeId::Sprite, Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false }));
+                layer_steps.push((PipeId::Sprite, Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false, splat: None }));
             }
             objects.push(data);
         }
@@ -1000,7 +1114,7 @@ impl GpuRenderer {
                     if batches.last().is_some_and(|b| b.mesh == it.id) {
                         batches.last_mut().expect("checked").count += 1;
                     } else {
-                        batches.push(Batch { mesh: it.id, tex: it.tex, first: objects.len() as u32, count: 1, cast: true });
+                        batches.push(Batch { mesh: it.id, tex: it.tex, first: objects.len() as u32, count: 1, cast: true, splat: None });
                     }
                     objects.push(it.data);
                 }
@@ -1157,6 +1271,9 @@ impl GpuRenderer {
         }
         if have_clear {
             self.need(PipeId::MeshBlend, samples, None)?;
+        }
+        if !splat_bgs.is_empty() {
+            self.need(PipeId::MeshSplat, samples, None)?;
         }
         if high {
             self.need(PipeId::Sky, samples, None)?;
@@ -1353,7 +1470,18 @@ impl GpuRenderer {
                 pass.draw(0..3, 0..1);
             }
             pass.set_pipeline(self.pipe(PipeId::Mesh, samples, None));
-            draw_batches(&mut pass, &mesh_batches, false, true);
+            if splat_bgs.is_empty() {
+                draw_batches(&mut pass, &mesh_batches, false, true);
+            } else {
+                let plain: Vec<Batch> = mesh_batches.iter().filter(|b| b.splat.is_none()).cloned().collect();
+                draw_batches(&mut pass, &plain, false, true);
+                pass.set_pipeline(self.pipe(PipeId::MeshSplat, samples, None));
+                for b in mesh_batches.iter().filter(|b| b.splat.is_some()) {
+                    pass.set_bind_group(2, &splat_bgs[b.splat.expect("filtered")], &[]);
+                    draw_batches(&mut pass, std::slice::from_ref(b), false, true);
+                }
+                pass.set_pipeline(self.pipe(PipeId::Mesh, samples, None));
+            }
             if have_clear {
                 pass.set_pipeline(self.pipe(PipeId::MeshBlend, samples, None));
                 draw_batches(&mut pass, &clear_batches, false, true);

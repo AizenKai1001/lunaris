@@ -100,6 +100,10 @@ impl Engine {
         let yaw = flag(a, "yaw", true)?;
         let align = flag(a, "align", false)?;
         let per_copy = a.opt_u64("attempts")?.unwrap_or(30).clamp(1, 1000);
+        let layer_min = number(a, "layer_min", 0.5)?;
+        if !(0.0..=1.0).contains(&layer_min) {
+            return Err(EcsError::new("out_of_range", "`layer_min` must be between 0 and 1").at("layer_min"));
+        }
 
         // where: a terrain of the world
         self.sim.load_terrains();
@@ -117,6 +121,15 @@ impl Engine {
             EcsError::new("terrain_unreadable", format!("the heightmap `{name}` of entity {uid} could not be used: {why}")).hint("see `check`; `reload_terrain` reads it again")
         })?;
         let placed = Placed::new(&field, t.pos, &g);
+        // only where one layer of a painted terrain weighs enough: trees on the grass, rocks on the rock
+        let layer_filter = match a.0.get("layer").filter(|v| !matches!(v, Json::Null)) {
+            None => None,
+            Some(which) => {
+                let lookup = self.layer_lookup(uid)?;
+                let k = lookup.find(which)?;
+                Some((lookup, k))
+            }
+        };
         let half = [placed.size[0] * 0.5, placed.size[1] * 0.5];
         let mut area = [placed.centre[0] - half[0], placed.centre[1] - half[1], placed.centre[0] + half[0], placed.centre[1] + half[1]];
         if let Some(v) = a.0.get("area").filter(|v| !matches!(v, Json::Null)) {
@@ -146,6 +159,11 @@ impl Engine {
             let (x, z) = (rng.between(area[0], area[2]), rng.between(area[1], area[3]));
             let (spin, s) = (rng.unit(), rng.between(scale[0], scale[1]));
             let Some(h) = placed.surface(x, z) else { continue };
+            if let Some((lookup, k)) = &layer_filter {
+                if !lookup.weights(x, z).is_some_and(|w| w[*k] >= layer_min - 1.0e-6) {
+                    continue;
+                }
+            }
             let n = placed.normal(x, z);
             if h < height[0] || h > height[1] || n[1] > max_up + 1.0e-6 || n[1] < min_up - 1.0e-6 {
                 continue;
@@ -162,7 +180,8 @@ impl Engine {
             spots.push(([x, h - sink, z], rot, s));
         }
         if spots.is_empty() {
-            return Err(EcsError::new("no_room", format!("none of {attempts} tries found ground that suits: slope {}..{} degrees, height {:?}..{:?}", slope[0], slope[1], height[0], height[1])).hint("allow steeper ground (`slope`), a wider `height` range or a smaller `min_distance`"));
+            let on_layer = layer_filter.as_ref().map_or(String::new(), |(l, k)| format!(", on the layer `{}` (weight {layer_min} or more)", l.specs[*k].name));
+            return Err(EcsError::new("no_room", format!("none of {attempts} tries found ground that suits: slope {}..{} degrees, height {:?}..{:?}{on_layer}", slope[0], slope[1], height[0], height[1])).hint("allow steeper ground (`slope`), a wider `height` range, a lower `layer_min` or a smaller `min_distance`"));
         }
 
         // the commands

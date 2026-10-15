@@ -202,9 +202,14 @@ pub struct TextureCache {
     map: BTreeMap<String, Arc<Texture>>,
     models: BTreeMap<String, Option<Arc<crate::mesh::Mesh>>>,
     heights: BTreeMap<String, HeightEntry>,
+    /// The splat maps of painted terrains (`TerrainLayers`), read again when the file changes.
+    splats: BTreeMap<String, SplatEntry>,
+    splat_stamps: BTreeMap<String, Stamp>,
     languages: BTreeMap<String, Arc<BTreeMap<String, String>>>,
     water_grids: BTreeMap<usize, Arc<crate::mesh::Mesh>>,
     terrain_meshes: Vec<(TerrainKey, Arc<crate::mesh::Mesh>)>,
+    /// The surfaces of water bodies (`None`: a picture with no water in it).
+    water_meshes: Vec<(WaterKey, Option<Arc<crate::mesh::Mesh>>)>,
     calls: u64,
     /// The TrueType fonts of the workspace and the letters drawn from them.
     pub fonts: crate::fonts::FontCache,
@@ -251,13 +256,22 @@ struct HeightEntry {
     failed_at: u64,
 }
 
+/// A splat map that was read (or could not be: it is tried again after a while).
+struct SplatEntry {
+    splat: Option<Arc<crate::terrain_layers::Splat>>,
+    failed_at: u64,
+}
+
 /// What a terrain mesh depends on: the heightmap, the step, the size and the relief.
 type TerrainKey = (String, u32, u32, u32, u32);
+
+/// What a water body's mesh depends on: the picture, the step, the size and the relief.
+type WaterKey = (String, u32, u32, u32, u32);
 
 impl TextureCache {
     pub fn new(root: Option<PathBuf>) -> TextureCache {
         let fonts = crate::fonts::FontCache::new(root.clone());
-        TextureCache { fonts, nested: false, view_ticks: BTreeMap::new(), reload_interval: Duration::from_millis(500), texture_stamps: BTreeMap::new(), model_stamps: BTreeMap::new(), collision: BTreeMap::new(), collision_stamps: BTreeMap::new(), hulls: BTreeMap::new(), shared_collision: None, root, map: BTreeMap::new(), models: BTreeMap::new(), heights: BTreeMap::new(), languages: BTreeMap::new(), water_grids: BTreeMap::new(), terrain_meshes: Vec::new(), calls: 0, warnings: Vec::new() }
+        TextureCache { fonts, nested: false, view_ticks: BTreeMap::new(), reload_interval: Duration::from_millis(500), texture_stamps: BTreeMap::new(), model_stamps: BTreeMap::new(), collision: BTreeMap::new(), collision_stamps: BTreeMap::new(), hulls: BTreeMap::new(), shared_collision: None, root, map: BTreeMap::new(), models: BTreeMap::new(), heights: BTreeMap::new(), splats: BTreeMap::new(), splat_stamps: BTreeMap::new(), languages: BTreeMap::new(), water_grids: BTreeMap::new(), terrain_meshes: Vec::new(), water_meshes: Vec::new(), calls: 0, warnings: Vec::new() }
     }
 
     /// A heightmap of the workspace (a greyscale PNG), read once. `None` (with a warning, and another try after a while) when it cannot be read.
@@ -286,6 +300,36 @@ impl TextureCache {
         field
     }
 
+    /// The splat map of a painted terrain (`TerrainLayers.splat`, an RGBA PNG of the workspace), read once and again when the file changes. `None` (with a warning, and another
+    /// try after a while) when it cannot be read; a map that was fine and cannot be read now (it is being written) keeps the old copy.
+    pub fn splat(&mut self, name: &str) -> Option<Arc<crate::terrain_layers::Splat>> {
+        self.calls += 1;
+        if let Some(e) = self.splats.get(name) {
+            let unchanged = !changed(&mut self.splat_stamps, &self.root, self.reload_interval, name);
+            if unchanged && (e.splat.is_some() || self.calls.saturating_sub(e.failed_at) < 120) {
+                return e.splat.clone();
+            }
+        }
+        let before = self.splats.get(name).and_then(|e| e.splat.clone());
+        let loaded = match &self.root {
+            Some(root) => crate::terrain_layers::Splat::read(root, name),
+            None => Err("no workspace folder to read splat maps from".to_string()),
+        };
+        let splat = match loaded {
+            Ok(m) => Some(Arc::new(m)),
+            Err(e) => {
+                let msg = if before.is_some() { format!("splat map {name}: it changed on disk but cannot be read now ({e}); the old map stays") } else { format!("splat map {name}: {e}") };
+                if !self.warnings.contains(&msg) {
+                    self.warnings.push(msg);
+                }
+                before
+            }
+        };
+        self.splat_stamps.entry(name.to_string()).and_modify(|s| s.looked = Instant::now()).or_insert_with(|| Stamp { modified: modified_time(&self.root, name), looked: Instant::now() });
+        self.splats.insert(name.to_string(), SplatEntry { splat: splat.clone(), failed_at: self.calls });
+        splat
+    }
+
     /// The mesh of a terrain (kept for the next picture; the few most recent sizes are remembered).
     pub fn terrain_mesh(&mut self, name: &str, g: &lunaris_sim::components::Terrain) -> Option<Arc<crate::mesh::Mesh>> {
         let field = self.heightfield(name)?;
@@ -299,6 +343,22 @@ impl TextureCache {
             self.terrain_meshes.remove(0);
         }
         Some(mesh)
+    }
+
+    /// The surface of a water body (kept for the next picture; the few most recent are remembered): the picture `name` read as the heights of the water, with the size, step and relief of
+    /// `w`. `None` when the picture cannot be read (a warning says why) or has no water in it.
+    pub fn water_mesh(&mut self, name: &str, w: &lunaris_sim::components::WaterBody) -> Option<Arc<crate::mesh::Mesh>> {
+        let field = self.heightfield(name)?;
+        let key: WaterKey = (name.to_string(), w.step, w.size[0].to_bits(), w.size[1].to_bits(), w.relief.to_bits());
+        if let Some((_, m)) = self.water_meshes.iter().find(|(k, _)| *k == key) {
+            return m.clone();
+        }
+        let mesh = crate::water_body::build_mesh(&field, w).map(Arc::new);
+        self.water_meshes.push((key, mesh.clone()));
+        if self.water_meshes.len() > 6 {
+            self.water_meshes.remove(0);
+        }
+        mesh
     }
 
     /// The texts of a language (`lang/<language>.json` of the workspace), read once: `{"hello": "Hello", "menu": {"play": "Play"}}` gives the keys
@@ -361,6 +421,9 @@ impl TextureCache {
     /// Read every heightmap again when it is next needed (after the files changed).
     pub fn forget_heightmaps(&mut self) {
         self.heights.clear();
+        self.water_meshes.clear();
+        self.splats.clear();
+        self.splat_stamps.clear();
         self.terrain_meshes.clear();
     }
 

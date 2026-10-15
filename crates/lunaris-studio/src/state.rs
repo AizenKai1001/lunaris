@@ -174,7 +174,7 @@ pub enum BottomTab {
 
 const READ_ONLY: &[&str] = &[
     "describe", "schema", "get", "query", "hash", "revision", "snapshots", "events", "resources", "systems", "get_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project", "files", "model_info",
-    "prefabs", "path", "acoustics", "compile_script", "get_script", "terrain_height", "saves",
+    "prefabs", "path", "acoustics", "compile_script", "get_script", "terrain_height", "terrain_layer", "water_depth", "saves",
 ];
 
 /// Calls that change the play session, not the scene: they never make the scene "modified".

@@ -152,6 +152,26 @@ pub fn tool_defs() -> Vec<ToolDef> {
             &["x", "z"],
         ),
         tool(
+            "terrain_layer",
+            "Which materials are under a point of a painted terrain (one with `TerrainLayers`, docs/TERRAIN.md \"Layers\"): the `weights` of its layers there (they add up to 1), each layer's name and weight, and the `dominant` one. Use it to pick a footstep sound, a decal or a spawn by the ground the hero stands on. Errors: `no_terrain` outside every terrain, `no_layers` when the terrain has none, `splat_unreadable`, `bad_layers`.",
+            vec![
+                ("x", Json::obj([("type", Json::str("number")), ("description", Json::str("World x."))])),
+                ("z", Json::obj([("type", Json::str("number")), ("description", Json::str("World z."))])),
+                ("terrain", int("uid of the Terrain entity to ask (default: the highest painted terrain under the point).")),
+            ],
+            &["x", "z"],
+        ),
+        tool(
+            "water_depth",
+            "How deep the water is at a point of the world's water bodies (`WaterBody`, docs/TERRAIN.md \"Water bodies\"): `wet` (is there water over the ground here), the height of its `surface`, the `ground` under it (the highest solid Terrain, null without one), the `depth` of the water over the ground and the `water` entity; with `y` also `above`, how far the surface is above that height (what `InWater.depth` is for feet at `y`). Dry land answers `wet: false`. Error `no_water` when the world has no WaterBody; `unread` lists water pictures that could not be read.",
+            vec![
+                ("x", Json::obj([("type", Json::str("number")), ("description", Json::str("World x."))])),
+                ("z", Json::obj([("type", Json::str("number")), ("description", Json::str("World z."))])),
+                ("y", Json::obj([("type", Json::str("number")), ("description", Json::str("A height to measure the surface against (feet, a boat's keel)."))])),
+            ],
+            &["x", "z"],
+        ),
+        tool(
             "scatter",
             "Put many copies of something on a terrain in one undoable step: trees, rocks, tufts of grass. Give either `prefab` (a prefab name) or `components` (what each copy has; its Transform scale is multiplied by the random scale). Copies go where the ground suits: slope within `slope` degrees, height within `height`, at least `min_distance` apart, inside `area`; the same `seed` gives the same forest. Returns how many fit (`placed`) and a `note` when fewer than `count` did. See docs/TERRAIN.md.",
             vec![
@@ -169,6 +189,8 @@ pub fn tool_defs() -> Vec<ToolDef> {
                 ("align", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Tilt each copy to the slope of the ground (default false: upright)."))])),
                 ("sink", Json::obj([("type", Json::str("number")), ("description", Json::str("Metres to bury each copy below the surface (default 0)."))])),
                 ("attempts", int("Tries per copy before giving up (default 30).")),
+                ("layer", Json::obj([("type", Json::arr([Json::str("string"), Json::str("integer")])), ("description", Json::str("Only on ground where this layer of the terrain's `TerrainLayers` (its name, or its number from 0) weighs at least `layer_min`: trees on the grass, rocks on the rock."))])),
+                ("layer_min", Json::obj([("type", Json::str("number")), ("description", Json::str("The least weight of `layer`, 0 to 1 (default 0.5: where it is the main material)."))])),
             ],
             &["count"],
         ),

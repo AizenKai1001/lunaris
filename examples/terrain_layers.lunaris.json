@@ -1,0 +1,11123 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.17,
+      0.4,
+      0.82
+     ],
+     "sky_horizon": [
+      0.86,
+      0.9,
+      0.96
+     ],
+     "ground": [
+      0.3,
+      0.32,
+      0.26
+     ],
+     "clouds": 0.42,
+     "fog": 0.0018,
+     "fog_color": [
+      0.78,
+      0.86,
+      0.95
+     ],
+     "bloom": 0.2,
+     "ssao": 1.0,
+     "exposure": 1.05,
+     "vignette": 0.12
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.46,
+      0.34,
+      0.14,
+      0.81
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.94,
+      0.82
+     ],
+     "intensity": 2.5
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Valley"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ]
+    },
+    "Terrain": {
+     "heightmap": "examples/terrain_layers/ground.png",
+     "size": [
+      256.0,
+      256.0
+     ],
+     "height": 60.0,
+     "step": 1,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "friction": 0.9
+    },
+    "TerrainLayers": {
+     "splat": "examples/terrain_layers/splat.png",
+     "layers": "grass grass uv_scale=52 bump=0.05\nrock concrete uv_scale=38 tint=0.66,0.6,0.55\nsand sand uv_scale=60\nsnow examples/terrain_layers/snow.png uv_scale=45"
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Water"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ]
+    },
+    "WaterBody": {
+     "heightmap": "examples/terrain_layers/water.png",
+     "size": [
+      256.0,
+      256.0
+     ],
+     "relief": 60.0,
+     "color": [
+      0.05,
+      0.3,
+      0.42,
+      0.84
+     ],
+     "wave_height": 0.16,
+     "wave_length": 4.5,
+     "speed": 1.1
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Crate 1"
+    },
+    "Transform": {
+     "pos": [
+      -24.0,
+      6.5,
+      30.0
+     ]
+    },
+    "Velocity": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1.3,
+      1.3,
+      1.3
+     ]
+    },
+    "RigidBody": {
+     "mass": 1,
+     "restitution": 0.2,
+     "friction": 0.6
+    },
+    "Buoyant": {
+     "density": 450,
+     "drag": 4.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.8,
+      0.8,
+      0.8,
+      1
+     ],
+     "roughness": 0.45,
+     "texture": "wood",
+     "uv_scale": [
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Crate 2"
+    },
+    "Transform": {
+     "pos": [
+      -33.0,
+      6.5,
+      24.0
+     ]
+    },
+    "Velocity": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "RigidBody": {
+     "mass": 1,
+     "restitution": 0.2,
+     "friction": 0.6
+    },
+    "Buoyant": {
+     "density": 600,
+     "drag": 4.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.8,
+      0.8,
+      0.8,
+      1
+     ],
+     "roughness": 0.45,
+     "texture": "wood",
+     "uv_scale": [
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Crate 3"
+    },
+    "Transform": {
+     "pos": [
+      -38.0,
+      6.5,
+      33.0
+     ]
+    },
+    "Velocity": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1.6,
+      1.6,
+      1.6
+     ]
+    },
+    "RigidBody": {
+     "mass": 1,
+     "restitution": 0.2,
+     "friction": 0.6
+    },
+    "Buoyant": {
+     "density": 350,
+     "drag": 4.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.8,
+      0.8,
+      0.8,
+      1
+     ],
+     "roughness": 0.45,
+     "texture": "wood",
+     "uv_scale": [
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Buoy"
+    },
+    "Transform": {
+     "pos": [
+      -27.0,
+      6.5,
+      21.0
+     ]
+    },
+    "Velocity": {},
+    "Collider": {
+     "shape": 0,
+     "size": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    "RigidBody": {
+     "mass": 1,
+     "restitution": 0.2,
+     "friction": 0.6
+    },
+    "Buoyant": {
+     "density": 250,
+     "drag": 4.0
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.2,
+      0.15,
+      1
+     ],
+     "roughness": 0.45
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Pine 1 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -72.689,
+      10.386,
+      -13.081
+     ],
+     "scale": [
+      0.3877513220313532,
+      2.0680070508338835,
+      0.3877513220313532
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Pine 1 top"
+    },
+    "Transform": {
+     "pos": [
+      -72.689,
+      12.454,
+      -13.081
+     ],
+     "scale": [
+      1.9818400903824718,
+      3.1020105762508257,
+      1.9818400903824718
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Pine 2 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -65.835,
+      10.229,
+      -10.612
+     ],
+     "scale": [
+      0.36497527081594433,
+      1.9465347776850361,
+      0.36497527081594433
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Pine 2 top"
+    },
+    "Transform": {
+     "pos": [
+      -65.835,
+      12.176,
+      -10.612
+     ],
+     "scale": [
+      1.8654291619481596,
+      2.9198021665275546,
+      1.8654291619481596
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Pine 3 trunk"
+    },
+    "Transform": {
+     "pos": [
+      49.562,
+      9.18,
+      -18.585
+     ],
+     "scale": [
+      0.45358001748433024,
+      2.419093426583095,
+      0.45358001748433024
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Pine 3 top"
+    },
+    "Transform": {
+     "pos": [
+      49.562,
+      11.599,
+      -18.585
+     ],
+     "scale": [
+      2.318297867142132,
+      3.628640139874642,
+      2.318297867142132
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 15,
+   "components": {
+    "Name": {
+     "value": "Pine 4 trunk"
+    },
+    "Transform": {
+     "pos": [
+      2.982,
+      7.709,
+      55.273
+     ],
+     "scale": [
+      0.373969677947827,
+      1.9945049490550772,
+      0.373969677947827
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 16,
+   "components": {
+    "Name": {
+     "value": "Pine 4 top"
+    },
+    "Transform": {
+     "pos": [
+      2.982,
+      9.704,
+      55.273
+     ],
+     "scale": [
+      1.9114005761777821,
+      2.991757423582616,
+      1.9114005761777821
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 17,
+   "components": {
+    "Name": {
+     "value": "Pine 5 trunk"
+    },
+    "Transform": {
+     "pos": [
+      66.812,
+      10.468,
+      21.033
+     ],
+     "scale": [
+      0.507803877608489,
+      2.708287347245274,
+      0.507803877608489
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 18,
+   "components": {
+    "Name": {
+     "value": "Pine 5 top"
+    },
+    "Transform": {
+     "pos": [
+      66.812,
+      13.176,
+      21.033
+     ],
+     "scale": [
+      2.5954420411100543,
+      4.062431020867912,
+      2.5954420411100543
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 19,
+   "components": {
+    "Name": {
+     "value": "Pine 6 trunk"
+    },
+    "Transform": {
+     "pos": [
+      37.267,
+      8.655,
+      28.554
+     ],
+     "scale": [
+      0.46928659621458224,
+      2.502861846477772,
+      0.46928659621458224
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Pine 6 top"
+    },
+    "Transform": {
+     "pos": [
+      37.267,
+      11.158,
+      28.554
+     ],
+     "scale": [
+      2.3985759362078647,
+      3.754292769716658,
+      2.3985759362078647
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Pine 7 trunk"
+    },
+    "Transform": {
+     "pos": [
+      61.31,
+      13.341,
+      -30.991
+     ],
+     "scale": [
+      0.3656974770238336,
+      1.9503865441271124,
+      0.3656974770238336
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Pine 7 top"
+    },
+    "Transform": {
+     "pos": [
+      61.31,
+      15.292,
+      -30.991
+     ],
+     "scale": [
+      1.869120438121816,
+      2.9255798161906688,
+      1.869120438121816
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 23,
+   "components": {
+    "Name": {
+     "value": "Pine 8 trunk"
+    },
+    "Transform": {
+     "pos": [
+      17.003,
+      8.911,
+      37.886
+     ],
+     "scale": [
+      0.506134167805702,
+      2.699382228297077,
+      0.506134167805702
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 24,
+   "components": {
+    "Name": {
+     "value": "Pine 8 top"
+    },
+    "Transform": {
+     "pos": [
+      17.003,
+      11.611,
+      37.886
+     ],
+     "scale": [
+      2.5869079687846988,
+      4.049073342445616,
+      2.5869079687846988
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 25,
+   "components": {
+    "Name": {
+     "value": "Pine 9 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -75.865,
+      12.019,
+      -41.675
+     ],
+     "scale": [
+      0.45021161191216,
+      2.4011285968648535,
+      0.45021161191216
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 26,
+   "components": {
+    "Name": {
+     "value": "Pine 9 top"
+    },
+    "Transform": {
+     "pos": [
+      -75.865,
+      14.42,
+      -41.675
+     ],
+     "scale": [
+      2.3010815719954842,
+      3.60169289529728,
+      2.3010815719954842
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 27,
+   "components": {
+    "Name": {
+     "value": "Pine 10 trunk"
+    },
+    "Transform": {
+     "pos": [
+      17.186,
+      9.63,
+      75.677
+     ],
+     "scale": [
+      0.4329304229258852,
+      2.308962255604721,
+      0.4329304229258852
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 28,
+   "components": {
+    "Name": {
+     "value": "Pine 10 top"
+    },
+    "Transform": {
+     "pos": [
+      17.186,
+      11.939,
+      75.677
+     ],
+     "scale": [
+      2.212755494954524,
+      3.4634433834070815,
+      2.212755494954524
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 29,
+   "components": {
+    "Name": {
+     "value": "Pine 11 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -39.93,
+      9.6,
+      -30.762
+     ],
+     "scale": [
+      0.5304625416646849,
+      2.8291335555449857,
+      0.5304625416646849
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Pine 11 top"
+    },
+    "Transform": {
+     "pos": [
+      -39.93,
+      12.429,
+      -30.762
+     ],
+     "scale": [
+      2.7112529907306113,
+      4.243700333317479,
+      2.7112529907306113
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Pine 12 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -49.918,
+      13.199,
+      -46.07
+     ],
+     "scale": [
+      0.4647731299894176,
+      2.478790026610227,
+      0.4647731299894176
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 32,
+   "components": {
+    "Name": {
+     "value": "Pine 12 top"
+    },
+    "Transform": {
+     "pos": [
+      -49.918,
+      15.678,
+      -46.07
+     ],
+     "scale": [
+      2.375507108834801,
+      3.718185039915341,
+      2.375507108834801
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 33,
+   "components": {
+    "Name": {
+     "value": "Pine 13 trunk"
+    },
+    "Transform": {
+     "pos": [
+      65.509,
+      9.82,
+      11.562
+     ],
+     "scale": [
+      0.3771539524619486,
+      2.0114877464637257,
+      0.3771539524619486
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 34,
+   "components": {
+    "Name": {
+     "value": "Pine 13 top"
+    },
+    "Transform": {
+     "pos": [
+      65.509,
+      11.832,
+      11.562
+     ],
+     "scale": [
+      1.9276757570277372,
+      3.017231619695589,
+      1.9276757570277372
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 35,
+   "components": {
+    "Name": {
+     "value": "Pine 14 trunk"
+    },
+    "Transform": {
+     "pos": [
+      66.979,
+      11.42,
+      48.886
+     ],
+     "scale": [
+      0.653257147855733,
+      3.4840381218972425,
+      0.653257147855733
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 36,
+   "components": {
+    "Name": {
+     "value": "Pine 14 top"
+    },
+    "Transform": {
+     "pos": [
+      66.979,
+      14.904,
+      48.886
+     ],
+     "scale": [
+      3.3388698668181904,
+      5.226057182845864,
+      3.3388698668181904
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 37,
+   "components": {
+    "Name": {
+     "value": "Pine 15 trunk"
+    },
+    "Transform": {
+     "pos": [
+      77.541,
+      24.949,
+      -61.826
+     ],
+     "scale": [
+      0.6660742697690416,
+      3.5523961054348883,
+      0.6660742697690416
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 38,
+   "components": {
+    "Name": {
+     "value": "Pine 15 top"
+    },
+    "Transform": {
+     "pos": [
+      77.541,
+      28.501,
+      -61.826
+     ],
+     "scale": [
+      3.404379601041768,
+      5.328594158152333,
+      3.404379601041768
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 39,
+   "components": {
+    "Name": {
+     "value": "Pine 16 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -78.527,
+      8.668,
+      112.102
+     ],
+     "scale": [
+      0.43461652002168066,
+      2.3179547734489634,
+      0.43461652002168066
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 40,
+   "components": {
+    "Name": {
+     "value": "Pine 16 top"
+    },
+    "Transform": {
+     "pos": [
+      -78.527,
+      10.986,
+      112.102
+     ],
+     "scale": [
+      2.2213733245552567,
+      3.4769321601734453,
+      2.2213733245552567
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 41,
+   "components": {
+    "Name": {
+     "value": "Pine 17 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -104.803,
+      12.307,
+      -19.771
+     ],
+     "scale": [
+      0.5676816730828591,
+      3.0276355897752487,
+      0.5676816730828591
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 42,
+   "components": {
+    "Name": {
+     "value": "Pine 17 top"
+    },
+    "Transform": {
+     "pos": [
+      -104.803,
+      15.335,
+      -19.771
+     ],
+     "scale": [
+      2.9014841068679464,
+      4.541453384662873,
+      2.9014841068679464
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 43,
+   "components": {
+    "Name": {
+     "value": "Pine 18 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -112.486,
+      10.985,
+      73.057
+     ],
+     "scale": [
+      0.5442845616287678,
+      2.902850995353428,
+      0.5442845616287678
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 44,
+   "components": {
+    "Name": {
+     "value": "Pine 18 top"
+    },
+    "Transform": {
+     "pos": [
+      -112.486,
+      13.888,
+      73.057
+     ],
+     "scale": [
+      2.781898870547035,
+      4.3542764930301425,
+      2.781898870547035
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 45,
+   "components": {
+    "Name": {
+     "value": "Pine 19 trunk"
+    },
+    "Transform": {
+     "pos": [
+      10.301,
+      8.15,
+      73.831
+     ],
+     "scale": [
+      0.43830325351034566,
+      2.3376173520551764,
+      0.43830325351034566
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 46,
+   "components": {
+    "Name": {
+     "value": "Pine 19 top"
+    },
+    "Transform": {
+     "pos": [
+      10.301,
+      10.488,
+      73.831
+     ],
+     "scale": [
+      2.2402166290528776,
+      3.5064260280827653,
+      2.2402166290528776
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 47,
+   "components": {
+    "Name": {
+     "value": "Pine 20 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -58.277,
+      9.156,
+      -18.467
+     ],
+     "scale": [
+      0.5295389556792028,
+      2.824207763622415,
+      0.5295389556792028
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 48,
+   "components": {
+    "Name": {
+     "value": "Pine 20 top"
+    },
+    "Transform": {
+     "pos": [
+      -58.277,
+      11.98,
+      -18.467
+     ],
+     "scale": [
+      2.706532440138148,
+      4.236311645433623,
+      2.706532440138148
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 49,
+   "components": {
+    "Name": {
+     "value": "Pine 21 trunk"
+    },
+    "Transform": {
+     "pos": [
+      94.605,
+      11.715,
+      -13.053
+     ],
+     "scale": [
+      0.44359428868513673,
+      2.365836206320729,
+      0.44359428868513673
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 50,
+   "components": {
+    "Name": {
+     "value": "Pine 21 top"
+    },
+    "Transform": {
+     "pos": [
+      94.605,
+      14.081,
+      -13.053
+     ],
+     "scale": [
+      2.267259697724032,
+      3.548754309481094,
+      2.267259697724032
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 51,
+   "components": {
+    "Name": {
+     "value": "Pine 22 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -37.105,
+      9.923,
+      92.59
+     ],
+     "scale": [
+      0.4466966506785323,
+      2.382382136952172,
+      0.4466966506785323
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 52,
+   "components": {
+    "Name": {
+     "value": "Pine 22 top"
+    },
+    "Transform": {
+     "pos": [
+      -37.105,
+      12.306,
+      92.59
+     ],
+     "scale": [
+      2.283116214579165,
+      3.5735732054282585,
+      2.283116214579165
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 53,
+   "components": {
+    "Name": {
+     "value": "Pine 23 trunk"
+    },
+    "Transform": {
+     "pos": [
+      74.046,
+      9.68,
+      93.263
+     ],
+     "scale": [
+      0.5028256201376791,
+      2.681736640734288,
+      0.5028256201376791
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 54,
+   "components": {
+    "Name": {
+     "value": "Pine 23 top"
+    },
+    "Transform": {
+     "pos": [
+      74.046,
+      12.362,
+      93.263
+     ],
+     "scale": [
+      2.569997614037026,
+      4.0226049611014325,
+      2.569997614037026
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 55,
+   "components": {
+    "Name": {
+     "value": "Pine 24 trunk"
+    },
+    "Transform": {
+     "pos": [
+      45.553,
+      11.506,
+      77.837
+     ],
+     "scale": [
+      0.3741960151300913,
+      1.9957120806938202,
+      0.3741960151300913
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 56,
+   "components": {
+    "Name": {
+     "value": "Pine 24 top"
+    },
+    "Transform": {
+     "pos": [
+      45.553,
+      13.502,
+      77.837
+     ],
+     "scale": [
+      1.912557410664911,
+      2.9935681210407306,
+      1.912557410664911
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 57,
+   "components": {
+    "Name": {
+     "value": "Pine 25 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -48.32,
+      8.71,
+      -21.331
+     ],
+     "scale": [
+      0.4324565467648208,
+      2.306434916079044,
+      0.4324565467648208
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 58,
+   "components": {
+    "Name": {
+     "value": "Pine 25 top"
+    },
+    "Transform": {
+     "pos": [
+      -48.32,
+      11.016,
+      -21.331
+     ],
+     "scale": [
+      2.210333461242417,
+      3.4596523741185665,
+      2.210333461242417
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 59,
+   "components": {
+    "Name": {
+     "value": "Pine 26 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -92.407,
+      12.641,
+      30.972
+     ],
+     "scale": [
+      0.669885362259806,
+      3.5727219320522985,
+      0.669885362259806
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 60,
+   "components": {
+    "Name": {
+     "value": "Pine 26 top"
+    },
+    "Transform": {
+     "pos": [
+      -92.407,
+      16.213,
+      30.972
+     ],
+     "scale": [
+      3.423858518216786,
+      5.359082898078448,
+      3.423858518216786
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 61,
+   "components": {
+    "Name": {
+     "value": "Pine 27 trunk"
+    },
+    "Transform": {
+     "pos": [
+      14.637,
+      10.188,
+      9.868
+     ],
+     "scale": [
+      0.6026035513529061,
+      3.213885607215499,
+      0.6026035513529061
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 62,
+   "components": {
+    "Name": {
+     "value": "Pine 27 top"
+    },
+    "Transform": {
+     "pos": [
+      14.637,
+      13.401,
+      9.868
+     ],
+     "scale": [
+      3.079973706914853,
+      4.820828410823249,
+      3.079973706914853
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 63,
+   "components": {
+    "Name": {
+     "value": "Pine 28 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -62.521,
+      8.794,
+      14.36
+     ],
+     "scale": [
+      0.4644144447959401,
+      2.4768770389116805,
+      0.4644144447959401
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 64,
+   "components": {
+    "Name": {
+     "value": "Pine 28 top"
+    },
+    "Transform": {
+     "pos": [
+      -62.521,
+      11.271,
+      14.36
+     ],
+     "scale": [
+      2.3736738289570267,
+      3.7153155583675206,
+      2.3736738289570267
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 65,
+   "components": {
+    "Name": {
+     "value": "Pine 29 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -6.908,
+      7.879,
+      -11.896
+     ],
+     "scale": [
+      0.6739555921106699,
+      3.594429824590239,
+      0.6739555921106699
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 66,
+   "components": {
+    "Name": {
+     "value": "Pine 29 top"
+    },
+    "Transform": {
+     "pos": [
+      -6.908,
+      11.473,
+      -11.896
+     ],
+     "scale": [
+      3.444661915232312,
+      5.391644736885359,
+      3.444661915232312
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 67,
+   "components": {
+    "Name": {
+     "value": "Pine 30 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -84.52,
+      10.011,
+      86.704
+     ],
+     "scale": [
+      0.46359298456788023,
+      2.4724959176953614,
+      0.46359298456788023
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 68,
+   "components": {
+    "Name": {
+     "value": "Pine 30 top"
+    },
+    "Transform": {
+     "pos": [
+      -84.52,
+      12.484,
+      86.704
+     ],
+     "scale": [
+      2.369475254458054,
+      3.708743876543042,
+      2.369475254458054
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 69,
+   "components": {
+    "Name": {
+     "value": "Pine 31 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -69.953,
+      8.823,
+      42.746
+     ],
+     "scale": [
+      0.6281351816241393,
+      3.350054301995409,
+      0.6281351816241393
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 70,
+   "components": {
+    "Name": {
+     "value": "Pine 31 top"
+    },
+    "Transform": {
+     "pos": [
+      -69.953,
+      12.173,
+      42.746
+     ],
+     "scale": [
+      3.2104687060789336,
+      5.025081452993114,
+      3.2104687060789336
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 71,
+   "components": {
+    "Name": {
+     "value": "Pine 32 trunk"
+    },
+    "Transform": {
+     "pos": [
+      47.107,
+      7.687,
+      -4.679
+     ],
+     "scale": [
+      0.4615813980620175,
+      2.46176745633076,
+      0.4615813980620175
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 72,
+   "components": {
+    "Name": {
+     "value": "Pine 32 top"
+    },
+    "Transform": {
+     "pos": [
+      47.107,
+      10.149,
+      -4.679
+     ],
+     "scale": [
+      2.359193812316978,
+      3.69265118449614,
+      2.359193812316978
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 73,
+   "components": {
+    "Name": {
+     "value": "Pine 33 trunk"
+    },
+    "Transform": {
+     "pos": [
+      44.606,
+      8.152,
+      9.235
+     ],
+     "scale": [
+      0.6416483959630769,
+      3.422124778469743,
+      0.6416483959630769
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 74,
+   "components": {
+    "Name": {
+     "value": "Pine 33 top"
+    },
+    "Transform": {
+     "pos": [
+      44.606,
+      11.574,
+      9.235
+     ],
+     "scale": [
+      3.2795362460335036,
+      5.133187167704615,
+      3.2795362460335036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 75,
+   "components": {
+    "Name": {
+     "value": "Pine 34 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -47.72,
+      7.867,
+      94.106
+     ],
+     "scale": [
+      0.5024015424368037,
+      2.679474892996286,
+      0.5024015424368037
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 76,
+   "components": {
+    "Name": {
+     "value": "Pine 34 top"
+    },
+    "Transform": {
+     "pos": [
+      -47.72,
+      10.546,
+      94.106
+     ],
+     "scale": [
+      2.5678301057881074,
+      4.0192123394944295,
+      2.5678301057881074
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 77,
+   "components": {
+    "Name": {
+     "value": "Pine 35 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -97.612,
+      11.343,
+      88.881
+     ],
+     "scale": [
+      0.6346358189762592,
+      3.3847243678733823,
+      0.6346358189762592
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 78,
+   "components": {
+    "Name": {
+     "value": "Pine 35 top"
+    },
+    "Transform": {
+     "pos": [
+      -97.612,
+      14.728,
+      88.881
+     ],
+     "scale": [
+      3.243694185878658,
+      5.077086551810074,
+      3.243694185878658
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 79,
+   "components": {
+    "Name": {
+     "value": "Pine 36 trunk"
+    },
+    "Transform": {
+     "pos": [
+      85.778,
+      10.422,
+      -0.518
+     ],
+     "scale": [
+      0.40312181706287653,
+      2.149983024335341,
+      0.40312181706287653
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 80,
+   "components": {
+    "Name": {
+     "value": "Pine 36 top"
+    },
+    "Transform": {
+     "pos": [
+      85.778,
+      12.572,
+      -0.518
+     ],
+     "scale": [
+      2.060400398321369,
+      3.2249745365030122,
+      2.060400398321369
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 81,
+   "components": {
+    "Name": {
+     "value": "Pine 37 trunk"
+    },
+    "Transform": {
+     "pos": [
+      65.36,
+      10.766,
+      40.915
+     ],
+     "scale": [
+      0.4842385174940776,
+      2.58260542663508,
+      0.4842385174940776
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 82,
+   "components": {
+    "Name": {
+     "value": "Pine 37 top"
+    },
+    "Transform": {
+     "pos": [
+      65.36,
+      13.348,
+      40.915
+     ],
+     "scale": [
+      2.474996867191952,
+      3.8739081399526207,
+      2.474996867191952
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 83,
+   "components": {
+    "Name": {
+     "value": "Pine 38 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -46.687,
+      8.884,
+      108.49
+     ],
+     "scale": [
+      0.46855144937701176,
+      2.4989410633440623,
+      0.46855144937701176
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 84,
+   "components": {
+    "Name": {
+     "value": "Pine 38 top"
+    },
+    "Transform": {
+     "pos": [
+      -46.687,
+      11.383,
+      108.49
+     ],
+     "scale": [
+      2.39481851903806,
+      3.748411595016094,
+      2.39481851903806
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 85,
+   "components": {
+    "Name": {
+     "value": "Pine 39 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -57.706,
+      15.092,
+      -52.376
+     ],
+     "scale": [
+      0.6062417066899098,
+      3.2332891023461854,
+      0.6062417066899098
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 86,
+   "components": {
+    "Name": {
+     "value": "Pine 39 top"
+    },
+    "Transform": {
+     "pos": [
+      -57.706,
+      18.325,
+      -52.376
+     ],
+     "scale": [
+      3.098568723081761,
+      4.849933653519279,
+      3.098568723081761
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 87,
+   "components": {
+    "Name": {
+     "value": "Pine 40 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -55.722,
+      9.386,
+      83.136
+     ],
+     "scale": [
+      0.6326252377995318,
+      3.37400126826417,
+      0.6326252377995318
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 88,
+   "components": {
+    "Name": {
+     "value": "Pine 40 top"
+    },
+    "Transform": {
+     "pos": [
+      -55.722,
+      12.76,
+      83.136
+     ],
+     "scale": [
+      3.2334178820864956,
+      5.061001902396255,
+      3.2334178820864956
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 89,
+   "components": {
+    "Name": {
+     "value": "Pine 41 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -52.947,
+      9.928,
+      -32.51
+     ],
+     "scale": [
+      0.4027083669899827,
+      2.1477779572799074,
+      0.4027083669899827
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 90,
+   "components": {
+    "Name": {
+     "value": "Pine 41 top"
+    },
+    "Transform": {
+     "pos": [
+      -52.947,
+      12.076,
+      -32.51
+     ],
+     "scale": [
+      2.058287209059911,
+      3.2216669359198615,
+      2.058287209059911
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 91,
+   "components": {
+    "Name": {
+     "value": "Pine 42 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -83.406,
+      8.73,
+      79.635
+     ],
+     "scale": [
+      0.4891712227836062,
+      2.608913188179233,
+      0.4891712227836062
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 92,
+   "components": {
+    "Name": {
+     "value": "Pine 42 top"
+    },
+    "Transform": {
+     "pos": [
+      -83.406,
+      11.339,
+      79.635
+     ],
+     "scale": [
+      2.500208472005098,
+      3.9133697822688496,
+      2.500208472005098
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 93,
+   "components": {
+    "Name": {
+     "value": "Pine 43 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -96.672,
+      11.682,
+      56.231
+     ],
+     "scale": [
+      0.41436870651167007,
+      2.2099664347289067,
+      0.41436870651167007
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 94,
+   "components": {
+    "Name": {
+     "value": "Pine 43 top"
+    },
+    "Transform": {
+     "pos": [
+      -96.672,
+      13.892,
+      56.231
+     ],
+     "scale": [
+      2.1178844999485356,
+      3.3149496520933606,
+      2.1178844999485356
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 95,
+   "components": {
+    "Name": {
+     "value": "Pine 44 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -85.16,
+      11.031,
+      54.726
+     ],
+     "scale": [
+      0.3807418661392346,
+      2.030623286075918,
+      0.3807418661392346
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 96,
+   "components": {
+    "Name": {
+     "value": "Pine 44 top"
+    },
+    "Transform": {
+     "pos": [
+      -85.16,
+      13.062,
+      54.726
+     ],
+     "scale": [
+      1.9460139824894211,
+      3.045934929113877,
+      1.9460139824894211
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 97,
+   "components": {
+    "Name": {
+     "value": "Pine 45 trunk"
+    },
+    "Transform": {
+     "pos": [
+      16.471,
+      9.115,
+      63.887
+     ],
+     "scale": [
+      0.4009916880215124,
+      2.1386223361147327,
+      0.4009916880215124
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 98,
+   "components": {
+    "Name": {
+     "value": "Pine 45 top"
+    },
+    "Transform": {
+     "pos": [
+      16.471,
+      11.253,
+      63.887
+     ],
+     "scale": [
+      2.049513072109952,
+      3.2079335041720993,
+      2.049513072109952
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 99,
+   "components": {
+    "Name": {
+     "value": "Pine 46 trunk"
+    },
+    "Transform": {
+     "pos": [
+      75.904,
+      11.824,
+      24.285
+     ],
+     "scale": [
+      0.3832425890520192,
+      2.043960474944102,
+      0.3832425890520192
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 100,
+   "components": {
+    "Name": {
+     "value": "Pine 46 top"
+    },
+    "Transform": {
+     "pos": [
+      75.904,
+      13.868,
+      24.285
+     ],
+     "scale": [
+      1.9587954551547644,
+      3.0659407124161535,
+      1.9587954551547644
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 101,
+   "components": {
+    "Name": {
+     "value": "Pine 47 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -17.331,
+      12.202,
+      -43.247
+     ],
+     "scale": [
+      0.4550537795664978,
+      2.4269534910213215,
+      0.4550537795664978
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 102,
+   "components": {
+    "Name": {
+     "value": "Pine 47 top"
+    },
+    "Transform": {
+     "pos": [
+      -17.331,
+      14.629,
+      -43.247
+     ],
+     "scale": [
+      2.325830428895433,
+      3.6404302365319823,
+      2.325830428895433
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 103,
+   "components": {
+    "Name": {
+     "value": "Pine 48 trunk"
+    },
+    "Transform": {
+     "pos": [
+      28.235,
+      8.198,
+      7.87
+     ],
+     "scale": [
+      0.49568589601535856,
+      2.643658112081912,
+      0.49568589601535856
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 104,
+   "components": {
+    "Name": {
+     "value": "Pine 48 top"
+    },
+    "Transform": {
+     "pos": [
+      28.235,
+      10.841,
+      7.87
+     ],
+     "scale": [
+      2.533505690745166,
+      3.9654871681228685,
+      2.533505690745166
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 105,
+   "components": {
+    "Name": {
+     "value": "Pine 49 trunk"
+    },
+    "Transform": {
+     "pos": [
+      84.733,
+      11.537,
+      -15.094
+     ],
+     "scale": [
+      0.6449464219640535,
+      3.439714250474952,
+      0.6449464219640535
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 106,
+   "components": {
+    "Name": {
+     "value": "Pine 49 top"
+    },
+    "Transform": {
+     "pos": [
+      84.733,
+      14.976,
+      -15.094
+     ],
+     "scale": [
+      3.2963928233718285,
+      5.159571375712428,
+      3.2963928233718285
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 107,
+   "components": {
+    "Name": {
+     "value": "Pine 50 trunk"
+    },
+    "Transform": {
+     "pos": [
+      57.773,
+      10.11,
+      100.41
+     ],
+     "scale": [
+      0.5653494381373125,
+      3.015197003399,
+      0.5653494381373125
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 108,
+   "components": {
+    "Name": {
+     "value": "Pine 50 top"
+    },
+    "Transform": {
+     "pos": [
+      57.773,
+      13.125,
+      100.41
+     ],
+     "scale": [
+      2.8895637949240416,
+      4.5227955050985,
+      2.8895637949240416
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 109,
+   "components": {
+    "Name": {
+     "value": "Pine 51 trunk"
+    },
+    "Transform": {
+     "pos": [
+      64.662,
+      9.75,
+      78.122
+     ],
+     "scale": [
+      0.5996479036106112,
+      3.1981221525899257,
+      0.5996479036106112
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 110,
+   "components": {
+    "Name": {
+     "value": "Pine 51 top"
+    },
+    "Transform": {
+     "pos": [
+      64.662,
+      12.949,
+      78.122
+     ],
+     "scale": [
+      3.0648670628986787,
+      4.797183228884889,
+      3.0648670628986787
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 111,
+   "components": {
+    "Name": {
+     "value": "Pine 52 trunk"
+    },
+    "Transform": {
+     "pos": [
+      52.901,
+      11.316,
+      60.954
+     ],
+     "scale": [
+      0.46413625895447475,
+      2.475393381090532,
+      0.46413625895447475
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 112,
+   "components": {
+    "Name": {
+     "value": "Pine 52 top"
+    },
+    "Transform": {
+     "pos": [
+      52.901,
+      13.792,
+      60.954
+     ],
+     "scale": [
+      2.3722519902117596,
+      3.713090071635798,
+      2.3722519902117596
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 113,
+   "components": {
+    "Name": {
+     "value": "Pine 53 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -43.499,
+      8.445,
+      -17.141
+     ],
+     "scale": [
+      0.4613429361009701,
+      2.460495659205174,
+      0.4613429361009701
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 114,
+   "components": {
+    "Name": {
+     "value": "Pine 53 top"
+    },
+    "Transform": {
+     "pos": [
+      -43.499,
+      10.905,
+      -17.141
+     ],
+     "scale": [
+      2.3579750067382914,
+      3.690743488807761,
+      2.3579750067382914
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 115,
+   "components": {
+    "Name": {
+     "value": "Pine 54 trunk"
+    },
+    "Transform": {
+     "pos": [
+      75.929,
+      11.915,
+      17.845
+     ],
+     "scale": [
+      0.4897825990043022,
+      2.612173861356278,
+      0.4897825990043022
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 116,
+   "components": {
+    "Name": {
+     "value": "Pine 54 top"
+    },
+    "Transform": {
+     "pos": [
+      75.929,
+      14.528,
+      17.845
+     ],
+     "scale": [
+      2.5033332837997664,
+      3.9182607920344177,
+      2.5033332837997664
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 117,
+   "components": {
+    "Name": {
+     "value": "Pine 55 trunk"
+    },
+    "Transform": {
+     "pos": [
+      80.287,
+      13.476,
+      -25.625
+     ],
+     "scale": [
+      0.433308038298564,
+      2.3109762042590076,
+      0.433308038298564
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 118,
+   "components": {
+    "Name": {
+     "value": "Pine 55 top"
+    },
+    "Transform": {
+     "pos": [
+      80.287,
+      15.787,
+      -25.625
+     ],
+     "scale": [
+      2.214685529081549,
+      3.466464306388512,
+      2.214685529081549
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 119,
+   "components": {
+    "Name": {
+     "value": "Pine 56 trunk"
+    },
+    "Transform": {
+     "pos": [
+      112.036,
+      12.181,
+      56.776
+     ],
+     "scale": [
+      0.36629273309343363,
+      1.9535612431649794,
+      0.36629273309343363
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 120,
+   "components": {
+    "Name": {
+     "value": "Pine 56 top"
+    },
+    "Transform": {
+     "pos": [
+      112.036,
+      14.135,
+      56.776
+     ],
+     "scale": [
+      1.8721628580331051,
+      2.930341864747469,
+      1.8721628580331051
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 121,
+   "components": {
+    "Name": {
+     "value": "Pine 57 trunk"
+    },
+    "Transform": {
+     "pos": [
+      49.278,
+      8.952,
+      39.753
+     ],
+     "scale": [
+      0.44674806757891883,
+      2.3826563604209006,
+      0.44674806757891883
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 122,
+   "components": {
+    "Name": {
+     "value": "Pine 57 top"
+    },
+    "Transform": {
+     "pos": [
+      49.278,
+      11.335,
+      39.753
+     ],
+     "scale": [
+      2.2833790120700295,
+      3.5739845406313506,
+      2.2833790120700295
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 123,
+   "components": {
+    "Name": {
+     "value": "Pine 58 trunk"
+    },
+    "Transform": {
+     "pos": [
+      20.786,
+      10.018,
+      3.417
+     ],
+     "scale": [
+      0.6524585658183591,
+      3.4797790176979153,
+      0.6524585658183591
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 124,
+   "components": {
+    "Name": {
+     "value": "Pine 58 top"
+    },
+    "Transform": {
+     "pos": [
+      20.786,
+      13.498,
+      3.417
+     ],
+     "scale": [
+      3.3347882252938357,
+      5.219668526546873,
+      3.3347882252938357
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 125,
+   "components": {
+    "Name": {
+     "value": "Pine 59 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -102.047,
+      12.333,
+      -6.317
+     ],
+     "scale": [
+      0.3760845329496683,
+      2.005784175731564,
+      0.3760845329496683
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 126,
+   "components": {
+    "Name": {
+     "value": "Pine 59 top"
+    },
+    "Transform": {
+     "pos": [
+      -102.047,
+      14.339,
+      -6.317
+     ],
+     "scale": [
+      1.9222098350760823,
+      3.0086762635973465,
+      1.9222098350760823
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 127,
+   "components": {
+    "Name": {
+     "value": "Pine 60 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -83.644,
+      11.462,
+      33.383
+     ],
+     "scale": [
+      0.518770159772797,
+      2.766774185454917,
+      0.518770159772797
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 128,
+   "components": {
+    "Name": {
+     "value": "Pine 60 top"
+    },
+    "Transform": {
+     "pos": [
+      -83.644,
+      14.229,
+      33.383
+     ],
+     "scale": [
+      2.651491927727629,
+      4.150161278182376,
+      2.651491927727629
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 129,
+   "components": {
+    "Name": {
+     "value": "Pine 61 trunk"
+    },
+    "Transform": {
+     "pos": [
+      59.05,
+      8.485,
+      25.119
+     ],
+     "scale": [
+      0.4330568066630836,
+      2.3096363022031126,
+      0.4330568066630836
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 130,
+   "components": {
+    "Name": {
+     "value": "Pine 61 top"
+    },
+    "Transform": {
+     "pos": [
+      59.05,
+      10.795,
+      25.119
+     ],
+     "scale": [
+      2.2134014562779827,
+      3.464454453304669,
+      2.2134014562779827
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 131,
+   "components": {
+    "Name": {
+     "value": "Pine 62 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -36.063,
+      11.135,
+      112.796
+     ],
+     "scale": [
+      0.6002151693269633,
+      3.201147569743804,
+      0.6002151693269633
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 132,
+   "components": {
+    "Name": {
+     "value": "Pine 62 top"
+    },
+    "Transform": {
+     "pos": [
+      -36.063,
+      14.337,
+      112.796
+     ],
+     "scale": [
+      3.0677664210044786,
+      4.801721354615706,
+      3.0677664210044786
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 133,
+   "components": {
+    "Name": {
+     "value": "Pine 63 trunk"
+    },
+    "Transform": {
+     "pos": [
+      68.616,
+      18.252,
+      -48.323
+     ],
+     "scale": [
+      0.372004160068304,
+      1.9840221870309545,
+      0.372004160068304
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 134,
+   "components": {
+    "Name": {
+     "value": "Pine 63 top"
+    },
+    "Transform": {
+     "pos": [
+      68.616,
+      20.236,
+      -48.323
+     ],
+     "scale": [
+      1.9013545959046647,
+      2.976033280546432,
+      1.9013545959046647
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 135,
+   "components": {
+    "Name": {
+     "value": "Pine 64 trunk"
+    },
+    "Transform": {
+     "pos": [
+      44.656,
+      10.743,
+      105.542
+     ],
+     "scale": [
+      0.5207377666506372,
+      2.7772680888033983,
+      0.5207377666506372
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 136,
+   "components": {
+    "Name": {
+     "value": "Pine 64 top"
+    },
+    "Transform": {
+     "pos": [
+      44.656,
+      13.521,
+      105.542
+     ],
+     "scale": [
+      2.6615485851032563,
+      4.165902133205098,
+      2.6615485851032563
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 137,
+   "components": {
+    "Name": {
+     "value": "Pine 65 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -91.85,
+      9.097,
+      77.235
+     ],
+     "scale": [
+      0.5883678019208421,
+      3.137961610244491,
+      0.5883678019208421
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 138,
+   "components": {
+    "Name": {
+     "value": "Pine 65 top"
+    },
+    "Transform": {
+     "pos": [
+      -91.85,
+      12.235,
+      77.235
+     ],
+     "scale": [
+      3.007213209817637,
+      4.706942415366737,
+      3.007213209817637
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 139,
+   "components": {
+    "Name": {
+     "value": "Pine 66 trunk"
+    },
+    "Transform": {
+     "pos": [
+      17.194,
+      9.611,
+      116.22
+     ],
+     "scale": [
+      0.5056445133839322,
+      2.6967707380476384,
+      0.5056445133839322
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 140,
+   "components": {
+    "Name": {
+     "value": "Pine 66 top"
+    },
+    "Transform": {
+     "pos": [
+      17.194,
+      12.308,
+      116.22
+     ],
+     "scale": [
+      2.5844052906289865,
+      4.045156107071458,
+      2.5844052906289865
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 141,
+   "components": {
+    "Name": {
+     "value": "Pine 67 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -71.402,
+      7.473,
+      55.452
+     ],
+     "scale": [
+      0.4052017342513406,
+      2.16107591600715,
+      0.4052017342513406
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 142,
+   "components": {
+    "Name": {
+     "value": "Pine 67 top"
+    },
+    "Transform": {
+     "pos": [
+      -71.402,
+      9.634,
+      55.452
+     ],
+     "scale": [
+      2.0710310861735186,
+      3.2416138740107248,
+      2.0710310861735186
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 143,
+   "components": {
+    "Name": {
+     "value": "Pine 68 trunk"
+    },
+    "Transform": {
+     "pos": [
+      73.04,
+      10.581,
+      61.164
+     ],
+     "scale": [
+      0.6400032342033105,
+      3.4133505824176558,
+      0.6400032342033105
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 144,
+   "components": {
+    "Name": {
+     "value": "Pine 68 top"
+    },
+    "Transform": {
+     "pos": [
+      73.04,
+      13.994,
+      61.164
+     ],
+     "scale": [
+      3.2711276414835866,
+      5.120025873626484,
+      3.2711276414835866
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 145,
+   "components": {
+    "Name": {
+     "value": "Pine 69 trunk"
+    },
+    "Transform": {
+     "pos": [
+      16.355,
+      9.209,
+      16.987
+     ],
+     "scale": [
+      0.36603089511214487,
+      1.9521647739314392,
+      0.36603089511214487
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 146,
+   "components": {
+    "Name": {
+     "value": "Pine 69 top"
+    },
+    "Transform": {
+     "pos": [
+      16.355,
+      11.162,
+      16.987
+     ],
+     "scale": [
+      1.870824575017629,
+      2.928247160897159,
+      1.870824575017629
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 147,
+   "components": {
+    "Name": {
+     "value": "Pine 70 trunk"
+    },
+    "Transform": {
+     "pos": [
+      70.323,
+      11.363,
+      32.182
+     ],
+     "scale": [
+      0.651899576789539,
+      3.476797742877541,
+      0.651899576789539
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 148,
+   "components": {
+    "Name": {
+     "value": "Pine 70 top"
+    },
+    "Transform": {
+     "pos": [
+      70.323,
+      14.84,
+      32.182
+     ],
+     "scale": [
+      3.3319311702576435,
+      5.215196614316312,
+      3.3319311702576435
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 149,
+   "components": {
+    "Name": {
+     "value": "Pine 71 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -85.108,
+      8.182,
+      70.056
+     ],
+     "scale": [
+      0.6177239540746542,
+      3.294527755064822,
+      0.6177239540746542
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 150,
+   "components": {
+    "Name": {
+     "value": "Pine 71 top"
+    },
+    "Transform": {
+     "pos": [
+      -85.108,
+      11.476,
+      70.056
+     ],
+     "scale": [
+      3.1572557652704543,
+      4.9417916325972335,
+      3.1572557652704543
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 151,
+   "components": {
+    "Name": {
+     "value": "Pine 72 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -20.211,
+      9.376,
+      83.407
+     ],
+     "scale": [
+      0.6384383609508723,
+      3.405004591737985,
+      0.6384383609508723
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 152,
+   "components": {
+    "Name": {
+     "value": "Pine 72 top"
+    },
+    "Transform": {
+     "pos": [
+      -20.211,
+      12.781,
+      83.407
+     ],
+     "scale": [
+      3.2631294004155693,
+      5.107506887606978,
+      3.2631294004155693
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 153,
+   "components": {
+    "Name": {
+     "value": "Pine 73 trunk"
+    },
+    "Transform": {
+     "pos": [
+      71.789,
+      9.521,
+      69.766
+     ],
+     "scale": [
+      0.6326349357835767,
+      3.374052990845742,
+      0.6326349357835767
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 154,
+   "components": {
+    "Name": {
+     "value": "Pine 73 top"
+    },
+    "Transform": {
+     "pos": [
+      71.789,
+      12.895,
+      69.766
+     ],
+     "scale": [
+      3.2334674495605027,
+      5.061079486268613,
+      3.2334674495605027
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 155,
+   "components": {
+    "Name": {
+     "value": "Pine 74 trunk"
+    },
+    "Transform": {
+     "pos": [
+      70.894,
+      9.085,
+      80.039
+     ],
+     "scale": [
+      0.47645542598860346,
+      2.5410956052725515,
+      0.47645542598860346
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 156,
+   "components": {
+    "Name": {
+     "value": "Pine 74 top"
+    },
+    "Transform": {
+     "pos": [
+      70.894,
+      11.626,
+      80.039
+     ],
+     "scale": [
+      2.4352166217195284,
+      3.8116434079088277,
+      2.4352166217195284
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 157,
+   "components": {
+    "Name": {
+     "value": "Pine 75 trunk"
+    },
+    "Transform": {
+     "pos": [
+      76.248,
+      11.773,
+      51.485
+     ],
+     "scale": [
+      0.5572370861568662,
+      2.971931126169953,
+      0.5572370861568662
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 158,
+   "components": {
+    "Name": {
+     "value": "Pine 75 top"
+    },
+    "Transform": {
+     "pos": [
+      76.248,
+      14.745,
+      51.485
+     ],
+     "scale": [
+      2.848100662579538,
+      4.457896689254929,
+      2.848100662579538
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 159,
+   "components": {
+    "Name": {
+     "value": "Pine 76 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -87.88,
+      12.484,
+      1.936
+     ],
+     "scale": [
+      0.5080623712762571,
+      2.7096659801400373,
+      0.5080623712762571
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 160,
+   "components": {
+    "Name": {
+     "value": "Pine 76 top"
+    },
+    "Transform": {
+     "pos": [
+      -87.88,
+      15.194,
+      1.936
+     ],
+     "scale": [
+      2.5967632309675355,
+      4.064498970210057,
+      2.5967632309675355
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 161,
+   "components": {
+    "Name": {
+     "value": "Pine 77 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -59.536,
+      10.158,
+      -30.76
+     ],
+     "scale": [
+      0.5442610378129147,
+      2.902725535002211,
+      0.5442610378129147
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 162,
+   "components": {
+    "Name": {
+     "value": "Pine 77 top"
+    },
+    "Transform": {
+     "pos": [
+      -59.536,
+      13.061,
+      -30.76
+     ],
+     "scale": [
+      2.781778637710452,
+      4.3540883025033175,
+      2.781778637710452
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 163,
+   "components": {
+    "Name": {
+     "value": "Pine 78 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -80.353,
+      12.451,
+      11.846
+     ],
+     "scale": [
+      0.47965207996648734,
+      2.5581444264879325,
+      0.47965207996648734
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 164,
+   "components": {
+    "Name": {
+     "value": "Pine 78 top"
+    },
+    "Transform": {
+     "pos": [
+      -80.353,
+      15.01,
+      11.846
+     ],
+     "scale": [
+      2.4515550753842685,
+      3.8372166397318987,
+      2.4515550753842685
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 165,
+   "components": {
+    "Name": {
+     "value": "Pine 79 trunk"
+    },
+    "Transform": {
+     "pos": [
+      65.116,
+      10.893,
+      55.744
+     ],
+     "scale": [
+      0.6292075028828313,
+      3.355773348708434,
+      0.6292075028828313
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 166,
+   "components": {
+    "Name": {
+     "value": "Pine 79 top"
+    },
+    "Transform": {
+     "pos": [
+      65.116,
+      14.249,
+      55.744
+     ],
+     "scale": [
+      3.2159494591789155,
+      5.033660023062651,
+      3.2159494591789155
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 167,
+   "components": {
+    "Name": {
+     "value": "Pine 80 trunk"
+    },
+    "Transform": {
+     "pos": [
+      32.314,
+      9.366,
+      61.154
+     ],
+     "scale": [
+      0.4569648403276572,
+      2.4371458150808385,
+      0.4569648403276572
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 168,
+   "components": {
+    "Name": {
+     "value": "Pine 80 top"
+    },
+    "Transform": {
+     "pos": [
+      32.314,
+      11.803,
+      61.154
+     ],
+     "scale": [
+      2.3355980727858032,
+      3.6557187226212577,
+      2.3355980727858032
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 169,
+   "components": {
+    "Name": {
+     "value": "Pine 81 trunk"
+    },
+    "Transform": {
+     "pos": [
+      100.939,
+      24.428,
+      -55.333
+     ],
+     "scale": [
+      0.5367814111333093,
+      2.862834192710983,
+      0.5367814111333093
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 170,
+   "components": {
+    "Name": {
+     "value": "Pine 81 top"
+    },
+    "Transform": {
+     "pos": [
+      100.939,
+      27.291,
+      -55.333
+     ],
+     "scale": [
+      2.7435494346813587,
+      4.294251289066475,
+      2.7435494346813587
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 171,
+   "components": {
+    "Name": {
+     "value": "Pine 82 trunk"
+    },
+    "Transform": {
+     "pos": [
+      56.267,
+      7.475,
+      -8.446
+     ],
+     "scale": [
+      0.38147364025552083,
+      2.0345260813627775,
+      0.38147364025552083
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 172,
+   "components": {
+    "Name": {
+     "value": "Pine 82 top"
+    },
+    "Transform": {
+     "pos": [
+      56.267,
+      9.509,
+      -8.446
+     ],
+     "scale": [
+      1.949754161305995,
+      3.0517891220441666,
+      1.949754161305995
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 173,
+   "components": {
+    "Name": {
+     "value": "Pine 83 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -96.179,
+      11.305,
+      -16.988
+     ],
+     "scale": [
+      0.3784653024528545,
+      2.01848161308189,
+      0.3784653024528545
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 174,
+   "components": {
+    "Name": {
+     "value": "Pine 83 top"
+    },
+    "Transform": {
+     "pos": [
+      -96.179,
+      13.323,
+      -16.988
+     ],
+     "scale": [
+      1.9343782125368114,
+      3.027722419622836,
+      1.9343782125368114
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 175,
+   "components": {
+    "Name": {
+     "value": "Pine 84 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -76.883,
+      10.255,
+      89.696
+     ],
+     "scale": [
+      0.6387933432316439,
+      3.4068978305687674,
+      0.6387933432316439
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 176,
+   "components": {
+    "Name": {
+     "value": "Pine 84 top"
+    },
+    "Transform": {
+     "pos": [
+      -76.883,
+      13.662,
+      89.696
+     ],
+     "scale": [
+      3.264943754295069,
+      5.1103467458531515,
+      3.264943754295069
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 177,
+   "components": {
+    "Name": {
+     "value": "Pine 85 trunk"
+    },
+    "Transform": {
+     "pos": [
+      84.582,
+      10.053,
+      65.623
+     ],
+     "scale": [
+      0.47234707484722466,
+      2.519184399185198,
+      0.47234707484722466
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 178,
+   "components": {
+    "Name": {
+     "value": "Pine 85 top"
+    },
+    "Transform": {
+     "pos": [
+      84.582,
+      12.572,
+      65.623
+     ],
+     "scale": [
+      2.4142183825524812,
+      3.7787765987777973,
+      2.4142183825524812
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 179,
+   "components": {
+    "Name": {
+     "value": "Pine 86 trunk"
+    },
+    "Transform": {
+     "pos": [
+      29.802,
+      13.081,
+      109.423
+     ],
+     "scale": [
+      0.477974025648286,
+      2.5491948034575254,
+      0.477974025648286
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 180,
+   "components": {
+    "Name": {
+     "value": "Pine 86 top"
+    },
+    "Transform": {
+     "pos": [
+      29.802,
+      15.63,
+      109.423
+     ],
+     "scale": [
+      2.4429783533134617,
+      3.823792205186288,
+      2.4429783533134617
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 181,
+   "components": {
+    "Name": {
+     "value": "Pine 87 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -47.603,
+      8.271,
+      7.044
+     ],
+     "scale": [
+      0.6704818397366674,
+      3.575903145262226,
+      0.6704818397366674
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 182,
+   "components": {
+    "Name": {
+     "value": "Pine 87 top"
+    },
+    "Transform": {
+     "pos": [
+      -47.603,
+      11.846,
+      7.044
+     ],
+     "scale": [
+      3.4269071808762996,
+      5.363854717893339,
+      3.4269071808762996
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 183,
+   "components": {
+    "Name": {
+     "value": "Pine 88 trunk"
+    },
+    "Transform": {
+     "pos": [
+      5.352,
+      13.127,
+      106.871
+     ],
+     "scale": [
+      0.587573249037583,
+      3.133723994867109,
+      0.587573249037583
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 184,
+   "components": {
+    "Name": {
+     "value": "Pine 88 top"
+    },
+    "Transform": {
+     "pos": [
+      5.352,
+      16.261,
+      106.871
+     ],
+     "scale": [
+      3.003152161747646,
+      4.700585992300664,
+      3.003152161747646
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 185,
+   "components": {
+    "Name": {
+     "value": "Pine 89 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -3.427,
+      11.973,
+      -35.189
+     ],
+     "scale": [
+      0.4089635982865649,
+      2.1811391908616797,
+      0.4089635982865649
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 186,
+   "components": {
+    "Name": {
+     "value": "Pine 89 top"
+    },
+    "Transform": {
+     "pos": [
+      -3.427,
+      14.154,
+      -35.189
+     ],
+     "scale": [
+      2.090258391242443,
+      3.2717087862925194,
+      2.090258391242443
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 187,
+   "components": {
+    "Name": {
+     "value": "Pine 90 trunk"
+    },
+    "Transform": {
+     "pos": [
+      100.537,
+      11.078,
+      66.202
+     ],
+     "scale": [
+      0.5310353692378341,
+      2.832188635935115,
+      0.5310353692378341
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 188,
+   "components": {
+    "Name": {
+     "value": "Pine 90 top"
+    },
+    "Transform": {
+     "pos": [
+      100.537,
+      13.91,
+      66.202
+     ],
+     "scale": [
+      2.7141807761044854,
+      4.248282953902673,
+      2.7141807761044854
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 189,
+   "components": {
+    "Name": {
+     "value": "Pine 91 trunk"
+    },
+    "Transform": {
+     "pos": [
+      38.96,
+      11.992,
+      81.889
+     ],
+     "scale": [
+      0.512169269230767,
+      2.731569435897424,
+      0.512169269230767
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 190,
+   "components": {
+    "Name": {
+     "value": "Pine 91 top"
+    },
+    "Transform": {
+     "pos": [
+      38.96,
+      14.723,
+      81.889
+     ],
+     "scale": [
+      2.617754042735031,
+      4.097354153846136,
+      2.617754042735031
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 191,
+   "components": {
+    "Name": {
+     "value": "Pine 92 trunk"
+    },
+    "Transform": {
+     "pos": [
+      91.125,
+      25.037,
+      -60.004
+     ],
+     "scale": [
+      0.5504307652282487,
+      2.935630747883993,
+      0.5504307652282487
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 192,
+   "components": {
+    "Name": {
+     "value": "Pine 92 top"
+    },
+    "Transform": {
+     "pos": [
+      91.125,
+      27.973,
+      -60.004
+     ],
+     "scale": [
+      2.8133128000554932,
+      4.40344612182599,
+      2.8133128000554932
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 193,
+   "components": {
+    "Name": {
+     "value": "Pine 93 trunk"
+    },
+    "Transform": {
+     "pos": [
+      54.724,
+      14.669,
+      -37.867
+     ],
+     "scale": [
+      0.4458814262292573,
+      2.3780342732227053,
+      0.4458814262292573
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 194,
+   "components": {
+    "Name": {
+     "value": "Pine 93 top"
+    },
+    "Transform": {
+     "pos": [
+      54.724,
+      17.047,
+      -37.867
+     ],
+     "scale": [
+      2.2789495118384258,
+      3.5670514098340584,
+      2.2789495118384258
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 195,
+   "components": {
+    "Name": {
+     "value": "Pine 94 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -29.451,
+      12.604,
+      -43.69
+     ],
+     "scale": [
+      0.44684240183138946,
+      2.383159476434077,
+      0.44684240183138946
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 196,
+   "components": {
+    "Name": {
+     "value": "Pine 94 top"
+    },
+    "Transform": {
+     "pos": [
+      -29.451,
+      14.987,
+      -43.69
+     ],
+     "scale": [
+      2.2838611649159906,
+      3.5747392146511157,
+      2.2838611649159906
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 197,
+   "components": {
+    "Name": {
+     "value": "Pine 95 trunk"
+    },
+    "Transform": {
+     "pos": [
+      86.305,
+      15.052,
+      -34.188
+     ],
+     "scale": [
+      0.6575777556273273,
+      3.5070813633457454,
+      0.6575777556273273
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 198,
+   "components": {
+    "Name": {
+     "value": "Pine 95 top"
+    },
+    "Transform": {
+     "pos": [
+      86.305,
+      18.559,
+      -34.188
+     ],
+     "scale": [
+      3.3609529732063392,
+      5.260622045018619,
+      3.3609529732063392
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 199,
+   "components": {
+    "Name": {
+     "value": "Pine 96 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -94.129,
+      13.478,
+      40.114
+     ],
+     "scale": [
+      0.5477581740843618,
+      2.9213769284499294,
+      0.5477581740843618
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 200,
+   "components": {
+    "Name": {
+     "value": "Pine 96 top"
+    },
+    "Transform": {
+     "pos": [
+      -94.129,
+      16.4,
+      40.114
+     ],
+     "scale": [
+      2.7996528897645154,
+      4.382065392674894,
+      2.7996528897645154
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 201,
+   "components": {
+    "Name": {
+     "value": "Pine 97 trunk"
+    },
+    "Transform": {
+     "pos": [
+      94.683,
+      11.078,
+      58.125
+     ],
+     "scale": [
+      0.5335105395046543,
+      2.845389544024823,
+      0.5335105395046543
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 202,
+   "components": {
+    "Name": {
+     "value": "Pine 97 top"
+    },
+    "Transform": {
+     "pos": [
+      94.683,
+      13.924,
+      58.125
+     ],
+     "scale": [
+      2.726831646357122,
+      4.268084316037235,
+      2.726831646357122
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 203,
+   "components": {
+    "Name": {
+     "value": "Pine 98 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -51.396,
+      9.564,
+      1.085
+     ],
+     "scale": [
+      0.5778842740448286,
+      3.0820494615724185,
+      0.5778842740448286
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 204,
+   "components": {
+    "Name": {
+     "value": "Pine 98 top"
+    },
+    "Transform": {
+     "pos": [
+      -51.396,
+      12.646,
+      1.085
+     ],
+     "scale": [
+      2.953630734006901,
+      4.6230741923586285,
+      2.953630734006901
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 205,
+   "components": {
+    "Name": {
+     "value": "Pine 99 trunk"
+    },
+    "Transform": {
+     "pos": [
+      64.257,
+      9.932,
+      67.18
+     ],
+     "scale": [
+      0.5969325900094311,
+      3.183640480050299,
+      0.5969325900094311
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 206,
+   "components": {
+    "Name": {
+     "value": "Pine 99 top"
+    },
+    "Transform": {
+     "pos": [
+      64.257,
+      13.116,
+      67.18
+     ],
+     "scale": [
+      3.0509887933815363,
+      4.775460720075449,
+      3.0509887933815363
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 207,
+   "components": {
+    "Name": {
+     "value": "Pine 100 trunk"
+    },
+    "Transform": {
+     "pos": [
+      54.363,
+      10.76,
+      80.966
+     ],
+     "scale": [
+      0.41636332573959556,
+      2.2206044039445096,
+      0.41636332573959556
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 208,
+   "components": {
+    "Name": {
+     "value": "Pine 100 top"
+    },
+    "Transform": {
+     "pos": [
+      54.363,
+      12.98,
+      80.966
+     ],
+     "scale": [
+      2.1280792204468217,
+      3.3309066059167645,
+      2.1280792204468217
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 209,
+   "components": {
+    "Name": {
+     "value": "Pine 101 trunk"
+    },
+    "Transform": {
+     "pos": [
+      76.596,
+      11.829,
+      9.686
+     ],
+     "scale": [
+      0.6066196842458547,
+      3.235304982644558,
+      0.6066196842458547
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 210,
+   "components": {
+    "Name": {
+     "value": "Pine 101 top"
+    },
+    "Transform": {
+     "pos": [
+      76.596,
+      15.064,
+      9.686
+     ],
+     "scale": [
+      3.1005006083677014,
+      4.852957473966837,
+      3.1005006083677014
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 211,
+   "components": {
+    "Name": {
+     "value": "Pine 102 trunk"
+    },
+    "Transform": {
+     "pos": [
+      97.589,
+      9.01,
+      82.207
+     ],
+     "scale": [
+      0.512062013034932,
+      2.730997402852971,
+      0.512062013034932
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 212,
+   "components": {
+    "Name": {
+     "value": "Pine 102 top"
+    },
+    "Transform": {
+     "pos": [
+      97.589,
+      11.741,
+      82.207
+     ],
+     "scale": [
+      2.6172058444007638,
+      4.096496104279456,
+      2.6172058444007638
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 213,
+   "components": {
+    "Name": {
+     "value": "Pine 103 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -14.324,
+      21.102,
+      -63.811
+     ],
+     "scale": [
+      0.407398356593152,
+      2.1727912351634773,
+      0.407398356593152
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 214,
+   "components": {
+    "Name": {
+     "value": "Pine 103 top"
+    },
+    "Transform": {
+     "pos": [
+      -14.324,
+      23.274,
+      -63.811
+     ],
+     "scale": [
+      2.0822582670316656,
+      3.259186852745216,
+      2.0822582670316656
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 215,
+   "components": {
+    "Name": {
+     "value": "Pine 104 trunk"
+    },
+    "Transform": {
+     "pos": [
+      89.221,
+      12.763,
+      18.104
+     ],
+     "scale": [
+      0.4596809252148867,
+      2.451631601146062,
+      0.4596809252148867
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 216,
+   "components": {
+    "Name": {
+     "value": "Pine 104 top"
+    },
+    "Transform": {
+     "pos": [
+      89.221,
+      15.214,
+      18.104
+     ],
+     "scale": [
+      2.349480284431643,
+      3.6774474017190935,
+      2.349480284431643
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 217,
+   "components": {
+    "Name": {
+     "value": "Pine 105 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -92.165,
+      8.959,
+      115.621
+     ],
+     "scale": [
+      0.6720968307534178,
+      3.5845164306848942,
+      0.6720968307534178
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 218,
+   "components": {
+    "Name": {
+     "value": "Pine 105 top"
+    },
+    "Transform": {
+     "pos": [
+      -92.165,
+      12.544,
+      115.621
+     ],
+     "scale": [
+      3.435161579406357,
+      5.376774646027342,
+      3.435161579406357
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 219,
+   "components": {
+    "Name": {
+     "value": "Pine 106 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -69.493,
+      11.043,
+      -26.66
+     ],
+     "scale": [
+      0.6261920303835006,
+      3.339690828712003,
+      0.6261920303835006
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 220,
+   "components": {
+    "Name": {
+     "value": "Pine 106 top"
+    },
+    "Transform": {
+     "pos": [
+      -69.493,
+      14.383,
+      -26.66
+     ],
+     "scale": [
+      3.200537044182336,
+      5.009536243068005,
+      3.200537044182336
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 221,
+   "components": {
+    "Name": {
+     "value": "Pine 107 trunk"
+    },
+    "Transform": {
+     "pos": [
+      109.166,
+      9.419,
+      86.31
+     ],
+     "scale": [
+      0.6445567917283633,
+      3.4376362225512707,
+      0.6445567917283633
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 222,
+   "components": {
+    "Name": {
+     "value": "Pine 107 top"
+    },
+    "Transform": {
+     "pos": [
+      109.166,
+      12.857,
+      86.31
+     ],
+     "scale": [
+      3.2944013799449676,
+      5.156454333826907,
+      3.2944013799449676
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 223,
+   "components": {
+    "Name": {
+     "value": "Pine 108 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -75.51,
+      8.394,
+      78.287
+     ],
+     "scale": [
+      0.5176738443135606,
+      2.760927169672323,
+      0.5176738443135606
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 224,
+   "components": {
+    "Name": {
+     "value": "Pine 108 top"
+    },
+    "Transform": {
+     "pos": [
+      -75.51,
+      11.155,
+      78.287
+     ],
+     "scale": [
+      2.6458885376026426,
+      4.1413907545084845,
+      2.6458885376026426
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 225,
+   "components": {
+    "Name": {
+     "value": "Pine 109 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -76.282,
+      26.618,
+      -72.578
+     ],
+     "scale": [
+      0.5604375653321,
+      2.9890003484378664,
+      0.5604375653321
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 226,
+   "components": {
+    "Name": {
+     "value": "Pine 109 top"
+    },
+    "Transform": {
+     "pos": [
+      -76.282,
+      29.607,
+      -72.578
+     ],
+     "scale": [
+      2.8644586672529555,
+      4.4835005226568,
+      2.8644586672529555
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 227,
+   "components": {
+    "Name": {
+     "value": "Pine 110 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -41.068,
+      8.92,
+      -3.734
+     ],
+     "scale": [
+      0.4848187899056142,
+      2.5857002128299422,
+      0.4848187899056142
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 228,
+   "components": {
+    "Name": {
+     "value": "Pine 110 top"
+    },
+    "Transform": {
+     "pos": [
+      -41.068,
+      11.506,
+      -3.734
+     ],
+     "scale": [
+      2.477962703962028,
+      3.878550319244914,
+      2.477962703962028
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 229,
+   "components": {
+    "Name": {
+     "value": "Pine 111 trunk"
+    },
+    "Transform": {
+     "pos": [
+      86.358,
+      23.004,
+      -54.271
+     ],
+     "scale": [
+      0.5914507292822223,
+      3.154403889505186,
+      0.5914507292822223
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 230,
+   "components": {
+    "Name": {
+     "value": "Pine 111 top"
+    },
+    "Transform": {
+     "pos": [
+      86.358,
+      26.159,
+      -54.271
+     ],
+     "scale": [
+      3.022970394109136,
+      4.7316058342577785,
+      3.022970394109136
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 231,
+   "components": {
+    "Name": {
+     "value": "Pine 112 trunk"
+    },
+    "Transform": {
+     "pos": [
+      83.04,
+      10.915,
+      6.714
+     ],
+     "scale": [
+      0.5287436715755437,
+      2.8199662484028996,
+      0.5287436715755437
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 232,
+   "components": {
+    "Name": {
+     "value": "Pine 112 top"
+    },
+    "Transform": {
+     "pos": [
+      83.04,
+      13.735,
+      6.714
+     ],
+     "scale": [
+      2.7024676547194453,
+      4.2299493726043496,
+      2.7024676547194453
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 233,
+   "components": {
+    "Name": {
+     "value": "Pine 113 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -107.297,
+      12.015,
+      39.222
+     ],
+     "scale": [
+      0.4726298346768195,
+      2.5206924516097042,
+      0.4726298346768195
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 234,
+   "components": {
+    "Name": {
+     "value": "Pine 113 top"
+    },
+    "Transform": {
+     "pos": [
+      -107.297,
+      14.535,
+      39.222
+     ],
+     "scale": [
+      2.4156635994592994,
+      3.781038677414556,
+      2.4156635994592994
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 235,
+   "components": {
+    "Name": {
+     "value": "Pine 114 trunk"
+    },
+    "Transform": {
+     "pos": [
+      29.478,
+      12.165,
+      82.482
+     ],
+     "scale": [
+      0.6678814229190059,
+      3.562034255568031,
+      0.6678814229190059
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 236,
+   "components": {
+    "Name": {
+     "value": "Pine 114 top"
+    },
+    "Transform": {
+     "pos": [
+      29.478,
+      15.727,
+      82.482
+     ],
+     "scale": [
+      3.4136161615860297,
+      5.343051383352047,
+      3.4136161615860297
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 237,
+   "components": {
+    "Name": {
+     "value": "Pine 115 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -110.208,
+      12.178,
+      59.95
+     ],
+     "scale": [
+      0.5177973615167355,
+      2.761585928089256,
+      0.5177973615167355
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 238,
+   "components": {
+    "Name": {
+     "value": "Pine 115 top"
+    },
+    "Transform": {
+     "pos": [
+      -110.208,
+      14.94,
+      59.95
+     ],
+     "scale": [
+      2.646519847752203,
+      4.142378892133884,
+      2.646519847752203
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 239,
+   "components": {
+    "Name": {
+     "value": "Pine 116 trunk"
+    },
+    "Transform": {
+     "pos": [
+      81.131,
+      8.413,
+      75.371
+     ],
+     "scale": [
+      0.3727189167702867,
+      1.9878342227748622,
+      0.3727189167702867
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 240,
+   "components": {
+    "Name": {
+     "value": "Pine 116 top"
+    },
+    "Transform": {
+     "pos": [
+      81.131,
+      10.401,
+      75.371
+     ],
+     "scale": [
+      1.9050077968259096,
+      2.9817513341622934,
+      1.9050077968259096
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 241,
+   "components": {
+    "Name": {
+     "value": "Pine 117 trunk"
+    },
+    "Transform": {
+     "pos": [
+      112.09,
+      16.449,
+      28.99
+     ],
+     "scale": [
+      0.6165007938143451,
+      3.288004233676507,
+      0.6165007938143451
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 242,
+   "components": {
+    "Name": {
+     "value": "Pine 117 top"
+    },
+    "Transform": {
+     "pos": [
+      112.09,
+      19.737,
+      28.99
+     ],
+     "scale": [
+      3.1510040572733193,
+      4.932006350514761,
+      3.1510040572733193
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 243,
+   "components": {
+    "Name": {
+     "value": "Pine 118 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -44.273,
+      9.365,
+      67.523
+     ],
+     "scale": [
+      0.3902119287042164,
+      2.0811302864224874,
+      0.3902119287042164
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 244,
+   "components": {
+    "Name": {
+     "value": "Pine 118 top"
+    },
+    "Transform": {
+     "pos": [
+      -44.273,
+      11.446,
+      67.523
+     ],
+     "scale": [
+      1.9944165244882168,
+      3.121695429633731,
+      1.9944165244882168
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 245,
+   "components": {
+    "Name": {
+     "value": "Pine 119 trunk"
+    },
+    "Transform": {
+     "pos": [
+      87.268,
+      12.415,
+      -24.363
+     ],
+     "scale": [
+      0.4481867072651211,
+      2.390329105413979,
+      0.4481867072651211
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 246,
+   "components": {
+    "Name": {
+     "value": "Pine 119 top"
+    },
+    "Transform": {
+     "pos": [
+      87.268,
+      14.805,
+      -24.363
+     ],
+     "scale": [
+      2.2907320593550633,
+      3.585493658120969,
+      2.2907320593550633
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 247,
+   "components": {
+    "Name": {
+     "value": "Pine 120 trunk"
+    },
+    "Transform": {
+     "pos": [
+      16.997,
+      9.157,
+      45.071
+     ],
+     "scale": [
+      0.5027074977769976,
+      2.681106654810654,
+      0.5027074977769976
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 248,
+   "components": {
+    "Name": {
+     "value": "Pine 120 top"
+    },
+    "Transform": {
+     "pos": [
+      16.997,
+      11.838,
+      45.071
+     ],
+     "scale": [
+      2.5693938775268763,
+      4.021659982215981,
+      2.5693938775268763
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 249,
+   "components": {
+    "Name": {
+     "value": "Pine 121 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -96.067,
+      12.427,
+      2.869
+     ],
+     "scale": [
+      0.42666860007044827,
+      2.2755658670423906,
+      0.42666860007044827
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 250,
+   "components": {
+    "Name": {
+     "value": "Pine 121 top"
+    },
+    "Transform": {
+     "pos": [
+      -96.067,
+      14.703,
+      2.869
+     ],
+     "scale": [
+      2.180750622582291,
+      3.413348800563586,
+      2.180750622582291
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 251,
+   "components": {
+    "Name": {
+     "value": "Pine 122 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -65.112,
+      9.502,
+      -17.903
+     ],
+     "scale": [
+      0.5015338354218019,
+      2.6748471222496097,
+      0.5015338354218019
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 252,
+   "components": {
+    "Name": {
+     "value": "Pine 122 top"
+    },
+    "Transform": {
+     "pos": [
+      -65.112,
+      12.176,
+      -17.903
+     ],
+     "scale": [
+      2.5633951588225425,
+      4.012270683374415,
+      2.5633951588225425
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 253,
+   "components": {
+    "Name": {
+     "value": "Pine 123 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -55.082,
+      9.605,
+      -26.389
+     ],
+     "scale": [
+      0.4985540322253997,
+      2.658954838535465,
+      0.4985540322253997
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 254,
+   "components": {
+    "Name": {
+     "value": "Pine 123 top"
+    },
+    "Transform": {
+     "pos": [
+      -55.082,
+      12.264,
+      -26.389
+     ],
+     "scale": [
+      2.5481650535964873,
+      3.9884322578031974,
+      2.5481650535964873
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 255,
+   "components": {
+    "Name": {
+     "value": "Pine 124 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -95.59,
+      8.827,
+      72.119
+     ],
+     "scale": [
+      0.5269917016168248,
+      2.8106224086230656,
+      0.5269917016168248
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 256,
+   "components": {
+    "Name": {
+     "value": "Pine 124 top"
+    },
+    "Transform": {
+     "pos": [
+      -95.59,
+      11.638,
+      72.119
+     ],
+     "scale": [
+      2.6935131415971045,
+      4.215933612934599,
+      2.6935131415971045
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 257,
+   "components": {
+    "Name": {
+     "value": "Pine 125 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -37.647,
+      9.134,
+      84.917
+     ],
+     "scale": [
+      0.5654176577648379,
+      3.0155608414124684,
+      0.5654176577648379
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 258,
+   "components": {
+    "Name": {
+     "value": "Pine 125 top"
+    },
+    "Transform": {
+     "pos": [
+      -37.647,
+      12.15,
+      84.917
+     ],
+     "scale": [
+      2.889912473020282,
+      4.523341262118703,
+      2.889912473020282
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 259,
+   "components": {
+    "Name": {
+     "value": "Pine 126 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -66.488,
+      10.544,
+      -33.568
+     ],
+     "scale": [
+      0.575915597382762,
+      3.071549852708064,
+      0.575915597382762
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 260,
+   "components": {
+    "Name": {
+     "value": "Pine 126 top"
+    },
+    "Transform": {
+     "pos": [
+      -66.488,
+      13.615,
+      -33.568
+     ],
+     "scale": [
+      2.943568608845228,
+      4.607324779062096,
+      2.943568608845228
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 261,
+   "components": {
+    "Name": {
+     "value": "Pine 127 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -9.574,
+      12.333,
+      98.618
+     ],
+     "scale": [
+      0.3758710871026134,
+      2.0046457978806047,
+      0.3758710871026134
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 262,
+   "components": {
+    "Name": {
+     "value": "Pine 127 top"
+    },
+    "Transform": {
+     "pos": [
+      -9.574,
+      14.338,
+      98.618
+     ],
+     "scale": [
+      1.9211188896355795,
+      3.0069686968209073,
+      1.9211188896355795
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 263,
+   "components": {
+    "Name": {
+     "value": "Pine 128 trunk"
+    },
+    "Transform": {
+     "pos": [
+      106.183,
+      7.462,
+      93.487
+     ],
+     "scale": [
+      0.4346944597507988,
+      2.31837045200426,
+      0.4346944597507988
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 264,
+   "components": {
+    "Name": {
+     "value": "Pine 128 top"
+    },
+    "Transform": {
+     "pos": [
+      106.183,
+      9.781,
+      93.487
+     ],
+     "scale": [
+      2.2217716831707492,
+      3.4775556780063903,
+      2.2217716831707492
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 265,
+   "components": {
+    "Name": {
+     "value": "Pine 129 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -37.942,
+      7.427,
+      60.495
+     ],
+     "scale": [
+      0.39673704250318165,
+      2.1159308933503023,
+      0.39673704250318165
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 266,
+   "components": {
+    "Name": {
+     "value": "Pine 129 top"
+    },
+    "Transform": {
+     "pos": [
+      -37.942,
+      9.542,
+      60.495
+     ],
+     "scale": [
+      2.0277671061273725,
+      3.173896340025453,
+      2.0277671061273725
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 267,
+   "components": {
+    "Name": {
+     "value": "Pine 130 trunk"
+    },
+    "Transform": {
+     "pos": [
+      42.606,
+      15.168,
+      -40.223
+     ],
+     "scale": [
+      0.4648569977242704,
+      2.4792373211961087,
+      0.4648569977242704
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 268,
+   "components": {
+    "Name": {
+     "value": "Pine 130 top"
+    },
+    "Transform": {
+     "pos": [
+      42.606,
+      17.647,
+      -40.223
+     ],
+     "scale": [
+      2.3759357661462706,
+      3.7188559817941633,
+      2.3759357661462706
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 269,
+   "components": {
+    "Name": {
+     "value": "Pine 131 trunk"
+    },
+    "Transform": {
+     "pos": [
+      90.329,
+      14.429,
+      28.591
+     ],
+     "scale": [
+      0.503928043879231,
+      2.6876162340225647,
+      0.503928043879231
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 270,
+   "components": {
+    "Name": {
+     "value": "Pine 131 top"
+    },
+    "Transform": {
+     "pos": [
+      90.329,
+      17.116,
+      28.591
+     ],
+     "scale": [
+      2.5756322242716245,
+      4.031424351033848,
+      2.5756322242716245
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 271,
+   "components": {
+    "Name": {
+     "value": "Pine 132 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -71.865,
+      10.911,
+      6.294
+     ],
+     "scale": [
+      0.6283209687378578,
+      3.351045166601908,
+      0.6283209687378578
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 272,
+   "components": {
+    "Name": {
+     "value": "Pine 132 top"
+    },
+    "Transform": {
+     "pos": [
+      -71.865,
+      14.263,
+      6.294
+     ],
+     "scale": [
+      3.2114182846601618,
+      5.0265677499028625,
+      3.2114182846601618
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 273,
+   "components": {
+    "Name": {
+     "value": "Pine 133 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -88.93,
+      12.001,
+      44.796
+     ],
+     "scale": [
+      0.3644479484869227,
+      1.9437223919302542,
+      0.3644479484869227
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 274,
+   "components": {
+    "Name": {
+     "value": "Pine 133 top"
+    },
+    "Transform": {
+     "pos": [
+      -88.93,
+      13.945,
+      44.796
+     ],
+     "scale": [
+      1.8627339589331602,
+      2.9155835878953815,
+      1.8627339589331602
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 275,
+   "components": {
+    "Name": {
+     "value": "Pine 134 trunk"
+    },
+    "Transform": {
+     "pos": [
+      53.782,
+      11.814,
+      -26.14
+     ],
+     "scale": [
+      0.6152213064757149,
+      3.2811803012038125,
+      0.6152213064757149
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 276,
+   "components": {
+    "Name": {
+     "value": "Pine 134 top"
+    },
+    "Transform": {
+     "pos": [
+      53.782,
+      15.095,
+      -26.14
+     ],
+     "scale": [
+      3.1444644553203203,
+      4.9217704518057195,
+      3.1444644553203203
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 277,
+   "components": {
+    "Name": {
+     "value": "Pine 135 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -82.522,
+      11.169,
+      -18.553
+     ],
+     "scale": [
+      0.4090654849575335,
+      2.181682586440178,
+      0.4090654849575335
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 278,
+   "components": {
+    "Name": {
+     "value": "Pine 135 top"
+    },
+    "Transform": {
+     "pos": [
+      -82.522,
+      13.351,
+      -18.553
+     ],
+     "scale": [
+      2.0907791453385043,
+      3.272523879660268,
+      2.0907791453385043
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 279,
+   "components": {
+    "Name": {
+     "value": "Pine 136 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -42.897,
+      16.525,
+      -63.373
+     ],
+     "scale": [
+      0.5933087410437063,
+      3.1643132855664335,
+      0.5933087410437063
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 280,
+   "components": {
+    "Name": {
+     "value": "Pine 136 top"
+    },
+    "Transform": {
+     "pos": [
+      -42.897,
+      19.689,
+      -63.373
+     ],
+     "scale": [
+      3.032466898667832,
+      4.746469928349651,
+      3.032466898667832
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 281,
+   "components": {
+    "Name": {
+     "value": "Pine 137 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -90.559,
+      11.638,
+      58.586
+     ],
+     "scale": [
+      0.627257163961855,
+      3.3453715411298934,
+      0.627257163961855
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 282,
+   "components": {
+    "Name": {
+     "value": "Pine 137 top"
+    },
+    "Transform": {
+     "pos": [
+      -90.559,
+      14.984,
+      58.586
+     ],
+     "scale": [
+      3.2059810602494814,
+      5.01805731169484,
+      3.2059810602494814
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 283,
+   "components": {
+    "Name": {
+     "value": "Pine 138 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -84.601,
+      12.504,
+      -34.507
+     ],
+     "scale": [
+      0.6706257626072193,
+      3.5766707339051695,
+      0.6706257626072193
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 284,
+   "components": {
+    "Name": {
+     "value": "Pine 138 top"
+    },
+    "Transform": {
+     "pos": [
+      -84.601,
+      16.081,
+      -34.507
+     ],
+     "scale": [
+      3.4276427866591206,
+      5.365006100857754,
+      3.4276427866591206
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 285,
+   "components": {
+    "Name": {
+     "value": "Pine 139 trunk"
+    },
+    "Transform": {
+     "pos": [
+      59.006,
+      10.577,
+      72.159
+     ],
+     "scale": [
+      0.5413231859653784,
+      2.8870569918153515,
+      0.5413231859653784
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 286,
+   "components": {
+    "Name": {
+     "value": "Pine 139 top"
+    },
+    "Transform": {
+     "pos": [
+      59.006,
+      13.464,
+      72.159
+     ],
+     "scale": [
+      2.7667629504897118,
+      4.330585487723027,
+      2.7667629504897118
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 287,
+   "components": {
+    "Name": {
+     "value": "Pine 140 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -62.487,
+      8.557,
+      82.785
+     ],
+     "scale": [
+      0.3774476364027747,
+      2.0130540608147984,
+      0.3774476364027747
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 288,
+   "components": {
+    "Name": {
+     "value": "Pine 140 top"
+    },
+    "Transform": {
+     "pos": [
+      -62.487,
+      10.57,
+      82.785
+     ],
+     "scale": [
+      1.9291768082808483,
+      3.0195810912221974,
+      1.9291768082808483
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 289,
+   "components": {
+    "Name": {
+     "value": "Pine 141 trunk"
+    },
+    "Transform": {
+     "pos": [
+      86.804,
+      13.869,
+      39.268
+     ],
+     "scale": [
+      0.4505407596348703,
+      2.4028840513859744,
+      0.4505407596348703
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 290,
+   "components": {
+    "Name": {
+     "value": "Pine 141 top"
+    },
+    "Transform": {
+     "pos": [
+      86.804,
+      16.272,
+      39.268
+     ],
+     "scale": [
+      2.3027638825782257,
+      3.6043260770789622,
+      2.3027638825782257
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 291,
+   "components": {
+    "Name": {
+     "value": "Pine 142 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -34.538,
+      8.544,
+      77.212
+     ],
+     "scale": [
+      0.4972523590273223,
+      2.652012581479052,
+      0.4972523590273223
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 292,
+   "components": {
+    "Name": {
+     "value": "Pine 142 top"
+    },
+    "Transform": {
+     "pos": [
+      -34.538,
+      11.196,
+      77.212
+     ],
+     "scale": [
+      2.541512057250758,
+      3.9780188722185783,
+      2.541512057250758
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 293,
+   "components": {
+    "Name": {
+     "value": "Pine 143 trunk"
+    },
+    "Transform": {
+     "pos": [
+      35.157,
+      7.944,
+      3.789
+     ],
+     "scale": [
+      0.5724798062540661,
+      3.0532256333550194,
+      0.5724798062540661
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 294,
+   "components": {
+    "Name": {
+     "value": "Pine 143 top"
+    },
+    "Transform": {
+     "pos": [
+      35.157,
+      10.998,
+      3.789
+     ],
+     "scale": [
+      2.926007898631893,
+      4.579838450032529,
+      2.926007898631893
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 295,
+   "components": {
+    "Name": {
+     "value": "Pine 144 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -23.179,
+      8.187,
+      -17.211
+     ],
+     "scale": [
+      0.6651124203902067,
+      3.5472662420811023,
+      0.6651124203902067
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 296,
+   "components": {
+    "Name": {
+     "value": "Pine 144 top"
+    },
+    "Transform": {
+     "pos": [
+      -23.179,
+      11.735,
+      -17.211
+     ],
+     "scale": [
+      3.3994634819943896,
+      5.3208993631216535,
+      3.3994634819943896
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 297,
+   "components": {
+    "Name": {
+     "value": "Pine 145 trunk"
+    },
+    "Transform": {
+     "pos": [
+      42.206,
+      8.949,
+      -14.653
+     ],
+     "scale": [
+      0.6360966785397372,
+      3.392515618878598,
+      0.6360966785397372
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 298,
+   "components": {
+    "Name": {
+     "value": "Pine 145 top"
+    },
+    "Transform": {
+     "pos": [
+      42.206,
+      12.342,
+      -14.653
+     ],
+     "scale": [
+      3.251160801425323,
+      5.088773428317897,
+      3.251160801425323
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 299,
+   "components": {
+    "Name": {
+     "value": "Pine 146 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -33.216,
+      9.019,
+      -28.841
+     ],
+     "scale": [
+      0.379879190110692,
+      2.026022347257024,
+      0.379879190110692
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 300,
+   "components": {
+    "Name": {
+     "value": "Pine 146 top"
+    },
+    "Transform": {
+     "pos": [
+      -33.216,
+      11.045,
+      -28.841
+     ],
+     "scale": [
+      1.9416047494546478,
+      3.039033520885536,
+      1.9416047494546478
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 301,
+   "components": {
+    "Name": {
+     "value": "Pine 147 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -12.286,
+      10.72,
+      93.035
+     ],
+     "scale": [
+      0.40053040941223017,
+      2.1361621835318942,
+      0.40053040941223017
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 302,
+   "components": {
+    "Name": {
+     "value": "Pine 147 top"
+    },
+    "Transform": {
+     "pos": [
+      -12.286,
+      12.857,
+      93.035
+     ],
+     "scale": [
+      2.047155425884732,
+      3.2042432752978414,
+      2.047155425884732
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 303,
+   "components": {
+    "Name": {
+     "value": "Pine 148 trunk"
+    },
+    "Transform": {
+     "pos": [
+      111.571,
+      15.01,
+      42.2
+     ],
+     "scale": [
+      0.5652497349553776,
+      3.014665253095347,
+      0.5652497349553776
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 304,
+   "components": {
+    "Name": {
+     "value": "Pine 148 top"
+    },
+    "Transform": {
+     "pos": [
+      111.571,
+      18.025,
+      42.2
+     ],
+     "scale": [
+      2.8890542008830407,
+      4.5219978796430205,
+      2.8890542008830407
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 305,
+   "components": {
+    "Name": {
+     "value": "Pine 149 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -74.504,
+      7.327,
+      67.008
+     ],
+     "scale": [
+      0.4252531944365693,
+      2.2680170369950363,
+      0.4252531944365693
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 306,
+   "components": {
+    "Name": {
+     "value": "Pine 149 top"
+    },
+    "Transform": {
+     "pos": [
+      -74.504,
+      9.595,
+      67.008
+     ],
+     "scale": [
+      2.1735163271202427,
+      3.4020255554925543,
+      2.1735163271202427
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 307,
+   "components": {
+    "Name": {
+     "value": "Pine 150 trunk"
+    },
+    "Transform": {
+     "pos": [
+      -83.487,
+      15.707,
+      -47.169
+     ],
+     "scale": [
+      0.543813666414523,
+      2.900339554210789,
+      0.543813666414523
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.36,
+      0.25,
+      0.16,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 308,
+   "components": {
+    "Name": {
+     "value": "Pine 150 top"
+    },
+    "Transform": {
+     "pos": [
+      -83.487,
+      18.607,
+      -47.169
+     ],
+     "scale": [
+      2.7794920727853394,
+      4.350509331316184,
+      2.7794920727853394
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.1,
+      0.32,
+      0.16,
+      1
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "uid": 309,
+   "components": {
+    "Name": {
+     "value": "Boulder 1"
+    },
+    "Transform": {
+     "pos": [
+      -113.156,
+      26.168,
+      -60.724
+     ],
+     "rot": [
+      0,
+      0.5278,
+      0,
+      0.8494
+     ],
+     "scale": [
+      1.5634793897560748,
+      1.0824088082926673,
+      1.322944099024371
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 310,
+   "components": {
+    "Name": {
+     "value": "Boulder 2"
+    },
+    "Transform": {
+     "pos": [
+      -42.58,
+      10.73,
+      -39.884
+     ],
+     "rot": [
+      0,
+      0.4029,
+      0,
+      -0.9152
+     ],
+     "scale": [
+      1.6415029179857108,
+      1.1364250970670307,
+      1.3889640075263707
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 311,
+   "components": {
+    "Name": {
+     "value": "Boulder 3"
+    },
+    "Transform": {
+     "pos": [
+      -72.967,
+      45.114,
+      -97.862
+     ],
+     "rot": [
+      0,
+      0.6764,
+      0,
+      -0.7365
+     ],
+     "scale": [
+      2.0883280347693742,
+      1.4457655625326438,
+      1.7670467986510092
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 312,
+   "components": {
+    "Name": {
+     "value": "Boulder 4"
+    },
+    "Transform": {
+     "pos": [
+      -112.181,
+      29.948,
+      -67.702
+     ],
+     "rot": [
+      0,
+      0.8802,
+      0,
+      0.4746
+     ],
+     "scale": [
+      2.6459268987139963,
+      1.831795545263536,
+      2.2388612219887665
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 313,
+   "components": {
+    "Name": {
+     "value": "Boulder 5"
+    },
+    "Transform": {
+     "pos": [
+      33.977,
+      10.248,
+      -18.598
+     ],
+     "rot": [
+      0,
+      0.6202,
+      0,
+      -0.7845
+     ],
+     "scale": [
+      2.573131612927985,
+      1.7813988089501434,
+      2.177265210939064
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 314,
+   "components": {
+    "Name": {
+     "value": "Boulder 6"
+    },
+    "Transform": {
+     "pos": [
+      62.731,
+      30.195,
+      -83.148
+     ],
+     "rot": [
+      0,
+      0.9967,
+      0,
+      -0.0812
+     ],
+     "scale": [
+      2.100693386678583,
+      1.4543261907774807,
+      1.777509788728032
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 315,
+   "components": {
+    "Name": {
+     "value": "Boulder 7"
+    },
+    "Transform": {
+     "pos": [
+      29.237,
+      10.195,
+      -5.675
+     ],
+     "rot": [
+      0,
+      0.99,
+      0,
+      0.1411
+     ],
+     "scale": [
+      2.0193803120643836,
+      1.398032523736881,
+      1.7087064179006322
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 316,
+   "components": {
+    "Name": {
+     "value": "Boulder 8"
+    },
+    "Transform": {
+     "pos": [
+      -9.802,
+      41.292,
+      -103.299
+     ],
+     "rot": [
+      0,
+      0.9733,
+      0,
+      -0.2296
+     ],
+     "scale": [
+      1.4780923890571696,
+      1.0232947308857328,
+      1.2506935599714513
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 317,
+   "components": {
+    "Name": {
+     "value": "Boulder 9"
+    },
+    "Transform": {
+     "pos": [
+      33.266,
+      17.27,
+      -55.588
+     ],
+     "rot": [
+      0,
+      0.7174,
+      0,
+      0.6966
+     ],
+     "scale": [
+      2.821834992732379,
+      1.953578071891647,
+      2.387706532312013
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 318,
+   "components": {
+    "Name": {
+     "value": "Boulder 10"
+    },
+    "Transform": {
+     "pos": [
+      -34.801,
+      12.972,
+      -50.805
+     ],
+     "rot": [
+      0,
+      0.9218,
+      0,
+      0.3877
+     ],
+     "scale": [
+      1.9086152829159275,
+      1.321349042018719,
+      1.6149821624673235
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 319,
+   "components": {
+    "Name": {
+     "value": "Boulder 11"
+    },
+    "Transform": {
+     "pos": [
+      -90.789,
+      27.2,
+      -116.963
+     ],
+     "rot": [
+      0,
+      0.2293,
+      0,
+      -0.9733
+     ],
+     "scale": [
+      1.6562874311834956,
+      1.1466605292808816,
+      1.4014739802321887
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 320,
+   "components": {
+    "Name": {
+     "value": "Boulder 12"
+    },
+    "Transform": {
+     "pos": [
+      -24.784,
+      27.396,
+      -78.939
+     ],
+     "rot": [
+      0,
+      0.2685,
+      0,
+      0.9633
+     ],
+     "scale": [
+      2.5542912000353017,
+      1.7683554461782858,
+      2.1613233231067936
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 321,
+   "components": {
+    "Name": {
+     "value": "Boulder 13"
+    },
+    "Transform": {
+     "pos": [
+      23.294,
+      30.435,
+      -80.024
+     ],
+     "rot": [
+      0,
+      0.8901,
+      0,
+      0.4558
+     ],
+     "scale": [
+      2.114570912705747,
+      1.4639337087962865,
+      1.789252310751017
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 322,
+   "components": {
+    "Name": {
+     "value": "Boulder 14"
+    },
+    "Transform": {
+     "pos": [
+      37.582,
+      20.215,
+      -61.27
+     ],
+     "rot": [
+      0,
+      0.3398,
+      0,
+      0.9405
+     ],
+     "scale": [
+      1.7999165299800715,
+      1.2460960592169725,
+      1.523006294598522
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 323,
+   "components": {
+    "Name": {
+     "value": "Boulder 15"
+    },
+    "Transform": {
+     "pos": [
+      -75.739,
+      37.782,
+      -90.56
+     ],
+     "rot": [
+      0,
+      0.9041,
+      0,
+      0.4273
+     ],
+     "scale": [
+      2.2929506164674307,
+      1.5874273498620675,
+      1.9401889831647492
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 324,
+   "components": {
+    "Name": {
+     "value": "Boulder 16"
+    },
+    "Transform": {
+     "pos": [
+      71.958,
+      12.404,
+      -27.329
+     ],
+     "rot": [
+      0,
+      0.3688,
+      0,
+      0.9295
+     ],
+     "scale": [
+      2.449164862717536,
+      1.6955756741890635,
+      2.0723702684533
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 325,
+   "components": {
+    "Name": {
+     "value": "Boulder 17"
+    },
+    "Transform": {
+     "pos": [
+      74.341,
+      29.035,
+      -76.6
+     ],
+     "rot": [
+      0,
+      0.9843,
+      0,
+      0.1765
+     ],
+     "scale": [
+      2.1169684719853326,
+      1.465593557528307,
+      1.79128101475682
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 326,
+   "components": {
+    "Name": {
+     "value": "Boulder 18"
+    },
+    "Transform": {
+     "pos": [
+      -57.982,
+      37.399,
+      -110.584
+     ],
+     "rot": [
+      0,
+      0.1952,
+      0,
+      0.9808
+     ],
+     "scale": [
+      2.369554332910081,
+      1.6404606920146716,
+      2.0050075124623765
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 327,
+   "components": {
+    "Name": {
+     "value": "Boulder 19"
+    },
+    "Transform": {
+     "pos": [
+      -6.33,
+      38.261,
+      -112.076
+     ],
+     "rot": [
+      0,
+      0.9967,
+      0,
+      -0.0807
+     ],
+     "scale": [
+      2.67847691025832,
+      1.8543301686403755,
+      2.266403539449348
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 328,
+   "components": {
+    "Name": {
+     "value": "Boulder 20"
+    },
+    "Transform": {
+     "pos": [
+      100.538,
+      12.402,
+      16.267
+     ],
+     "rot": [
+      0,
+      0.5008,
+      0,
+      0.8656
+     ],
+     "scale": [
+      1.5632623496088704,
+      1.0822585497292179,
+      1.3227604496690442
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 329,
+   "components": {
+    "Name": {
+     "value": "Boulder 21"
+    },
+    "Transform": {
+     "pos": [
+      -48.732,
+      25.074,
+      -117.56
+     ],
+     "rot": [
+      0,
+      0.0402,
+      0,
+      0.9992
+     ],
+     "scale": [
+      2.7324713053465475,
+      1.891710903701456,
+      2.3120911045240016
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 330,
+   "components": {
+    "Name": {
+     "value": "Boulder 22"
+    },
+    "Transform": {
+     "pos": [
+      101.831,
+      35.714,
+      -114.728
+     ],
+     "rot": [
+      0,
+      0.8218,
+      0,
+      0.5698
+     ],
+     "scale": [
+      2.2596205303612757,
+      1.5643526748654988,
+      1.9119866026133874
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 331,
+   "components": {
+    "Name": {
+     "value": "Boulder 23"
+    },
+    "Transform": {
+     "pos": [
+      46.477,
+      20.5,
+      -56.319
+     ],
+     "rot": [
+      0,
+      0.1058,
+      0,
+      -0.9944
+     ],
+     "scale": [
+      1.753558969262277,
+      1.2140023633354224,
+      1.4837806662988497
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 332,
+   "components": {
+    "Name": {
+     "value": "Boulder 24"
+    },
+    "Transform": {
+     "pos": [
+      93.285,
+      13.656,
+      27.361
+     ],
+     "rot": [
+      0,
+      0.5474,
+      0,
+      0.8369
+     ],
+     "scale": [
+      1.3276518702691331,
+      0.9191436024940152,
+      1.1233977363815741
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 333,
+   "components": {
+    "Name": {
+     "value": "Boulder 25"
+    },
+    "Transform": {
+     "pos": [
+      111.903,
+      15.22,
+      -39.425
+     ],
+     "rot": [
+      0,
+      0.9123,
+      0,
+      0.4095
+     ],
+     "scale": [
+      1.0636191770285357,
+      0.7363517379428324,
+      0.8999854574856841
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 334,
+   "components": {
+    "Name": {
+     "value": "Boulder 26"
+    },
+    "Transform": {
+     "pos": [
+      -102.692,
+      34.591,
+      -102.309
+     ],
+     "rot": [
+      0,
+      0.1382,
+      0,
+      0.9904
+     ],
+     "scale": [
+      1.1976697737756818,
+      0.8291559972293182,
+      1.0134128855025002
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 335,
+   "components": {
+    "Name": {
+     "value": "Boulder 27"
+    },
+    "Transform": {
+     "pos": [
+      -81.273,
+      42.847,
+      -97.395
+     ],
+     "rot": [
+      0,
+      0.1731,
+      0,
+      -0.9849
+     ],
+     "scale": [
+      2.461679933753976,
+      1.704239954137368,
+      2.082959943945672
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 336,
+   "components": {
+    "Name": {
+     "value": "Boulder 28"
+    },
+    "Transform": {
+     "pos": [
+      -117.123,
+      8.63,
+      -26.448
+     ],
+     "rot": [
+      0,
+      0.9502,
+      0,
+      -0.3115
+     ],
+     "scale": [
+      1.3901279519423466,
+      0.9623962744216246,
+      1.1762621131819857
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 337,
+   "components": {
+    "Name": {
+     "value": "Boulder 29"
+    },
+    "Transform": {
+     "pos": [
+      -4.907,
+      36.329,
+      -113.589
+     ],
+     "rot": [
+      0,
+      0.5278,
+      0,
+      0.8494
+     ],
+     "scale": [
+      3.043802477389558,
+      2.1072478689620016,
+      2.57552517317578
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 338,
+   "components": {
+    "Name": {
+     "value": "Boulder 30"
+    },
+    "Transform": {
+     "pos": [
+      82.17,
+      34.396,
+      -114.936
+     ],
+     "rot": [
+      0,
+      0.9999,
+      0,
+      -0.0164
+     ],
+     "scale": [
+      1.3620026372977394,
+      0.9429249027445887,
+      1.1524637700211642
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 339,
+   "components": {
+    "Name": {
+     "value": "Boulder 31"
+    },
+    "Transform": {
+     "pos": [
+      62.226,
+      34.955,
+      -114.193
+     ],
+     "rot": [
+      0,
+      0.9686,
+      0,
+      -0.2485
+     ],
+     "scale": [
+      1.1480854999539318,
+      0.7948284230450297,
+      0.9714569614994808
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 340,
+   "components": {
+    "Name": {
+     "value": "Boulder 32"
+    },
+    "Transform": {
+     "pos": [
+      39.717,
+      8.776,
+      116.384
+     ],
+     "rot": [
+      0,
+      0.3681,
+      0,
+      -0.9298
+     ],
+     "scale": [
+      2.77461841292358,
+      1.9208896704855554,
+      2.347754041704568
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 341,
+   "components": {
+    "Name": {
+     "value": "Boulder 33"
+    },
+    "Transform": {
+     "pos": [
+      24.87,
+      26.216,
+      -76.537
+     ],
+     "rot": [
+      0,
+      0.9842,
+      0,
+      -0.177
+     ],
+     "scale": [
+      1.2767555615666684,
+      0.883907696469232,
+      1.0803316290179503
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 342,
+   "components": {
+    "Name": {
+     "value": "Boulder 34"
+    },
+    "Transform": {
+     "pos": [
+      -46.109,
+      17.312,
+      -65.159
+     ],
+     "rot": [
+      0,
+      0.9881,
+      0,
+      0.1535
+     ],
+     "scale": [
+      2.088319042487036,
+      1.4457593371064095,
+      1.7670391897967228
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 343,
+   "components": {
+    "Name": {
+     "value": "Boulder 35"
+    },
+    "Transform": {
+     "pos": [
+      -39.679,
+      26.734,
+      -84.728
+     ],
+     "rot": [
+      0,
+      0.9453,
+      0,
+      -0.3261
+     ],
+     "scale": [
+      1.4224302054337954,
+      0.9847593729926275,
+      1.2035947892132115
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 344,
+   "components": {
+    "Name": {
+     "value": "Boulder 36"
+    },
+    "Transform": {
+     "pos": [
+      24.78,
+      10.32,
+      80.6
+     ],
+     "rot": [
+      0,
+      0.8405,
+      0,
+      -0.5418
+     ],
+     "scale": [
+      1.3568305810186654,
+      0.9393442483975375,
+      1.1480874147081015
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.55,
+      0.53,
+      0.5,
+      1
+     ],
+     "roughness": 0.95,
+     "texture": "concrete",
+     "uv_scale": [
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "uid": 345,
+   "components": {
+    "Name": {
+     "value": "Hero"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      5.839940489814603,
+      28.0
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.35,
+     "height": 1.8,
+     "step_height": 0.4
+    }
+   }
+  },
+  {
+   "uid": 346,
+   "components": {
+    "Name": {
+     "value": "Hero body"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      6.739940489814603,
+      28.0
+     ],
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "Parent": {
+     "target": 345
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.95,
+      0.5,
+      0.25,
+      1
+     ],
+     "roughness": 0.5
+    }
+   }
+  },
+  {
+   "uid": 347,
+   "components": {
+    "Name": {
+     "value": "Hero head"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      7.789940489814603,
+      28.0
+     ],
+     "scale": [
+      0.55,
+      0.55,
+      0.55
+     ]
+    },
+    "Parent": {
+     "target": 345
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      1.95,
+      0
+     ],
+     "scale": [
+      0.55,
+      0.55,
+      0.55
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.85,
+      0.7,
+      1
+     ],
+     "roughness": 0.45
+    }
+   }
+  },
+  {
+   "uid": 348,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      10.039940489814603,
+      36.0
+     ],
+     "rot": [
+      -0.2,
+      0,
+      0,
+      0.98
+     ]
+    },
+    "Parent": {
+     "target": 345
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      4.2,
+      8
+     ],
+     "rot": [
+      -0.2,
+      0,
+      0,
+      0.98
+     ]
+    },
+    "Camera": {
+     "fov_y": 55,
+     "far": 700,
+     "clear": [
+      0.5,
+      0.65,
+      0.85,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 349,
+   "components": {
+    "Name": {
+     "value": "Hint"
+    },
+    "Text": {
+     "value": "WASD walk   Space jump   wade into the lake",
+     "pos": [
+      0.5,
+      0.04
+     ],
+     "size": 0.04,
+     "align": 1,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "shadow": true
+    }
+   }
+  }
+ ],
+ "systems": [
+  {
+   "name": "walk_input",
+   "doc": "Keys into the character controller: A/D and W/S set the walking speed (6 m/s), Space asks for a jump (6.5 m/s up) when on the ground.",
+   "each": [
+    "CharacterBody"
+   ],
+   "do": [
+    {
+     "set": "CharacterBody.walk[0]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.d"
+         },
+         {
+          "res": "input.a"
+         }
+        ]
+       },
+       6
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[1]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.s"
+         },
+         {
+          "res": "input.w"
+         }
+        ]
+       },
+       6
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "input.space"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "CharacterBody.jump",
+       "to": 6.5
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "wade",
+   "doc": "The engine puts InWater on a character whose feet are under the water and takes it off when it climbs out: only those are visited here. The deeper the water, the slower the walk (down to 30% at 1.5 m).",
+   "each": [
+    "CharacterBody",
+    "InWater"
+   ],
+   "order": 150,
+   "do": [
+    {
+     "let": "k",
+     "be": {
+      "sub": [
+       1.0,
+       {
+        "mul": [
+         0.7,
+         {
+          "clamp": [
+           {
+            "div": [
+             {
+              "get": "InWater.depth"
+             },
+             1.5
+            ]
+           },
+           0,
+           1
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[0]",
+     "to": {
+      "mul": [
+       {
+        "get": "CharacterBody.walk[0]"
+       },
+       {
+        "var": "k"
+       }
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[1]",
+     "to": {
+      "mul": [
+       {
+        "get": "CharacterBody.walk[1]"
+       },
+       {
+        "var": "k"
+       }
+      ]
+     }
+    },
+    {
+     "res_set": "hero.wet",
+     "to": 1
+    }
+   ]
+  },
+  {
+   "name": "dry",
+   "doc": "The resource hero.wet is 1 while the hero is in the water (written by `wade`) and 0 otherwise.",
+   "each": [
+    "CharacterBody"
+   ],
+   "order": 140,
+   "do": [
+    {
+     "res_set": "hero.wet",
+     "to": 0
+    }
+   ]
+  }
+ ]
+}

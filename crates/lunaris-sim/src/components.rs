@@ -1692,3 +1692,72 @@ component! {
         pub inner: f32 = 0.0,
     }
 }
+
+// ------------------------------------------------------------------------------------------------ terrain layers
+// A new component for painted terrain materials (docs/TERRAIN.md, "Layers"; the splat map is read and drawn by `crates/lunaris-render/src/terrain_layers.rs` and the GPU renderer). Kept at the end of the file.
+
+component! {
+    /// Painted materials for the `Terrain` on the same entity (docs/TERRAIN.md, "Layers"; Unity's terrain layers, Unreal's landscape layers): up to four materials blended by a **splat map**, in
+    /// place of the terrain's one `texture`. `splat` is an RGBA PNG of the workspace that covers the whole ground like the heightmap does (row 0 is the north edge, the left column the west edge, samples on the
+    /// corners of the cells; any size): the weight of layer 1 is its red channel, layer 2 the green, layer 3 the blue and layer 4 the alpha, normalised where they do not add up to 1 (a texel with no
+    /// weight at all is the first layer). `layers` is text, one layer a line: `NAME [TEXTURE] [uv_scale=N] [bump=D] [tint=R,G,B]`: the name (letters, digits, `_`, `-`; it is what `terrain_layer` and
+    /// `scatter` call the layer), the texture (a built-in material such as `grass`, `dirt`, `stone`, `sand`, or a PNG or JPEG of the workspace; the name itself when left out), how many times the
+    /// texture repeats across the whole ground (`uv_scale=48`, or `uv_scale=48,32`; the `Terrain`'s own `uv_scale` when left out), the depth in metres of the relief of a built-in material's bumps in the GPU
+    /// renderer's high qualities (`bump=0.03`, 0 for flat), and a colour the texture is multiplied by (`tint=1.2,1.2,1.3`, each 0 to 4). `Terrain.color` multiplies the blend as it multiplies a texture
+    /// (set it to `[1, 1, 1, 1]` to see the layers as they are); `Terrain.texture` and its alpha are not used while this is here. Both renderers draw the blend; a mistake in the text
+    /// (see `check`) leaves the terrain drawn with its own texture.
+    pub struct TerrainLayers {
+        pub splat: Sym = Sym(0),
+        pub layers: Sym = Sym(0),
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ water bodies
+// New components for water that follows a heightmap (docs/TERRAIN.md, "Water bodies"; the geometry and what the engine does with it is `water.rs`, the picture is drawn by both renderers). Kept at the end of the file.
+
+component! {
+    /// Water that follows a heightmap (docs/TERRAIN.md, "Water bodies"): rivers that step down a valley and lakes at their own levels, from one picture, where the flat `Water` sheet is one level. `heightmap` is a
+    /// 16-bit greyscale PNG of the workspace (Tellus writes it as `water.png`) in which **0 is dry land** and any other value is the height of the water's surface: `value / 65535 * relief` metres above
+    /// the entity's `Transform.y` (0 for Tellus's, whose heights are absolute). It covers `size` metres (x, z) centred on the entity, laid on the ground like a `Terrain`'s heightmap (row 0 north, samples on the
+    /// corners of the cells, `step` uses every step-th sample). Both renderers draw the surface (in the GPU renderer's high qualities see-through in `color`, rolling with waves `wave_height` metres tall
+    /// and `wave_length` long that move at `speed`, lit by the sun and reflecting the sky; the reference renderer and `classic` draw it flat and solid); the water is only where the picture says, so it hides
+    /// under a bank that stands higher. `phase` is the engine's clock for the waves. The engine also uses it: characters that stand in it get an `InWater`, `Buoyant` bodies float on it, and the
+    /// `water_depth` tool measures it. It is not solid and rays pass through it.
+    pub struct WaterBody {
+        pub heightmap: Sym = Sym(0),
+        pub size: [f32; 2] = [256.0, 256.0],
+        pub relief: f32 = 64.0,
+        pub step: u32 = 1,
+        pub color: [f32; 4] = [0.04, 0.28, 0.38, 0.82],
+        pub wave_height: f32 = 0.15,
+        pub wave_length: f32 = 6.0,
+        pub speed: f32 = 1.0,
+        pub phase: f32 = 0.0,
+        pub visible: bool = true,
+    }
+}
+
+component! {
+    /// Written by the engine on every entity with a `CharacterBody` whose feet are under the surface of a `WaterBody`, and taken off again when it climbs out (docs/TERRAIN.md, "Water bodies"): its mere
+    /// presence is the answer to "is it in water?", so a graph system that `each`es over `CharacterBody` and `InWater` runs only for swimmers and waders (slow them, change the animation, play a
+    /// splash). `depth` is how far the surface is above the character's feet in metres (compare it with `CharacterBody.height`: 0.5 is a wade, 1.5 a swim), `surface` the height of the surface in
+    /// world y and `body` the `WaterBody` entity. Leave the fields alone: they are rewritten every tick. A scene with no `WaterBody` never gets one.
+    pub struct InWater {
+        pub depth: f32 = 0.0,
+        pub surface: f32 = 0.0,
+        pub body: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// Makes a rigid body float in a `WaterBody` (docs/TERRAIN.md, "Water bodies"; beside a `Collider`, a `RigidBody` and a `Velocity`: a ball, a box, a capsule). The water pushes the body up by gravity
+    /// times how many times heavier the water is than the body (1000 / `density`, the density in kilograms per cubic metre: 500 is wood, 920 ice, 1000 floats awash, above 1000 it sinks slowly) times the
+    /// share of the body that is under the surface (a ball's by its cap, a box's by its height), and slows it by `drag` per second in proportion to that share (and its spin too). A body
+    /// of density 500 sinks until half of it is under. `submerged` (0 to 1) is the share the engine found this tick: read it for splash sounds and foam. Waves are not part of the simulation, so the surface
+    /// is the flat one of the picture.
+    pub struct Buoyant {
+        pub density: f32 = 500.0,
+        pub drag: f32 = 2.0,
+        pub submerged: f32 = 0.0,
+    }
+}

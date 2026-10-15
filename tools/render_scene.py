@@ -1,6 +1,6 @@
 """Load a scene, optionally add entities and step, and render one picture with the `lunaris` binary: for looking at what a change to a renderer does.
 
-    python3 tools/render_scene.py examples/vista.lunaris.json out.png [--add '{"PostFx":{"shafts":0.8}}']... [--steps N]
+    python3 tools/render_scene.py examples/vista.lunaris.json out.png [--add '{"PostFx":{"shafts":0.8}}']... [--steps N] [--hold a,w]
         [--quality high|ultra|reference|classic|...] [--size 960x540] [--eye x,y,z --target x,y,z --fov 60] [--bin target/release/lunaris]
 
 `--add` takes a JSON object of components and may be given several times (each becomes one new entity). The picture is written to the given path
@@ -16,6 +16,7 @@ ap.add_argument("scene")
 ap.add_argument("out")
 ap.add_argument("--add", action="append", default=[])
 ap.add_argument("--steps", type=int, default=0)
+ap.add_argument("--hold", help="keys held down during --steps, e.g. a,w: a hero that walks to where the picture is taken")
 ap.add_argument("--quality", default="high")
 ap.add_argument("--size", default="960x540")
 ap.add_argument("--eye")
@@ -29,8 +30,12 @@ w, h = (int(v) for v in a.size.split("x"))
 reqs = [{"name": "load_scene", "arguments": {"path": a.scene}}]
 for comp in a.add:
     reqs.append({"name": "spawn", "arguments": {"components": json.loads(comp)}})
+if a.hold:
+    reqs.append({"name": "input", "arguments": {"values": {k: True for k in a.hold.split(",")}}})
 if a.steps:
     reqs.append({"name": "step", "arguments": {"ticks": a.steps}})
+if a.hold:
+    reqs.append({"name": "input", "arguments": {"values": {k: False for k in a.hold.split(",")}}})
 if a.prime:
     pe, pt = a.prime.split(";")
     reqs.append({"name": "render", "arguments": {"width": w, "height": h, "quality": a.quality, "image": False, "eye": [float(v) for v in pe.split(",")], "target": [float(v) for v in pt.split(",")], "fov": a.fov}})

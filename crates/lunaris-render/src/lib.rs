@@ -13,9 +13,11 @@ pub mod render;
 pub mod rig;
 mod l10n;
 pub mod terrain;
+pub mod terrain_layers;
 pub mod texture;
 mod ui;
 pub mod views;
+pub mod water_body;
 
 pub use frame::{encode_png, Frame, Visible};
 pub use query::{raycast, raycast_masked, raycast_targets, raycast_with, RayHit, RayTargets};
@@ -42,3 +44,5 @@ mod ui_scale_tests;
 mod ui_scroll_tests;
 #[cfg(test)]
 mod ui_radial_tests;
+#[cfg(test)]
+mod terrain_layers_tests;

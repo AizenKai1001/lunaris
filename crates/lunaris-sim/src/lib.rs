@@ -38,6 +38,7 @@ mod ui_select;
 mod ui_tip;
 pub mod vehicle;
 mod vehicle_ray;
+pub mod water;
 mod vm;
 
 pub use command::{apply, apply_batch, Applied, Command};
@@ -83,6 +84,8 @@ mod physics_tests;
 mod physics_rot_tests;
 #[cfg(test)]
 mod terrain_tests;
+#[cfg(test)]
+mod water_tests;
 #[cfg(test)]
 mod ui_kit_tests;
 #[cfg(test)]

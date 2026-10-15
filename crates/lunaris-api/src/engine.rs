@@ -18,7 +18,7 @@ pub(crate) const MAX_SPAWN_COUNT: u64 = 1_000_000;
 /// Tools that never change the world (they may write a file or draw a picture). Every other tool advances the revision counter.
 const READ_ONLY_TOOLS: &[&str] = &[
     "describe", "schema", "get", "query", "hash", "revision", "snapshots", "events", "resources", "systems", "get_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project",
-    "save_scene", "export_game", "verify", "files", "saves", "model_info", "prefabs", "path", "acoustics", "compile_script", "get_script", "terrain_height",
+    "save_scene", "export_game", "verify", "files", "saves", "model_info", "prefabs", "path", "acoustics", "compile_script", "get_script", "terrain_height", "terrain_layer", "water_depth",
 ];
 
 fn script_diag_json(d: &lunaris_script::Diagnostic) -> Json {
@@ -244,6 +244,8 @@ impl Engine {
             "model_info" => self.model_info_tool(&a),
             "define_system" => self.single(Command::DefineSystem { def: args.clone() }),
             "terrain_height" => self.terrain_height_tool(&a),
+            "terrain_layer" => self.terrain_layer_tool(&a),
+            "water_depth" => self.water_depth_tool(&a),
             "scatter" => self.scatter_tool(&a),
             "type_text" => self.type_text_tool(&a),
             "save_game" => self.save_game_tool(&a),

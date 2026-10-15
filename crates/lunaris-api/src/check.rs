@@ -12,8 +12,10 @@ mod draw_order;
 mod language;
 mod layers;
 mod menus;
+mod terrain_layers;
 mod ui_kit3;
 mod vehicle;
+mod water;
 
 struct Problems(Vec<Json>);
 
@@ -682,6 +684,8 @@ impl Engine {
         language::run(&mut self.sim.world, &root, &mut problems)?;
         menus::run(&mut self.sim.world, &mut problems)?;
         ui_kit3::run(&mut self.sim.world, &mut problems)?;
+        terrain_layers::run(&mut self.sim.world, &mut self.textures, &root, &mut problems)?;
+        water::run(&mut self.sim, &mut problems)?;
         // raycast vehicles: the chassis, the wheel table, the numbers; gravity (the lowest-uid PhysicsSettings, like the physics) tells how much weight a spring carries
         {
             let mut gravity = 9.8f32;

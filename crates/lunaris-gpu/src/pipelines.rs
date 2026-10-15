@@ -15,6 +15,8 @@ pub const MESH_STRIDE: u64 = 48;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PipeId {
     Mesh,
+    /// Painted terrain (`TerrainLayers`): the mesh shader with a splat map and up to four layers in a third bind group.
+    MeshSplat,
     /// See-through meshes: sorted far to near, blended over the picture, not writing depth.
     MeshBlend,
     Sprite,
@@ -62,6 +64,7 @@ pub struct Shaders {
 pub struct Layouts {
     pub scene0: BindGroupLayout,
     pub tex1: BindGroupLayout,
+    pub splat2: BindGroupLayout,
     pub depth0: BindGroupLayout,
     pub text0: BindGroupLayout,
     pub resolve: BindGroupLayout,
@@ -136,6 +139,8 @@ impl Layouts {
         Layouts {
             scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array())]),
             tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float())]),
+            // a painted terrain: its numbers, the splat map and its sampler, the layers' sampler, four colour textures and four relief maps
+            splat2: make("splat2", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering()), entry(3, sampler_filtering()), entry(4, tex_float()), entry(5, tex_float()), entry(6, tex_float()), entry(7, tex_float()), entry(8, tex_float()), entry(9, tex_float()), entry(10, tex_float()), entry(11, tex_float())]),
             depth0: make("depth0", &[entry(0, uniform()), entry(1, storage_ro())]),
             text0: make("text0", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering())]),
             resolve: make("resolve", &[entry(2, tex_float())]),
@@ -222,6 +227,20 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
                 multisample: ms,
                 fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_mesh"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),
+                multiview_mask: None,
+                cache: None,
+            })
+        }
+        PipeId::MeshSplat => {
+            let pl = layout("mesh-splat", &[&ly.scene0, &ly.tex1, &ly.splat2]);
+            device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("mesh-splat"),
+                layout: Some(&pl),
+                vertex: VertexState { module: &sh.scene, entry_point: Some("vs_mesh"), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
+                primitive: tri(Some(Face::Back)),
+                depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
+                multisample: ms,
+                fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_mesh_splat"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),
                 multiview_mask: None,
                 cache: None,
             })

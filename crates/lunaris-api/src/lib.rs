@@ -15,10 +15,12 @@ mod gpu;
 mod render_tools;
 mod saves;
 mod scatter;
+mod terrain_layers;
 mod rpc;
 mod tools;
 mod typing;
 mod verify;
+mod water;
 
 pub use audio::{acoustics_for, room_settings, AcousticsConfig, Director};
 pub use engine::{Engine, VERSION};
@@ -43,6 +45,10 @@ mod saves_tests;
 mod script_tests;
 #[cfg(test)]
 mod terrain_tests;
+#[cfg(test)]
+mod terrain_layers_tests;
+#[cfg(test)]
+mod water_tests;
 #[cfg(test)]
 mod ui_tests;
 #[cfg(test)]

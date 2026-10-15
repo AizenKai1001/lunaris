@@ -418,6 +418,8 @@ impl Sim {
         // slow motion, pause and fast forward: the resource `time.scale` (default 1, 0 to 8) multiplies the length of every step; at 0 nothing moves
         // but graph systems and the interface still run, so a pause menu can unpause
         let dt = self.dt * self.world.resource("time.scale").filter(|s| s.is_finite()).unwrap_or(1.0).clamp(0.0, 8.0) as f32;
+        // bodies that float are pushed up by the water before the physics step moves them (a world without a `Buoyant` pays for one query)
+        stage!("buoyancy", crate::water::Water::buoyancy(&mut self.world, &self.heightfields, dt));
         let mut ctx = SimCtx { tick: self.tick, threads: self.threads, gravity: [0.0, -9.8, 0.0], contacts: Vec::new(), dt, seed: self.seed, rng: self.rng.clone(), terrains: self.heightfields.clone(), meshes: self.meshes.clone() };
         for s in &self.systems {
             match prof.as_mut() {
@@ -445,6 +447,11 @@ impl Sim {
         // tick's input, then attached entities follow their parents after everything else has moved them
         stage!("navigation", crate::nav::step(&mut self.world, &mut self.nav, dt, &self.heightfields, &self.meshes));
         stage!("characters", crate::character::step(&mut self.world, dt, &self.heightfields, &self.meshes));
+        // the waves' clock, and `InWater` on the characters that now stand in a water body
+        stage!("water", {
+            crate::water::Water::waves(&mut self.world, dt);
+            crate::water::Water::swimmers(&mut self.world, &self.heightfields);
+        });
         stage!("gameplay blocks", crate::gameplay::update(&mut self.world, &mut self.scripts, self.tick, dt, &self.heightfields, &self.meshes));
         stage!("hierarchy", systems::hierarchy(&mut self.world));
         let tick = self.tick;
@@ -470,9 +477,10 @@ impl Sim {
         }
     }
 
-    /// The heightmaps that the `Terrain` entities of the world name (sorted, each once).
+    /// The pictures that the `Terrain` and `WaterBody` entities of the world name (sorted, each once): heightmaps, and the heights of the water.
     pub fn used_terrains(&self) -> Vec<String> {
-        let syms: Vec<u32> = self.world.entities_by_uid().iter().filter_map(|e| self.world.get::<Terrain>(*e)).map(|t| t.heightmap.0).collect();
+        let mut syms: Vec<u32> = self.world.entities_by_uid().iter().filter_map(|e| self.world.get::<Terrain>(*e)).map(|t| t.heightmap.0).collect();
+        syms.extend(self.world.entities_by_uid().iter().filter_map(|e| self.world.get::<WaterBody>(*e)).map(|w| w.heightmap.0));
         self.terrain_names(syms)
     }
 
@@ -489,6 +497,7 @@ impl Sim {
         // (a query over the archetypes that have a Terrain: free when there is none, however many entities there are)
         let mut syms: Vec<u32> = Vec::new();
         let _ = self.world.for_each_uid::<(&Terrain,), _>(|_, _, (t,)| syms.push(t.heightmap.0));
+        let _ = self.world.for_each_uid::<(&WaterBody,), _>(|_, _, (w,)| syms.push(w.heightmap.0));
         for name in self.terrain_names(syms) {
             if self.heightfields.contains_key(&name) || (self.terrain_errors.contains_key(&name) && self.tick % 300 != 0) {
                 continue;
@@ -834,6 +843,10 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::UiTooltip>().expect("standard component");
     world.register_native::<crate::components::UiTooltipBox>().expect("standard component");
     world.register_native::<crate::components::UiRadial>().expect("standard component");
+    world.register_native::<crate::components::TerrainLayers>().expect("standard component");
+    world.register_native::<crate::components::WaterBody>().expect("standard component");
+    world.register_native::<crate::components::InWater>().expect("standard component");
+    world.register_native::<crate::components::Buoyant>().expect("standard component");
 }
 
 impl RecordedRead {

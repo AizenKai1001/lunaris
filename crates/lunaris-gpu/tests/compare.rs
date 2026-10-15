@@ -50,6 +50,8 @@ fn compare(cpu: &[u8], gpu: &[u8]) -> (Diff, Vec<u8>) {
 fn load(root: &PathBuf, name: &str, ticks: u64) -> Sim {
     let text = std::fs::read_to_string(root.join("examples").join(format!("{name}.lunaris.json"))).unwrap();
     let mut sim = Sim::new(1);
+    // the ground of a terrain and the water of a water body are read from the workspace
+    sim.asset_root = Some(root.clone());
     sim.load_scene(&lunaris_json::parse(&text).unwrap()).unwrap();
     sim.step_n(ticks);
     sim
@@ -91,6 +93,8 @@ fn classic_pictures_match_the_reference_renderer() {
         ("particle_clouds", 0, 640, 360, 1.5, 0.02),
         ("particle_fx", 120, 640, 360, 1.5, 0.02),
         ("views", 0, 640, 360, 1.5, 0.02),
+        // a painted valley with a lake: the crates have settled on the water
+        ("terrain_layers", 480, 640, 360, 1.0, 0.005),
     ];
     let classic = Quality::classic();
     for &(name, ticks, w, h, max_mean, max_outliers) in scenes {
@@ -118,7 +122,7 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
     let out = root.join("target").join("gpu-compare");
     std::fs::create_dir_all(&out).unwrap();
     let high = Quality::high();
-    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0)] {
+    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0), ("terrain_layers", 480)] {
         let mut sim = load(&root, name, ticks);
         let opts = RenderOptions { width: 960, height: 540, ..RenderOptions::default() };
         let mut tex = TextureCache::new(Some(root.clone()));
@@ -134,7 +138,7 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
 fn entity_ids_agree_with_the_reference_renderer() {
     let Some(mut gpu) = gpu_or_skip() else { return };
     let root = repo_root();
-    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("coin_chase", 60), ("pile", 120), ("clockwork", 300)] {
+    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("coin_chase", 60), ("pile", 120), ("clockwork", 300), ("terrain_layers", 480)] {
         let mut sim = load(&root, name, ticks);
         let opts = RenderOptions { width: 640, height: 360, ..RenderOptions::default() };
         let mut tex_cpu = TextureCache::new(Some(root.clone()));
@@ -491,6 +495,278 @@ fn the_ui_kit3_widgets_are_drawn_the_same_in_both_renderers_in_every_state() {
     point(&mut sim, 0.835, 0.612, false, 62);
     let cool = check(&mut sim, "cooldown");
     assert_ne!(tip, cool);
+}
+
+// ------------------------------------------------------------------------------------------------ painted terrain (`TerrainLayers`)
+
+fn write_grey16(path: &PathBuf, n: u32, samples: &[u16]) {
+    let mut bytes = Vec::with_capacity(samples.len() * 2);
+    for v in samples {
+        bytes.extend_from_slice(&v.to_be_bytes());
+    }
+    let mut enc = png::Encoder::new(std::io::BufWriter::new(std::fs::File::create(path).unwrap()), n, n);
+    enc.set_color(png::ColorType::Grayscale);
+    enc.set_depth(png::BitDepth::Sixteen);
+    enc.write_header().unwrap().write_image_data(&bytes).unwrap();
+}
+
+fn write_rgba8(path: &PathBuf, w: u32, h: u32, rgba: &[u8]) {
+    png(path, w, h, rgba);
+}
+
+/// The scene text of a ground made of `heightmap`, painted by `splat` with `layers`, seen by an explicit camera (so no camera entity): a sun, a sky, and the ground.
+fn painted_scene(dir: &str, layers: &str, size: f32, relief: f32) -> Sim {
+    let text = format!(
+        r#"{{"lunaris":1,"entities":[
+{{"uid":1,"components":{{"Transform":{{"rot":[-0.5,0.32,0.12,0.8]}},"Light":{{"kind":0,"color":[1,0.95,0.85],"intensity":2.2}}}}}},
+{{"uid":2,"components":{{"Environment":{{"sky":true,"sky_top":[0.2,0.4,0.8],"sky_horizon":[0.8,0.85,0.95],"clouds":0.3,"bloom":0.1}}}}}},
+{{"uid":3,"components":{{"Transform":{{"pos":[0,0,0]}},"Terrain":{{"heightmap":"{dir}/hills.png","size":[{size},{size}],"height":{relief},"color":[1,1,1,1],"uv_scale":[16,16]}},"TerrainLayers":{{"splat":"{dir}/splat.png","layers":{}}}}}}}
+]}}"#,
+        lunaris_json::Json::str(layers).to_string_lossy()
+    );
+    let mut sim = Sim::new(1);
+    sim.load_scene(&lunaris_json::parse(&text).unwrap()).unwrap();
+    sim
+}
+
+fn above(eye: [f32; 3], target: [f32; 3], up: [f32; 3], fov: f32) -> lunaris_render::View {
+    lunaris_render::View::Explicit(lunaris_render::ExplicitCamera { eye, target, up, fov_y: fov, ..Default::default() })
+}
+
+/// Hills painted with the four built-in materials by height: the two renderers must blend the same layers in the same places. The classic GPU picture is compared with the reference pixel by pixel
+/// (nearest-neighbour textures, bilinear splat); the high-quality picture is written for a look and must show every layer.
+#[test]
+fn a_painted_terrain_is_blended_the_same_way_in_both_renderers() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let out = root.join("target").join("gpu-compare");
+    let ws = out.join("painted");
+    std::fs::create_dir_all(&ws).unwrap();
+    // 65 x 65 hills; the splat map has a weight per layer: sand low, grass above it, rock in a few patches, snow on the high ground
+    let n = 65usize;
+    let mut heights = vec![0u16; n * n];
+    let mut splat = Vec::with_capacity(n * n * 4);
+    for j in 0..n {
+        for i in 0..n {
+            let (x, z) = (i as f32 / (n - 1) as f32, j as f32 / (n - 1) as f32);
+            let h = (0.5 + 0.28 * (x * 9.0).sin() * (z * 7.0 + 1.0).cos() + 0.25 * ((x - 0.5) * 3.0).cos() * ((z - 0.5) * 3.0).cos() - 0.25).clamp(0.0, 1.0);
+            heights[j * n + i] = (h * 65535.0) as u16;
+            let step = |a: f32, b: f32, v: f32| ((v - a) / (b - a)).clamp(0.0, 1.0);
+            let sand = 1.0 - step(0.30, 0.42, h);
+            let snow = step(0.62, 0.74, h);
+            let rock = (((x * 23.0).sin() * (z * 19.0).sin()) * 2.0).clamp(0.0, 1.0) * (1.0 - snow);
+            let grass = (1.0 - sand - snow).max(0.0) * (1.0 - rock);
+            splat.extend_from_slice(&[(grass * 255.0) as u8, (rock * 255.0) as u8, (sand * 255.0) as u8, (snow * 255.0) as u8]);
+        }
+    }
+    write_grey16(&ws.join("hills.png"), n as u32, &heights);
+    write_rgba8(&ws.join("splat.png"), n as u32, n as u32, &splat);
+    let layers = "grass grass uv_scale=10\nrock stone uv_scale=8\nsand sand uv_scale=12\nsnow concrete uv_scale=10 tint=1.7,1.7,1.8";
+    let mut sim = painted_scene("target/gpu-compare/painted", layers, 96.0, 18.0);
+    let (w, h) = (640u32, 360u32);
+    let view = above([0.0, 30.0, 62.0], [0.0, 4.0, 0.0], [0.0, 1.0, 0.0], 58.0);
+    let opts = RenderOptions { width: w, height: h, view: view.clone(), ..RenderOptions::default() };
+    let mut tex_cpu = TextureCache::new(Some(root.clone()));
+    let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
+    let mut tex_gpu = TextureCache::new(Some(root.clone()));
+    let g = gpu.render_to_image(&mut sim.world, &mut tex_gpu, &opts, &Quality::classic()).expect("gpu render");
+    assert!(cpu.warnings.is_empty() && g.warnings.is_empty(), "{:?} {:?}", cpu.warnings, g.warnings);
+    let (d, diff_img) = compare(&cpu.rgba, &g.rgba);
+    png(&out.join("painted-cpu.png"), w, h, &cpu.rgba);
+    png(&out.join("painted-classic.png"), w, h, &g.rgba);
+    png(&out.join("painted-diff.png"), w, h, &diff_img);
+    println!("painted terrain: mean abs error {:.3}, {:.2}% of pixels differ by more than 40, worst {}", d.mean, d.outliers * 100.0, d.worst);
+    assert!(d.mean <= 1.0 && d.outliers <= 0.005, "the renderers differ (mean {}, {:.2}% outliers)", d.mean, d.outliers * 100.0);
+    // the ground is what is picked, in both
+    assert_eq!(cpu.pick(320, 250), Some(3));
+    assert_eq!(g.pick(320, 250), Some(3));
+    // the layers are really there: the picture has far more colours than the one texture the same terrain would have, and it differs from the plain terrain
+    let colours: std::collections::BTreeSet<[u8; 3]> = cpu.rgba.chunks(4).map(|p| [p[0], p[1], p[2]]).collect();
+    assert!(colours.len() > 400, "{} colours", colours.len());
+    let hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    png(&out.join("painted-high.png"), w, h, &hi.rgba);
+    let again = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    assert_eq!(hi.rgba, again.rgba, "the same world draws the same picture twice");
+    let hi_colours: std::collections::BTreeSet<[u8; 3]> = hi.rgba.chunks(4).map(|p| [p[0], p[1], p[2]]).collect();
+    assert!(hi_colours.len() > 1000, "{} colours in high quality", hi_colours.len());
+    // without the component the same ground is drawn another way in every quality
+    let e = sim.world.entity(3).unwrap();
+    sim.world.remove_typed::<lunaris_sim::components::TerrainLayers>(e).unwrap();
+    let plain_cpu = render(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts).expect("cpu render");
+    let plain_hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    assert_ne!(plain_cpu.rgba, cpu.rgba);
+    assert_ne!(plain_hi.rgba, hi.rgba);
+}
+
+/// Four solid layers (red, green, blue, yellow) on the four quarters of the ground, seen from above: each layer is where the splat map puts it, row 0 of the map is the north edge, and the
+/// same holds in the classic and in the high qualities.
+#[test]
+fn each_layer_is_where_the_splat_map_puts_it_in_every_quality() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let out = root.join("target").join("gpu-compare");
+    let ws = out.join("quarters");
+    std::fs::create_dir_all(&ws).unwrap();
+    write_grey16(&ws.join("hills.png"), 9, &vec![0u16; 81]);
+    // 8 x 8 splat: north-west layer 1 (red), north-east layer 2 (green), south-west layer 3 (blue), south-east layer 4 (yellow)
+    let mut splat = Vec::new();
+    for row in 0..8 {
+        for col in 0..8 {
+            splat.extend_from_slice(&match (row < 4, col < 4) {
+                (true, true) => [255u8, 0, 0, 0],
+                (true, false) => [0, 255, 0, 0],
+                (false, true) => [0, 0, 255, 0],
+                (false, false) => [0, 0, 0, 255],
+            });
+        }
+    }
+    write_rgba8(&ws.join("splat.png"), 8, 8, &splat);
+    for (name, rgb) in [("red", [255u8, 0, 0]), ("green", [0, 255, 0]), ("blue", [0, 0, 255]), ("yellow", [255, 255, 0])] {
+        let mut px = Vec::new();
+        for _ in 0..16 {
+            px.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
+        }
+        write_rgba8(&ws.join(format!("{name}.png")), 4, 4, &px);
+    }
+    let layers: String = ["red", "green", "blue", "yellow"].iter().map(|c| format!("{c} target/gpu-compare/quarters/{c}.png uv_scale=4")).collect::<Vec<_>>().join("
+");
+    let mut sim = painted_scene("target/gpu-compare/quarters", &layers, 32.0, 4.0);
+    let (w, h) = (200u32, 200u32);
+    // from straight above with north at the top of the picture
+    let opts = RenderOptions { width: w, height: h, view: above([0.0, 40.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, -1.0], 45.0), ..RenderOptions::default() };
+    // which of the four colours a pixel is, by how far one channel stands out (the high quality has a sun, a sky and a filmic tone curve that wash colours out: a smaller margin there)
+    let hue = |c: &[u8], margin: i32| -> &'static str {
+        let (r, g, b) = (c[0] as i32, c[1] as i32, c[2] as i32);
+        if r - g > margin && r - b > margin {
+            "red"
+        } else if g - r > margin && g - b > margin {
+            "green"
+        } else if b - r > margin && b - g > margin {
+            "blue"
+        } else if r - b > margin && g - b > margin && (r - g).abs() < margin + 20 {
+            "yellow"
+        } else {
+            "?"
+        }
+    };
+    // the middle of each quarter of the picture (the 32 m ground covers about 170 pixels)
+    let spots = [("red", 45u32, 45u32), ("green", 155, 45), ("blue", 45, 155), ("yellow", 155, 155)];
+    let mut tex_cpu = TextureCache::new(Some(root.clone()));
+    let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
+    assert!(cpu.warnings.is_empty(), "{:?}", cpu.warnings);
+    let g = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::classic()).expect("gpu classic render");
+    let hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    png(&out.join("quarters-cpu.png"), w, h, &cpu.rgba);
+    png(&out.join("quarters-classic.png"), w, h, &g.rgba);
+    png(&out.join("quarters-high.png"), w, h, &hi.rgba);
+    for (picture, name, margin) in [(&cpu, "reference", 50), (&g, "GPU classic", 50), (&hi, "GPU high", 15)] {
+        for &(want, x, y) in &spots {
+            let o = ((y * w + x) * 4) as usize;
+            assert_eq!(hue(&picture.rgba[o..o + 3], margin), want, "{name} at ({x}, {y}): {:?}", &picture.rgba[o..o + 3]);
+        }
+    }
+    // the weights blend smoothly: half way between the red and the green quarter, along the north, both show
+    let mid = |p: &lunaris_render::Frame| -> [u8; 3] {
+        let o = ((45 * w + 100) * 4) as usize;
+        [p.rgba[o], p.rgba[o + 1], p.rgba[o + 2]]
+    };
+    for (picture, name) in [(&cpu, "reference"), (&g, "GPU classic")] {
+        let m = mid(picture);
+        assert!(m[0] > 60 && m[1] > 60, "{name}: red and green blend between the quarters: {m:?}");
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ water bodies (`WaterBody`)
+
+/// Two lakes at different levels in two basins of a hilly ground, from one 16-bit picture of the water's heights: the surface is where the picture says in both renderers, each lake at its level,
+/// hidden by the banks that stand higher, and the high quality rolls waves over it.
+#[test]
+fn a_water_body_follows_its_picture_in_both_renderers() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let out = root.join("target").join("gpu-compare");
+    let ws = out.join("lakes");
+    std::fs::create_dir_all(&ws).unwrap();
+    // 97 x 97 samples over 96 m, 24 m of relief: a ridge between a west basin and an east basin
+    let n = 97usize;
+    let relief = 24.0f32;
+    let ground = |x: f32, z: f32| -> f32 {
+        // metres from the middle, -48 to 48
+        let (west, east) = (((x + 22.0).powi(2) + z.powi(2)) / 230.0, ((x - 24.0).powi(2) + (z - 4.0).powi(2)) / 190.0);
+        (14.0 - 11.0 * (-west).exp() - 9.0 * (-east).exp() + 0.5 * (x * 0.3).sin() * (z * 0.25).cos()).clamp(0.0, relief)
+    };
+    let mut heights = vec![0u16; n * n];
+    let mut water = vec![0u16; n * n];
+    for j in 0..n {
+        for i in 0..n {
+            let (x, z) = (i as f32 - 48.0, j as f32 - 48.0);
+            let g = ground(x, z);
+            heights[j * n + i] = (g / relief * 65535.0) as u16;
+            // the west lake stands 5.5 m up, the east one 8 m: wet where the ground is under the surface
+            let level = if x < 0.0 { 5.5 } else { 8.0 };
+            if g < level {
+                water[j * n + i] = (level / relief * 65535.0) as u16;
+            }
+        }
+    }
+    write_grey16(&ws.join("ground.png"), n as u32, &heights);
+    write_grey16(&ws.join("water.png"), n as u32, &water);
+    let scene = |with_water: bool| {
+        let lake = if with_water { r#",{"uid":4,"components":{"Transform":{"pos":[0,0,0]},"WaterBody":{"heightmap":"target/gpu-compare/lakes/water.png","size":[96,96],"relief":24,"color":[0.05,0.3,0.45,0.85],"wave_height":0.25,"wave_length":7}}}"# } else { "" };
+        let text = format!(
+            r#"{{"lunaris":1,"entities":[
+{{"uid":1,"components":{{"Transform":{{"rot":[-0.5,0.32,0.12,0.8]}},"Light":{{"kind":0,"color":[1,0.95,0.85],"intensity":2.2}}}}}},
+{{"uid":2,"components":{{"Environment":{{"sky":true,"sky_top":[0.2,0.4,0.8],"sky_horizon":[0.8,0.85,0.95],"clouds":0.3,"bloom":0.1}}}}}},
+{{"uid":3,"components":{{"Transform":{{"pos":[0,0,0]}},"Terrain":{{"heightmap":"target/gpu-compare/lakes/ground.png","size":[96,96],"height":24,"color":[0.45,0.55,0.35,1]}}}}}}{lake}
+]}}"#
+        );
+        let mut sim = Sim::new(1);
+        sim.load_scene(&lunaris_json::parse(&text).unwrap()).unwrap();
+        sim
+    };
+    let (w, h) = (640u32, 360u32);
+    let opts = RenderOptions { width: w, height: h, view: above([0.0, 46.0, 70.0], [0.0, 3.0, 0.0], [0.0, 1.0, 0.0], 55.0), ..RenderOptions::default() };
+    let mut sim = scene(true);
+    let cpu = render(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts).expect("cpu render");
+    let g = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::classic()).expect("gpu render");
+    assert!(cpu.warnings.is_empty() && g.warnings.is_empty(), "{:?} {:?}", cpu.warnings, g.warnings);
+    let (d, diff_img) = compare(&cpu.rgba, &g.rgba);
+    png(&out.join("lakes-cpu.png"), w, h, &cpu.rgba);
+    png(&out.join("lakes-classic.png"), w, h, &g.rgba);
+    png(&out.join("lakes-diff.png"), w, h, &diff_img);
+    println!("water bodies: mean abs error {:.3}, {:.2}% of pixels differ by more than 40, worst {}", d.mean, d.outliers * 100.0, d.worst);
+    assert!(d.mean <= 1.0 && d.outliers <= 0.005, "the renderers differ (mean {}, {:.2}% outliers)", d.mean, d.outliers * 100.0);
+    // the water is what is picked over the lakes and the ground over the banks, in both renderers (the id pictures)
+    let water_pixels = |f: &lunaris_render::Frame| f.ids.iter().filter(|i| **i == 4).count();
+    assert!(water_pixels(&cpu) > 1000, "{} water pixels", water_pixels(&cpu));
+    let (a, b) = (water_pixels(&cpu) as f64, water_pixels(&g) as f64);
+    assert!((a - b).abs() / a < 0.03, "the lakes cover {a} pixels in the reference and {b} on the GPU");
+    // without the water entity the same ground is a different picture; with it the high quality is blue where the lakes are and not flat
+    let mut dry = scene(false);
+    let dry_cpu = render(&mut dry.world, &mut TextureCache::new(Some(root.clone())), &opts).expect("cpu render");
+    assert_ne!(dry_cpu.rgba, cpu.rgba);
+    let hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    png(&out.join("lakes-high.png"), w, h, &hi.rgba);
+    let bluish = |f: &lunaris_render::Frame, left: bool| {
+        let mut n = 0;
+        for (k, id) in f.ids.iter().enumerate() {
+            let x = k as u32 % f.width;
+            if *id == 4 && (x < f.width / 2) == left {
+                let p = &f.rgba[k * 4..k * 4 + 3];
+                if p[2] > p[0] + 8 {
+                    n += 1;
+                }
+            }
+        }
+        n
+    };
+    assert!(bluish(&hi, true) > 300 && bluish(&hi, false) > 300, "both lakes are blue in high quality: {} {}", bluish(&hi, true), bluish(&hi, false));
+    let again = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    assert_eq!(hi.rgba, again.rgba, "the same world draws the same picture twice");
+    // the waves are in the simulation's clock: later in time the surface is not the same picture
+    sim.world.get_mut::<lunaris_sim::components::WaterBody>(sim.world.entity(4).unwrap()).unwrap().phase = 2.0;
+    let later = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    assert_ne!(hi.rgba, later.rgba, "the waves move with the phase");
 }
 
 /// Not a pass/fail test: prints how fast the GPU draws a busy scene compared with the CPU reference (run with --nocapture, in release
