@@ -450,6 +450,45 @@ impl Engine {
             w.for_each_uid::<(&Tween,), _>(|_, uid, (t,)| tweens.push((uid, t.path.0, t.entity.0)))?;
             let mut rigs: Vec<(u64, u64)> = Vec::new();
             w.for_each_uid::<(&CameraRig,), _>(|_, uid, (r,)| rigs.push((uid, r.target.0)))?;
+            // a 2D picture with a rig that turns the camera toward its target (the default `look_at` with a `look_offset` of [0, 1, 0]) is tilted a few degrees: the layers are
+            // sorted by their depth along the tilted view, so a big tilemap can come out in front of the sprites that stand on it
+            let mut tilted: Vec<u64> = Vec::new();
+            w.for_each_uid::<(&CameraRig, &Camera), _>(|_, uid, (r, c)| {
+                if c.ortho && r.look_at && (r.look_offset[0] != 0.0 || r.look_offset[1] != 0.0) {
+                    tilted.push(uid);
+                }
+            })?;
+            // bodies of a 2D scene (an orthographic camera) stand in one plane: the contact normal of two solid bodies at different z has a part along z, which pushes
+            // them out of the plane and apart, so they stop meeting (a hero drawn "above" a guard by a bigger z walks through it)
+            let mut ortho = false;
+            w.for_each_uid::<(&Camera,), _>(|_, _, (c,)| ortho |= c.ortho)?;
+            if ortho {
+                let mut bodies: Vec<(u64, f32)> = Vec::new();
+                w.for_each_uid::<(&lunaris_sim::components::RigidBody, &Collider, &Transform), _>(|_, uid, (_, c, t)| {
+                    if !c.trigger {
+                        bodies.push((uid, t.pos[2]));
+                    }
+                })?;
+                let lo = bodies.iter().copied().min_by(|a, b| a.1.total_cmp(&b.1));
+                let hi = bodies.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1));
+                if let (Some(lo), Some(hi)) = (lo, hi) {
+                    if hi.1 - lo.1 > 0.001 {
+                        problems.add(
+                            "warning",
+                            Some(hi.0),
+                            format!("solid bodies of a 2D scene are at different z (entity {} at {}, entity {} at {}): their contacts push along z and they drift apart", lo.0, lo.1, hi.0, hi.1),
+                            "keep bodies in one plane (z 0) and use `z` only for the drawing order of things that do not collide: pickups, decoration, effects",
+                        );
+                    }
+                }
+            }
+            let mut has_tilemap = false;
+            w.for_each_uid::<(&Tilemap,), _>(|_, _, _| has_tilemap = true)?;
+            if has_tilemap {
+                for uid in tilted {
+                    problems.add("warning", Some(uid), "an orthographic camera with a CameraRig that looks at its target (`look_at`, `look_offset` [0, 1, 0] by default) tilts the 2D picture, and sprites can then be drawn behind the tilemap".into(), "for a top-down 2D game set the rig's `look_at` to false (and keep the camera's own rotation unturned)");
+                }
+            }
             let mut sensors: Vec<(u64, u32)> = Vec::new();
             w.for_each_uid::<(&Sensor,), _>(|_, uid, (r,)| sensors.push((uid, r.filter.0)))?;
             for (uid, sym) in maps {
@@ -838,6 +877,10 @@ impl Engine {
             for (uid, a) in raw {
                 let clip = world.strings().get(a.clip.0).to_string();
                 let mesh = world.entity(uid).and_then(|e| world.get::<MeshRenderer>(e).map(|m| world.strings().get(m.mesh.0).to_string()));
+                // a 2D flipbook (`Sprite` + `SpriteAnim`) is animated by the Animator's clock too: nothing to say about it here (the SpriteAnim check above judges it)
+                if mesh.is_none() && world.entity(uid).is_some_and(|e| world.get::<lunaris_sim::components::SpriteAnim>(e).is_some()) {
+                    continue;
+                }
                 animated.push((uid, clip, mesh.clone().unwrap_or_default(), mesh.is_some()));
             }
             for (uid, clip, mesh, has_mesh) in animated {

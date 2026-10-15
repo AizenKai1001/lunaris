@@ -1,0 +1,205 @@
+{
+  "name": "Depths main menu with the keyboard: W/S and the arrows move the focus (UiNav), Enter on Play fades out and starts level 1 with a fresh run",
+  "scene": "examples/depths/menu.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1301,
+        "message": "the focus starts on Play"
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1302,
+        "message": "S moves the focus down to Continue"
+      }
+    },
+    {
+      "input": {
+        "arrowdown": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "arrowdown": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1303
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "arrowup": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "arrowup": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1301,
+        "message": "W and the arrow go back up"
+      }
+    },
+    {
+      "expect": {
+        "name": "Continue button",
+        "field": "Ui.hover",
+        "eq": false
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "coins",
+          "value": 7
+        }
+      }
+    },
+    {
+      "input": {
+        "enter": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "enter": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "resource": "leave",
+        "eq": 1,
+        "message": "Enter on Play starts the run"
+      }
+    },
+    {
+      "until": {
+        "exists": "Level 1",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 1
+      }
+    },
+    {
+      "expect": {
+        "resource": "coins",
+        "eq": 0,
+        "message": "a new run starts with no coins"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "eq": 100
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "eq": 0
+      }
+    },
+    {
+      "expect": {
+        "name": "Fader",
+        "field": "ColorGrade.fade[3]",
+        "gt": 0.5,
+        "message": "the new level fades in from black"
+      }
+    },
+    {
+      "step": 60
+    },
+    {
+      "expect": {
+        "name": "Fader",
+        "field": "ColorGrade.fade[3]",
+        "eq": 0
+      }
+    }
+  ]
+}

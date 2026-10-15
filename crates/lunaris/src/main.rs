@@ -82,7 +82,9 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
 }
 
 fn print_json(v: &Json) {
-    println!("{}", v.to_string_pretty().unwrap_or_else(|_| v.to_string_lossy()));
+    // `lunaris schema | head` closes the pipe early: that is not an error worth a panic
+    use std::io::Write;
+    let _ = writeln!(stdout(), "{}", v.to_string_pretty().unwrap_or_else(|_| v.to_string_lossy()));
 }
 
 fn load_into(engine: &mut Engine, scene: &str) -> Result<(), String> {
@@ -127,8 +129,11 @@ fn main() -> ExitCode {
             }
         }
         "tools" => {
+            use std::io::Write;
             for t in tool_defs() {
-                println!("{:<18} {}", t.name, t.description);
+                if writeln!(stdout(), "{:<18} {}", t.name, t.description).is_err() {
+                    break; // the reader went away (`| head`)
+                }
             }
             ExitCode::SUCCESS
         }
@@ -380,6 +385,8 @@ fn play_cmd(opts: &Opts) -> ExitCode {
         volume: opts.kv.get("volume").and_then(|v| v.parse::<f32>().ok()).filter(|v| v.is_finite()).map(|v| v.clamp(0.0, 4.0)).unwrap_or(1.0),
         frames: opts.kv.get("frames").and_then(|f| f.parse().ok()),
         hold: opts.kv.get("hold").map(|h| h.split(',').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect()).unwrap_or_default(),
+        // `--press enter@30:4,s@50`: KEY@FIRST_FRAME[:FRAMES] (4 frames when not said)
+        presses: opts.kv.get("press").map(|p| play::parse_presses(p)).unwrap_or_default(),
         save_frame: opts.kv.get("save-frame").map(PathBuf::from),
         report: opts.kv.contains_key("report"),
         cpu: opts.kv.contains_key("cpu"),

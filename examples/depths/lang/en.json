@@ -1,0 +1,63 @@
+{
+  "hud": {
+    "level": "LEVEL",
+    "score": "SCORE",
+    "hint": "WASD: walk     SPACE: sword     E: talk     ESC: pause"
+  },
+  "level1": {
+    "name": "THE CELLARS"
+  },
+  "level2": {
+    "name": "THE CAVES"
+  },
+  "level3": {
+    "name": "THE CATACOMBS"
+  },
+  "pause": {
+    "title": "PAUSED",
+    "resume": "Resume",
+    "menu": "Main menu"
+  },
+  "npc": {
+    "talk": "Press E to talk",
+    "hello": "Careful, stranger. These cellars are full of grunts.",
+    "door": "A locked door bars the way to the stairs. Find the key first.",
+    "q_advice": "Any advice?",
+    "q_fine": "I will manage",
+    "advice": "Swing your sword with SPACE and keep moving. Torchlight is your friend. Take 20 gold for the road.",
+    "again": "I have told you all I know. Go on.",
+    "bye": "Then good luck, and mind the dark."
+  },
+  "menu": {
+    "title": "DEPTHS",
+    "subtitle": "a dungeon crawler made with Lunaris",
+    "play": "Play",
+    "continue": "Continue",
+    "credits": "Credits",
+    "quit": "Quit",
+    "back": "Back",
+    "nosave": "No saved game yet",
+    "hint": "W S or arrows to choose, Enter to confirm, or use the mouse"
+  },
+  "credits": {
+    "title": "CREDITS",
+    "text": "Depths is a small game made to test the Lunaris engine: every level, picture and sound was made by scripts that call the engine's tools. No outside art.\n\nEngine: Lunaris\nDesign, art, sound and rules: written as data and Lunaris Script"
+  },
+  "over": {
+    "title": "YOU DIED",
+    "stats": "Level {level}      Score {score}",
+    "retry": "Retry level",
+    "menu": "Main menu"
+  },
+  "win": {
+    "title": "YOU ESCAPED!",
+    "score": "FINAL SCORE",
+    "stats": "Coins {coins}      Guards slain {kills}",
+    "again": "Play again",
+    "menu": "Main menu",
+    "rank_s": "RANK S  -  a legend of the depths",
+    "rank_a": "RANK A  -  a hero",
+    "rank_b": "RANK B  -  a survivor",
+    "rank_c": "RANK C  -  lucky to be alive"
+  }
+}

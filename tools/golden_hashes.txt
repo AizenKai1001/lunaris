@@ -4,6 +4,13 @@ examples/bouncing.lunaris.json           state 4bc78dd0e544766a  frame 005f4fae5
 examples/clockwork.lunaris.json          state c32fcd7bfaefa1ab  frame ea751e3087ca27d5
 examples/coin_chase.lunaris.json         state dfc30a7034177467  frame f6afca59ac7f3008
 examples/depth_of_field.lunaris.json     state a68dd4a7d9992e11  frame 14778f6614f4016f
+examples/depths/boot.lunaris.json        state 9c342a9ee22ceb93  frame 0c824c81cbc50490
+examples/depths/gameover.lunaris.json    state d95af6588201e31a  frame d2428703245e1541
+examples/depths/level1.lunaris.json      state e96be8b3ebb659cb  frame 85147d02b4c93e1a
+examples/depths/level2.lunaris.json      state 8f02de3cb23be7d0  frame 84c4d4e21e5e8d1b
+examples/depths/level3.lunaris.json      state 1f04f6e4c08796a6  frame 9150a0a844045937
+examples/depths/menu.lunaris.json        state b03aedbce67e75df  frame fb61d38b2c678476
+examples/depths/win.lunaris.json         state 7a2eb7e1ac9e6ec1  frame 050c40080bbfb60f
 examples/dominoes.lunaris.json           state 9f7c11d8ab4eef02  frame 7f11b776a6e5a579
 examples/driving.lunaris.json            state 87f8c589fa90f36d  frame b45a0cdb9d2e7a78
 examples/duel.lunaris.json               state 045dae09b9ccec35  frame 9642f7d962915895

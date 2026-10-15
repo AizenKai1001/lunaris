@@ -74,6 +74,76 @@ fn a_game_saves_and_loads_itself_through_resources() {
 }
 
 #[test]
+fn a_recording_goes_on_across_a_game_that_loads_itself_and_replays_to_the_same_state() {
+    let mut e = engine();
+    let _ = std::fs::remove_dir_all(e.root.join("saves"));
+    e.call("spawn", &j(r#"{"uid":1,"components":{"Transform":{"pos":[0,0,0]},"Velocity":{"lin":[1,0,0]}}}"#)).unwrap();
+    e.call("step", &j(r#"{"ticks":100}"#)).unwrap();
+    e.call("record_start", &j("{}")).unwrap();
+    e.call("set_resource", &j(r#"{"name":"game.save","value":1}"#)).unwrap();
+    e.call("step", &j(r#"{"ticks":10}"#)).unwrap();
+    // the game plays on for a long while, then goes back to the saved moment from the inside, at a tick number it passed long ago
+    e.call("step", &j(r#"{"ticks":200}"#)).unwrap();
+    e.call("set_resource", &j(r#"{"name":"game.load","value":1}"#)).unwrap();
+    e.call("step", &j(r#"{"ticks":5}"#)).unwrap();
+    assert_eq!(e.call("resources", &Json::Null).unwrap().get("resources").unwrap().get("game.loaded").is_some(), true);
+    assert!(e.sim.tick < 120, "the load took the clock back: {}", e.sim.tick);
+    e.call("record_stop", &j("{}")).unwrap();
+    let replay = e.call("replay", &j("{}")).unwrap();
+    assert_eq!(replay.get("matches"), Some(&Json::Bool(true)), "{replay:?}");
+}
+
+#[test]
+fn a_replay_gets_the_answers_the_files_gave_the_first_time_and_writes_no_files() {
+    let mut e = engine();
+    let _ = std::fs::remove_dir_all(e.root.join("saves"));
+    e.call("spawn", &j(r#"{"uid":1,"components":{"Transform":{"pos":[0,0,0]},"Velocity":{"lin":[1,0,0]}}}"#)).unwrap();
+    e.call("record_start", &j("{}")).unwrap();
+    // the game asks whether there is a saved game (there is none), saves, plays on, and loads the save
+    e.call("set_resource", &j(r#"{"name":"game.probe","value":1}"#)).unwrap();
+    e.call("step", &j(r#"{"ticks":3}"#)).unwrap();
+    assert_eq!(e.call("resources", &Json::Null).unwrap().get("resources").unwrap().get("game.has.1").and_then(|v| v.as_f64()), Some(0.0));
+    e.call("set_resource", &j(r#"{"name":"game.save","value":1}"#)).unwrap();
+    e.call("step", &j(r#"{"ticks":40}"#)).unwrap();
+    e.call("set_resource", &j(r#"{"name":"game.load","value":1}"#)).unwrap();
+    e.call("step", &j(r#"{"ticks":5}"#)).unwrap();
+    let rec = e.call("record_stop", &j(r#"{"path":"runs/reads.recording.json"}"#)).unwrap();
+    assert!(rec.get("saved_to").is_some());
+    // by now the file is there, and it could say something else: the replay must not care
+    let first = std::fs::read_to_string(e.root.join("saves/slot1.json")).unwrap();
+    e.call("spawn", &j(r#"{"uid":77,"components":{"Transform":{"pos":[5,5,5]}}}"#)).unwrap();
+    e.call("save_game", &j(r#"{"slot":1}"#)).unwrap();
+    let other = std::fs::read_to_string(e.root.join("saves/slot1.json")).unwrap();
+    assert_ne!(other, first, "the file now holds another world");
+    let replay = e.call("replay", &j("{}")).unwrap();
+    assert_eq!(replay.get("matches"), Some(&Json::Bool(true)), "{replay:?}");
+    assert_eq!(std::fs::read_to_string(e.root.join("saves/slot1.json")).unwrap(), other, "a replay does not write the saved game again");
+    // and the recording kept in a file says the same
+    let again = e.call("replay", &j(r#"{"path":"runs/reads.recording.json"}"#)).unwrap();
+    assert_eq!(again.get("matches"), Some(&Json::Bool(true)), "{again:?}");
+}
+
+#[test]
+fn a_game_can_ask_whether_a_slot_has_a_saved_game() {
+    let mut e = engine();
+    let _ = std::fs::remove_dir_all(e.root.join("saves"));
+    let has = |e: &mut crate::Engine, n: u32| e.call("resources", &Json::Null).unwrap().get("resources").unwrap().get(&format!("game.has.{n}")).and_then(|v| v.as_f64());
+    // nothing is known until the game asks
+    e.call("step", &Json::Null).unwrap();
+    assert_eq!(has(&mut e, 1), None);
+    e.call("set_resource", &j(r#"{"name":"game.probe","value":1}"#)).unwrap();
+    e.call("step", &Json::Null).unwrap();
+    assert_eq!(has(&mut e, 1), Some(0.0), "no saved game yet");
+    assert_eq!(e.call("resources", &Json::Null).unwrap().get("resources").unwrap().get("game.probe").unwrap().as_f64(), Some(0.0), "the question is answered");
+    e.call("set_resource", &j(r#"{"name":"game.save","value":1}"#)).unwrap();
+    e.call("step", &Json::Null).unwrap();
+    e.call("set_resource", &j(r#"{"name":"game.probe","value":1}"#)).unwrap();
+    e.call("step", &Json::Null).unwrap();
+    assert_eq!(has(&mut e, 1), Some(1.0), "the autosave is there");
+    assert_eq!(has(&mut e, 2), None, "another slot was not asked about");
+}
+
+#[test]
 fn type_text_types_into_a_focused_text_field_and_enter_submits_it() {
     let mut e = engine();
     e.call("spawn", &j(r#"{"uid":1,"components":{"Ui":{"pos":[0.1,0.1],"size":[0.4,0.1],"button":true},"UiInput":{}}}"#)).unwrap();

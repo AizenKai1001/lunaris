@@ -165,7 +165,8 @@ pub fn lex(src: &str) -> (Vec<Token>, Vec<Diag>) {
                     while j < b.len() && is_ident_char(b[j]) {
                         j += 1;
                     }
-                    if b.get(j) == Some(&b'.') && b.get(j + 1).is_some_and(|d| is_ident_start(*d)) {
+                    // a name goes on after a dot with a letter, a digit or `_`: `$game.has.1` (the engine's own resources have such names)
+                    if b.get(j) == Some(&b'.') && b.get(j + 1).is_some_and(|d| is_ident_char(*d)) {
                         j += 1;
                         continue;
                     }

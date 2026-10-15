@@ -395,3 +395,10 @@ fn a_file_may_hold_several_systems_and_names_must_differ() {
     let e = compile("system a each A { }\nsystem a each A { }").unwrap_err();
     assert!(e[0].message.contains("already a system named `a`"), "{e:?}");
 }
+
+#[test]
+fn a_resource_name_may_have_a_number_between_dots() {
+    let v = compile("system a each A { $game.has.1 = A.x; A.x = $game.has.1 + 1; A.y = $a.5; }").unwrap();
+    let text = v[0].def.to_string_compact().unwrap();
+    assert!(text.contains(r#""res_set":"game.has.1""#) && text.contains(r#"{"res":"game.has.1"}"#) && text.contains(r#"{"res":"a.5"}"#), "{text}");
+}

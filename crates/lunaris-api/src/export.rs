@@ -18,10 +18,39 @@ fn collect_strings(j: &Json, out: &mut BTreeSet<String>) {
             if s.len() <= 260 && !s.contains('\n') {
                 out.insert(s.clone());
             }
+            // a text field names files too: a music playlist is one track a line (`music/theme.ogg volume=0.8`), so the first word of every line is a candidate
+            if s.len() <= 8000 && (s.contains('\n') || s.contains(' ')) {
+                for word in s.lines().filter_map(|l| l.split_whitespace().next()).filter(|w| w.len() <= 260) {
+                    out.insert(word.to_string());
+                }
+            }
         }
         Json::Arr(a) => a.iter().for_each(|v| collect_strings(v, out)),
         Json::Obj(pairs) => pairs.iter().for_each(|(_, v)| collect_strings(v, out)),
         _ => {}
+    }
+}
+
+/// Sort the strings of a scene into the files of the workspace it uses (`wanted`) and the file names it uses that do not exist (`missing`). A string with a slash that is the path of a
+/// `.json` file without its ending is a language (`Localization.language`: `examples/depths/lang/en`): that file and the other `.json` files of its folder (the other languages) are wanted.
+fn absorb_strings(root: &Path, strings: &BTreeSet<String>, wanted: &mut BTreeSet<String>, missing: &mut BTreeSet<String>) {
+    for s in strings {
+        let Ok(norm) = lunaris_json::safe_relative(s) else { continue };
+        if root.join(&norm).is_file() {
+            wanted.insert(norm);
+        } else if has_asset_extension(&norm) && !norm.contains(' ') {
+            missing.insert(norm);
+        } else if norm.contains('/') && root.join(format!("{norm}.json")).is_file() {
+            let dir = norm.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+            if let Ok(rd) = std::fs::read_dir(root.join(dir)) {
+                for e in rd.filter_map(|e| e.ok()) {
+                    let n = e.file_name().to_string_lossy().to_string();
+                    if n.ends_with(".json") && e.path().is_file() {
+                        wanted.insert(format!("{dir}/{n}"));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -94,12 +123,24 @@ impl Engine {
         collect_strings(&scene, &mut candidates);
         let mut wanted: BTreeSet<String> = BTreeSet::new();
         let mut missing: BTreeSet<String> = BTreeSet::new();
-        for s in &candidates {
-            let Ok(norm) = lunaris_json::safe_relative(s) else { continue };
-            if self.root.join(&norm).is_file() {
-                wanted.insert(norm);
-            } else if has_asset_extension(&norm) && !norm.contains(' ') {
-                missing.insert(norm);
+        absorb_strings(&self.root, &candidates, &mut wanted, &mut missing);
+        // a scene the game can switch to (`SceneSwitch.path`) brings the files it uses, and so does the next scene it names: follow the chain
+        let mut read: BTreeSet<String> = BTreeSet::new();
+        loop {
+            let next: Vec<String> = wanted.iter().filter(|f| f.ends_with(".json") && !read.contains(*f)).cloned().collect();
+            if next.is_empty() {
+                break;
+            }
+            for f in next {
+                read.insert(f.clone());
+                let Ok(text) = std::fs::read_to_string(self.root.join(&f)) else { continue };
+                let Ok(doc) = lunaris_json::parse(&text) else { continue };
+                if doc.get("entities").is_none() {
+                    continue; // a language file, a save, some data: not a scene
+                }
+                let mut strings = BTreeSet::new();
+                collect_strings(&doc, &mut strings);
+                absorb_strings(&self.root, &strings, &mut wanted, &mut missing);
             }
         }
         // the language files of a game with a `Localization`

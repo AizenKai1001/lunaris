@@ -6,11 +6,12 @@ For each scene: load it, press random keys for a few thousand ticks (seeded), re
   * a second engine with 1 worker thread and one with 8 worker threads end in exactly the same state,
   * no graph system recorded a runtime error.
 
-    python -I tools/soak.py [--ticks 3000] [--seed 7]
+    python -I tools/soak.py [--ticks 3000] [--seed 7] [--only depths]
 """
 import glob
 import os
 import random
+import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -21,17 +22,23 @@ ROOT = os.path.join(HERE, "..")
 ticks = int(sys.argv[sys.argv.index("--ticks") + 1]) if "--ticks" in sys.argv else 3000
 seed = int(sys.argv[sys.argv.index("--seed") + 1]) if "--seed" in sys.argv else 7
 KEYS = ["w", "a", "s", "d", "space", "arrowleft", "arrowright", "arrowup", "arrowdown"]
+# the games of a folder of their own press more: menus and pause (enter, escape), talking (e, 1, 2)
+GAME_KEYS = KEYS + ["enter", "escape", "e", "1", "2"]
+only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
 
 
 def run(scene, threads):
     """Play the scene with a seeded random keyboard; returns (final hash, replay matches, errors, entities)."""
+    # a game that saves and loads itself has the files in its history: every run starts without any (the first run's saves must not be the second's past)
+    shutil.rmtree(os.path.join(ROOT, "saves"), ignore_errors=True)
     rng = random.Random(seed)
+    keys = GAME_KEYS if scene.startswith("examples/depths/") else KEYS
     with Engine(root=ROOT, threads=threads) as eng:
         eng.load_scene(path=scene)
         eng.record_start()
         done = 0
         while done < ticks:
-            eng.input(values={k: rng.random() < 0.35 for k in KEYS})
+            eng.input(values={k: rng.random() < 0.35 for k in keys})
             n = rng.choice([1, 2, 4, 8])
             eng.step(ticks=n)
             done += n
@@ -43,8 +50,13 @@ def run(scene, threads):
 
 
 bad = 0
-for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json"))):
+held = os.path.join(ROOT, "saves.held-by-soak")
+if os.path.isdir(os.path.join(ROOT, "saves")):
+    os.replace(os.path.join(ROOT, "saves"), held)
+for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "depths", "*.lunaris.json"))):
     rel = os.path.relpath(scene, ROOT).replace("\\", "/")
+    if only and only not in rel:
+        continue
     h1, ok1, err1, n1 = run(rel, 1)
     h8, ok8, err8, n8 = run(rel, 8)
     good = h1 == h8 and ok1 and ok8 and not err1 and not err8

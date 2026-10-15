@@ -132,6 +132,16 @@ fn letters(lines: &Lines, uid: u64, color: [f32; 4], ax: i64, align: u32, top: i
     out
 }
 
+/// A text's `{resource}` placeholders and `{#key}` translations. A translated text may bring placeholders of its own (`"Score {score}"` in the language file): they are filled too.
+fn fill_text(world: &World, say: &dyn Fn(String) -> String, template: &str) -> String {
+    let filled = say(crate::font::expand_template(template, |n| world.resource(n)));
+    if template.contains("{#") && filled.contains('{') {
+        crate::font::expand_template(&filled, |n| world.resource(n))
+    } else {
+        filled
+    }
+}
+
 pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4, pw: f32, ph: f32, data: &UiData<'_>, say: &dyn Fn(String) -> String) -> (Vec<SceneRect>, Vec<SceneText>) {
     let mut rects: Vec<SceneRect> = Vec::new();
     let mut texts: Vec<SceneText> = Vec::new();
@@ -151,7 +161,7 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
             let Some((sx, sy)) = anchor_screen(world, view_proj, a) else { continue };
             tx.pos = [sx, sy];
         }
-        let text = say(crate::font::expand_template(&template, |n| world.resource(n)));
+        let text = fill_text(world, say, &template);
         if let Some(spec) = data.fonts.get(uid) {
             if tx.pos[0].is_finite() && tx.pos[1].is_finite() {
                 let ax = (tx.pos[0] * pw).round().clamp(-1.0e9, 1.0e9) as i64;
@@ -250,7 +260,7 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
         }
         let template = sym(u.text);
         if !template.is_empty() {
-            let label = say(crate::font::expand_template(&template, |n| world.resource(n)));
+            let label = fill_text(world, say, &template);
             let size = u.text_size.clamp(0.005, 0.5);
             if let Some(spec) = data.fonts.get(uid) {
                 if let Some(lines) = lay_out(&mut textures.fonts, spec, &label, size, pw, ph) {

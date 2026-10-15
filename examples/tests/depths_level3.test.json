@@ -1,0 +1,1043 @@
+{
+  "name": "Depths level 3 (maze): a locked door stops the hero; it walks to the key (46 cells), through the door and to the stairs (124 cells); the last level ends in the win screen",
+  "scene": "examples/depths/level3.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 40
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 3,
+        "message": "the level says which one it is"
+      }
+    },
+    {
+      "expect": {
+        "resource": "game.saved",
+        "gt": 0,
+        "message": "the level saved the game when it began"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "eq": 100
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 300
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 301
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 302
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 303
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 304
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 305
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 306
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 307
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -4.0,
+              6.0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 45
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "expect": {
+        "exists": "Door",
+        "eq": true,
+        "message": "the door is locked: a hero without a key cannot open it"
+      }
+    },
+    {
+      "expect": {
+        "resource": "keys",
+        "eq": 0
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -19.0,
+              12.0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -17.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 10.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -19.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 4.0,
+        "max_ticks": 204
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -13.0,
+        "max_ticks": 204
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 6.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -9.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 12.0,
+        "max_ticks": 204
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -13.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 8.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -17.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 6.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -15.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "keys",
+        "eq": 1,
+        "message": "the hero found the key"
+      }
+    },
+    {
+      "expect": {
+        "exists": "Key",
+        "eq": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -17.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 8.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -13.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 12.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -1.0,
+        "max_ticks": 288
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 10.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -3.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 8.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -5.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 10.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": -7.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 6.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -3.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "expect": {
+        "exists": "Door",
+        "eq": false,
+        "message": "the key opened the door"
+      }
+    },
+    {
+      "expect": {
+        "resource": "keys",
+        "eq": 0,
+        "message": "and was used up"
+      }
+    },
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0,
+        "message": "no graph system has failed while playing (check reports the last error of each)"
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": -1.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 8.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 1.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 12.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 3.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 8.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 5.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 10.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 17.0,
+        "max_ticks": 288
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 12.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 19.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -4.0,
+        "max_ticks": 344
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": 15.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -12.0,
+        "max_ticks": 232
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 19.0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": -6.0,
+        "max_ticks": 204
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": 17.0,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "HitPoints",
+          "value": {
+            "value": 63
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "resource": "leave",
+        "gt": 0,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "ge": 150,
+        "message": "key, door and stairs are worth points"
+      }
+    },
+    {
+      "until": {
+        "exists": "Win title",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 5
+    },
+    {
+      "expect": {
+        "resource": "hp",
+        "between": [
+          60,
+          66
+        ],
+        "message": "the health arrives at the win screen"
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "ge": 150,
+        "message": "and the score"
+      }
+    }
+  ]
+}

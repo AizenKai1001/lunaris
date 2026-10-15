@@ -1,0 +1,381 @@
+{
+  "name": "Depths dialogue: the old warden of level 1 talks when E is pressed near him (Dialogue, Sensor), the hero listens, a choice pays 20 once",
+  "scene": "examples/depths/level1.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 3
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 300
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 301
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 302
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 303
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 304
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 305
+        }
+      }
+    },
+    {
+      "expect": {
+        "resource": "near",
+        "eq": 0,
+        "message": "far from the warden there is nobody to talk to"
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -22.5,
+              15.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "resource": "near",
+        "eq": 1,
+        "message": "the hero's Sensor sees the warden"
+      }
+    },
+    {
+      "expect": {
+        "name": "Talk hint",
+        "field": "Text.visible",
+        "eq": true
+      }
+    },
+    {
+      "input": {
+        "e": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "e": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 1,
+        "message": "E starts the Dialogue"
+      }
+    },
+    {
+      "expect": {
+        "name": "Talk hint",
+        "field": "Text.visible",
+        "eq": false
+      }
+    },
+    {
+      "expect": {
+        "name": "Dialogue text",
+        "field": "Ui.visible",
+        "eq": true
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 20
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "approx": [
+          -22.5,
+          0.05
+        ],
+        "message": "the hero stands still while it listens"
+      }
+    },
+    {
+      "step": 130
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 130
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 30
+    },
+    {
+      "expect": {
+        "name": "Choice 1",
+        "field": "Ui.visible",
+        "eq": true,
+        "message": "two lines, then a choice"
+      }
+    },
+    {
+      "input": {
+        "1": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "1": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 130
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 0,
+        "message": "the talk is over"
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "eq": 20,
+        "message": "the warden paid 20"
+      }
+    },
+    {
+      "expect": {
+        "resource": "gift",
+        "eq": 1
+      }
+    },
+    {
+      "input": {
+        "e": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "e": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 130
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 130
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "1": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "1": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 130
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 0
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "eq": 20,
+        "message": "he gives nothing twice"
+      }
+    }
+  ]
+}

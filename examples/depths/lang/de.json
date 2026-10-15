@@ -1,0 +1,63 @@
+{
+  "hud": {
+    "level": "EBENE",
+    "score": "PUNKTE",
+    "hint": "WASD: gehen     LEERTASTE: Schwert     E: sprechen     ESC: Pause"
+  },
+  "level1": {
+    "name": "DIE KELLER"
+  },
+  "level2": {
+    "name": "DIE HOEHLEN"
+  },
+  "level3": {
+    "name": "DIE KATAKOMBEN"
+  },
+  "pause": {
+    "title": "PAUSE",
+    "resume": "Weiter",
+    "menu": "Hauptmenue"
+  },
+  "npc": {
+    "talk": "E druecken zum Sprechen",
+    "hello": "Vorsicht, Fremder. In diesen Kellern wimmelt es von Grunzern.",
+    "door": "Eine verschlossene Tuer versperrt den Weg zur Treppe. Such zuerst den Schluessel.",
+    "q_advice": "Ein Rat?",
+    "q_fine": "Ich schaffe das",
+    "advice": "Schwing dein Schwert mit LEERTASTE und bleib in Bewegung. Fackellicht ist dein Freund. Nimm 20 Gold mit.",
+    "again": "Mehr weiss ich nicht. Geh weiter.",
+    "bye": "Dann viel Glueck, und huete dich vor der Dunkelheit."
+  },
+  "menu": {
+    "title": "DEPTHS",
+    "subtitle": "ein Dungeon-Spiel mit Lunaris",
+    "play": "Spielen",
+    "continue": "Fortsetzen",
+    "credits": "Mitwirkende",
+    "quit": "Beenden",
+    "back": "Zurueck",
+    "nosave": "Noch kein Spielstand",
+    "hint": "W S oder Pfeile waehlen, Enter bestaetigt, oder die Maus"
+  },
+  "credits": {
+    "title": "MITWIRKENDE",
+    "text": "Depths ist ein kleines Spiel zum Testen der Lunaris-Engine: jede Ebene, jedes Bild und jeder Klang entstand durch Skripte, die die Werkzeuge der Engine aufrufen. Keine fremde Grafik.\n\nEngine: Lunaris\nEntwurf, Grafik, Klang und Regeln: als Daten und Lunaris Script geschrieben"
+  },
+  "over": {
+    "title": "DU BIST GESTORBEN",
+    "stats": "Ebene {level}      Punkte {score}",
+    "retry": "Ebene wiederholen",
+    "menu": "Hauptmenue"
+  },
+  "win": {
+    "title": "DU BIST ENTKOMMEN!",
+    "score": "ENDSTAND",
+    "stats": "Muenzen {coins}      Wachen besiegt {kills}",
+    "again": "Nochmal spielen",
+    "menu": "Hauptmenue",
+    "rank_s": "RANG S  -  eine Legende der Tiefe",
+    "rank_a": "RANG A  -  ein Held",
+    "rank_b": "RANG B  -  ein Ueberlebender",
+    "rank_c": "RANG C  -  mit Glueck davongekommen"
+  }
+}

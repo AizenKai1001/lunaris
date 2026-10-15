@@ -1,0 +1,97 @@
+{
+  "name": "Depths start: the boot scene switches to the menu and the music (Persist) outlives every scene change, handing over to the dungeon's track",
+  "scene": "examples/depths/boot.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 4
+    },
+    {
+      "until": {
+        "exists": "Play button",
+        "eq": true,
+        "max_ticks": 60
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "exists": "To the menu",
+        "eq": false,
+        "message": "the boot scene is gone"
+      }
+    },
+    {
+      "expect": {
+        "exists": "Theme music",
+        "eq": true,
+        "message": "the music (Persist) stayed through the scene change"
+      }
+    },
+    {
+      "expect": {
+        "name": "Theme music",
+        "field": "MusicPlayer.playing",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "name": "Depths music",
+        "field": "MusicPlayer.playing",
+        "eq": false
+      }
+    },
+    {
+      "input": {
+        "enter": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "enter": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "until": {
+        "exists": "Level 1",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "exists": "Theme music",
+        "eq": true,
+        "message": "and through the next one"
+      }
+    },
+    {
+      "expect": {
+        "name": "Depths music",
+        "field": "MusicPlayer.playing",
+        "eq": true,
+        "message": "the dungeon's track takes over in a level"
+      }
+    },
+    {
+      "expect": {
+        "name": "Theme music",
+        "field": "MusicPlayer.playing",
+        "eq": false
+      }
+    }
+  ]
+}

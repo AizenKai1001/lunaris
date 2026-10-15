@@ -1,0 +1,223 @@
+{
+  "name": "Depths combat: Space swings the sword, a guard in front of the hero is hurt, knocked back and killed for points",
+  "scene": "examples/depths/level1.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "face.x",
+          "value": 0
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "face.y",
+          "value": -1
+        }
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 301
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 302
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 303
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 304
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 305
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 300,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -20.5,
+              12.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 300,
+          "component": "Velocity",
+          "value": {
+            "lin": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 1
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "entity": 300,
+        "field": "HitPoints.value",
+        "lt": 40,
+        "message": "the sword hurt the guard"
+      }
+    },
+    {
+      "expect": {
+        "events": "swing",
+        "ge": 1
+      }
+    },
+    {
+      "expect": {
+        "events": "hit",
+        "ge": 1
+      }
+    },
+    {
+      "step": 22
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 300,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -20.5,
+              12.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 300,
+          "component": "Velocity",
+          "value": {
+            "lin": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 1
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "step": 6
+    },
+    {
+      "expect": {
+        "exists": 300,
+        "eq": false,
+        "message": "two blows killed the guard"
+      }
+    },
+    {
+      "expect": {
+        "resource": "kills",
+        "eq": 1
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "eq": 50,
+        "message": "a grunt is worth 50 points"
+      }
+    },
+    {
+      "expect": {
+        "events": "kill",
+        "ge": 1
+      }
+    }
+  ]
+}

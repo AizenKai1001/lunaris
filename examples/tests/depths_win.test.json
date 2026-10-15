@@ -1,0 +1,130 @@
+{
+  "name": "Depths win screen: the rank follows the score, Play again starts a fresh run at level 1",
+  "scene": "examples/depths/win.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 5
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "score",
+          "value": 1700
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Rank S",
+        "field": "Text.visible",
+        "eq": true,
+        "message": "1700 points is rank S"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rank A",
+        "field": "Text.visible",
+        "eq": false
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "score",
+          "value": 700
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Rank B",
+        "field": "Text.visible",
+        "eq": true,
+        "message": "700 is rank B"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rank S",
+        "field": "Text.visible",
+        "eq": false
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "score",
+          "value": 120
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Rank C",
+        "field": "Text.visible",
+        "eq": true
+      }
+    },
+    {
+      "input": {
+        "enter": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "enter": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "until": {
+        "exists": "Level 1",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "eq": 0,
+        "message": "Play again starts a fresh run"
+      }
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 1
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "eq": 100
+      }
+    }
+  ]
+}

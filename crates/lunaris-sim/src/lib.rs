@@ -38,7 +38,7 @@ mod vm;
 pub use command::{apply, apply_batch, Applied, Command};
 pub use graph::{ScriptSet, ScriptSystem};
 pub use rng::{hash_rand, Rng};
-pub use sim::{default_threads, register_standard_components, Checkpoint, Event, Recording, Sim, SimCtx, SystemEntry, MAX_EVENTS};
+pub use sim::{default_threads, register_standard_components, Checkpoint, Event, RecordedRead, Recording, Sim, SimCtx, SystemEntry, MAX_EVENTS};
 
 #[cfg(test)]
 mod character_tests;

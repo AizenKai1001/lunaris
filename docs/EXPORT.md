@@ -23,6 +23,8 @@ dist/showcase/
 
 **How files are found.** Every string in the scene that is a path of an existing file in the workspace is copied: textures (PNG, JPEG), models (`.glb`, and for a `.gltf` its buffers and pictures), sounds (WAV, Ogg, MP3), fonts, heightmaps, WebAssembly modules, other scenes. A game with a `Localization` also gets every `lang/*.json`. A string that ends like a game file (`.png`, `.glb`, `.ogg`, `.ttf`, ...) and names nothing is listed as `missing` in the result and in `export.json`: the exported game draws the same placeholder the workspace does, so it is a bug in the scene, not in the export. A file only a **script computes** the name of (a graph system that builds `"sounds/" + n + ".ogg"`) is not found; keep one entity that names each such file, or copy the folder by hand.
 
+**A game of several scenes.** A scene the game can switch to (`SceneSwitch.path`) is copied with everything it uses, and so is the scene that one names, down the chain: export the first scene and the whole game comes. A text field names files too: every line of a `MusicPlayer` playlist (`music/theme.wav volume=0.8`) counts by its first word. A `Localization.language` that is a path (`mygame/lang/en` is the file `mygame/lang/en.json`) brings that folder's `.json` files, the other languages.
+
 **Checked first.** `export_game` runs `check` and refuses a game that has errors (a missing texture on a mesh, an unreadable font) so you do not ship something broken; `force: true` / `--force` exports anyway and says how many errors it ignored.
 
 **Safe.** It writes only inside the folder you name (which must be inside the workspace, never the workspace itself), deletes nothing, and never changes the workspace. A folder that already has files in it is refused unless `overwrite: true` / `--overwrite`; then files with the same names are replaced and everything else is left alone.
@@ -30,6 +32,8 @@ dist/showcase/
 ## Playing it
 
 On Windows, run `play.bat` (options after it go to the player: `play.bat --size 1920x1080 --quality high --mute`). The player draws with the GPU renderer and falls back to the CPU one (`--cpu`). The same folder works with `lunaris verify`/`run` for playtests: the scene's relative paths are the same everywhere.
+
+To prove that a folder plays by itself, start its player in a hidden window and let it press keys: `./lunaris play depths.lunaris.json --hidden --frames 260 --mute --press enter@45:4 --report --save-frame shot.png` (on Linux the window needs a display, for example `DISPLAY=:0`). `tools/check_depths_export.py` does exactly this for `examples/depths`, plays the workspace copy the same way and requires the same state hash from both.
 
 ## Limits
 

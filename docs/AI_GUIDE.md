@@ -78,7 +78,11 @@ If a person edits the same world (the Lunaris Editor is a separate program with 
 ## Pitfalls
 
 - Plane and quad meshes are centred on the entity (a floor at y = 0 is at y = 0). Cubes and spheres are one unit across, centred.
-- 3D colliders have depth: keep 2D bodies and the things they touch in the same z, or they never meet.
+- 3D colliders have depth: keep 2D bodies and the things they touch in the same z, or they never meet (the contact of two solid bodies at different z pushes them apart along z: use `z` for the drawing order of what does not collide, pickups, decoration, effects; `check` warns about solid bodies at different z under an orthographic camera).
+- A flat 2D follow camera: set the `CameraRig`'s `look_at` to false (the default tilts it a few degrees and sprites can then draw behind a big tilemap; `check` says so).
+- `tilemap_colliders` gives its boxes the uids after the map's: give your own entities higher uids.
+- `Persist` entities and returning: a scene that holds a persistent entity cannot be switched back to while it lives; put the music in a boot scene.
+- A whole game made of scenes, saves and an export is `examples/depths` (`docs/GAMES.md`); `docs/DOGFOOD.md` lists what was in the way.
 - A text template placeholder is `{score}`; a resource nothing sets reads 0 forever (`check` warns).
 - Events are output, not state: they are not in the hash, and a replay makes them again.
 - A model shows one texture (PNG) and its rest pose; sprites and tile maps use nearest-neighbour sampling (crisp pixel art).

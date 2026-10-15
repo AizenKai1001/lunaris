@@ -1,0 +1,129 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "ThemeTrack",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "DepthsTrack",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 9003,
+  "entities": [
+    {
+      "uid": 2,
+      "components": {
+        "Camera": {
+          "fov_y": 60,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": true,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.019999999552965164,
+            0.014999999664723873,
+            0.029999999329447746,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Name": {
+          "value": "To the menu"
+        },
+        "SceneSwitch": {
+          "path": "examples/depths/menu.lunaris.json",
+          "go": true,
+          "keep_resources": true,
+          "keep_systems": false
+        }
+      }
+    },
+    {
+      "uid": 9000,
+      "components": {
+        "MusicPlayer": {
+          "playlist": "examples/depths/music_theme.wav",
+          "crossfade": 3,
+          "volume": 0.800000011920929,
+          "shuffle": false,
+          "repeat": true,
+          "playing": true,
+          "skip": 0
+        },
+        "Name": {
+          "value": "Theme music"
+        },
+        "Persist": {
+          "keep": true
+        },
+        "ThemeTrack": {}
+      }
+    },
+    {
+      "uid": 9001,
+      "components": {
+        "AudioMixer": {
+          "config": "bus master volume=1\nbus music parent=master volume=0.55\nbus sfx parent=master volume=0.9\nroute examples/depths/music_* -> music\nroute * -> sfx"
+        },
+        "Name": {
+          "value": "Mixer"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    },
+    {
+      "uid": 9002,
+      "components": {
+        "DepthsTrack": {},
+        "MusicPlayer": {
+          "playlist": "examples/depths/music_depths.wav",
+          "crossfade": 3,
+          "volume": 0.800000011920929,
+          "shuffle": false,
+          "repeat": true,
+          "playing": false,
+          "skip": 0
+        },
+        "Name": {
+          "value": "Depths music"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    }
+  ],
+  "systems": []
+}

@@ -73,6 +73,20 @@ pub struct Recording {
     pub entries: Vec<(u64, Command)>,
     pub final_tick: u64,
     pub final_hash: u64,
+    /// How many ticks were stepped while recording. Usually `final_tick - start_tick`, but a game that loads a saved game from inside (`game.load`) goes back in time:
+    /// the replay must step as often as the game did, not up to a tick number.
+    pub steps: u64,
+    /// What the game asked the files for while it was recorded (`game.probe`, `game.load`), in order: the replay is given the same answers, whatever the files say by then.
+    pub reads: Vec<RecordedRead>,
+}
+
+/// One answer the outside world gave to a running game (see `Recording::reads`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum RecordedRead {
+    /// `game.probe`: did slot `slot` have a saved game?
+    Probe { slot: u32, exists: bool },
+    /// `game.load`: the saved game that slot `slot` held (`None`: nothing, or something unreadable).
+    Load { slot: u32, save: Option<Json> },
 }
 
 /// Time spent in one part of a tick.
@@ -153,6 +167,8 @@ pub struct Sim {
     pub profile: Option<StepProfile>,
     systems: Vec<SystemEntry>,
     recording: Option<Recording>,
+    /// While a recording is replayed: the answers the files gave the game the first time (`Recording::reads`), handed out in order.
+    replay_reads: Option<std::collections::VecDeque<RecordedRead>>,
 }
 
 impl Sim {
@@ -160,7 +176,7 @@ impl Sim {
     pub fn new(seed: u64) -> Sim {
         let mut world = World::new();
         register_standard_components(&mut world);
-        let mut sim = Sim { world, tick: 0, dt: 1.0 / 60.0, seed, rng: Rng::new(seed), threads: default_threads(), scripts: ScriptSet::default(), nav: Default::default(), contacts: Vec::new(), events: Vec::new(), asset_root: None, heightfields: Arc::default(), terrain_errors: Default::default(), meshes: Arc::default(), mesh_errors: Default::default(), mesh_stamps: Default::default(), profile: None, systems: Vec::new(), recording: None };
+        let mut sim = Sim { world, tick: 0, dt: 1.0 / 60.0, seed, rng: Rng::new(seed), threads: default_threads(), scripts: ScriptSet::default(), nav: Default::default(), contacts: Vec::new(), events: Vec::new(), asset_root: None, heightfields: Arc::default(), terrain_errors: Default::default(), meshes: Arc::default(), mesh_errors: Default::default(), mesh_stamps: Default::default(), profile: None, systems: Vec::new(), recording: None, replay_reads: None };
         sim.add_system("ui", systems::ui);
         sim.add_system("wander", systems::wander);
         sim.add_system("particles", systems::particles);
@@ -191,6 +207,16 @@ impl Sim {
 
     /// Replace the world with a saved game (`save_json`). An error leaves everything as it was.
     pub fn load_save(&mut self, save: &Json) -> Result<Vec<u64>> {
+        // a recording in progress goes on across the load (a game that loads a saved game from inside, `game.load`, is recorded and replayed as it happened: the replay
+        // makes the same load at the same step)
+        let (recording, reads) = (self.recording.take(), self.replay_reads.take());
+        let result = self.load_save_inner(save);
+        self.recording = recording;
+        self.replay_reads = reads;
+        result
+    }
+
+    fn load_save_inner(&mut self, save: &Json) -> Result<Vec<u64>> {
         let mut next = self.clone();
         next.clear();
         let created = next.load_scene(save)?;
@@ -215,6 +241,13 @@ impl Sim {
     /// (`game.saved` / `game.loaded` get the tick, `game.error` 1 when it did not work).
     fn game_requests(&mut self) {
         let want = |s: &Sim, name: &str| s.world.resource(name).filter(|v| v.is_finite() && *v >= 1.0).map(|v| (v as u32).min(99));
+        // `game.probe` = a slot number asks whether that slot has a saved game: the answer is the resource `game.has.<slot>` (1 or 0) at the end of the step
+        // (a menu shows or greys its Continue button from it; it costs nothing until a game asks)
+        if let Some(n) = want(self, "game.probe") {
+            let exists = self.slot_exists(n);
+            let _ = self.world.set_resource("game.probe", Some(0.0));
+            let _ = self.world.set_resource(&format!("game.has.{n}"), Some(if exists { 1.0 } else { 0.0 }));
+        }
         let (load, save) = (want(self, "game.load"), want(self, "game.save"));
         if load.is_none() && save.is_none() {
             return;
@@ -227,8 +260,7 @@ impl Sim {
         };
         let mut failed = false;
         if let Some(n) = load {
-            let path = root.join("saves").join(format!("slot{n}.json"));
-            let loaded = std::fs::read_to_string(&path).ok().and_then(|t| lunaris_json::parse(&t).ok()).map(|j| self.load_save(&j));
+            let loaded = self.slot_save(n, &root).map(|j| self.load_save(&j));
             match loaded {
                 Some(Ok(_)) => {
                     let _ = self.world.set_resource("game.loaded", Some(self.tick as f64));
@@ -239,7 +271,9 @@ impl Sim {
         if let Some(n) = save {
             let dir = root.join("saves");
             let text = self.save_json().to_string_pretty().ok();
-            let ok = text.is_some_and(|t| std::fs::create_dir_all(&dir).is_ok() && std::fs::write(dir.join(format!("slot{n}.json.tmp")), t).is_ok() && std::fs::rename(dir.join(format!("slot{n}.json.tmp")), dir.join(format!("slot{n}.json"))).is_ok());
+            // a replay does not write the files again (they are output: what the first run wrote is there already, and a replay of an old recording must not overwrite a newer save)
+            let replaying = self.replay_reads.is_some();
+            let ok = text.is_some_and(|t| replaying || (std::fs::create_dir_all(&dir).is_ok() && std::fs::write(dir.join(format!("slot{n}.json.tmp")), t).is_ok() && std::fs::rename(dir.join(format!("slot{n}.json.tmp")), dir.join(format!("slot{n}.json"))).is_ok()));
             if ok {
                 let _ = self.world.set_resource("game.saved", Some(self.tick as f64));
             } else {
@@ -249,6 +283,42 @@ impl Sim {
         if failed {
             let _ = self.world.set_resource("game.error", Some(1.0));
         }
+    }
+
+    /// Does slot `n` hold a saved game? A recording keeps the answer, and a replay is given it again: what the files say is not part of the game's history.
+    fn slot_exists(&mut self, n: u32) -> bool {
+        if let Some(queue) = &mut self.replay_reads {
+            if let Some(RecordedRead::Probe { slot, exists }) = queue.front() {
+                if *slot == n {
+                    let answer = *exists;
+                    queue.pop_front();
+                    return answer;
+                }
+            }
+        }
+        let exists = self.asset_root.as_ref().is_some_and(|r| r.join("saves").join(format!("slot{n}.json")).is_file());
+        if let Some(rec) = &mut self.recording {
+            rec.reads.push(RecordedRead::Probe { slot: n, exists });
+        }
+        exists
+    }
+
+    /// The saved game of slot `n`, read from `saves/` (or, in a replay, given back as it was the first time).
+    fn slot_save(&mut self, n: u32, root: &std::path::Path) -> Option<Json> {
+        if let Some(queue) = &mut self.replay_reads {
+            if let Some(RecordedRead::Load { slot, save }) = queue.front() {
+                if *slot == n {
+                    let answer = save.clone();
+                    queue.pop_front();
+                    return answer;
+                }
+            }
+        }
+        let save = std::fs::read_to_string(root.join("saves").join(format!("slot{n}.json"))).ok().and_then(|t| lunaris_json::parse(&t).ok());
+        if let Some(rec) = &mut self.recording {
+            rec.reads.push(RecordedRead::Load { slot: n, save: save.clone() });
+        }
+        save
     }
 
     /// Load a scene produced by `scene_json` (entities, runtime components and graph systems).
@@ -324,6 +394,9 @@ impl Sim {
 
     /// Advance one tick: run every system in order, then increment the tick counter.
     pub fn step(&mut self) {
+        if let Some(rec) = &mut self.recording {
+            rec.steps += 1;
+        }
         let mut prof = self.profile.take();
         let tick_started = prof.is_some().then(std::time::Instant::now);
         // `stage!("name", work)` runs the work and, while profiling, adds its time under that name
@@ -594,6 +667,8 @@ impl Sim {
             entries: Vec::new(),
             final_tick: self.tick,
             final_hash: 0,
+            steps: 0,
+            reads: Vec::new(),
         });
         Ok(())
     }
@@ -626,8 +701,9 @@ impl Sim {
         sim.seed = rec.seed;
         sim.dt = rec.dt;
         sim.rng = Rng::from_state(rec.start_rng);
+        sim.replay_reads = Some(rec.reads.iter().cloned().collect());
         let mut next = 0usize;
-        while sim.tick < rec.final_tick {
+        for _ in 0..rec.steps {
             while next < rec.entries.len() && rec.entries[next].0 == sim.tick {
                 apply(&mut sim.world, &mut sim.scripts, &rec.entries[next].1)?;
                 next += 1;
@@ -638,6 +714,7 @@ impl Sim {
             apply(&mut sim.world, &mut sim.scripts, &rec.entries[next].1)?;
             next += 1;
         }
+        sim.replay_reads = None;
         Ok(sim)
     }
 }
@@ -740,8 +817,33 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<Vehicle>().expect("standard component");
 }
 
+impl RecordedRead {
+    fn to_json(&self) -> Json {
+        match self {
+            RecordedRead::Probe { slot, exists } => Json::obj([("probe", Json::from(*slot as i64)), ("exists", Json::Bool(*exists))]),
+            RecordedRead::Load { slot, save } => Json::obj([("load", Json::from(*slot as i64)), ("save", save.clone().unwrap_or(Json::Null))]),
+        }
+    }
+
+    fn from_json(j: &Json) -> Option<RecordedRead> {
+        if let Some(slot) = j.get("probe").and_then(|v| v.as_u64()) {
+            return Some(RecordedRead::Probe { slot: slot as u32, exists: j.get("exists").and_then(|v| v.as_bool()).unwrap_or(false) });
+        }
+        let slot = j.get("load").and_then(|v| v.as_u64())?;
+        Some(RecordedRead::Load { slot: slot as u32, save: j.get("save").filter(|s| !matches!(s, Json::Null)).cloned() })
+    }
+}
+
 impl Recording {
     pub fn to_json(&self) -> Json {
+        let mut out = self.to_json_base();
+        if !self.reads.is_empty() {
+            out.set("reads", Json::arr(self.reads.iter().map(RecordedRead::to_json)));
+        }
+        out
+    }
+
+    fn to_json_base(&self) -> Json {
         Json::obj([
             ("lunaris_recording", Json::from(1)),
             ("seed", Json::str(format!("{:016x}", self.seed))),
@@ -752,6 +854,7 @@ impl Recording {
             ("entries", Json::arr(self.entries.iter().map(|(t, c)| Json::obj([("tick", Json::from(*t as i64)), ("command", c.to_json())])))),
             ("final_tick", Json::from(self.final_tick as i64)),
             ("final_hash", Json::str(format!("{:016x}", self.final_hash))),
+            ("steps", Json::from(self.steps as i64)),
         ])
     }
 
@@ -776,15 +879,20 @@ impl Recording {
             let tick = e.get("tick").and_then(|v| v.as_u64()).ok_or_else(|| bad("entry without tick"))?;
             entries.push((tick, Command::from_json(e.get("command").ok_or_else(|| bad("entry without command"))?)?));
         }
+        let start_tick = j.get("start_tick").and_then(|v| v.as_u64()).ok_or_else(|| bad("missing start_tick"))?;
+        let final_tick = j.get("final_tick").and_then(|v| v.as_u64()).ok_or_else(|| bad("missing final_tick"))?;
         Ok(Recording {
             seed: hex(j.get("seed"))?,
             dt: j.get("dt").and_then(|v| v.as_f64()).ok_or_else(|| bad("missing dt"))? as f32,
-            start_tick: j.get("start_tick").and_then(|v| v.as_u64()).ok_or_else(|| bad("missing start_tick"))?,
+            start_tick,
             start_scene: j.get("start_scene").cloned().ok_or_else(|| bad("missing start_scene"))?,
             start_rng,
             entries,
-            final_tick: j.get("final_tick").and_then(|v| v.as_u64()).ok_or_else(|| bad("missing final_tick"))?,
+            final_tick,
             final_hash: hex(j.get("final_hash"))?,
+            // recordings written before `steps` existed never went back in time
+            steps: j.get("steps").and_then(|v| v.as_u64()).unwrap_or(final_tick.saturating_sub(start_tick)),
+            reads: j.get("reads").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(RecordedRead::from_json).collect()).unwrap_or_default(),
         })
     }
 }

@@ -1,0 +1,236 @@
+{
+  "name": "Depths with a game pad: the d-pad and A in the menu, the left stick to walk, X to swing, Start to pause, A to resume",
+  "scene": "examples/depths/menu.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 10
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1301
+      }
+    },
+    {
+      "input": {
+        "gamepad.dpad_down": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.dpad_down": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1302,
+        "message": "the d-pad moves the focus"
+      }
+    },
+    {
+      "input": {
+        "gamepad.dpad_up": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.dpad_up": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1301
+      }
+    },
+    {
+      "input": {
+        "gamepad.a": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.a": false
+      }
+    },
+    {
+      "until": {
+        "exists": "Level 1",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 40
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "eq": 100
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 300
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 301
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 302
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 303
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 304
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 305
+        }
+      }
+    },
+    {
+      "input": {
+        "gamepad.lx": 1.0
+      }
+    },
+    {
+      "step": 20
+    },
+    {
+      "input": {
+        "gamepad.lx": 0
+      }
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "gt": -20.0,
+        "message": "the left stick walks the hero"
+      }
+    },
+    {
+      "input": {
+        "gamepad.x": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.x": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "events": "swing",
+        "ge": 1,
+        "message": "X swings the sword"
+      }
+    },
+    {
+      "input": {
+        "gamepad.start": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.start": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 1,
+        "message": "Start pauses"
+      }
+    },
+    {
+      "input": {
+        "gamepad.a": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.a": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 0,
+        "message": "A on Resume goes on"
+      }
+    }
+  ]
+}

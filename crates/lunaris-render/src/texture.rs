@@ -226,6 +226,11 @@ pub struct TextureCache {
     pub warnings: Vec<String>,
 }
 
+/// A language is a plain name (`en`, `de-AT`) or a path of the workspace without its `.json` (`examples/depths/lang/en`): letters, digits, `-`, `_` and `/` between names, no dots, nothing absolute.
+pub fn language_name_ok(language: &str) -> bool {
+    !language.is_empty() && language.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '/')) && !language.starts_with('/') && !language.ends_with('/') && !language.contains("//")
+}
+
 fn flatten_texts(j: &lunaris_json::Json, prefix: &str, out: &mut BTreeMap<String, String>) {
     match j {
         lunaris_json::Json::Str(s) if !prefix.is_empty() => {
@@ -303,8 +308,13 @@ impl TextureCache {
             return t.clone();
         }
         let mut table = BTreeMap::new();
+        // a name is a file of the workspace's `lang` folder (`en` is `lang/en.json`); a name with slashes is the path of the file without its `.json`
+        // (`examples/depths/lang/en`), so that a game can keep its texts beside its other files
         let loaded = match &self.root {
-            Some(root) if !language.is_empty() && language.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') => std::fs::read_to_string(root.join("lang").join(format!("{language}.json"))).map_err(|e| e.to_string()).and_then(|t| lunaris_json::parse(&t).map_err(|e| e.to_string())),
+            Some(root) if language_name_ok(language) => {
+                let rel = if language.contains('/') { format!("{language}.json") } else { format!("lang/{language}.json") };
+                std::fs::read_to_string(root.join(rel)).map_err(|e| e.to_string()).and_then(|t| lunaris_json::parse(&t).map_err(|e| e.to_string()))
+            }
             _ => Err("not a language name".to_string()),
         };
         match loaded {

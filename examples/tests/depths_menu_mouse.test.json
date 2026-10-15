@@ -1,0 +1,182 @@
+{
+  "name": "Depths main menu with the mouse: Credits opens and Back closes, Quit asks the player to close, Play starts level 1",
+  "scene": "examples/depths/menu.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "mouse_x": 0.5,
+        "mouse_y": 0.705
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "mouse_left": true
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "input": {
+        "mouse_left": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "credits",
+        "eq": 1,
+        "message": "a click on Credits opens them"
+      }
+    },
+    {
+      "expect": {
+        "name": "Credits title",
+        "field": "Text.visible",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "name": "Play button",
+        "field": "Ui.visible",
+        "eq": false
+      }
+    },
+    {
+      "input": {
+        "mouse_x": 0.5,
+        "mouse_y": 0.825
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "mouse_left": true
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "input": {
+        "mouse_left": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "credits",
+        "eq": 0,
+        "message": "Back closes them"
+      }
+    },
+    {
+      "expect": {
+        "name": "Play button",
+        "field": "Ui.visible",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "resource": "app.quit",
+        "eq": 0
+      }
+    },
+    {
+      "input": {
+        "mouse_x": 0.5,
+        "mouse_y": 0.82
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "mouse_left": true
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "input": {
+        "mouse_left": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "app.quit",
+        "eq": 1,
+        "message": "Quit asks the player program to close"
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "app.quit",
+          "value": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "mouse_x": 0.5,
+        "mouse_y": 0.475
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "mouse_left": true
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "input": {
+        "mouse_left": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "leave",
+        "eq": 1,
+        "message": "a click on Play starts the run"
+      }
+    },
+    {
+      "until": {
+        "exists": "Level 1",
+        "eq": true,
+        "max_ticks": 240
+      }
+    }
+  ]
+}

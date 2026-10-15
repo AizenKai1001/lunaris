@@ -1,0 +1,256 @@
+{
+  "name": "Depths pause: Esc (or the pad's Start) stops time (time.scale 0) and shows the menu, Esc again resumes, Main menu goes back to the title",
+  "scene": "examples/depths/level1.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 30
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 0
+      }
+    },
+    {
+      "input": {
+        "escape": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "escape": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 1,
+        "message": "Esc pauses"
+      }
+    },
+    {
+      "expect": {
+        "resource": "time.scale",
+        "eq": 0,
+        "message": "and stops time"
+      }
+    },
+    {
+      "expect": {
+        "name": "Resume",
+        "field": "Ui.visible",
+        "eq": true,
+        "message": "the pause menu comes up"
+      }
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1201,
+        "message": "with the focus on Resume"
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -20.5,
+              13.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 40
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "approx": [
+          -20.5,
+          0.01
+        ],
+        "message": "time stands still: holding a key moves nothing"
+      }
+    },
+    {
+      "expect": {
+        "tick": true,
+        "gt": 70,
+        "message": "(the clock of the interface goes on)"
+      }
+    },
+    {
+      "input": {
+        "escape": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "escape": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 0,
+        "message": "a second Esc goes on"
+      }
+    },
+    {
+      "expect": {
+        "resource": "time.scale",
+        "eq": 1
+      }
+    },
+    {
+      "expect": {
+        "name": "Resume",
+        "field": "Ui.visible",
+        "eq": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 12
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "gt": -20.1,
+        "message": "and the hero walks again"
+      }
+    },
+    {
+      "input": {
+        "gamepad.start": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "gamepad.start": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 1,
+        "message": "Start on a pad pauses"
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1202,
+        "message": "S moves the focus to Main menu"
+      }
+    },
+    {
+      "input": {
+        "enter": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "enter": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "until": {
+        "exists": "Play button",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "time.scale",
+        "eq": 1,
+        "message": "back at the title, time runs again"
+      }
+    },
+    {
+      "expect": {
+        "resource": "paused",
+        "eq": 0
+      }
+    }
+  ]
+}

@@ -229,7 +229,7 @@ selector
 
 `SceneManager.LoadScene` / `OpenLevel`: an entity with a `SceneSwitch` names a scene file in `path` (relative to the workspace, like `levels/two.lunaris.json`); when a graph system, a contact or a state machine sets its `go` to true, at the end of that tick the world is replaced by that scene. A main menu's Play button, the door at the end of a level, a game-over screen that restarts: each is a button or a contact that sets `SceneSwitch.go` on the entity that carries the path (a path is text, and graph systems only handle numbers, so the paths sit in the scene as data and the systems choose which switch to throw).
 
-* every entity goes except those with a `Persist` (the player, a score board, the music: "do not destroy on load"); the entity numbers of the new scene must not clash with a persistent one;
+* every entity goes except those with a `Persist` (the player, a score board, the music: "do not destroy on load"); the entity numbers of the new scene must not clash with a persistent one, which also means that **a scene that holds a persistent entity cannot be switched back to while the entity lives**: put such entities in a first scene that nothing returns to (`examples/depths/boot.lunaris.json` holds the music and switches to the title at once);
 * the graph systems and prefabs of the old scene go too, and the new scene brings its own (put shared systems in each scene file, or set `keep_systems` so the old ones stay); `keep_resources` (on by default) keeps every resource, the score and the time of day, and they win over the new scene's defaults of the same names, so a counter carries from level to level;
 * the tick and the random numbers go on, and terrains are read again; the resource `scene.loaded` is the tick of the last switch and the event `scene_loaded` is emitted (a few lines of a graph system can fade in with `ColorGrade`); a scene that cannot be read, parsed or merged changes nothing and sets `scene.error` to 1; `check` reports a path that is not a file;
 * replays and networked games switch at the same tick, because the switch is an outcome of the simulation itself: every machine needs the same scene files.
@@ -371,7 +371,7 @@ setting `Timeline.playing`.
 
 ## Camera rigs: `CameraRig`
 
-On the camera entity: `target` (a uid), `mode` 0 follow (stay at `offset`, eased at `follow_speed` per second, 0 snaps) or 1 orbit (`distance`, `yaw`, `pitch` in radians: a graph system
+On the camera entity (for a flat 2D picture set `look_at` to false: the default turns the camera toward `target` plus `look_offset` [0, 1, 0], which tilts it a few degrees, and `check` says so): `target` (a uid), `mode` 0 follow (stay at `offset`, eased at `follow_speed` per second, 0 snaps) or 1 orbit (`distance`, `yaw`, `pitch` in radians: a graph system
 can add the mouse movement to them), `look_at` with `look_offset` to face the target, and `shake` (0 to 1: set it to 1 when something explodes) with `shake_decay` per second and `shake_amount` metres.
 
 ## Sensors: `Sensor`
@@ -411,10 +411,16 @@ brings it back exactly (the next ticks are the ticks that would have come), `sav
 set the resource `game.save` (or `game.load`) to a slot number from 1 to 99 in a graph system: at the end of the step the engine does it, sets the resource back to 0, and sets `game.saved` or
 `game.loaded` to the tick, or `game.error` to 1 when it could not. Navigation paths in progress are not saved (agents plan again); `input.*` resources are not saved either.
 
+A title screen asks whether to offer Continue with the resource `game.probe` (a slot number): at the end of the step `game.has.<slot>` is 1 when that slot has a saved game and 0 when not (`$"game.has.1"` in a script is fine too: a name may have a number between dots). A recording that is running goes on across an in-game load, and a replay is given the same answers the files gave the first time (what `game.probe` found, which save `game.load` read) and writes no files, so it matches whatever the files hold by then.
+
+## Closing the player, and Esc
+
+`lunaris play` (and an exported game) closes its window on Esc. A game that wants Esc for itself, a pause menu, sets the resource `app.quit_on_escape` to 0: Esc is then the key `input.escape` (bind it in an `InputMap`: `pause = escape, gamepad.start`). A game closes itself, a Quit button, by setting the resource `app.quit` above 0 (also in a hidden self-test). A self-test presses keys at set frames with `--press enter@45:4,s@80` (KEY@FRAME[:FRAMES]; one tick a frame), prints the resources with `--report` and saves the last picture with `--save-frame`: `tools/check_depths_export.py` uses them to play an exported folder.
+
 ## Languages: `Localization`
 
 Put `{#key}` in any `Text.value` or `Ui.text`; one `Localization {"language": "en"}` entity picks `lang/en.json` of the workspace: `{"hello": "Hello", "menu": {"play": "Play"}}` gives `{#hello}` and `{#menu.play}`
-(a key that is not in the file shows as the key). Setting `language` to `"de"` switches at once. `{resource}` placeholders still work in the same text: `{#score_label}: {score}`.
+(a key that is not in the file shows as the key). Setting `language` to `"de"` switches at once. `{resource}` placeholders still work in the same text: `{#score_label}: {score}`, and a translated text may hold placeholders of its own (`"stats": "Level {level}   Score {score}"` in the language file). A `language` with slashes is the path of the file without `.json`, so that a game keeps its texts beside its other files (`"language": "mygame/lang/en"` is `mygame/lang/en.json`; `examples/depths` does it); an export copies that whole folder of languages. A graph system cannot set a text, so a language switch in the game itself needs the `language` set from the outside.
 
 ## Limits
 

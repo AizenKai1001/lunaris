@@ -5,7 +5,7 @@
 //! works everywhere.
 //!
 //!   lunaris play examples/vista.lunaris.json [--size 1280x720] [--mute] [--quality high] [--cpu]
-//!   lunaris play scene.json --hidden --frames 120 --hold d --save-frame shot.png --report     (a self-test: no window shown)
+//!   lunaris play scene.json --hidden --frames 120 --hold d --press enter@30:4 --save-frame shot.png --report     (a self-test: no window shown; `--press KEY@FRAME[:FRAMES]` presses keys at set frames)
 //!
 //! Game controllers work too (Xbox-style pads: XInput on Windows, the joystick interface on Linux): `input.gamepad.a`, `input.gamepad.lx` and so on, which an
 //! `InputMap` binds (`jump = space, gamepad.a`), and `rumble.low` / `rumble.high` resources shake the pad (Windows). `lunaris-pad` has the names.
@@ -14,7 +14,7 @@
 //! (notches), and a game that writes the resource `cursor.lock` above 0.5 gets the pointer hidden and held in the window (first-person games; Esc still quits). A
 //! `MouseLook` component turns by them.
 //!
-//! Esc quits, F11 toggles full screen. Mouse position is `input.mouse_x` / `input.mouse_y` (0..1 across the picture, y down) and the
+//! Esc quits (unless the game sets the resource `app.quit_on_escape` to 0: then Esc is the key `input.escape`, and the game closes itself with `app.quit` above 0), F11 toggles full screen. Mouse position is `input.mouse_x` / `input.mouse_y` (0..1 across the picture, y down) and the
 //! buttons are `input.mouse_left` / `input.mouse_right`.
 use lunaris_api::{Director, Engine};
 use lunaris_audio::{Mixer, Output};
@@ -52,6 +52,8 @@ pub struct Options {
     pub volume: f32,
     pub frames: Option<u64>,
     pub hold: Vec<String>,
+    /// Keys pressed by a self-test at a given frame: (key, first frame, frames held). `--press enter@30:4,s@50` presses Enter at frame 30 for 4 frames and S at frame 50 for 4.
+    pub presses: Vec<(String, u64, u64)>,
     pub save_frame: Option<PathBuf>,
     pub report: bool,
     /// Draw with the reference CPU renderer even when a GPU is available.
@@ -61,6 +63,23 @@ pub struct Options {
     /// Play over the network: take a seat in a `lunaris host` game (lockstep or rollback: every player's copy plays the same inputs), or
     /// watch one.
     pub join: Option<Join>,
+}
+
+/// `--press enter@30:4,s@50`: KEY@FIRST_FRAME[:FRAMES] (4 frames when not said): the keys a self-test presses and when.
+pub fn parse_presses(text: &str) -> Vec<(String, u64, u64)> {
+    text.split(',')
+        .filter_map(|item| {
+            let (key, when) = item.trim().split_once('@')?;
+            let (first, len) = when.split_once(':').unwrap_or((when, "4"));
+            Some((key.trim().to_string(), first.trim().parse::<u64>().ok()?, len.trim().parse::<u64>().ok()?.max(1))).filter(|(k, _, _)| !k.is_empty())
+        })
+        .collect()
+}
+
+/// Does Esc close the window? Yes, unless the game has set the resource `app.quit_on_escape` to 0: then Esc is the key `input.escape` (a pause menu, a back button) and
+/// the game closes itself with the resource `app.quit` (a Quit button).
+fn escape_quits(engine: &Engine) -> bool {
+    engine.sim.world.resource("app.quit_on_escape").is_none_or(|v| v > 0.5)
 }
 
 /// The name of a key as the games read it: `input.<name>`.
@@ -235,6 +254,12 @@ impl App {
             self.set_input(moved);
         }
         // the mouse's motion since the last frame goes into the first tick of this one, then back to zero
+        // keys a self-test presses at set frames (one tick a frame, so the frame is the tick)
+        let at = self.frames;
+        let scripted: Vec<(String, bool)> = self.opts.presses.iter().flat_map(|(k, first, len)| [(at == *first).then(|| (k.clone(), true)), (at == first + len).then(|| (k.clone(), false))]).flatten().collect();
+        if !scripted.is_empty() {
+            self.press(scripted);
+        }
         let (look, wheel) = (std::mem::take(&mut self.look), std::mem::take(&mut self.wheel));
         let moving = look != (0.0, 0.0) || wheel != 0.0;
         if moving || self.look_sent {
@@ -361,7 +386,7 @@ impl App {
                 w.set_title(&format!("Lunaris - {}{} - tick {} - {:.0} fps ({})", self.opts.scene, seat, self.engine.sim.tick, self.fps, if self.gpu.is_some() { format!("GPU {}", self.opts.quality) } else { "CPU".to_string() }));
             }
         }
-        if self.error.is_some() || self.opts.frames.is_some_and(|n| self.frames >= n) {
+        if self.error.is_some() || self.opts.frames.is_some_and(|n| self.frames >= n) || self.engine.sim.world.resource("app.quit").is_some_and(|v| v > 0.5) {
             el.exit();
         }
     }
@@ -430,8 +455,20 @@ impl ApplicationHandler for App {
             WindowEvent::KeyboardInput { event, .. } => {
                 let PhysicalKey::Code(code) = event.physical_key else { return };
                 let down = event.state == ElementState::Pressed;
-                if code == KeyCode::Escape && down {
-                    el.exit();
+                if code == KeyCode::Escape && escape_quits(&self.engine) {
+                    if down {
+                        el.exit();
+                    }
+                } else if code == KeyCode::Escape {
+                    // a game that took Esc for itself (a pause menu) reads it as the key `input.escape`
+                    if !event.repeat && down != self.held.contains("escape") {
+                        if down {
+                            self.held.insert("escape".to_string());
+                        } else {
+                            self.held.remove("escape");
+                        }
+                        self.press(vec![("escape".to_string(), down)]);
+                    }
                 } else if code == KeyCode::F11 && down && !event.repeat {
                     if let Some(w) = &self.window {
                         w.set_fullscreen(if w.fullscreen().is_some() { None } else { Some(Fullscreen::Borderless(None)) });
@@ -645,6 +682,23 @@ pub fn run(mut opts: Options, root: PathBuf, seed: u64, threads: Option<usize>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scripted_presses_say_which_key_when_and_for_how_long() {
+        assert_eq!(parse_presses("enter@30:4, s@50 ,space@7:1"), vec![("enter".to_string(), 30, 4), ("s".to_string(), 50, 4), ("space".to_string(), 7, 1)]);
+        assert_eq!(parse_presses("nonsense,@3,x@y,w@5:0"), vec![("w".to_string(), 5, 1)], "what cannot be read is skipped, a press lasts at least a frame");
+        assert!(parse_presses("").is_empty());
+    }
+
+    #[test]
+    fn escape_is_the_games_when_it_says_so() {
+        let mut e = Engine::new(1, std::env::temp_dir());
+        assert!(escape_quits(&e), "a game that says nothing keeps the old way: Esc closes the window");
+        e.sim.world.set_resource("app.quit_on_escape", Some(0.0)).unwrap();
+        assert!(!escape_quits(&e), "the resource at 0 hands Esc to the game as the key `input.escape`");
+        e.sim.world.set_resource("app.quit_on_escape", Some(1.0)).unwrap();
+        assert!(escape_quits(&e));
+    }
 
     #[test]
     fn keys_get_the_names_games_read() {

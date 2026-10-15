@@ -43,6 +43,43 @@ mod tests {
     }
 
     #[test]
+    fn a_translated_text_can_hold_placeholders_of_its_own() {
+        let dir = std::env::temp_dir().join(format!("lunaris-l10n-holes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("lang")).unwrap();
+        std::fs::write(dir.join("lang").join("en.json"), r#"{"stats": "Level {level}   Score {score}"}"#).unwrap();
+        let mut s = world(&["{#stats}", "Coins {score}: {#stats}"]);
+        s.world.set_resource("score", Some(30.0)).unwrap();
+        s.world.set_resource("level", Some(2.0)).unwrap();
+        let Json::Obj(components) = lunaris_json::parse(r#"{"Localization":{"language":"en"}}"#).unwrap() else { panic!() };
+        s.apply(&lunaris_sim::Command::Spawn { uid: Some(1), components }).unwrap();
+        let mut tex = TextureCache::new(Some(dir));
+        let scene = gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 48, ..RenderOptions::default() }).unwrap();
+        assert_eq!(scene.texts.iter().map(|t| t.text.clone()).collect::<Vec<_>>(), vec!["Level 2   Score 30", "Coins 30: Level 2   Score 30"]);
+    }
+
+    #[test]
+    fn a_language_name_with_slashes_is_a_path_beside_the_game_and_cannot_leave_the_workspace() {
+        use crate::texture::language_name_ok;
+        for good in ["en", "de-AT", "village_en", "examples/depths/lang/en"] {
+            assert!(language_name_ok(good), "{good}");
+        }
+        for bad in ["", "/etc/passwd", "../x", "a//b", "lang/", "a.b", "a b"] {
+            assert!(!language_name_ok(bad), "{bad}");
+        }
+        let dir = std::env::temp_dir().join(format!("lunaris-l10n-path-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("game").join("lang")).unwrap();
+        std::fs::write(dir.join("game").join("lang").join("en.json"), r#"{"play": "Play"}"#).unwrap();
+        let mut s = world(&["{#play}"]);
+        let Json::Obj(components) = lunaris_json::parse(r#"{"Localization":{"language":"game/lang/en"}}"#).unwrap() else { panic!() };
+        s.apply(&lunaris_sim::Command::Spawn { uid: Some(1), components }).unwrap();
+        let mut tex = TextureCache::new(Some(dir));
+        let scene = gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 48, ..RenderOptions::default() }).unwrap();
+        assert_eq!(scene.texts.iter().map(|t| t.text.clone()).collect::<Vec<_>>(), vec!["Play"]);
+    }
+
+    #[test]
     fn water_becomes_a_see_through_grid_with_wave_numbers_and_a_flat_one_without_waves() {
         let mut s = lunaris_sim::Sim::new(1);
         for (uid, comps) in [(1u64, r#"{"Transform":{"pos":[0,2,0]},"Water":{"size":[60,30],"wave_height":0.4,"wave_length":6,"phase":1.5,"color":[0,0.3,0.4,0.7]}}"#), (2, r#"{"Transform":{"pos":[0,0,0]},"Water":{"size":[10,10],"wave_height":0}}"#)] {

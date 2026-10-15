@@ -1,0 +1,867 @@
+{
+  "name": "Depths level 2 (caves): a locked door stops the hero; it walks to the key (62 cells), through the door and to the stairs (67 cells); the stairs lead to level 3",
+  "scene": "examples/depths/level2.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 40
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 2,
+        "message": "the level says which one it is"
+      }
+    },
+    {
+      "expect": {
+        "resource": "game.saved",
+        "gt": 0,
+        "message": "the level saved the game when it began"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "eq": 100
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 300
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 301
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 302
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 303
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 304
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 305
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 306
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 307
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 308
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              15.5,
+              -7.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 45
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "expect": {
+        "exists": "Door",
+        "eq": true,
+        "message": "the door is locked: a hero without a key cannot open it"
+      }
+    },
+    {
+      "expect": {
+        "resource": "keys",
+        "eq": 0
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -22.5,
+              2.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 2.5,
+        "max_ticks": 470
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 1.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 3.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": 0.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 13.5,
+        "max_ticks": 260
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 1.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 14.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 5.5,
+        "max_ticks": 176
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 15.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 6.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 17.5,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 9.5,
+        "max_ticks": 162
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 18.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 11.5,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 19.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 13.5,
+        "max_ticks": 148
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 20.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 14.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 21.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "ge": 15.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 22.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "keys",
+        "eq": 1,
+        "message": "the hero found the key"
+      }
+    },
+    {
+      "expect": {
+        "exists": "Key",
+        "eq": false
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "le": 12.5,
+        "max_ticks": 260
+      }
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -5.5,
+        "max_ticks": 414
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 13.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -6.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 14.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -7.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 15.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -8.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "expect": {
+        "exists": "Door",
+        "eq": false,
+        "message": "the key opened the door"
+      }
+    },
+    {
+      "expect": {
+        "resource": "keys",
+        "eq": 0,
+        "message": "and was used up"
+      }
+    },
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0,
+        "message": "no graph system has failed while playing (check reports the last error of each)"
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 16.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[1]",
+        "le": -9.5,
+        "max_ticks": 134
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "until": {
+        "entity": 1000,
+        "field": "Transform.pos[0]",
+        "ge": 25.5,
+        "max_ticks": 246
+      }
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "HitPoints",
+          "value": {
+            "value": 63
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "resource": "leave",
+        "gt": 0,
+        "max_ticks": 386
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "ge": 150,
+        "message": "key, door and stairs are worth points"
+      }
+    },
+    {
+      "until": {
+        "exists": "Level 3",
+        "eq": true,
+        "max_ticks": 240
+      }
+    },
+    {
+      "step": 5
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 3,
+        "message": "the stairs lead to the next level"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "between": [
+          62,
+          68
+        ],
+        "message": "the hero arrives with the health it had"
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "ge": 150,
+        "message": "and the score"
+      }
+    },
+    {
+      "expect": {
+        "resource": "game.saved",
+        "gt": 0
+      }
+    }
+  ]
+}

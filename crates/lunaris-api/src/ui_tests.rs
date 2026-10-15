@@ -197,6 +197,7 @@ fn check_reads_flipbook_tables() {
     let mut e = engine();
     e.call("spawn", &j(r#"{"uid":1,"components":{"Sprite":{"sheet":[4,2]},"Animator":{"clip":"run"},"SpriteAnim":{"clips":"idle: 0-3\nrun: 4-7 fps=12 step@1"}}}"#)).unwrap();
     assert!(problems(&mut e).iter().all(|m| !m.contains("SpriteAnim") && !m.contains("flip")), "{:?}", problems(&mut e));
+    assert!(problems(&mut e).iter().all(|m| !m.contains("no MeshRenderer")), "a 2D flipbook is animated without a mesh: {:?}", problems(&mut e));
     e.call("set", &j(r#"{"uid":1,"component":"SpriteAnim","value":{"clips":"idle: 0-3\nrun: 4-9"}}"#)).unwrap();
     assert!(problems(&mut e).iter().any(|m| m.contains("`run`") && m.contains("past the end of the Sprite's sheet")), "{:?}", problems(&mut e));
     e.call("set", &j(r#"{"uid":1,"component":"Animator","value":{"clip":"walk"}}"#)).unwrap();
@@ -256,4 +257,30 @@ fn check_reads_particle_modules() {
     assert!(problems(&mut e).iter().any(|m| m.contains("draws at most 20000 solids")), "{:?}", problems(&mut e));
     e.call("spawn", &j(r#"{"uid":2,"components":{"ParticleModules":{"modules":"noise"}}}"#)).unwrap();
     assert!(problems(&mut e).iter().any(|m| m.contains("needs a Particles cloud")), "{:?}", problems(&mut e));
+}
+
+#[test]
+fn check_warns_about_2d_bodies_at_different_z() {
+    let mut e = engine();
+    e.call("spawn", &j(r#"{"uid":1,"components":{"Camera":{"ortho":true},"Transform":{}}}"#)).unwrap();
+    let body = |z: f32| format!(r#"{{"components":{{"Transform":{{"pos":[0,0,{z}]}},"Velocity":{{}},"Collider":{{"shape":0}},"RigidBody":{{"mass":1}}}}}}"#);
+    e.call("spawn", &j(&body(0.0))).unwrap();
+    e.call("spawn", &j(&body(0.0))).unwrap();
+    assert!(problems(&mut e).iter().all(|m| !m.contains("different z")), "{:?}", problems(&mut e));
+    e.call("spawn", &j(r#"{"components":{"Transform":{"pos":[0,0,0.5]},"Collider":{"shape":1}}}"#)).unwrap();
+    assert!(problems(&mut e).iter().all(|m| !m.contains("different z")), "a static box in another plane is the level's business: {:?}", problems(&mut e));
+    e.call("spawn", &j(&body(0.1))).unwrap();
+    assert!(problems(&mut e).iter().any(|m| m.contains("different z")), "{:?}", problems(&mut e));
+}
+
+#[test]
+fn check_warns_when_a_2d_follow_camera_would_tilt_the_picture() {
+    let mut e = engine();
+    e.call("spawn", &j(r#"{"uid":1,"components":{"Tilemap":{"size":[2,2],"data":"0 0 0 0"}}}"#)).unwrap();
+    e.call("spawn", &j(r#"{"uid":3,"components":{"Transform":{},"Camera":{"ortho":true},"CameraRig":{"target":1}}}"#)).unwrap();
+    assert!(problems(&mut e).iter().any(|m| m.contains("tilts the 2D picture")), "the default rig looks at the target a metre above it: {:?}", problems(&mut e));
+    e.call("set", &j(r#"{"uid":3,"component":"CameraRig","value":{"look_at":false}}"#)).unwrap();
+    assert!(problems(&mut e).iter().all(|m| !m.contains("tilts the 2D picture")), "{:?}", problems(&mut e));
+    e.call("set", &j(r#"{"uid":3,"component":"CameraRig","value":{"look_at":true,"look_offset":[0,0,0]}}"#)).unwrap();
+    assert!(problems(&mut e).iter().all(|m| !m.contains("tilts the 2D picture")), "looking straight at the target is fine: {:?}", problems(&mut e));
 }

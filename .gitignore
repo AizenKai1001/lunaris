@@ -10,3 +10,6 @@ bin/
 .claude/worktrees/
 
 *probe_tmp*
+
+# games write their saved games here when played or tested in the workspace
+/saves/

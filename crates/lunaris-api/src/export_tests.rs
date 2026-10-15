@@ -111,3 +111,39 @@ fn a_game_with_errors_is_not_exported_unless_forced() {
     assert_eq!(r.get("errors_ignored").unwrap().as_u64(), Some(1));
     assert!(e.root.join("dist/broken/game.lunaris.json").is_file());
 }
+
+#[test]
+fn a_game_of_several_scenes_exports_the_files_of_every_scene_its_music_and_its_language_folder() {
+    let mut e = engine();
+    let root = e.root.clone();
+    let _ = std::fs::remove_dir_all(root.join("dist_levels"));
+    for d in ["game/art", "game/lang", "game/sound"] {
+        std::fs::create_dir_all(root.join(d)).unwrap();
+    }
+    write_png(&root.join("game/art/menu.png"), [1, 2, 3]);
+    write_png(&root.join("game/art/level1.png"), [4, 5, 6]);
+    write_png(&root.join("game/art/level2.png"), [7, 8, 9]);
+    std::fs::write(root.join("game/sound/theme.wav"), b"RIFF").unwrap();
+    std::fs::write(root.join("game/sound/boss.wav"), b"RIFF").unwrap();
+    std::fs::write(root.join("game/lang/en.json"), r#"{"hi":"Hello"}"#).unwrap();
+    std::fs::write(root.join("game/lang/de.json"), r#"{"hi":"Hallo"}"#).unwrap();
+    // level 1 is named by the start scene, level 2 only by level 1: the chain must be followed
+    let level2 = r#"{"lunaris":1,"entities":[{"uid":1,"components":{"Sprite":{"texture":"game/art/level2.png"}}}]}"#;
+    let level1 = r#"{"lunaris":1,"entities":[{"uid":1,"components":{"Sprite":{"texture":"game/art/level1.png"}}},{"uid":2,"components":{"SceneSwitch":{"path":"game/level2.lunaris.json"}}}]}"#;
+    std::fs::write(root.join("game/level2.lunaris.json"), level2).unwrap();
+    std::fs::write(root.join("game/level1.lunaris.json"), level1).unwrap();
+    for (uid, comps) in [
+        (1, r#"{"Sprite":{"texture":"game/art/menu.png"}}"#),
+        (2, r#"{"SceneSwitch":{"path":"game/level1.lunaris.json"}}"#),
+        (3, r#"{"MusicPlayer":{"playlist":"game/sound/theme.wav volume=0.5\n# a comment\nvoice:coin\ngame/sound/boss.wav"}}"#),
+        (4, r#"{"Localization":{"language":"game/lang/en"}}"#),
+    ] {
+        e.call("spawn", &j(&format!(r#"{{"uid":{uid},"components":{comps}}}"#))).unwrap();
+    }
+    let r = e.call("export_game", &j(r#"{"out":"dist_levels","name":"chain","force":true}"#)).unwrap();
+    let files: Vec<String> = parse(&std::fs::read_to_string(root.join("dist_levels/export.json")).unwrap()).unwrap().get("files").unwrap().as_array().unwrap().iter().map(|f| f.get("path").unwrap().as_str().unwrap().to_string()).collect();
+    for want in ["game/art/menu.png", "game/art/level1.png", "game/art/level2.png", "game/level1.lunaris.json", "game/level2.lunaris.json", "game/sound/theme.wav", "game/sound/boss.wav", "game/lang/en.json", "game/lang/de.json"] {
+        assert!(files.iter().any(|f| f == want), "{want} is exported: {files:?} {r:?}");
+        assert!(root.join("dist_levels").join(want).is_file(), "{want} is in the folder");
+    }
+}

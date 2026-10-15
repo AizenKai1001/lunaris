@@ -11,6 +11,7 @@ Each line: scene, state hash after 600 ticks (seed 1), hash of a 320x180 referen
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -46,10 +47,21 @@ def hashes_of(rel):
 
 
 lines = []
-for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json"))):
-    rel = os.path.relpath(scene, ROOT).replace(os.sep, "/")
-    state, frame = hashes_of(rel)
-    lines.append(f"{rel:40} state {state}  frame {frame}")
+# a game that asks for its saved games (`game.probe`: the title screen of examples/depths) has the files in its state: start from a workspace without any, and give them back after
+saves = os.path.join(ROOT, "saves")
+held = saves + ".held-by-xplat-hashes"
+if os.path.isdir(saves):
+    os.replace(saves, held)
+try:
+    # the examples, and the scenes of the games that keep theirs in a folder of their own (examples/depths: a menu, three levels, a game over and a win screen)
+    for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "depths", "*.lunaris.json"))):
+        rel = os.path.relpath(scene, ROOT).replace(os.sep, "/")
+        state, frame = hashes_of(rel)
+        lines.append(f"{rel:40} state {state}  frame {frame}")
+finally:
+    shutil.rmtree(saves, ignore_errors=True)
+    if os.path.isdir(held):
+        os.replace(held, saves)
 
 text = "\n".join(lines) + "\n"
 if MODE == "print":

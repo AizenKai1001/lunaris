@@ -84,6 +84,7 @@ fn main() -> std::process::ExitCode {
         volume: flag("--volume").and_then(|v| v.parse::<f32>().ok()).filter(|v| v.is_finite()).map(|v| v.clamp(0.0, 4.0)).unwrap_or(1.0),
         frames: flag("--frames").and_then(|f| f.parse().ok()),
         hold: flag("--hold").map(|h| h.split(',').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect()).unwrap_or_default(),
+        presses: flag("--press").map(|p| play::parse_presses(&p)).unwrap_or_default(),
         save_frame: None,
         report: has("--report"),
         cpu: has("--cpu"),

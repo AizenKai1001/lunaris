@@ -1,0 +1,261 @@
+{
+  "name": "Depths saving: every level autosaves to slot 1 when it begins; from the title, Continue brings back the level, the health, the coins and the score",
+  "scene": "examples/depths/level1.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "step": 5
+    },
+    {
+      "expect": {
+        "resource": "game.saved",
+        "gt": 0,
+        "message": "level 1 saved the game when it began"
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1000,
+          "component": "HitPoints",
+          "value": {
+            "value": 63
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "coins",
+          "value": 5
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "score",
+          "value": 250
+        }
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 901,
+          "component": "SceneSwitch",
+          "value": {
+            "go": true
+          }
+        }
+      }
+    },
+    {
+      "until": {
+        "exists": "Level 2",
+        "eq": true,
+        "max_ticks": 30
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 2
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "between": [
+          62,
+          66
+        ],
+        "message": "level 2 starts with the health the hero had"
+      }
+    },
+    {
+      "expect": {
+        "resource": "game.saved",
+        "gt": 7,
+        "message": "and saved the game again"
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 903,
+          "component": "SceneSwitch",
+          "value": {
+            "go": true
+          }
+        }
+      }
+    },
+    {
+      "until": {
+        "exists": "Play button",
+        "eq": true,
+        "max_ticks": 30
+      }
+    },
+    {
+      "step": 5
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "hp",
+          "value": 100
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "coins",
+          "value": 0
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "score",
+          "value": 0
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set_resource",
+        "args": {
+          "name": "level",
+          "value": 1
+        }
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "game.has.1",
+        "eq": 1,
+        "message": "the title knows there is a saved game"
+      }
+    },
+    {
+      "expect": {
+        "name": "Continue button",
+        "field": "Ui.color[3]",
+        "gt": 0.9,
+        "message": "so Continue is lit"
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "expect": {
+        "name": "Nav",
+        "field": "UiNav.current",
+        "eq": 1302
+      }
+    },
+    {
+      "input": {
+        "enter": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "enter": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "until": {
+        "exists": "Level 2",
+        "eq": true,
+        "max_ticks": 60
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "game.loaded",
+        "gt": 0,
+        "message": "Continue loaded the saved game"
+      }
+    },
+    {
+      "expect": {
+        "resource": "level",
+        "eq": 2,
+        "message": "the level comes back"
+      }
+    },
+    {
+      "expect": {
+        "resource": "coins",
+        "eq": 5,
+        "message": "the coins"
+      }
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "eq": 250,
+        "message": "the score"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "HitPoints.value",
+        "between": [
+          62,
+          66
+        ],
+        "message": "and the health"
+      }
+    }
+  ]
+}
