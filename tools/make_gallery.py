@@ -1,10 +1,10 @@
-"""Renders a picture of every example scene (and the two bots' games) into docs/gallery/ and writes docs/gallery/index.html. The
+"""Renders a picture of every example scene (and the two bots' games) into docs/gallery/ and writes docs/gallery/README.md. The
 reference pictures come from the deterministic CPU renderer; the `-high` ones from the GPU renderer's high-quality mode (they need a GPU,
 and differ a little from one graphics card to the next).
 
     python -I tools/make_gallery.py
 
-Editor screenshots (docs/gallery/editor-*.png) are added by hand with a browser; the page lists them when they exist.
+Screenshots of the editor window (docs/gallery/editor-*.png, from `lunaris-editor --shot`) are listed when they exist.
 """
 import html
 import os
@@ -79,15 +79,12 @@ with Engine(root=ROOT) as eng:
     m = eng.minimap(around=player, radius=16, cells=25)
     minimap = "\n".join(m["rows"]) + "\n\nlegend: " + ", ".join(f"{k} = {v}" for k, v in m["legend"].items())
 
-extras = [(f, c) for f, c in [("editor-game.png", "The browser editor playing Orb Dash: entity list, viewport, inspector, Systems and Tool calls tabs."), ("editor-nodes.png", "A graph system drawn as nodes (right-click to edit; Apply sends it to the engine)."), ("editor-hierarchy.png", "Attached entities nested under their parent in the list (Parent + LocalTransform, set with Attach...); the inspector shows the selected moon's local placement. Made by tools/editor_shots.mjs."), ("editor-new-menu.png", "The + menu: ten kinds of entity, each one an ordinary spawn call.")] if os.path.exists(os.path.join(OUT, f))]
-page = ["<!doctype html><meta charset=utf-8><title>Lunaris gallery</title><style>body{font:15px system-ui;max-width:1040px;margin:24px auto;padding:0 16px;background:#14161b;color:#d6dae3}img{max-width:100%;border:1px solid #303644;border-radius:6px}figure{margin:0 0 28px}figcaption{margin-top:6px}small{color:#8b93a6}pre{background:#0f1115;padding:12px;border-radius:6px;overflow:auto}</style>", "<h1>Lunaris engine gallery</h1>", "<p>Every picture below was produced by the engine itself (<code>tools/make_gallery.py</code>); the scenes are in <code>examples/</code>.</p>"]
-for name, caption, info in cards:
-    page.append(f'<figure><img src="{name}.png" alt="{name}"><figcaption><b>{html.escape(name)}</b>: {html.escape(caption)} <small>{html.escape(info)}</small></figcaption></figure>')
-for name, caption, info in high_cards:
-    page.append(f'<figure><img src="{name}.png" alt="{name}"><figcaption><b>{html.escape(name)}</b>: {html.escape(caption)} <small>{html.escape(info)}</small></figcaption></figure>')
+extras = [(f, c) for f, c in [("editor-scene.png", "The Lunaris Editor (a native window): hierarchy, scene view, inspector, project browser and console.")] if os.path.exists(os.path.join(OUT, f))]
+page = ["# Gallery", "", "Pictures of the example scenes: the plain ones come from the deterministic CPU reference renderer, the `-high` ones from the GPU renderer's high-quality mode (made by `tools/make_gallery.py`).", ""]
+for name, caption, info in cards + high_cards:
+    page += [f"### {name}", "", f"![{name}]({name}.png)", "", f"{caption} ({info})", ""]
 for f, c in extras:
-    page.append(f'<figure><img src="{f}" alt="{f}"><figcaption>{html.escape(c)}</figcaption></figure>')
-page.append("<h2>What a language model sees</h2><p>The <code>minimap</code> tool: a text map around the player in Orb Dash (<code>@</code> is the player, <code>O</code> an orb, up is -z).</p>")
-page.append("<pre>" + html.escape(minimap) + "</pre>")
-open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write("\n".join(page))
-print("wrote docs/gallery/index.html")
+    page += [f"![{f}]({f})", "", c, ""]
+page += ["### What a language model sees", "", "The `minimap` tool: a text map around the player in Orb Dash (`@` is the player, `O` an orb, up is -z).", "", "```", minimap, "```", ""]
+open(os.path.join(OUT, "README.md"), "w", encoding="utf-8").write("\n".join(page))
+print("wrote docs/gallery/README.md")

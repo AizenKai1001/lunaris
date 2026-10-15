@@ -7,7 +7,6 @@
 //   const frame = await eng.render({ width: 320, height: 180 });   // frame.png is a Buffer with the PNG
 //   await eng.close();
 //
-//   const shared = await Engine.connect({ session: 's.json' });   // join a running `lunaris edit --web --session-file s.json`
 //
 // Every tool is a method (`eng.tools` lists them). A refused call rejects with a LunarisError carrying `code`, `path`, `hint`.
 import { spawn } from 'node:child_process';
@@ -45,16 +44,6 @@ export class Engine {
     return Engine.#withTools(new Engine(spawn(findExe(exe), args, { stdio: ['pipe', 'pipe', 'ignore'] })));
   }
 
-  // Join a world that is already running next to a person: `lunaris edit --web scene.json --session-file s.json` writes the file.
-  // Edits made here show up on their page, and theirs in your queries. close() only drops the connection.
-  static async connect({ session = process.env.LUNARIS_SESSION, rpc, token } = {}) {
-    if (session) ({ rpc, token } = typeof session === 'string' ? JSON.parse(readFileSync(session, 'utf8')) : session);
-    if (!rpc || !token) throw new Error('connect needs { session } (a file from `lunaris edit --session-file`), or { rpc, token }, or LUNARIS_SESSION');
-    const e = new Engine(null);
-    e.remote = { rpc, token };
-    return Engine.#withTools(e);
-  }
-
   static async #withTools(e) {
     e.tools = Object.fromEntries((await e.rpc('tools/list', {})).tools.map((t) => [t.name, t]));
     // every tool is available as a method: eng.spawn({...})
@@ -65,7 +54,6 @@ export class Engine {
 
   constructor(proc) {
     this.proc = proc;
-    this.remote = null;
     this.tools = {};
     this.nextId = 1;
     this.waiting = new Map();
@@ -85,22 +73,7 @@ export class Engine {
     });
   }
 
-  async _http(method, params) {
-    const id = this.nextId++;
-    let resp;
-    try {
-      resp = await fetch(this.remote.rpc, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lunaris-Token': this.remote.token }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params }) });
-    } catch (err) {
-      throw new Error(`cannot reach the editor at ${this.remote.rpc}: ${err.cause?.code || err.message}`);
-    }
-    if (!resp.ok) throw new Error(`the editor refused the request (${resp.status}): ${await resp.text()}`);
-    const reply = await resp.json();
-    if (reply.error) throw new LunarisError({ message: reply.error.message, ...(reply.error.data || {}) });
-    return reply.result;
-  }
-
   rpc(method, params) {
-    if (this.remote) return this._http(method, params);
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.waiting.set(id, { resolve, reject });

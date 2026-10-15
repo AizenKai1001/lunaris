@@ -73,7 +73,7 @@ Logic is data: `define_system` takes a JSON graph that runs every tick, determin
 
 ## Sharing a world
 
-A person can have the browser editor open on the world you work in: they start `lunaris edit --web scene.json --session-file session.json` and you join with `connect("session.json")` (Python) or `Engine.connect({ session })` (JavaScript), or `POST` to the `rpc` URL in the file with its token. Your edits appear on their page, and theirs in your queries. Poll `revision` (cheap, read-only) to learn that someone else changed something: when the number differs from the last one you saw, `query` again before acting on old information. `undo` undoes the last edit, whoever made it, so use `undo_group` and take a `snapshot` before risky work.
+If a person edits the same world (the Lunaris Editor is a separate program with its own world for now), poll `revision` (cheap, read-only) to learn that someone else changed something: when the number differs from the last one you saw, `query` again before acting on old information. `undo` undoes the last edit, whoever made it, so use `undo_group` and take a `snapshot` before risky work.
 
 ## Pitfalls
 

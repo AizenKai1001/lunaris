@@ -1168,7 +1168,6 @@ dependencies = [
  "lunaris-api",
  "lunaris-audio",
  "lunaris-ecs",
- "lunaris-editor",
  "lunaris-gpu",
  "lunaris-json",
  "lunaris-mind",
@@ -1206,14 +1205,6 @@ dependencies = [
 name = "lunaris-ecs"
 version = "0.0.1"
 dependencies = [
- "lunaris-json",
-]
-
-[[package]]
-name = "lunaris-editor"
-version = "0.0.1"
-dependencies = [
- "lunaris-api",
  "lunaris-json",
 ]
 

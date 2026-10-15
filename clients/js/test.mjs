@@ -48,27 +48,3 @@ test('render returns a PNG buffer', async () => {
   assert.ok(Buffer.isBuffer(frame.png) && frame.png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
   assert.ok(frame.visible.length > 0);
 });
-
-test('a client joins the world of a running editor (--session-file)', async () => {
-  const tmp = join(repo, 'target', 'test-tmp');
-  mkdirSync(tmp, { recursive: true });
-  const session = join(tmp, 'session-js.json');
-  rmSync(session, { force: true });
-  const exe = join(repo, 'target', 'release', process.platform === 'win32' ? 'lunaris.exe' : 'lunaris');
-  const proc = spawn(exe, ['edit', '--port', '0', '--root', repo, '--session-file', session], { stdio: 'ignore' });
-  try {
-    for (let i = 0; i < 100 && !(existsSync(session) && statSync(session).size > 0); i++) await new Promise((r) => setTimeout(r, 100));
-    const a = await Engine.connect({ session });
-    const b = await Engine.connect({ session });
-    await a.reset();
-    await a.spawn({ count: 2, components: { Transform: {} } });
-    assert.equal((await b.query({ with: ['Transform'] })).total, 2, 'the second client sees edits made by the first');
-    assert.ok(Buffer.isBuffer((await b.render({ width: 32, height: 18 })).png));
-    await assert.rejects(a.spawn({ components: { Transfrom: {} } }), (e) => e instanceof LunarisError && e.code === 'unknown_component');
-    const info = JSON.parse(await (await import('node:fs/promises')).readFile(session, 'utf8'));
-    await assert.rejects(Engine.connect({ rpc: info.rpc, token: 'not-the-token' }), /403/);
-    await a.close();
-  } finally {
-    proc.kill();
-  }
-});

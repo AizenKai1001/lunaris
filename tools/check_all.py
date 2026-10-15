@@ -1,6 +1,6 @@
 """Run every check the project has, one after another, and say what passed.
 
-    python -I tools/check_all.py            (about two minutes; needs cargo, Python, Node 22+, Chrome or Edge for the editor script)
+    python -I tools/check_all.py            (about two minutes; needs cargo, Python and Node 22+)
     python -I tools/check_all.py --quick    (skips the editor script and the long determinism soak)
     python -I tools/check_all.py --low      (builds and tests at below normal priority with four jobs: for when somebody is using the computer)
 
@@ -32,8 +32,6 @@ steps = [
     ("Python client tests", [sys.executable, "-I", "clients/python/test_lunaris.py"]),
     ("JavaScript client tests", ["node", "--test", "clients/js/test.mjs"]),
 ]
-if not QUICK:
-    steps.append(("editor, driven in headless Chrome", ["node", "tools/editor_smoke.mjs"]))
 steps += [("playtest: " + os.path.basename(f), [EXE, "verify", f]) for f in sorted(glob.glob(os.path.join(ROOT, "examples", "tests", "*.test.json")))]
 steps += [
     ("documentation: every mentioned file exists", [sys.executable, "-I", "tools/check_docs.py"]),

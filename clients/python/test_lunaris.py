@@ -6,7 +6,7 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lunaris import Embedded, Engine, LunarisError, Remote, _find_exe, connect  # noqa: E402
+from lunaris import Embedded, Engine, LunarisError, _find_exe  # noqa: E402
 
 
 class ClientTests(unittest.TestCase):
@@ -81,46 +81,6 @@ class EmbeddedTests(unittest.TestCase):
         emb.close()
         with self.assertRaises(RuntimeError):
             emb.describe()
-
-
-class RemoteTests(unittest.TestCase):
-    """A client joins the world of a running `lunaris edit` (the one a person is using in the browser)."""
-
-    def test_two_clients_and_the_editor_share_one_world(self):
-        repo = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-        tmp = os.path.join(repo, "target", "test-tmp")
-        os.makedirs(tmp, exist_ok=True)
-        session = os.path.join(tmp, "session-py.json")
-        if os.path.exists(session):
-            os.remove(session)
-        proc = subprocess.Popen([_find_exe(None), "edit", "--port", "0", "--root", repo, "--session-file", session], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            for _ in range(100):
-                if os.path.exists(session) and os.path.getsize(session) > 0:
-                    break
-                time.sleep(0.1)
-            a, b = connect(session), Remote(session)
-            self.assertGreaterEqual(len(a.tools), 36)
-            a.reset()
-            a.spawn(count=2, components={"Transform": {}})
-            self.assertEqual(b.query(with_=["Transform"])["total"], 2, "the second client sees edits made by the first")
-            self.assertTrue(b.render(width=32, height=18)["png"].startswith(b"\x89PNG"))
-            with self.assertRaises(LunarisError) as cm:
-                a.spawn(components={"Transfrom": {}})
-            self.assertEqual(cm.exception.code, "unknown_component")
-            with self.assertRaises(RuntimeError) as bad:
-                Remote(rpc=a._rpc_url, token="not-the-token")
-            self.assertIn("403", str(bad.exception))
-            # the revision counter moves for edits and stays put for reads, and the HTTP reply says which revisions a call used
-            r0 = a.revision()["revision"]
-            a.query()
-            self.assertEqual(a.revision()["revision"], r0)
-            a.spawn(components={"Transform": {}})
-            self.assertGreater(a.revision()["revision"], r0)
-            a.close()
-        finally:
-            proc.kill()
-            proc.wait(timeout=10)
 
 
 if __name__ == "__main__":

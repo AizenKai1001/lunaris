@@ -2,7 +2,7 @@
 //!
 //! * [`wav`]: read a WAV file into a [`Clip`] (8, 16, 24 or 32 bit PCM, or 32/64 bit float; mono or stereo; any sample rate), and write one.
 //! * [`synth`]: the built-in voices (a pitch glide of a sine, square, saw or triangle wave, or filtered noise) that make a game audible
-//!   before it has any sound files, the same ones the browser editor plays.
+//!   before it has any sound files, the same ones the editor and the player use.
 //! * [`mixer`]: a stereo mixer at 44.1 kHz. Voices play a clip once or in a loop; a voice can sit at a place in the world, and then it gets
 //!   quieter with distance and moves to the left or the right ear with the direction of the listener's ears.
 //! * [`device`]: the sound card (Windows, through the system's `waveOut`); elsewhere opening it reports that there is none, and the mixer can

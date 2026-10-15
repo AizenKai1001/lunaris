@@ -25,7 +25,7 @@ from itertools import count
 from pathlib import Path
 from typing import Any
 
-__all__ = ["Engine", "Embedded", "Remote", "connect", "LunarisError"]
+__all__ = ["Engine", "Embedded", "LunarisError"]
 
 
 class LunarisError(Exception):
@@ -176,53 +176,6 @@ class Embedded(Engine):
             self.close()
         except Exception:
             pass
-
-
-class Remote(Engine):
-    """Work in a world that is already running, next to the person using it: `lunaris edit scene.json --session-file s.json`
-    starts the browser editor and writes the connection details to `s.json`; `connect("s.json")` then gives the same methods as
-    `Engine`, and every edit you make shows up on the person's page (and theirs in your queries). Tool calls from the page and
-    from you take turns, so nothing is lost. `close()` only drops the connection; it never stops the editor."""
-
-    def __init__(self, session: str | os.PathLike | dict | None = None, *, rpc: str | None = None, token: str | None = None):
-        if session is None and rpc is None:
-            session = os.environ.get("LUNARIS_SESSION")
-        if session is not None:
-            info = session if isinstance(session, dict) else json.loads(Path(session).read_text(encoding="utf-8"))
-            rpc, token = info["rpc"], info["token"]
-        if not rpc or not token:
-            raise ValueError("connect needs a session file (from `lunaris edit --session-file`), or rpc= and token=, or LUNARIS_SESSION")
-        self._rpc_url, self._token = rpc, token
-        self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # a local server: never through a proxy
-        self._ids = count(1)
-        self.tools = {t["name"]: t for t in self._rpc("tools/list", {})["tools"]}
-
-    def _rpc(self, method: str, params: dict) -> Any:
-        body = json.dumps({"jsonrpc": "2.0", "id": next(self._ids), "method": method, "params": params}).encode("utf-8")
-        req = urllib.request.Request(self._rpc_url, data=body, headers={"Content-Type": "application/json", "X-Lunaris-Token": self._token})
-        try:
-            with self._opener.open(req, timeout=120) as resp:
-                reply = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"the editor refused the request ({e.code}): {e.read().decode('utf-8', 'replace')}") from None
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"cannot reach the editor at {self._rpc_url}: {e.reason}") from None
-        if "error" in reply:
-            err = reply["error"]
-            d = err.get("data") or {}
-            raise LunarisError(d.get("message", err.get("message", "error")), d.get("code", ""), d.get("path", ""), d.get("hint", ""), d)
-        return reply["result"]
-
-    def close(self) -> None:
-        pass
-
-    def __enter__(self) -> "Remote":
-        return self
-
-
-def connect(session: str | os.PathLike | dict | None = None, *, rpc: str | None = None, token: str | None = None) -> Remote:
-    """Join a running editor's world (see `Remote`)."""
-    return Remote(session, rpc=rpc, token=token)
 
 
 if __name__ == "__main__":

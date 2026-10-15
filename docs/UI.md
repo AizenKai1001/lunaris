@@ -81,7 +81,7 @@ The built-in font is a 5x8 pixel font. For anything else put a `TextFont` with t
 
 ## Where the mouse comes from
 
-`lunaris play` sets the three resources from the window; the browser editor does while it plays (the pointer over the view); a test or an agent sets them with the `input` tool: `{"values": {"mouse_x": 0.5, "mouse_y": 0.6, "mouse_left": true}}`, then steps, then `{"mouse_left": false}`. In a lockstep game (`docs/NETWORK.md`) they travel like any other input. `examples/tests/menu.test.json` clicks the buttons of `examples/menu.lunaris.json` this way and checks the health, the bar and a drag-away release.
+`lunaris play` sets the three resources from the window; the Lunaris Editor does while it plays (the pointer over the view); a test or an agent sets them with the `input` tool: `{"values": {"mouse_x": 0.5, "mouse_y": 0.6, "mouse_left": true}}`, then steps, then `{"mouse_left": false}`. In a lockstep game (`docs/NETWORK.md`) they travel like any other input. `examples/tests/menu.test.json` clicks the buttons of `examples/menu.lunaris.json` this way and checks the health, the bar and a drag-away release.
 
 ## Limits
 

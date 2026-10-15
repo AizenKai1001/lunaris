@@ -16,7 +16,6 @@ lunaris-sim = { path = "../lunaris-sim" }
 lunaris-api = { path = "../lunaris-api" }
 lunaris-render = { path = "../lunaris-render" }
 lunaris-mind = { path = "../lunaris-mind" }
-lunaris-editor = { path = "../lunaris-editor" }
 lunaris-gpu = { path = "../lunaris-gpu" }
 lunaris-net = { path = "../lunaris-net" }
 lunaris-audio = { path = "../lunaris-audio" }

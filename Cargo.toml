@@ -7,7 +7,6 @@ members = [
     "crates/lunaris-api",
     "crates/lunaris-render",
     "crates/lunaris-mind",
-    "crates/lunaris-editor",
     "crates/lunaris-ffi",
     "crates/lunaris-gpu",
     "crates/lunaris-wasm",

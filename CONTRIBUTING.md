@@ -7,12 +7,12 @@ Thank you for looking. Lunaris is a game engine in Rust whose first rule is **de
 ```bash
 cargo build --release                         # the engine and the `lunaris` command
 cargo test --workspace                        # every crate's tests, the fuzzers, the integration tests
-python -I tools/check_all.py                  # everything: build, tests, MCP and client smoke tests, the editor in headless Chrome,
+python -I tools/check_all.py                  # everything: build, tests, MCP and client smoke tests, the editor window,
                                               # playtests, bots, the golden hashes, GPU-vs-CPU checks (about three minutes)
 python -I tools/check_all.py --quick          # without the editor script and the long soak
 ```
 
-Node 22+ and Chrome or Edge are needed for the editor script only. Without a GPU the GPU tests skip themselves.
+Node 22+ is needed for the MCP and JavaScript client tests only. Without a GPU the GPU tests skip themselves.
 
 ## The rules that keep it deterministic
 

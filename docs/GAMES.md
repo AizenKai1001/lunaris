@@ -4,7 +4,7 @@ A Lunaris game is data: components, graph systems, and a few entities. This page
 
 ```bash
 lunaris play examples/orb_dash.lunaris.json      # a native window (Windows): WASD or the arrows, Esc quits, F11 full screen
-lunaris edit examples/orb_dash.lunaris.json      # the Lunaris Editor (a Windows application): press Play; `lunaris edit --web ...` is the browser page
+lunaris edit examples/orb_dash.lunaris.json      # the Lunaris Editor (a Windows application): press Play
 python -I tools/play_orb_dash.py --check          # a bot plays the same game through the tools, then the run is replayed without it
 python -I tools/build_orb_dash.py                 # rebuilds the scene file by calling tools, as an agent would
 ```
@@ -20,7 +20,7 @@ Roll the blue ball with WASD or the arrow keys and collect the 12 gold orbs befo
 | Graph systems (the rules) | `timer`, `player_move`, `orb_pickup` (a contact system), `orb_bob`, `camera_follow`, `win_banner`, `lose_banner` (`get_system` shows each; the editor draws them as nodes) |
 | Input | WASD and arrows become `input.w`, `input.arrowleft`, ... resources; `player_move` turns them into velocity |
 | Globals | `score`, `time_left`, and `player.x` / `player.z`, which the player system publishes for the other systems |
-| Sound | `{"emit": "coin"}` in `orb_pickup`, `win` / `lose` in `timer`; `Sound` entities define how each name sounds (wave, pitch glide, length, volume), and the editor plays them with WebAudio; in the native player `SoundFile` and `AudioSource` play WAV files placed in the world and traced through the colliders (`docs/AUDIO.md`) |
+| Sound | `{"emit": "coin"}` in `orb_pickup`, `win` / `lose` in `timer`; `Sound` entities define how each name sounds (wave, pitch glide, length, volume), and the editor and the player play them; in the player `SoundFile` and `AudioSource` play WAV files placed in the world and traced through the colliders (`docs/AUDIO.md`) |
 | HUD | `Text` entities with `{score}` and `{time_left}` placeholders, drawn over the picture by the engine's own renderer |
 
 ## How the pieces talk

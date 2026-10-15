@@ -399,7 +399,7 @@ pub fn build(def: &Json) -> Graph {
     let block_y = h + 26.0;
     let (first, _, node_x) = lay.block(&stmts, &vec![Seg::Key("do".to_string())], 0.0, block_y);
     let ev = Node { kind: Kind::Event, ty: Ty::Num, title, rows, x: node_x, y: 0.0, w, h, path: vec![], ins: vec![], is_if: false, has_in: false, has_out: true };
-    // the event node goes first, as in the browser version: every index is one more
+    // the event node goes first, as before: every index is one more
     let mut g = lay.g;
     g.nodes.insert(0, ev);
     for wire in g.wires.iter_mut() {

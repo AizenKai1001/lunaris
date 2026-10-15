@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn usage() -> &'static str {
-    "lunaris - AI-first game engine core\n\nUSAGE:\n  lunaris serve [--seed N] [--root DIR]\n  lunaris call <tool> [JSON-ARGS] [--scene FILE] [--seed N] [--root DIR]\n  lunaris run <scene.json> [--steps N] [--seed N] [--twice]\n  lunaris tools\n  lunaris schema\n  lunaris bench [--entities N] [--ticks N] [--json]\n  lunaris mind <scene.json> --body UID --goal TEXT (--scripted FILE | --endpoint http://host:port/v1 [--model NAME]) [--turns N] [--think-ticks N] [--record FILE] [--transcript FILE]\n  lunaris edit [scene.json]   (the Lunaris Editor, a Windows application)   |   lunaris edit --web [scene.json] [--port N] [--open] [--session-file FILE]   (the page in a browser)
+    "lunaris - AI-first game engine core\n\nUSAGE:\n  lunaris serve [--seed N] [--root DIR]\n  lunaris call <tool> [JSON-ARGS] [--scene FILE] [--seed N] [--root DIR]\n  lunaris run <scene.json> [--steps N] [--seed N] [--twice]\n  lunaris tools\n  lunaris schema\n  lunaris bench [--entities N] [--ticks N] [--json]\n  lunaris mind <scene.json> --body UID --goal TEXT (--scripted FILE | --endpoint http://host:port/v1 [--model NAME]) [--turns N] [--think-ticks N] [--record FILE] [--transcript FILE]\n  lunaris edit [scene.json]   (the Lunaris Editor, a Windows application)
   lunaris export <scene.json> [--out DIR] [--name NAME] [--no-player] [--overwrite] [--force]   package the game: the scene and every file it uses in a folder that plays by itself (docs/EXPORT.md)\n  lunaris verify <spec.json>... [--json] [--root DIR]   playtests as data: steps, inputs and expectations
   lunaris play <scene.json> [--size WxH] [--mute] [--volume 0..1] [--quality classic|low|medium|high|ultra] [--cpu] [--join HOST:PORT --name NAME [--rollback] [--input-delay D] [--lobby] [--token T] [--watch]]   (a native window drawn by the GPU; --cpu uses the reference renderer; Windows)\n  lunaris host [--players N] [--port P] [--bind ADDR] [--delay D] [--ticks N] [--rollback [--window W] [--grace S]] [--lobby]   relay a multiplayer game: lockstep (default) or rollback (docs/NETWORK.md)\n  lunaris join HOST:PORT <scene.json> [--name NAME] [--hold KEYS] [--ticks N] [--rollback [--input-delay D] [--token T]] [--lobby [--ready]]   take a seat in it without a window (a bot)\n  lunaris watch HOST:PORT <scene.json> [--name NAME] [--ticks N]   watch a rollback game: replay it from tick 0 at full speed, then follow it live\n  (join, watch, play --join) --sim-latency MS --sim-jitter MS --sim-loss PCT   make this client's network worse on purpose (docs/NETWORK.md)\n  (serve, call, edit) --no-gpu | --quality NAME    the render tool draws with the CPU reference renderer only / with this GPU quality by default (high)\n  (any command) --threads N    worker threads for parallel systems; results never depend on it\n  lunaris --version\n"
 }
@@ -64,7 +64,7 @@ fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--twice" => o.twice = true,
             "--json" => o.json = true,
             "--allow-plugins" => std::env::set_var("LUNARIS_ALLOW_PLUGINS", "1"),
-            "--open" | "--hidden" | "--mute" | "--report" | "--cpu" | "--no-gpu" | "--json-schema" | "--no-thinking" | "--web" | "--play" | "--force" | "--overwrite" | "--no-player" | "--rollback" | "--lobby" | "--ready" | "--watch" => {
+            "--open" | "--hidden" | "--mute" | "--report" | "--cpu" | "--no-gpu" | "--json-schema" | "--no-thinking" | "--play" | "--force" | "--overwrite" | "--no-player" | "--rollback" | "--lobby" | "--ready" | "--watch" => {
                 o.kv.insert(args[i].trim_start_matches("--").to_string(), "1".to_string());
             }
             "--threads" => { o.threads = Some(need(i, "--threads")?.parse().map_err(|_| "--threads needs an integer".to_string())?); i += 1; }
@@ -309,22 +309,16 @@ fn verify_cmd(opts: &Opts) -> ExitCode {
     }
 }
 
-/// `lunaris edit` opens the Lunaris Editor, a Windows application next to this program; `--web` serves the old browser page instead
-/// (for another machine, or a session that an AI agent shares).
+/// `lunaris edit` opens the Lunaris Editor, the native desktop application that sits next to this program.
 fn edit_cmd(opts: &Opts) -> ExitCode {
-    let web = opts.kv.contains_key("web") || opts.kv.contains_key("session-file") || opts.kv.contains_key("port") || opts.kv.contains_key("open");
-    if !web {
-        return native_editor(opts);
-    }
-    edit_web(opts)
+    native_editor(opts)
 }
 
 fn native_editor(opts: &Opts) -> ExitCode {
     let exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(if cfg!(windows) { "lunaris-editor.exe" } else { "lunaris-editor" })));
     let Some(exe) = exe.filter(|p| p.exists()) else {
         eprintln!("error: the editor program `lunaris-editor` is not next to `lunaris`.
-Build it with: cargo build --release -p lunaris-studio
-(or use `lunaris edit --web` for the page in a browser)");
+Build it with: cargo build --release -p lunaris-studio");
         return ExitCode::FAILURE;
     };
     let mut cmd = std::process::Command::new(exe);
@@ -343,73 +337,6 @@ Build it with: cargo build --release -p lunaris-studio
         Ok(_) => ExitCode::FAILURE,
         Err(e) => {
             eprintln!("error: cannot start the editor: {e}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-/// `lunaris edit --web [scene.json] [--port N]`: the browser editor on 127.0.0.1.
-fn edit_web(opts: &Opts) -> ExitCode {
-    let mut engine = Engine::new(opts.seed, opts.root.clone());
-    gpu_backend::attach(&mut engine, opts.kv.contains_key("no-gpu"), opts.kv.get("quality").map(String::as_str));
-    if let Some(threads) = opts.threads {
-        engine.sim.threads = threads.clamp(1, 64);
-    }
-    if let Some(scene) = opts.positional.first() {
-        if let Err(e) = engine.call("load_scene", &Json::obj([("path", Json::str(scene.clone()))])) {
-            eprintln!("error: {e}");
-            return ExitCode::FAILURE;
-        }
-    }
-    let port: u16 = match opts.kv.get("port").map(|p| p.parse()) {
-        None => 7777,
-        Some(Ok(p)) => p,
-        Some(Err(_)) => {
-            eprintln!("error: --port needs a number (0 picks a free port)");
-            return ExitCode::from(2);
-        }
-    };
-    let server = match lunaris_editor::Server::bind(engine, port) {
-        Ok(s) => match opts.positional.first() {
-            Some(scene) => s.with_scene(scene),
-            None => s,
-        },
-        Err(e) => {
-            eprintln!("error: cannot listen on 127.0.0.1:{port}: {e} (try --port 0 for any free port)");
-            return ExitCode::FAILURE;
-        }
-    };
-    println!("Lunaris editor: {}", server.url());
-    println!("Workspace folder: {}  (scenes load and save here)", opts.root.display());
-    println!("Listening on 127.0.0.1 only. Press Ctrl+C to stop.");
-    if let Some(file) = opts.kv.get("session-file") {
-        // everything an AI agent (or a script) needs to work in this same live world next to the person using the page
-        let rpc = format!("{}rpc", server.url());
-        let info = Json::obj([("url", Json::str(server.url())), ("rpc", Json::str(rpc.clone())), ("token", Json::str(server.token())), ("root", Json::str(opts.root.display().to_string()))]);
-        if let Err(e) = std::fs::write(file, info.to_string_pretty().unwrap_or_default()) {
-            eprintln!("error: cannot write the session file {file}: {e}");
-            return ExitCode::FAILURE;
-        }
-        println!("Session file written: {file}  (agents connect with it: lunaris.connect(\"{file}\") in Python or Engine.connect({{ session: \"{file}\" }}) in JavaScript; POST {rpc} with the X-Lunaris-Token header from the file)");
-    }
-    if opts.kv.contains_key("open") {
-        // open the default browser (the page works in any browser)
-        let url = server.url();
-        let started = if cfg!(windows) {
-            std::process::Command::new("cmd").args(["/C", "start", "", &url]).spawn()
-        } else if cfg!(target_os = "macos") {
-            std::process::Command::new("open").arg(&url).spawn()
-        } else {
-            std::process::Command::new("xdg-open").arg(&url).spawn()
-        };
-        if let Err(e) = started {
-            eprintln!("could not open a browser ({e}); open {url} yourself");
-        }
-    }
-    match server.serve() {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("error: {e}");
             ExitCode::FAILURE
         }
     }
@@ -464,6 +391,6 @@ fn play_cmd(opts: &Opts) -> ExitCode {
 
 #[cfg(not(any(windows, target_os = "linux")))]
 fn play_cmd(_opts: &Opts) -> ExitCode {
-    eprintln!("error: the native window runs on Windows and Linux only for now; use `lunaris edit <scene> --web --open` in a browser");
+    eprintln!("error: the native window runs on Windows and Linux only for now");
     ExitCode::from(2)
 }

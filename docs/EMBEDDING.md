@@ -1,11 +1,10 @@
 # Using Lunaris from any language
 
-Everything the engine does is a **tool**: a name and a JSON object in, a JSON object out (`tools/list` or `docs/AI_GUIDE.md` lists them). There are four ways to reach the tools, and all of them run the same engine and give the same results (same seed and commands, same state hash):
+Everything the engine does is a **tool**: a name and a JSON object in, a JSON object out (`tools/list` or `docs/AI_GUIDE.md` lists them). There are three ways to reach the tools, and all of them run the same engine and give the same results (same seed and commands, same state hash):
 
 | Way | Good for | How |
 |---|---|---|
 | **Child process** (`lunaris serve`) | Any language that can start a process and read lines. This is also **MCP**, so AI agents use it directly. | One JSON-RPC 2.0 object per line on stdin and stdout. Python and JavaScript clients are in `clients/`. See `docs/MCP.md`. |
-| **Shared live world** (`lunaris edit --session-file`) | An agent or script working next to a person who has the editor open. | POST JSON-RPC to the address in the session file with the token it holds. `connect()` in the clients does it. See `docs/EDITOR.md`. |
 | **Library in your process** (`lunaris_ffi`) | C, C++, C#, Go, Zig, Rust, Java, Lua, Python (ctypes) ... when you do not want a second process. | A C interface of five functions, below. |
 | **Rust crates** | Rust programs. | Link `lunaris-api` and call `Engine::call(tool, &args)`. |
 
