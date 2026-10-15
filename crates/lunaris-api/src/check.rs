@@ -12,6 +12,7 @@ mod draw_order;
 mod language;
 mod layers;
 mod menus;
+mod ui_kit3;
 mod vehicle;
 
 struct Problems(Vec<Json>);
@@ -680,6 +681,7 @@ impl Engine {
         draw_order::run(&mut self.sim.world, &mut problems)?;
         language::run(&mut self.sim.world, &root, &mut problems)?;
         menus::run(&mut self.sim.world, &mut problems)?;
+        ui_kit3::run(&mut self.sim.world, &mut problems)?;
         // raycast vehicles: the chassis, the wheel table, the numbers; gravity (the lowest-uid PhysicsSettings, like the physics) tells how much weight a spring carries
         {
             let mut gravity = 9.8f32;
@@ -850,15 +852,18 @@ impl Engine {
                 if *parent == 0 {
                     continue;
                 }
-                if !with_local.contains(child) {
+                // an interface element inside another one (a row of a `UiLayout` column, the content of a `UiScroll` view, a panel of a tab) is not attached in the world: it needs no Transform
+                let ui_link = world.entity(*child).is_some_and(|c| world.get::<lunaris_sim::components::Ui>(c).is_some() || world.get::<lunaris_sim::components::Text>(c).is_some())
+                    && world.entity(*parent).is_some_and(|p| world.get::<lunaris_sim::components::Ui>(p).is_some());
+                if !ui_link && !with_local.contains(child) {
                     problems.add("error", Some(*child), "has a Parent but no LocalTransform, so it does not follow the parent".into(), "add a LocalTransform (its position, rotation and scale relative to the parent)");
                 }
-                if !with_transform.contains(child) {
+                if !ui_link && !with_transform.contains(child) {
                     problems.add("error", Some(*child), "has a Parent but no Transform, so there is nothing for the parent to move".into(), "add a Transform");
                 }
                 if world.entity(*parent).is_none() {
                     problems.add("error", Some(*child), format!("its Parent {parent} does not exist, so it stays where it is"), "set Parent.target to the uid of an existing entity (0 = no parent)");
-                } else if !with_transform.contains(parent) {
+                } else if !ui_link && !with_transform.contains(parent) {
                     problems.add("error", Some(*child), format!("its Parent {parent} has no Transform, so it cannot follow it"), "add a Transform to the parent");
                 } else {
                     // walk up: a chain that never ends is a cycle

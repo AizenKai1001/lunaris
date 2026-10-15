@@ -52,6 +52,8 @@ mod language_tests;
 #[cfg(test)]
 mod menus_tests;
 #[cfg(test)]
+mod ui_kit3_tests;
+#[cfg(test)]
 mod scene_paths_tests;
 #[cfg(test)]
 mod tilecol_tests;

@@ -1,7 +1,7 @@
 //! Small helpers: matrix maths for the GPU's depth convention, colour conversions, cascade fitting for the shadow maps, texture mip
 //! chains, and the glyph quads of the HUD text.
 use lunaris_render::math::{cross, dot, length, normalize, rotate, scale, sub, add, M4, V3};
-use lunaris_render::render::{Cam, Scene};
+use lunaris_render::render::{clip_pixels, Cam, Scene, Sweep};
 use lunaris_render::font;
 use lunaris_render::texture::Texture;
 use std::sync::Arc;
@@ -252,12 +252,80 @@ pub fn mip_chain(width: u32, height: u32, rgba: Vec<u8>, srgb: bool) -> Vec<(u32
     levels
 }
 
-/// A run of interface vertices drawn with one texture (`None`: plain white).
+/// A run of interface vertices drawn with one texture (`None`: plain white) and one scissor rectangle (inside a scroll view: x, y, width and height in pixels; `None`: the whole picture).
 pub struct UiBatch {
     pub tex: Option<Arc<Texture>>,
     pub smooth: bool,
     pub first: u32,
     pub count: u32,
+    pub scissor: Option<[u32; 4]>,
+}
+
+/// The scissor rectangle (x, y, width, height) of a clip on a picture of `w` x `h` pixels, cut to the picture; `None` when nothing of it is on the picture.
+pub fn scissor_of(clip: [f32; 4], w: f32, h: f32) -> Option<[u32; 4]> {
+    let (x0, y0, x1, y1) = clip_pixels(clip, w as usize, h as usize);
+    let (x0, y0, x1, y1) = (x0.clamp(0, w as i64), y0.clamp(0, h as i64), x1.clamp(0, w as i64), y1.clamp(0, h as i64));
+    (x1 > x0 && y1 > y0).then(|| [x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32])
+}
+
+/// The triangles of a radial fill (`UiRadial`) on the pixel box `x0, y0, x1, y1`, as a flat list of corners (three to a triangle): a fan of thin triangles round the arc for a circle (a ring when it has a
+/// hole: two triangles to a step), a fan from the middle to the points where the rays and the corners meet the edge for the whole rectangle. The graphics card decides each pixel by its middle, as the
+/// reference renderer does for the straight edges of the sector; the arc is a polygon of at most a fraction of a pixel's error.
+pub fn sweep_triangles(sw: &Sweep, x0: f32, y0: f32, x1: f32, y1: f32) -> Vec<[f32; 2]> {
+    let (start, delta) = sw.span();
+    let mut out: Vec<[f32; 2]> = Vec::new();
+    if !(delta > 0.0) || !(x1 > x0 && y1 > y0) {
+        return out;
+    }
+    let a0 = start.rem_euclid(360.0);
+    let ((cx, cy), (hw, hh)) = (((x0 + x1) * 0.5, (y0 + y1) * 0.5), ((x1 - x0) * 0.5, (y1 - y0) * 0.5));
+    let dir = |deg: f32| {
+        let r = deg.to_radians();
+        (r.sin(), -r.cos())
+    };
+    if sw.shape == 0 {
+        let radius = hw.min(hh);
+        let hole = if sw.inner.is_finite() { sw.inner.clamp(0.0, 1.0) * radius } else { 0.0 };
+        let per_turn = radius.clamp(32.0, 256.0);
+        let n = ((delta / 360.0) * per_turn).ceil().max(1.0) as usize;
+        for i in 0..n {
+            let (d0, d1) = (dir(a0 + delta * i as f32 / n as f32), dir(a0 + delta * (i + 1) as f32 / n as f32));
+            let (o0, o1) = ([cx + d0.0 * radius, cy + d0.1 * radius], [cx + d1.0 * radius, cy + d1.1 * radius]);
+            if hole > 0.0 {
+                let (i0, i1) = ([cx + d0.0 * hole, cy + d0.1 * hole], [cx + d1.0 * hole, cy + d1.1 * hole]);
+                out.extend_from_slice(&[o0, o1, i1, o0, i1, i0]);
+            } else {
+                out.extend_from_slice(&[[cx, cy], o0, o1]);
+            }
+        }
+    } else {
+        // where a ray from the middle leaves the rectangle
+        let hit = |deg: f32| {
+            let d = dir(deg);
+            let t = (hw / d.0.abs().max(1.0e-6)).min(hh / d.1.abs().max(1.0e-6));
+            [cx + d.0 * t, cy + d.1 * t]
+        };
+        // the angles of the corners (clockwise from twelve o'clock) that fall inside the sweep, in order
+        let mut angles: Vec<f32> = vec![a0];
+        let mut corners: Vec<f32> = [(hw, hh), (hw, -hh), (-hw, -hh), (-hw, hh)]
+            .iter()
+            .map(|&(dx, dy)| {
+                let mut a = dx.atan2(dy).to_degrees();
+                while a <= a0 {
+                    a += 360.0;
+                }
+                a
+            })
+            .filter(|a| *a < a0 + delta)
+            .collect();
+        corners.sort_by(|a, b| a.total_cmp(b));
+        angles.extend(corners);
+        angles.push(a0 + delta);
+        for w in angles.windows(2) {
+            out.extend_from_slice(&[[cx, cy], hit(w[0]), hit(w[1])]);
+        }
+    }
+    out
 }
 
 /// Triangles for every shape of the interface (flat and rounded rectangles, gradients, pictures, the letters of TrueType text), in drawing order, as
@@ -273,8 +341,33 @@ pub fn ui_vertices(scene: &Scene, w: f32, h: f32, square: bool) -> (Vec<f32>, Ve
         if px1 <= px0 || py1 <= py0 {
             continue;
         }
+        // inside a scroll view: the graphics card cuts the shape at the viewport (a scissor rectangle), and nothing of it on the picture means nothing to draw
+        let scissor = match r.clip {
+            Some(c) => match scissor_of(c, w, h) {
+                Some(s) => Some(s),
+                None => continue,
+            },
+            None => None,
+        };
         let (x0, y0, x1, y1) = (px0 as f32, py0 as f32, px1 as f32, py1 as f32);
         let (wf, hf) = (x1 - x0, y1 - y0);
+        // a radial fill: the triangles of its sector, in one flat colour
+        if let Some(sw) = &r.sweep {
+            let c = if square { [r.color[0] * r.color[0], r.color[1] * r.color[1], r.color[2] * r.color[2], r.color[3]] } else { r.color };
+            let first = (out.len() / 8) as u32;
+            let tris = sweep_triangles(sw, x0, y0, x1, y1);
+            for p in &tris {
+                out.extend_from_slice(&[p[0], p[1], 0.5, 0.5, c[0], c[1], c[2], c[3].clamp(0.0, 1.0)]);
+            }
+            let count = tris.len() as u32;
+            if count > 0 {
+                match batches.last_mut() {
+                    Some(b) if b.tex.is_none() && !b.smooth && b.scissor == scissor => b.count += count,
+                    _ => batches.push(UiBatch { tex: None, smooth: false, first, count, scissor }),
+                }
+            }
+            continue;
+        }
         let radius = if r.radius.is_finite() { (r.radius * h).clamp(0.0, wf.min(hf) * 0.5) } else { 0.0 };
         let sq = |c: [f32; 4]| if square { [c[0] * c[0], c[1] * c[1], c[2] * c[2], c[3]] } else { c };
         let c1 = sq(r.color);
@@ -316,8 +409,8 @@ pub fn ui_vertices(scene: &Scene, w: f32, h: f32, square: bool) -> (Vec<f32>, Ve
             _ => false,
         };
         match batches.last_mut() {
-            Some(b) if same(&b.tex) && b.smooth == smooth => b.count += count,
-            _ => batches.push(UiBatch { tex, smooth, first, count }),
+            Some(b) if same(&b.tex) && b.smooth == smooth && b.scissor == scissor => b.count += count,
+            _ => batches.push(UiBatch { tex, smooth, first, count, scissor }),
         }
     }
     (out, batches)
@@ -346,6 +439,11 @@ pub fn text_vertices(scene: &Scene, w: f32, h: f32, square: bool, slots: Option<
         let y0 = (tx.pos[1] * h).round();
         let c = if square { [tx.color[0] * tx.color[0], tx.color[1] * tx.color[1], tx.color[2] * tx.color[2], tx.color[3]] } else { tx.color };
         let a = c[3].clamp(0.0, 1.0);
+        // inside a scroll view the glyph quads are cut at the viewport (their texture coordinates with them, so the visible pixels are the ones the reference renderer draws)
+        let bounds = t.clip.map(|c| {
+            let (a, b, c2, d) = clip_pixels(c, w as usize, h as usize);
+            (a as f32, b as f32, c2 as f32, d as f32)
+        });
         let id_pass = [(0.0f32, [slots.map(|s| s[ti] as f32).unwrap_or(0.0), 0.0, 0.0, 1.0])];
         let passes: &[(f32, [f32; 4])] = if slots.is_some() { &id_pass } else if tx.shadow { &[(cell, [0.0, 0.0, 0.0, 0.65 * a]), (0.0, [c[0], c[1], c[2], a])] } else { &[(0.0, [c[0], c[1], c[2], a])] };
         for &(off, color) in passes {
@@ -354,7 +452,18 @@ pub fn text_vertices(scene: &Scene, w: f32, h: f32, square: bool, slots: Option<
                 let (u0, u1) = (gi as f32 / 95.0, (gi + 1) as f32 / 95.0);
                 let (x, y) = (x0 + off + n as f32 * advance, y0 + off);
                 let (xr, yb) = (x + gw * cell, y + gh * cell);
-                for (px, py, u, v) in [(x, y, u0, 0.0), (xr, y, u1, 0.0), (xr, yb, u1, 1.0), (x, y, u0, 0.0), (xr, yb, u1, 1.0), (x, yb, u0, 1.0)] {
+                let (mut qx, mut qy, mut qxr, mut qyb) = (x, y, xr, yb);
+                let (mut qu0, mut qu1, mut qv0, mut qv1) = (u0, u1, 0.0f32, 1.0f32);
+                if let Some((bx0, by0, bx1, by1)) = bounds {
+                    let (nx0, nx1, ny0, ny1) = (x.max(bx0), xr.min(bx1), y.max(by0), yb.min(by1));
+                    if nx0 >= nx1 || ny0 >= ny1 {
+                        continue;
+                    }
+                    let (du, dv) = ((u1 - u0) / (xr - x), 1.0 / (yb - y));
+                    (qu0, qu1, qv0, qv1) = (u0 + (nx0 - x) * du, u0 + (nx1 - x) * du, (ny0 - y) * dv, (ny1 - y) * dv);
+                    (qx, qxr, qy, qyb) = (nx0, nx1, ny0, ny1);
+                }
+                for (px, py, u, v) in [(qx, qy, qu0, qv0), (qxr, qy, qu1, qv0), (qxr, qyb, qu1, qv1), (qx, qy, qu0, qv0), (qxr, qyb, qu1, qv1), (qx, qyb, qu0, qv1)] {
                     out.extend_from_slice(&[px, py, u, v, color[0], color[1], color[2], color[3]]);
                 }
             }
@@ -407,6 +516,54 @@ mod tests {
             let edge = [p[0] + 0.0, p[1], p[2]];
             let _ = edge;
         }
+    }
+
+    /// The area of a list of triangles (corners three to a triangle).
+    fn area(tris: &[[f32; 2]]) -> f32 {
+        tris.chunks(3).map(|t| ((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])).abs() * 0.5).sum()
+    }
+
+    fn sweep(start: f32, amount: f32, clockwise: bool, shape: u32, inner: f32) -> Sweep {
+        Sweep { start, amount, clockwise, shape, inner }
+    }
+
+    #[test]
+    fn the_triangles_of_a_circle_ring_and_box_sector_cover_the_right_area() {
+        let r = 40.0f32;
+        let pi = std::f32::consts::PI;
+        // a disc in an 80 x 100 box: the circle inscribed (radius 40), the whole turn, a quarter, three quarters, and a ring with half the radius left out
+        let (full, quarter, three, ring) = (
+            sweep_triangles(&sweep(0.0, 1.0, true, 0, 0.0), 0.0, 0.0, 80.0, 100.0),
+            sweep_triangles(&sweep(0.0, 0.25, true, 0, 0.0), 0.0, 0.0, 80.0, 100.0),
+            sweep_triangles(&sweep(90.0, 0.75, false, 0, 0.0), 0.0, 0.0, 80.0, 100.0),
+            sweep_triangles(&sweep(0.0, 1.0, true, 0, 0.5), 0.0, 0.0, 80.0, 100.0),
+        );
+        let disc = pi * r * r;
+        assert!((area(&full) - disc).abs() < disc * 0.01, "{} vs {disc}", area(&full));
+        assert!((area(&quarter) - disc * 0.25).abs() < disc * 0.01);
+        assert!((area(&three) - disc * 0.75).abs() < disc * 0.01);
+        assert!((area(&ring) - disc * 0.75).abs() < disc * 0.01, "a ring with half the radius out has three quarters of the area: {}", area(&ring));
+        // the quarter from twelve o'clock clockwise is the top right quarter of the disc: the middle is (40, 50)
+        assert!(quarter.iter().all(|p| p[0] >= 40.0 - 1e-3 && p[1] <= 50.0 + 1e-3), "{quarter:?}");
+        // the box: all of it, the right half, a quarter from twelve o'clock to three (the top right quarter of the box), and an eighth that is cut by a corner
+        let (w, h) = (60.0f32, 100.0f32);
+        let whole = sweep_triangles(&sweep(0.0, 1.0, true, 1, 0.0), 0.0, 0.0, w, h);
+        let right = sweep_triangles(&sweep(0.0, 0.5, true, 1, 0.0), 0.0, 0.0, w, h);
+        let top_right = sweep_triangles(&sweep(0.0, 0.25, true, 1, 0.0), 0.0, 0.0, w, h);
+        let left_up = sweep_triangles(&sweep(0.0, 0.25, false, 1, 0.0), 0.0, 0.0, w, h);
+        assert!((area(&whole) - w * h).abs() < 0.1, "{}", area(&whole));
+        assert!((area(&right) - w * h * 0.5).abs() < 0.1);
+        assert!((area(&top_right) - w * h * 0.25).abs() < 0.1, "{}", area(&top_right));
+        assert!((area(&left_up) - w * h * 0.25).abs() < 0.1, "counter-clockwise from twelve o'clock: the top left quarter");
+        assert!(left_up.iter().all(|p| p[0] <= 30.0 + 1e-3 && p[1] <= 50.0 + 1e-3));
+        // starting past a corner: a sweep from three o'clock for a quarter turn is the bottom right quarter
+        let bottom_right = sweep_triangles(&sweep(90.0, 0.25, true, 1, 0.0), 0.0, 0.0, w, h);
+        assert!((area(&bottom_right) - w * h * 0.25).abs() < 0.1);
+        assert!(bottom_right.iter().all(|p| p[0] >= 30.0 - 1e-3 && p[1] >= 50.0 - 1e-3));
+        // nothing for nothing
+        assert!(sweep_triangles(&sweep(0.0, 0.0, true, 0, 0.0), 0.0, 0.0, 80.0, 100.0).is_empty());
+        assert!(sweep_triangles(&sweep(0.0, 0.5, true, 1, 0.0), 5.0, 5.0, 5.0, 9.0).is_empty());
+        assert!(sweep_triangles(&sweep(f32::NAN, 0.5, true, 1, 0.0), 0.0, 0.0, 10.0, 10.0).len() <= 12, "a start that is not a number is treated as 0");
     }
 
     #[test]

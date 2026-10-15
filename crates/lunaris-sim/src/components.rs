@@ -1482,3 +1482,213 @@ component! {
         pub screen: bool = false,
     }
 }
+
+// ------------------------------------------------------------------------------------------------ UI kit v3: scroll views
+// New components for scrolling lists and panels (docs/UI.md, "Scroll views"; the code is `ui_kit3.rs`). Kept at the end of the file.
+
+component! {
+    /// A scrolling container on a `Ui` (docs/UI.md, "Scroll views"): the `Ui` rectangle is the **viewport**. Everything whose `Parent` chain reaches it (a `Ui` or a `Text`, at any depth, a
+    /// `UiLayout` column of rows for instance) is **clipped** to that rectangle (whole pixels, in both renderers; a line of text is cut where the viewport ends) and moves with `offset`: the
+    /// children's own `pos` is where they sit at offset 0 and the engine shifts them by minus the offset, so lay the whole list out as if it were all on screen and let the engine scroll it.
+    /// `offset` (x, y) is how far the content has moved up and left, in fractions of the picture like `Ui.pos`, between 0 and `content` minus the viewport's size. `content_size` is the size
+    /// of the content in the same fractions; an axis left at 0 is **measured** from the visible children (the lowest and rightmost edge), and the size used is written to `content`. The
+    /// mouse wheel (`input.mouse_wheel`, in notches: `lunaris play` writes it, a test sets it with the `input` tool and back to 0) scrolls the innermost scrollable view under the pointer by `speed`
+    /// (a fraction of the picture's height) a notch; dragging the content with the left button scrolls it too (`drag`; a press on a button only becomes a drag once the pointer has moved
+    /// a little, and a drag is never a click); the right stick (`input.gamepad.ry`) scrolls the view that holds the focused button; and when `UiNav` moves the focus to a button inside
+    /// the view the view scrolls just far enough to show it. A button scrolled out of the viewport does not hover or click from there. `changed` is true for a tick in which `offset` moved. A
+    /// scroll bar is a `UiScrollBar`. Do not put a `UiLayout` on the viewport itself (put one on a child that is taller than the viewport). `applied`, `dragging`, `grab`, `grab_offset`,
+    /// `grab_bar`, `down` and `focus` are the engine's bookkeeping.
+    pub struct UiScroll {
+        pub offset: [f32; 2] = [0.0, 0.0],
+        pub content_size: [f32; 2] = [0.0, 0.0],
+        pub speed: f32 = 0.06,
+        pub drag: bool = true,
+        pub content: [f32; 2] = [0.0, 0.0],
+        pub changed: bool = false,
+        pub applied: [f32; 2] = [0.0, 0.0],
+        pub dragging: u32 = 0,
+        pub grab: [f32; 2] = [0.0, 0.0],
+        pub grab_offset: [f32; 2] = [0.0, 0.0],
+        pub grab_bar: f32 = 0.0,
+        pub down: bool = false,
+        pub focus: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// The scroll bar of a `UiScroll` (docs/UI.md, "Scroll views"), on the `Ui` that is its **thumb**: give the thumb `button` true and style it like any `Ui` (a `UiStyle` makes it a rounded,
+    /// shaded handle). `view` is the entity with the `UiScroll`; `track` is optionally a second `Ui` (also a `button`) drawn behind it, which the engine places along the whole edge. Every tick the
+    /// engine sets the position, size and visibility of the thumb and the track: along the right edge of the viewport (the bottom edge with `horizontal`), `thickness` wide (a fraction of the
+    /// picture's height, so the resource `screen.aspect` or a `UiScale` makes it equally thick in pixels), `inset` from the edge, the thumb as long as the share of the content that is in view
+    /// (never shorter than `min_length`) and as far along as the scroll `offset`. Pressing the thumb and moving the pointer scrolls; pressing the track puts the thumb under the pointer and
+    /// carries on as a drag. With `hide` the bar and its track are invisible while there is nothing to scroll. Draw them above the content with a higher `Ui.layer`. Because the engine places them,
+    /// they are not scrolled or clipped even when their `Parent` is the view.
+    pub struct UiScrollBar {
+        pub view: Uid = Uid(0),
+        pub track: Uid = Uid(0),
+        pub horizontal: bool = false,
+        pub thickness: f32 = 0.014,
+        pub inset: f32 = 0.004,
+        pub min_length: f32 = 0.05,
+        pub hide: bool = true,
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ UI kit v3: drop-downs, tabs and groups
+// New components for choosing one of several things (docs/UI.md, "Drop-downs and tabs"; the code is `ui_kit3.rs` and `ui_select.rs`). Kept at the end of the file.
+
+component! {
+    /// Shows or hides a whole piece of the interface at once (docs/UI.md, "Drop-downs and tabs"): while `shown` is false the entity it is on and **everything below it** (every entity whose `Parent` chain reaches it:
+    /// panels, rows, texts, buttons) is not drawn, does not react to the pointer, is not focused by `UiNav`, takes no room in a `UiLayout` and does not count as scroll content. The `visible` flags of the entities
+    /// themselves are not touched, so a row a game hides stays hidden when its panel comes back. A pause menu is one `UiGroup` that a graph system sets. Tabs and drop-downs use it for their panels and lists.
+    pub struct UiGroup {
+        pub shown: bool = true,
+    }
+}
+
+component! {
+    /// A drop-down on a `Ui` button, the **header** (docs/UI.md, "Drop-downs and tabs"): a click opens a list of options and a click on one picks it. The options are ordinary `Ui` buttons marked with a `UiOption`
+    /// that names this entity; `list` is the entity that holds them (a `Ui` with a `UiLayout` column, say), which is shown while `open` and hidden otherwise (give it a `UiGroup`, or a plain `Ui` whose `visible`
+    /// is switched). `selected` is the index of the picked option, written to the resource named by `resource` (`"ui.quality"`; every tick, so a graph system reads it like any resource) and set from the outside
+    /// to preselect; the header's text becomes the text of that option. `changed` is true for the tick in which a pick changed `selected`. While the list is open a press **outside** the header and the list closes it
+    /// and goes no further (the press does not also click what is under it, until the button is let go), the buttons under the list do not react where the list covers them, the action `ui_cancel` closes it,
+    /// and so does moving the `UiNav` focus to something else; opening it from the keyboard or a pad puts the focus on the picked option. Keep the list in a higher `Ui.layer` than what it covers, and use a
+    /// `TextFont` for labels that must be covered by it (the built-in bitmap font is always drawn over every rectangle). `down`, `swallow` and `focus` are the engine's bookkeeping.
+    pub struct UiDropdown {
+        pub selected: u32 = 0,
+        pub open: bool = false,
+        pub list: Uid = Uid(0),
+        pub resource: Sym = Sym(0),
+        pub changed: bool = false,
+        pub down: bool = false,
+        pub swallow: bool = false,
+        pub focus: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// One option of a `UiDropdown`, on a `Ui` button: `dropdown` is the uid of the drop-down and `index` the number it gives to `selected` and to its resource when this option is picked. The text of the
+    /// option's `Ui` is what the header shows once it is picked. Options are laid out and styled like any buttons (a `UiLayout` column in the list; a `UiStyle` for rounded corners).
+    pub struct UiOption {
+        pub dropdown: Uid = Uid(0),
+        pub index: u32 = 0,
+    }
+}
+
+component! {
+    /// The state of a set of tabs (docs/UI.md, "Drop-downs and tabs"), on any entity: `selected` is the index of the tab that is shown, written to the resource named by `resource` every tick (when it is not empty).
+    /// The tabs are `Ui` buttons with a `UiTab` that names this entity; a click on one makes its `index` the `selected` one (`changed` is true for that tick). Set `selected` from the outside to switch tabs from a
+    /// graph system.
+    pub struct UiTabs {
+        pub selected: u32 = 0,
+        pub resource: Sym = Sym(0),
+        pub changed: bool = false,
+    }
+}
+
+component! {
+    /// A tab, on a `Ui` button (docs/UI.md, "Drop-downs and tabs"): `tabs` is the uid of the entity with the `UiTabs`, `index` this tab's number and `panel` the entity (a `Ui` panel with children) shown while it is the
+    /// selected tab and hidden otherwise: the engine sets the `shown` of the panel's `UiGroup` (a panel without one has its `Ui.visible` set instead, which hides only the panel itself). The tab's rectangle takes
+    /// `on_color` while it is selected and `off_color` otherwise.
+    pub struct UiTab {
+        pub tabs: Uid = Uid(0),
+        pub index: u32 = 0,
+        pub panel: Uid = Uid(0),
+        pub on_color: [f32; 4] = [0.3, 0.5, 0.9, 1.0],
+        pub off_color: [f32; 4] = [0.16, 0.2, 0.32, 0.92],
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ UI kit v3: drag and drop
+// New components for inventories and equipment (docs/UI.md, "Drag and drop"; the code is `ui_drag.rs`). Kept at the end of the file.
+
+component! {
+    /// A thing that can be picked up with the mouse, on a `Ui` button (docs/UI.md, "Drag and drop"): while the left button is held on it the rectangle follows the pointer (keeping the grip it was taken
+    /// with, drawn above everything: `lift` is added to its `Ui.layer` meanwhile), and when the button is let go it goes into the `UiDrop` under the pointer, or snaps back. `item` is a number of your
+    /// own (an item id) that is reported with the drop, `kind` (0 to 31) is matched against the bits of each slot's `accept`. `slot` is the `UiDrop` the thing sits in (0 for a free thing): it is centred in
+    /// that slot every tick, so it follows a slot that moves or scrolls, and a thing dropped on another slot sets `slot` to it; a free thing returns to its `home` (where it was at the start). Dropped on a
+    /// slot that holds another thing, the two **trade places** when the other one fits where this one came from (`UiDrop.swap`), otherwise it snaps back. A press that does not move is a click
+    /// (`Ui.clicked`) as for any button, a drag is not one. Only a press that starts on the thing picks it up, and a `UiScroll` under it does not scroll while it is held. `dragging` is true while it is
+    /// held; `moved`, `grab`, `layer0`, `home_set`, `home` and `down` are the engine's bookkeeping.
+    pub struct UiDrag {
+        pub item: u32 = 0,
+        pub kind: u32 = 0,
+        pub slot: Uid = Uid(0),
+        pub lift: u32 = 100,
+        pub dragging: bool = false,
+        pub moved: bool = false,
+        pub home: [f32; 2] = [0.0, 0.0],
+        pub home_set: bool = false,
+        pub grab: [f32; 2] = [0.0, 0.0],
+        pub layer0: u32 = 0,
+        pub down: bool = false,
+    }
+}
+
+component! {
+    /// A place a `UiDrag` can be dropped, on a `Ui` (docs/UI.md, "Drag and drop"): an inventory slot, an equipment slot, a bin. `accept` is the set of kinds it takes (bit `n` for a `UiDrag.kind` of `n`; the
+    /// default takes all 32), `swap` lets a thing dropped on it trade places with the one it holds. When a thing is dropped on it the engine reports it for one tick: `dropped` is true, `from` is the
+    /// dragged entity's uid, `item` its `UiDrag.item`, `count` counts the drops so far, and the resources `drop.NAME` (the dragged entity's uid; back to 0 a tick later), `drop.NAME.item` and `drop.NAME.count`
+    /// say the same to a graph system (`NAME` is `name`, or this entity's uid when `name` is empty). Putting a thing back in the slot it came from is not a drop. `holds` is the uid of the thing in the
+    /// slot (0 when empty), worked out from the things' `slot` every tick; `over` is true while a thing that fits is held over the slot (to light it up). The topmost slot under the pointer (by `Ui.layer`) wins.
+    pub struct UiDrop {
+        pub name: Sym = Sym(0),
+        pub accept: u32 = 0xFFFF_FFFF,
+        pub swap: bool = true,
+        pub holds: Uid = Uid(0),
+        pub over: bool = false,
+        pub dropped: bool = false,
+        pub from: Uid = Uid(0),
+        pub item: u32 = 0,
+        pub count: u32 = 0,
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ UI kit v3: tooltips and radial fills
+// New components for tooltips and cooldown rings (docs/UI.md, "Tooltips" and "Radial fill"; the code is `ui_tip.rs`, and the shape is drawn by `crates/lunaris-render/src/ui.rs`). Kept at the end of the file.
+
+component! {
+    /// A tooltip for the `Ui` it is on (docs/UI.md, "Tooltips"): when the pointer rests on that rectangle for `delay` seconds (the unscaled clock, so it works while the game is paused) the **tooltip box**,
+    /// the `Ui` that has the `UiTooltipBox`, appears near the pointer with this `text` (it may hold `{resource}` placeholders and `{#key}` translations like any label). It goes away when the pointer leaves
+    /// the rectangle or a button is pressed there (it comes back after the pointer has left and rested again). The triggering rectangle must be visible, not hidden by a `UiGroup` and, inside a
+    /// `UiScroll`, under the pointer within the viewport; the topmost one under the pointer by `Ui.layer` wins.
+    pub struct UiTooltip {
+        pub text: Sym = Sym(0),
+        pub delay: f32 = 0.5,
+    }
+}
+
+component! {
+    /// The box a `UiTooltip` shows its text in, on a `Ui` of your own style (a rounded dark rectangle with a `TextFont`; give it a high `Ui.layer`; docs/UI.md, "Tooltips"). One per scene (the lowest uid is
+    /// used). The engine keeps it hidden (`Ui.visible` false) until a tooltip is due, then sets its `text`, its position (`offset` from the pointer, flipped to the other side of the pointer where it
+    /// would run off the picture, never off the top or left) and, with `auto_size`, its size from the length of the text (an estimate: 0.75 of the text size a letter, `padding` all round, a fraction of the
+    /// picture's height; switch `auto_size` off and give the box a `size` when the text changes a lot). `source` is the trigger it is shown for, `shown` whether it is up. `timer`, `anchor`, `suppress` and
+    /// `down` are the engine's bookkeeping.
+    pub struct UiTooltipBox {
+        pub offset: [f32; 2] = [0.012, 0.025],
+        pub padding: f32 = 0.012,
+        pub auto_size: bool = true,
+        pub source: Uid = Uid(0),
+        pub shown: bool = false,
+        pub timer: f32 = 0.0,
+        pub anchor: [f32; 2] = [0.0, 0.0],
+        pub suppress: bool = false,
+        pub down: bool = false,
+    }
+}
+
+component! {
+    /// A radial fill for a `Ui` (docs/UI.md, "Radial fill"): instead of the rectangle's bar, the `Ui` draws a **sector** that sweeps `value` (0 to 1) of the way round: a cooldown wipe over an icon, a progress
+    /// ring, a clock. The sector starts `start` degrees clockwise from twelve o'clock and runs clockwise (or counter-clockwise with `clockwise` false) for `value` of a full turn, in `Ui.color`
+    /// (the display colour; a button's hover and press shading applies); `Ui.back_color`, when its alpha is above 0, is the full shape behind it. `shape` 0 is the circle (or ring) inscribed in the rectangle,
+    /// `shape` 1 the whole rectangle (the classic clock wipe over a square icon); `inner` (0 to 1) cuts a hole of that share of the circle's radius out of shape 0, which makes a ring. The shape ignores the
+    /// rectangle's border, shadow, gradient and picture; the label (`Ui.text`) is drawn as ever. Both renderers draw it from the same description: the reference renderer by testing each pixel (the circle's
+    /// edge is anti-aliased, the straight edges of the sector are not), the GPU renderer as triangles. Drive `value` from a graph system (`{"set": "UiRadial.value", "to": {"res": "cooldown"}}`).
+    pub struct UiRadial {
+        pub value: f32 = 1.0,
+        pub start: f32 = 0.0,
+        pub clockwise: bool = true,
+        pub shape: u32 = 0,
+        pub inner: f32 = 0.0,
+    }
+}

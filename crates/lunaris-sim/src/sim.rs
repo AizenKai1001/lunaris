@@ -433,7 +433,7 @@ impl Sim {
         self.contacts = std::mem::take(&mut ctx.contacts);
         stage!("event resources", crate::gameplay::publish_events(&mut self.world, &self.events, self.tick));
         stage!("input actions", crate::gameplay::actions(&mut self.world));
-        stage!("interface widgets", crate::ui_kit::update(&mut self.world, self.tick));
+        stage!("interface widgets", crate::ui_kit::update(&mut self.world, self.tick, self.dt));
         stage!("graph systems (all)", graph::run_all(&mut self.world, &mut self.scripts, &self.contacts, self.tick, dt, self.seed, self.threads));
         stage!("language", crate::language::update(&mut self.world));
         if let Some(p) = prof.as_mut() {
@@ -822,6 +822,18 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::SceneReset>().expect("standard component");
     world.register_native::<crate::components::UiScale>().expect("standard component");
     world.register_native::<crate::components::UiEdge>().expect("standard component");
+    world.register_native::<crate::components::UiScroll>().expect("standard component");
+    world.register_native::<crate::components::UiScrollBar>().expect("standard component");
+    world.register_native::<crate::components::UiGroup>().expect("standard component");
+    world.register_native::<crate::components::UiDropdown>().expect("standard component");
+    world.register_native::<crate::components::UiOption>().expect("standard component");
+    world.register_native::<crate::components::UiTabs>().expect("standard component");
+    world.register_native::<crate::components::UiTab>().expect("standard component");
+    world.register_native::<crate::components::UiDrag>().expect("standard component");
+    world.register_native::<crate::components::UiDrop>().expect("standard component");
+    world.register_native::<crate::components::UiTooltip>().expect("standard component");
+    world.register_native::<crate::components::UiTooltipBox>().expect("standard component");
+    world.register_native::<crate::components::UiRadial>().expect("standard component");
 }
 
 impl RecordedRead {

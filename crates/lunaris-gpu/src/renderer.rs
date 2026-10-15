@@ -1252,6 +1252,28 @@ impl GpuRenderer {
                 pass.draw_indexed(0..g.count, 0, b.first..b.first + b.count);
             }
         };
+        // the interface shapes in drawing order, each run with its own scissor rectangle when it is inside a scroll view (and the whole picture again after)
+        let draw_ui = |pass: &mut wgpu::RenderPass<'_>| {
+            let mut cut = false;
+            for (b, key) in ui_batches.iter().zip(&ui_keys) {
+                match b.scissor {
+                    Some([x, y, sw, sh]) => {
+                        pass.set_scissor_rect(x, y, sw, sh);
+                        cut = true;
+                    }
+                    None if cut => {
+                        pass.set_scissor_rect(0, 0, w, h);
+                        cut = false;
+                    }
+                    None => {}
+                }
+                pass.set_bind_group(0, &self.ui_bgs[key], &[]);
+                pass.draw(b.first..b.first + b.count, 0..1);
+            }
+            if cut {
+                pass.set_scissor_rect(0, 0, w, h);
+            }
+        };
         let fullscreen = |enc: &mut wgpu::CommandEncoder, label: &str, view: &wgpu::TextureView, load: wgpu::LoadOp<wgpu::Color>, pipe: &wgpu::RenderPipeline, bg: &wgpu::BindGroup| {
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(label),
@@ -1356,10 +1378,7 @@ impl GpuRenderer {
             if !high && ui_n > 0 {
                 pass.set_pipeline(self.pipe(PipeId::UiInPass, 1, None));
                 pass.set_vertex_buffer(0, self.text_vb.slice(..));
-                for (b, key) in ui_batches.iter().zip(&ui_keys) {
-                    pass.set_bind_group(0, &self.ui_bgs[key], &[]);
-                    pass.draw(b.first..b.first + b.count, 0..1);
-                }
+                draw_ui(&mut pass);
             }
             if !high && nverts > ui_n {
                 pass.set_pipeline(self.pipe(PipeId::TextInPass, 1, None));
@@ -1393,10 +1412,7 @@ impl GpuRenderer {
                 if ui_n > 0 {
                     pass.set_pipeline(self.pipe(PipeId::UiOut, 1, Some(out_format)));
                     pass.set_vertex_buffer(0, self.text_vb.slice(..));
-                    for (b, key) in ui_batches.iter().zip(&ui_keys) {
-                        pass.set_bind_group(0, &self.ui_bgs[key], &[]);
-                        pass.draw(b.first..b.first + b.count, 0..1);
-                    }
+                    draw_ui(&mut pass);
                 }
                 if nverts > ui_n {
                     pass.set_pipeline(self.pipe(PipeId::TextOut, 1, Some(out_format)));

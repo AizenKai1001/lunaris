@@ -1,0 +1,2551 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "ListItem",
+      "doc": "A row of the scrolling list: `n` is its number.",
+      "fields": [
+        {
+          "name": "n",
+          "type": "u32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "UseButton",
+      "doc": "The button that starts the cooldown.",
+      "fields": []
+    }
+  ],
+  "next_uid": 57,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            5
+          ]
+        },
+        "Camera": {
+          "clear": [
+            0.07,
+            0.08,
+            0.13,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Name": {
+          "value": "Interface shape"
+        },
+        "UiScale": {
+          "aspect": 1.7777777777777777
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Name": {
+          "value": "Title"
+        },
+        "Text": {
+          "value": "UI KIT 3",
+          "pos": [
+            0.03,
+            0.012
+          ],
+          "size": 0.05,
+          "color": [
+            1,
+            0.9,
+            0.5,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Name": {
+          "value": "Scroll label"
+        },
+        "Text": {
+          "value": "Scroll list",
+          "pos": [
+            0.03,
+            0.08
+          ],
+          "size": 0.04,
+          "color": [
+            0.75,
+            0.8,
+            0.95,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Name": {
+          "value": "Picked"
+        },
+        "Text": {
+          "value": "picked: {list.picked}",
+          "pos": [
+            0.03,
+            0.655
+          ],
+          "size": 0.04,
+          "color": [
+            0.6,
+            0.9,
+            0.6,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Name": {
+          "value": "Items view"
+        },
+        "Ui": {
+          "pos": [
+            0.03,
+            0.14
+          ],
+          "size": [
+            0.27,
+            0.5
+          ],
+          "color": [
+            0.11,
+            0.13,
+            0.2,
+            1
+          ],
+          "layer": 1,
+          "button": false,
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.8
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.015
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiScroll": {
+          "offset": [
+            0.0,
+            0.05
+          ],
+          "speed": 0.06
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Name": {
+          "value": "Items content"
+        },
+        "Ui": {
+          "pos": [
+            0.03,
+            0.14
+          ],
+          "size": [
+            0.25313,
+            1.2
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 2
+        },
+        "UiLayout": {
+          "kind": 0,
+          "padding": 0.012,
+          "spacing": 0.012
+        },
+        "Parent": {
+          "target": 6
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Name": {
+          "value": "Item 1"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.28,
+            0.33,
+            0.5,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 1",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.168,
+            0.196,
+            0.38,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 1
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Name": {
+          "value": "Item 2"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.32,
+            0.37,
+            0.54,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 2",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.192,
+            0.22399999999999998,
+            0.42000000000000004,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 2
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Name": {
+          "value": "Item 3"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.28,
+            0.33,
+            0.5,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 3",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.168,
+            0.196,
+            0.38,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 3
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Name": {
+          "value": "Item 4"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.32,
+            0.37,
+            0.54,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 4",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.192,
+            0.22399999999999998,
+            0.42000000000000004,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 4
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Name": {
+          "value": "Item 5"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.28,
+            0.33,
+            0.5,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 5",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.168,
+            0.196,
+            0.38,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 5
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Name": {
+          "value": "Item 6"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.32,
+            0.37,
+            0.54,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 6",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.192,
+            0.22399999999999998,
+            0.42000000000000004,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 6
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Name": {
+          "value": "Item 7"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.28,
+            0.33,
+            0.5,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 7",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.168,
+            0.196,
+            0.38,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 7
+        }
+      }
+    },
+    {
+      "uid": 15,
+      "components": {
+        "Name": {
+          "value": "Item 8"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.32,
+            0.37,
+            0.54,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 8",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.192,
+            0.22399999999999998,
+            0.42000000000000004,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 8
+        }
+      }
+    },
+    {
+      "uid": 16,
+      "components": {
+        "Name": {
+          "value": "Item 9"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.28,
+            0.33,
+            0.5,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 9",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.168,
+            0.196,
+            0.38,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 9
+        }
+      }
+    },
+    {
+      "uid": 17,
+      "components": {
+        "Name": {
+          "value": "Item 10"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.32,
+            0.37,
+            0.54,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 10",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.192,
+            0.22399999999999998,
+            0.42000000000000004,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 10
+        }
+      }
+    },
+    {
+      "uid": 18,
+      "components": {
+        "Name": {
+          "value": "Item 11"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.28,
+            0.33,
+            0.5,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 11",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.168,
+            0.196,
+            0.38,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 11
+        }
+      }
+    },
+    {
+      "uid": 19,
+      "components": {
+        "Name": {
+          "value": "Item 12"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.1
+          ],
+          "color": [
+            0.32,
+            0.37,
+            0.54,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "Item 12",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012,
+          "color2": [
+            0.192,
+            0.22399999999999998,
+            0.42000000000000004,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 7
+        },
+        "ListItem": {
+          "n": 12
+        }
+      }
+    },
+    {
+      "uid": 20,
+      "components": {
+        "Name": {
+          "value": "Items track"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.02,
+            0.02
+          ],
+          "color": [
+            0.05,
+            0.06,
+            0.1,
+            0.9
+          ],
+          "layer": 4,
+          "button": true,
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "Name": {
+          "value": "Items bar"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.02,
+            0.02
+          ],
+          "color": [
+            0.55,
+            0.65,
+            0.95,
+            1
+          ],
+          "layer": 5,
+          "button": true,
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01,
+          "color2": [
+            0.3,
+            0.4,
+            0.75,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiScrollBar": {
+          "view": 6,
+          "track": 20,
+          "thickness": 0.022,
+          "inset": 0.006,
+          "min_length": 0.08
+        }
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "Name": {
+          "value": "Dropdown label"
+        },
+        "Text": {
+          "value": "Drop-down",
+          "pos": [
+            0.36,
+            0.09
+          ],
+          "size": 0.04,
+          "color": [
+            0.75,
+            0.8,
+            0.95,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "Name": {
+          "value": "Quality list"
+        },
+        "Ui": {
+          "pos": [
+            0.36,
+            0.225
+          ],
+          "size": [
+            0.26,
+            0.2
+          ],
+          "color": [
+            0.1,
+            0.12,
+            0.2,
+            1
+          ],
+          "layer": 20,
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.9
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.014,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.5
+          ],
+          "shadow_offset": [
+            0.004,
+            0.008
+          ]
+        },
+        "UiLayout": {
+          "kind": 0,
+          "padding": 0.01,
+          "spacing": 0.008
+        },
+        "UiGroup": {
+          "shown": false
+        }
+      }
+    },
+    {
+      "uid": 24,
+      "components": {
+        "Name": {
+          "value": "Quality header"
+        },
+        "Ui": {
+          "pos": [
+            0.36,
+            0.15
+          ],
+          "size": [
+            0.26,
+            0.07
+          ],
+          "color": [
+            0.2,
+            0.28,
+            0.5,
+            1
+          ],
+          "layer": 6,
+          "button": true,
+          "text": "Quality",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0.003,
+          "border_color": [
+            1,
+            1,
+            1,
+            0.5
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.014,
+          "color2": [
+            0.12,
+            0.17,
+            0.34,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiDropdown": {
+          "list": 23,
+          "selected": 1,
+          "resource": "ui.quality"
+        }
+      }
+    },
+    {
+      "uid": 25,
+      "components": {
+        "Name": {
+          "value": "Quality Low"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.05
+          ],
+          "color": [
+            0.2,
+            0.3,
+            0.5,
+            1
+          ],
+          "layer": 21,
+          "button": true,
+          "text": "Low",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01,
+          "color2": [
+            0.12,
+            0.18,
+            0.34,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 23
+        },
+        "UiOption": {
+          "dropdown": 24,
+          "index": 0
+        }
+      }
+    },
+    {
+      "uid": 26,
+      "components": {
+        "Name": {
+          "value": "Quality Medium"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.05
+          ],
+          "color": [
+            0.2,
+            0.3,
+            0.5,
+            1
+          ],
+          "layer": 21,
+          "button": true,
+          "text": "Medium",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01,
+          "color2": [
+            0.12,
+            0.18,
+            0.34,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 23
+        },
+        "UiOption": {
+          "dropdown": 24,
+          "index": 1
+        }
+      }
+    },
+    {
+      "uid": 27,
+      "components": {
+        "Name": {
+          "value": "Quality High"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.1,
+            0.05
+          ],
+          "color": [
+            0.2,
+            0.3,
+            0.5,
+            1
+          ],
+          "layer": 21,
+          "button": true,
+          "text": "High",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01,
+          "color2": [
+            0.12,
+            0.18,
+            0.34,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 23
+        },
+        "UiOption": {
+          "dropdown": 24,
+          "index": 2
+        }
+      }
+    },
+    {
+      "uid": 28,
+      "components": {
+        "Name": {
+          "value": "Tabs label"
+        },
+        "Text": {
+          "value": "Tabs",
+          "pos": [
+            0.36,
+            0.44
+          ],
+          "size": 0.04,
+          "color": [
+            0.75,
+            0.8,
+            0.95,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 29,
+      "components": {
+        "Name": {
+          "value": "Tabs state"
+        },
+        "UiTabs": {
+          "selected": 0,
+          "resource": "ui.tab"
+        }
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "Name": {
+          "value": "Stats panel"
+        },
+        "Ui": {
+          "pos": [
+            0.36,
+            0.565
+          ],
+          "size": [
+            0.26,
+            0.15
+          ],
+          "color": [
+            0.12,
+            0.15,
+            0.25,
+            1
+          ],
+          "layer": 2,
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.7
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "UiGroup": {
+          "shown": true
+        }
+      }
+    },
+    {
+      "uid": 31,
+      "components": {
+        "Name": {
+          "value": "Stats line 1"
+        },
+        "Ui": {
+          "pos": [
+            0.37,
+            0.57
+          ],
+          "size": [
+            0.24,
+            0.04
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 3,
+          "button": false,
+          "text": "HP 100   MP 40",
+          "text_size": 0.034,
+          "text_color": [
+            0.8,
+            0.85,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 30
+        }
+      }
+    },
+    {
+      "uid": 32,
+      "components": {
+        "Name": {
+          "value": "Stats line 2"
+        },
+        "Ui": {
+          "pos": [
+            0.37,
+            0.61
+          ],
+          "size": [
+            0.24,
+            0.04
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 3,
+          "button": false,
+          "text": "ATK 12   DEF 8",
+          "text_size": 0.034,
+          "text_color": [
+            0.8,
+            0.85,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 30
+        }
+      }
+    },
+    {
+      "uid": 33,
+      "components": {
+        "Name": {
+          "value": "Stats button"
+        },
+        "Ui": {
+          "pos": [
+            0.52,
+            0.67
+          ],
+          "size": [
+            0.09,
+            0.035
+          ],
+          "color": [
+            0.3,
+            0.5,
+            0.4,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "More",
+          "text_size": 0.028,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.008
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 30
+        }
+      }
+    },
+    {
+      "uid": 34,
+      "components": {
+        "Name": {
+          "value": "Stats tab"
+        },
+        "Ui": {
+          "pos": [
+            0.36,
+            0.5
+          ],
+          "size": [
+            0.085,
+            0.055
+          ],
+          "color": [
+            0.16,
+            0.2,
+            0.32,
+            0.92
+          ],
+          "layer": 4,
+          "button": true,
+          "text": "Stats",
+          "text_size": 0.035,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiTab": {
+          "tabs": 29,
+          "index": 0,
+          "panel": 30,
+          "on_color": [
+            0.3,
+            0.5,
+            0.9,
+            1
+          ],
+          "off_color": [
+            0.16,
+            0.2,
+            0.32,
+            0.92
+          ]
+        }
+      }
+    },
+    {
+      "uid": 35,
+      "components": {
+        "Name": {
+          "value": "Items panel"
+        },
+        "Ui": {
+          "pos": [
+            0.36,
+            0.565
+          ],
+          "size": [
+            0.26,
+            0.15
+          ],
+          "color": [
+            0.12,
+            0.15,
+            0.25,
+            1
+          ],
+          "layer": 2,
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.7
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "UiGroup": {
+          "shown": false
+        }
+      }
+    },
+    {
+      "uid": 36,
+      "components": {
+        "Name": {
+          "value": "Items line 1"
+        },
+        "Ui": {
+          "pos": [
+            0.37,
+            0.57
+          ],
+          "size": [
+            0.24,
+            0.04
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 3,
+          "button": false,
+          "text": "Sword   Shield",
+          "text_size": 0.034,
+          "text_color": [
+            0.8,
+            0.85,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 35
+        }
+      }
+    },
+    {
+      "uid": 37,
+      "components": {
+        "Name": {
+          "value": "Items line 2"
+        },
+        "Ui": {
+          "pos": [
+            0.37,
+            0.61
+          ],
+          "size": [
+            0.24,
+            0.04
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 3,
+          "button": false,
+          "text": "Potion x3",
+          "text_size": 0.034,
+          "text_color": [
+            0.8,
+            0.85,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 35
+        }
+      }
+    },
+    {
+      "uid": 38,
+      "components": {
+        "Name": {
+          "value": "Items button"
+        },
+        "Ui": {
+          "pos": [
+            0.52,
+            0.67
+          ],
+          "size": [
+            0.09,
+            0.035
+          ],
+          "color": [
+            0.3,
+            0.5,
+            0.4,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "More",
+          "text_size": 0.028,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.008
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 35
+        }
+      }
+    },
+    {
+      "uid": 39,
+      "components": {
+        "Name": {
+          "value": "Items tab"
+        },
+        "Ui": {
+          "pos": [
+            0.4475,
+            0.5
+          ],
+          "size": [
+            0.085,
+            0.055
+          ],
+          "color": [
+            0.16,
+            0.2,
+            0.32,
+            0.92
+          ],
+          "layer": 4,
+          "button": true,
+          "text": "Items",
+          "text_size": 0.035,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiTab": {
+          "tabs": 29,
+          "index": 1,
+          "panel": 35,
+          "on_color": [
+            0.3,
+            0.5,
+            0.9,
+            1
+          ],
+          "off_color": [
+            0.16,
+            0.2,
+            0.32,
+            0.92
+          ]
+        }
+      }
+    },
+    {
+      "uid": 40,
+      "components": {
+        "Name": {
+          "value": "Map panel"
+        },
+        "Ui": {
+          "pos": [
+            0.36,
+            0.565
+          ],
+          "size": [
+            0.26,
+            0.15
+          ],
+          "color": [
+            0.12,
+            0.15,
+            0.25,
+            1
+          ],
+          "layer": 2,
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.7
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "UiGroup": {
+          "shown": false
+        }
+      }
+    },
+    {
+      "uid": 41,
+      "components": {
+        "Name": {
+          "value": "Map line 1"
+        },
+        "Ui": {
+          "pos": [
+            0.37,
+            0.57
+          ],
+          "size": [
+            0.24,
+            0.04
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 3,
+          "button": false,
+          "text": "Cave   Forest",
+          "text_size": 0.034,
+          "text_color": [
+            0.8,
+            0.85,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 40
+        }
+      }
+    },
+    {
+      "uid": 42,
+      "components": {
+        "Name": {
+          "value": "Map line 2"
+        },
+        "Ui": {
+          "pos": [
+            0.37,
+            0.61
+          ],
+          "size": [
+            0.24,
+            0.04
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layer": 3,
+          "button": false,
+          "text": "Town   Castle",
+          "text_size": 0.034,
+          "text_color": [
+            0.8,
+            0.85,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 40
+        }
+      }
+    },
+    {
+      "uid": 43,
+      "components": {
+        "Name": {
+          "value": "Map button"
+        },
+        "Ui": {
+          "pos": [
+            0.52,
+            0.67
+          ],
+          "size": [
+            0.09,
+            0.035
+          ],
+          "color": [
+            0.3,
+            0.5,
+            0.4,
+            1
+          ],
+          "layer": 3,
+          "button": true,
+          "text": "More",
+          "text_size": 0.028,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.008
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "Parent": {
+          "target": 40
+        }
+      }
+    },
+    {
+      "uid": 44,
+      "components": {
+        "Name": {
+          "value": "Map tab"
+        },
+        "Ui": {
+          "pos": [
+            0.535,
+            0.5
+          ],
+          "size": [
+            0.085,
+            0.055
+          ],
+          "color": [
+            0.16,
+            0.2,
+            0.32,
+            0.92
+          ],
+          "layer": 4,
+          "button": true,
+          "text": "Map",
+          "text_size": 0.035,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.01
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiTab": {
+          "tabs": 29,
+          "index": 2,
+          "panel": 40,
+          "on_color": [
+            0.3,
+            0.5,
+            0.9,
+            1
+          ],
+          "off_color": [
+            0.16,
+            0.2,
+            0.32,
+            0.92
+          ]
+        }
+      }
+    },
+    {
+      "uid": 45,
+      "components": {
+        "Name": {
+          "value": "Inventory label"
+        },
+        "Text": {
+          "value": "Inventory",
+          "pos": [
+            0.7,
+            0.09
+          ],
+          "size": 0.04,
+          "color": [
+            0.75,
+            0.8,
+            0.95,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 46,
+      "components": {
+        "Name": {
+          "value": "Slot A"
+        },
+        "Ui": {
+          "pos": [
+            0.7,
+            0.15
+          ],
+          "size": [
+            0.1,
+            0.178
+          ],
+          "color": [
+            0.12,
+            0.15,
+            0.25,
+            1
+          ],
+          "layer": 1,
+          "button": false,
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.8
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiDrop": {
+          "name": "A"
+        }
+      }
+    },
+    {
+      "uid": 47,
+      "components": {
+        "Name": {
+          "value": "Slot B"
+        },
+        "Ui": {
+          "pos": [
+            0.84,
+            0.15
+          ],
+          "size": [
+            0.1,
+            0.178
+          ],
+          "color": [
+            0.12,
+            0.15,
+            0.25,
+            1
+          ],
+          "layer": 1,
+          "button": false,
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0.003,
+          "border_color": [
+            0.4,
+            0.5,
+            0.8,
+            0.8
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiDrop": {
+          "name": "B"
+        }
+      }
+    },
+    {
+      "uid": 48,
+      "components": {
+        "Name": {
+          "value": "Sword"
+        },
+        "Ui": {
+          "pos": [
+            0.715,
+            0.177
+          ],
+          "size": [
+            0.07,
+            0.124
+          ],
+          "color": [
+            0.95,
+            0.65,
+            0.2,
+            1
+          ],
+          "layer": 2,
+          "button": true,
+          "text": "Sw",
+          "text_size": 0.05,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.02,
+          "color2": [
+            0.7,
+            0.35,
+            0.1,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiDrag": {
+          "item": 7,
+          "slot": 46
+        },
+        "UiTooltip": {
+          "text": "Iron sword\n+5 attack",
+          "delay": 0.4
+        }
+      }
+    },
+    {
+      "uid": 49,
+      "components": {
+        "Name": {
+          "value": "Inventory moves"
+        },
+        "Text": {
+          "value": "moves: {inv.moves}",
+          "pos": [
+            0.7,
+            0.348
+          ],
+          "size": 0.034,
+          "color": [
+            0.6,
+            0.9,
+            0.6,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 50,
+      "components": {
+        "Name": {
+          "value": "Inventory last item"
+        },
+        "Text": {
+          "value": "last item: {inv.last_item}",
+          "pos": [
+            0.7,
+            0.388
+          ],
+          "size": 0.034,
+          "color": [
+            0.6,
+            0.9,
+            0.6,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 51,
+      "components": {
+        "Name": {
+          "value": "Cooldown label"
+        },
+        "Text": {
+          "value": "Cooldown",
+          "pos": [
+            0.7,
+            0.49
+          ],
+          "size": 0.04,
+          "color": [
+            0.75,
+            0.8,
+            0.95,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    },
+    {
+      "uid": 52,
+      "components": {
+        "Name": {
+          "value": "Cooldown ring"
+        },
+        "Ui": {
+          "pos": [
+            0.7,
+            0.55
+          ],
+          "size": [
+            0.07,
+            0.124
+          ],
+          "color": [
+            0.95,
+            0.75,
+            0.25,
+            1
+          ],
+          "layer": 2,
+          "button": false,
+          "back_color": [
+            0.15,
+            0.2,
+            0.35,
+            0.9
+          ],
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiRadial": {
+          "value": 0.0,
+          "start": 0,
+          "shape": 0,
+          "inner": 0.72
+        }
+      }
+    },
+    {
+      "uid": 53,
+      "components": {
+        "Name": {
+          "value": "Use button"
+        },
+        "Ui": {
+          "pos": [
+            0.8,
+            0.55
+          ],
+          "size": [
+            0.07,
+            0.124
+          ],
+          "color": [
+            0.25,
+            0.55,
+            0.4,
+            1
+          ],
+          "layer": 2,
+          "button": true,
+          "text": "Use",
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.015,
+          "color2": [
+            0.12,
+            0.3,
+            0.22,
+            1
+          ]
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UseButton": {},
+        "UiTooltip": {
+          "text": "Use the ability\nrecharges in 4 s",
+          "delay": 0.4
+        }
+      }
+    },
+    {
+      "uid": 54,
+      "components": {
+        "Name": {
+          "value": "Use wipe"
+        },
+        "Ui": {
+          "pos": [
+            0.8,
+            0.55
+          ],
+          "size": [
+            0.07,
+            0.124
+          ],
+          "color": [
+            0.0,
+            0.0,
+            0.0,
+            0.62
+          ],
+          "layer": 3,
+          "button": false,
+          "text_size": 0.04,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiRadial": {
+          "value": 0.0,
+          "start": 0,
+          "shape": 1
+        }
+      }
+    },
+    {
+      "uid": 55,
+      "components": {
+        "Name": {
+          "value": "Tooltip"
+        },
+        "Ui": {
+          "pos": [
+            0,
+            0
+          ],
+          "size": [
+            0.2,
+            0.08
+          ],
+          "color": [
+            0.03,
+            0.04,
+            0.09,
+            0.96
+          ],
+          "layer": 40,
+          "button": false,
+          "visible": false,
+          "text_size": 0.034,
+          "text_color": [
+            0.95,
+            0.95,
+            0.8,
+            1
+          ],
+          "border": 0.003,
+          "border_color": [
+            0.9,
+            0.8,
+            0.4,
+            0.9
+          ]
+        },
+        "UiStyle": {
+          "radius": 0.012
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        },
+        "UiTooltipBox": {}
+      }
+    },
+    {
+      "uid": 56,
+      "components": {
+        "Name": {
+          "value": "Status"
+        },
+        "Text": {
+          "value": "quality: {ui.quality}   tab: {ui.tab}",
+          "pos": [
+            0.36,
+            0.78
+          ],
+          "size": 0.04,
+          "color": [
+            0.6,
+            0.9,
+            0.6,
+            1
+          ],
+          "shadow": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf"
+        }
+      }
+    }
+  ],
+  "resources": {
+    "list.picked": 0,
+    "ui.quality": 1,
+    "ui.tab": 0,
+    "inv.last_item": 0,
+    "inv.moves": 0,
+    "cooldown": 0
+  },
+  "systems": [
+    {
+      "name": "pick_item",
+      "doc": "A click on a row of the list says which one in the resource list.picked.",
+      "each": [
+        "ListItem",
+        "Ui"
+      ],
+      "do": [
+        {
+          "if": {
+            "get": "Ui.clicked"
+          },
+          "then": [
+            {
+              "res_set": "list.picked",
+              "to": {
+                "get": "ListItem.n"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "remember_drop",
+      "doc": "A drop on a slot is remembered in resources: which item, and how many drops there have been.",
+      "each": [
+        "UiDrop"
+      ],
+      "do": [
+        {
+          "if": {
+            "get": "UiDrop.dropped"
+          },
+          "then": [
+            {
+              "res_set": "inv.last_item",
+              "to": {
+                "get": "UiDrop.item"
+              }
+            },
+            {
+              "res_add": "inv.moves",
+              "by": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "use_ability",
+      "order": 90,
+      "doc": "A click on the Use button starts the cooldown (1 = just used) when it is not running.",
+      "each": [
+        "UseButton",
+        "Ui"
+      ],
+      "do": [
+        {
+          "if": {
+            "and": [
+              {
+                "get": "Ui.clicked"
+              },
+              {
+                "le": [
+                  {
+                    "res": "cooldown"
+                  },
+                  0
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "res_set": "cooldown",
+              "to": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "run_cooldown",
+      "order": 100,
+      "doc": "The remaining share of the cooldown is what the dials show; it runs down in four seconds.",
+      "each": [
+        "UiRadial"
+      ],
+      "do": [
+        {
+          "set": "UiRadial.value",
+          "to": {
+            "res": "cooldown"
+          }
+        },
+        {
+          "res_set": "cooldown",
+          "to": {
+            "max": [
+              0,
+              {
+                "sub": [
+                  {
+                    "res": "cooldown"
+                  },
+                  {
+                    "mul": [
+                      {
+                        "dt": true
+                      },
+                      0.25
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -32,6 +32,10 @@ pub mod spriteanim;
 pub mod systems;
 pub mod terrain;
 pub mod ui_kit;
+pub mod ui_kit3;
+mod ui_drag;
+mod ui_select;
+mod ui_tip;
 pub mod vehicle;
 mod vehicle_ray;
 mod vm;
@@ -81,6 +85,14 @@ mod physics_rot_tests;
 mod terrain_tests;
 #[cfg(test)]
 mod ui_kit_tests;
+#[cfg(test)]
+mod ui_kit3_tests;
+#[cfg(test)]
+mod ui_select_tests;
+#[cfg(test)]
+mod ui_drag_tests;
+#[cfg(test)]
+mod ui_tip_tests;
 #[cfg(test)]
 mod prefab_tests;
 #[cfg(test)]

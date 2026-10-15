@@ -343,10 +343,23 @@ fn display_to_linear(c: [f32; 4]) -> [f32; 4] {
     [c[0] * c[0], c[1] * c[1], c[2] * c[2], c[3]]
 }
 
-/// Fill a rectangle of the render target with `color` at `alpha`, optionally claiming the pixels for an entity.
-fn fill_rect(t: &mut Target<'_>, x: i64, y: i64, w: usize, h: usize, color: V3, alpha: f32, claim: Option<u64>) {
-    for yy in y.max(t.y0 as i64)..(y + h as i64).min(t.y1 as i64) {
-        for xx in x.max(0)..(x + w as i64).min(t.w as i64) {
+/// The whole-pixel box (x0, y0, x1, y1) of a clip rectangle (fractions of the picture) on a picture of `w` x `h` pixels, rounded the way `SceneRect::pixels` rounds a shape, so that a shape whose edge
+/// is the clip's edge ends on the same pixel. Both renderers use this one function.
+pub fn clip_pixels(clip: [f32; 4], w: usize, h: usize) -> (i64, i64, i64, i64) {
+    let to_px = |v: f32, n: usize| if v.is_finite() { (v * n as f32).round().clamp(-1.0e9, 1.0e9) as i64 } else { 0 };
+    (to_px(clip[0], w), to_px(clip[1], h), to_px(clip[2], w), to_px(clip[3], h))
+}
+
+/// The pixels a thing may touch: the clip's box, or all of the plane when it has none.
+fn clip_bounds(clip: Option<[f32; 4]>, w: usize, h: usize) -> (i64, i64, i64, i64) {
+    clip.map_or((i64::MIN, i64::MIN, i64::MAX, i64::MAX), |c| clip_pixels(c, w, h))
+}
+
+/// Fill a rectangle of the render target with `color` at `alpha`, optionally claiming the pixels for an entity, and only inside `bounds` (x0, y0, x1, y1).
+#[allow(clippy::too_many_arguments)]
+fn fill_rect(t: &mut Target<'_>, x: i64, y: i64, w: usize, h: usize, color: V3, alpha: f32, claim: Option<u64>, bounds: (i64, i64, i64, i64)) {
+    for yy in y.max(t.y0 as i64).max(bounds.1)..(y + h as i64).min(t.y1 as i64).min(bounds.3) {
+        for xx in x.max(0).max(bounds.0)..(x + w as i64).min(t.w as i64).min(bounds.2) {
             let i = (yy as usize - t.y0) * t.w + xx as usize;
             let bg = t.color[i];
             t.color[i] = [bg[0] + (color[0] - bg[0]) * alpha, bg[1] + (color[1] - bg[1]) * alpha, bg[2] + (color[2] - bg[2]) * alpha];
@@ -372,14 +385,20 @@ fn draw_shape(t: &mut Target<'_>, r: &SceneRect, target_height: usize) {
     if px1 <= px0 || py1 <= py0 {
         return;
     }
+    if let Some(sw) = &r.sweep {
+        draw_sweep(t, r, sw);
+        return;
+    }
     let (wf, hf) = ((px1 - px0) as f32, (py1 - py0) as f32);
     let radius = if r.radius.is_finite() { (r.radius * target_height as f32).clamp(0.0, wf.min(hf) * 0.5) } else { 0.0 };
     let c1 = display_to_linear(r.color);
     let c2 = if r.color2[3] > 0.0 { display_to_linear(r.color2) } else { c1 };
     let styled = r.is_styled();
-    for yy in py0.max(t.y0 as i64)..py1.min(t.y1 as i64) {
+    // inside a scroll view the shape is cut at the viewport: whole pixels, and every pixel inside keeps the colour it would have had without the cut
+    let bounds = clip_bounds(r.clip, t.w, t.h);
+    for yy in py0.max(t.y0 as i64).max(bounds.1)..py1.min(t.y1 as i64).min(bounds.3) {
         let fy = (yy - py0) as f32 + 0.5;
-        for xx in px0.max(0)..px1.min(t.w as i64) {
+        for xx in px0.max(0).max(bounds.0)..px1.min(t.w as i64).min(bounds.2) {
             let fx = (xx - px0) as f32 + 0.5;
             let mut cover = 1.0f32;
             if radius > 0.0 {
@@ -406,8 +425,44 @@ fn draw_shape(t: &mut Target<'_>, r: &SceneRect, target_height: usize) {
     }
 }
 
-fn draw_text(t: &mut Target<'_>, uid: u64, text: &str, tx: &Text, ss: usize, final_height: usize) {
+/// A radial fill (`UiRadial`): a pixel is in the sector when its direction from the middle of the box is (`Sweep::contains`: products and comparisons only), and, for the circle, inside the radius
+/// (anti-aliased by its coverage, like a rounded corner) and outside the hole. The straight edges of the sector are decided on pixel centres, the way the graphics card's triangles are.
+fn draw_sweep(t: &mut Target<'_>, r: &SceneRect, sw: &Sweep) {
+    let (px0, py0, px1, py1) = r.pixels(t.w, t.h);
+    let (wf, hf) = ((px1 - px0) as f32, (py1 - py0) as f32);
+    let c = display_to_linear(r.color);
+    let radius = wf.min(hf) * 0.5;
+    let hole = if sw.shape == 0 && sw.inner.is_finite() { sw.inner.clamp(0.0, 1.0) * radius } else { 0.0 };
+    let bounds = clip_bounds(r.clip, t.w, t.h);
+    for yy in py0.max(t.y0 as i64).max(bounds.1)..py1.min(t.y1 as i64).min(bounds.3) {
+        let dy = (yy - py0) as f32 + 0.5 - hf * 0.5;
+        for xx in px0.max(0).max(bounds.0)..px1.min(t.w as i64).min(bounds.2) {
+            let dx = (xx - px0) as f32 + 0.5 - wf * 0.5;
+            let mut cover = 1.0f32;
+            if sw.shape == 0 {
+                let d = (dx * dx + dy * dy).sqrt();
+                cover = (0.5 - (d - radius)).clamp(0.0, 1.0);
+                if hole > 0.0 {
+                    cover = cover.min((d - hole + 0.5).clamp(0.0, 1.0));
+                }
+            }
+            if cover <= 0.0 || !sw.contains(dx, dy) {
+                continue;
+            }
+            let alpha = c[3].clamp(0.0, 1.0) * cover;
+            if alpha <= 0.0 {
+                continue;
+            }
+            let i = (yy as usize - t.y0) * t.w + xx as usize;
+            let bg = t.color[i];
+            t.color[i] = [bg[0] + (c[0] - bg[0]) * alpha, bg[1] + (c[1] - bg[1]) * alpha, bg[2] + (c[2] - bg[2]) * alpha];
+        }
+    }
+}
+
+fn draw_text(t: &mut Target<'_>, uid: u64, text: &str, tx: &Text, clip: Option<[f32; 4]>, ss: usize, final_height: usize) {
     use crate::font::{glyph, lit, GLYPH_H, GLYPH_W};
+    let bounds = clip_bounds(clip, t.w, t.h);
     // whole font pixels (a multiple of the supersampling factor) keep the edges crisp
     let cell = ((tx.size.clamp(0.005, 0.5) * final_height as f32 / GLYPH_H as f32).round().max(1.0) as usize) * ss;
     let advance = (GLYPH_W + 1) * cell;
@@ -430,7 +485,7 @@ fn draw_text(t: &mut Target<'_>, uid: u64, text: &str, tx: &Text, ss: usize, fin
                     if lit(g, col, row) {
                         let x = x0 + off + (n * advance + col * cell) as i64;
                         let y = y0 + off + (row * cell) as i64;
-                        fill_rect(t, x, y, cell, cell, color, a * c[3].clamp(0.0, 1.0), if claim { Some(uid) } else { None });
+                        fill_rect(t, x, y, cell, cell, color, a * c[3].clamp(0.0, 1.0), if claim { Some(uid) } else { None }, bounds);
                     }
                 }
             }
@@ -506,7 +561,7 @@ enum DrawKind<'a> {
     Mesh { mesh: &'a Mesh, model: M4, color: V3, shininess: u32, emissive: f32, tex: Option<&'a Texture>, uv_scale: [f32; 2] },
     Sprite { mesh: &'a Mesh, model: M4, color: [f32; 4], tex: Option<&'a Texture>, uv: [f32; 4] },
     Particles { mesh: &'a Mesh, tex: Option<&'a Texture>, additive: bool },
-    Text { text: String, tx: Text },
+    Text { text: String, tx: Text, clip: Option<[f32; 4]> },
     Rect(&'a SceneRect),
 }
 
@@ -568,7 +623,7 @@ fn draw_band(t: &mut Target<'_>, draws: &[Draw<'_>], view_proj: &M4, lights: &[L
                 let shade = Shade::Particle { tex: *tex, additive: *additive };
                 draw_mesh(t, mesh, &M4::identity(), view_proj, &shade, lights, eye, d.uid, false);
             }
-            DrawKind::Text { text, tx } => draw_text(t, d.uid, text, tx, ss, final_height),
+            DrawKind::Text { text, tx, clip } => draw_text(t, d.uid, text, tx, *clip, ss, final_height),
             DrawKind::Rect(r) => {
                 let th = t.h;
                 draw_shape(t, r, th);
@@ -687,6 +742,55 @@ pub struct SceneRect {
     /// Corner radius as a fraction of the picture's height.
     pub radius: f32,
     pub image: Option<UiImage>,
+    /// Inside a scroll view (`UiScroll`): the viewport the shape is cut at, `[x0, y0, x1, y1]` as fractions of the picture, rounded to whole pixels by `clip_pixels`. Both renderers draw nothing outside it.
+    pub clip: Option<[f32; 4]>,
+    /// A radial fill (`UiRadial`): the shape is a sector of the circle (or ring) inscribed in the rectangle, or of the whole rectangle, in `color`, instead of the rectangle itself.
+    pub sweep: Option<Sweep>,
+}
+
+/// The part of a turn a radial fill covers: `start` degrees clockwise from twelve o'clock, `amount` (0 to 1) of a full turn, clockwise or not; `shape` 0 is the circle inscribed in the rectangle, 1 the whole
+/// rectangle; `inner` (0 to 1, shape 0) is the share of the radius that is a hole.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Sweep {
+    pub start: f32,
+    pub amount: f32,
+    pub clockwise: bool,
+    pub shape: u32,
+    pub inner: f32,
+}
+
+impl Sweep {
+    /// The same sector as a clockwise sweep: where it begins (degrees clockwise from twelve o'clock) and how far it goes (degrees, 0 to 360).
+    pub fn span(&self) -> (f32, f32) {
+        let delta = if self.amount.is_finite() { self.amount.clamp(0.0, 1.0) * 360.0 } else { 0.0 };
+        let start = if self.start.is_finite() { self.start } else { 0.0 };
+        (if self.clockwise { start } else { start - delta }, delta)
+    }
+
+    /// The unit vector of a direction `deg` degrees clockwise from twelve o'clock, in picture coordinates (x right, y down), from the deterministic sine and cosine.
+    pub fn ray(deg: f32) -> (f32, f32) {
+        let r = (deg as f64 % 360.0) * (lunaris_sim::detmath::PI / 180.0);
+        (lunaris_sim::detmath::sin(r) as f32, -(lunaris_sim::detmath::cos(r) as f32))
+    }
+
+    /// Is the direction `(dx, dy)` from the middle inside the sector? Only products and comparisons, so every machine says the same (a direction on a straight edge is inside).
+    pub fn contains(&self, dx: f32, dy: f32) -> bool {
+        let (a0, delta) = self.span();
+        if delta <= 0.0 {
+            return false;
+        }
+        if delta >= 360.0 {
+            return true;
+        }
+        let cross = |u: (f32, f32), v: (f32, f32)| u.0 * v.1 - u.1 * v.0;
+        let (u0, u1, d) = (Sweep::ray(a0), Sweep::ray(a0 + delta), (dx, dy));
+        if delta <= 180.0 {
+            cross(u0, d) >= 0.0 && cross(d, u1) >= 0.0
+        } else {
+            // more than half a turn: everything but the clockwise sweep from the end back to the start
+            !(cross(u1, d) > 0.0 && cross(d, u0) > 0.0)
+        }
+    }
 }
 
 /// A picture on a `SceneRect`: the part `uv` (u0, v0, u1, v1, from the top left) of `tex`.
@@ -716,6 +820,8 @@ pub struct SceneText {
     pub uid: u64,
     pub text: String,
     pub tx: Text,
+    /// Inside a scroll view: the viewport the letters are cut at (as for `SceneRect::clip`), so a line at the edge is drawn in part.
+    pub clip: Option<[f32; 4]>,
 }
 
 /// How the whole picture should look in the GPU renderer's high-quality mode (the reference CPU renderer ignores all of it). Colours are
@@ -1394,7 +1500,16 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             edges.insert(uid, *e);
         })?;
     }
-    let data = crate::ui::UiData { uis: &uis_raw, texts: &texts_raw, styles, fonts, anchors, views, scale, edges };
+    // elements inside a scroll view are cut at its viewport
+    let clips = lunaris_sim::ui_kit3::clip_rects(world);
+    // and what a `UiGroup` that is not shown hides
+    let hidden = lunaris_sim::ui_kit3::hidden_set(world);
+    // and the elements that are a sector of a circle instead of a bar
+    let mut radials: std::collections::BTreeMap<u64, lunaris_sim::components::UiRadial> = Default::default();
+    world.for_each_uid::<(&lunaris_sim::components::UiRadial,), _>(|_, uid, (r,)| {
+        radials.insert(uid, *r);
+    })?;
+    let data = crate::ui::UiData { uis: &uis_raw, texts: &texts_raw, styles, fonts, anchors, views, scale, edges, clips, hidden, radials };
     // a picture drawn for a `CameraView` has no interface
     let (scene_rects, scene_texts) = if textures.nested { (Vec::new(), Vec::new()) } else { crate::ui::gather(world, textures, &view_proj, pw, ph, &data, &say) };
     let mut font_warnings = std::mem::take(&mut textures.fonts.warnings);
@@ -1493,7 +1608,7 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
         draws.push(Draw { uid: r.uid, rows: None, kind: DrawKind::Rect(r) });
     }
     for t in &scene.texts {
-        draws.push(Draw { uid: t.uid, rows: None, kind: DrawKind::Text { text: t.text.clone(), tx: t.tx } });
+        draws.push(Draw { uid: t.uid, rows: None, kind: DrawKind::Text { text: t.text.clone(), tx: t.tx, clip: t.clip } });
     }
 
     // ---- draw: the picture is cut into bands of rows, each drawn independently (in parallel when threads > 1)

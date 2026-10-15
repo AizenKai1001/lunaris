@@ -40,12 +40,12 @@ pub fn pointer_to_ui(aspect: Option<f32>, x: f32, y: f32, w: u32, h: u32) -> (f3
     }
 }
 
-fn pointer(world: &World) -> Option<(f32, f32)> {
+pub(crate) fn pointer(world: &World) -> Option<(f32, f32)> {
     let (x, y) = (world.resource("input.mouse_x")?, world.resource("input.mouse_y")?);
     (x.is_finite() && y.is_finite()).then_some((x as f32, y as f32))
 }
 
-fn pressed(world: &World, action: &str) -> bool {
+pub(crate) fn pressed(world: &World, action: &str) -> bool {
     world.resource(&format!("action.{action}.pressed")).is_some_and(|v| v > 0.5)
 }
 
@@ -62,9 +62,11 @@ fn layout(world: &mut World) {
     let _ = world.for_each_uid::<(&Ui,), _>(|_, uid, (u,)| {
         ui.insert(uid, *u);
     });
+    // what a `UiGroup` hides takes no room either
+    let hidden = crate::ui_kit3::hidden_set(world);
     let _ = world.for_each_uid::<(&Parent,), _>(|e, uid, (p,)| {
         parent_of.insert(uid, p.target.0);
-        if ui.get(&uid).is_some_and(|u| u.visible) {
+        if ui.get(&uid).is_some_and(|u| u.visible) && !hidden.contains(&uid) {
             kids.entry(p.target.0).or_default().push((uid, e));
         }
     });
@@ -120,8 +122,9 @@ fn nav(world: &mut World) {
     let _ = world.for_each_uid::<(&UiNav,), _>(|e, uid, (n,)| navs.push((uid, e, *n)));
     let Some((_, ne, nav)) = navs.into_iter().min_by_key(|n| n.0) else { return };
     let mut cands: Vec<(u64, Entity, [f32; 2])> = Vec::new();
+    let hidden = crate::ui_kit3::hidden_set(world);
     let _ = world.for_each_uid::<(&Ui,), _>(|e, uid, (u,)| {
-        if u.button && u.visible {
+        if u.button && u.visible && !hidden.contains(&uid) {
             cands.push((uid, e, [u.pos[0] + u.size[0] * 0.5, u.pos[1] + u.size[1] * 0.5]));
         }
     });
@@ -300,10 +303,21 @@ fn inputs(world: &mut World, tick: u64) {
 }
 
 /// Run the whole toolkit for one tick.
-pub fn update(world: &mut World, tick: u64) {
+pub fn update(world: &mut World, tick: u64, dt: f32) {
     layout(world);
+    // UI kit v3 (`ui_kit3.rs`, `ui_select.rs`): what is hidden, scrolled away or covered by an open list does not see the pointer, before anything reacts to it; the widgets that
+    // answer clicks (drop-downs, tabs) run after the buttons have been clicked, and scroll views move their content after the focus has moved
+    crate::ui_kit3::hide_pointer(world);
+    crate::ui_kit3::scroll_pointer(world);
+    crate::ui_select::popup_pointer(world);
     nav(world);
     sliders(world);
     toggles(world);
     inputs(world, tick);
+    crate::ui_select::update(world);
+    crate::ui_kit3::scroll_apply(world);
+    // things in slots are placed last, where the slots (and the scroll views they are in) have ended up this tick
+    crate::ui_drag::update(world);
+    // and the tooltip last, so that it sees where everything is: `dt` is the unscaled step, so a tooltip is shown while the game is paused too
+    crate::ui_tip::update(world, dt);
 }

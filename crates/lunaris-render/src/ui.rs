@@ -3,10 +3,10 @@
 //! once, in whole picture pixels, so the reference renderer and the GPU renderer cannot disagree about where anything is.
 use crate::fonts::FontCache;
 use crate::math::*;
-use crate::render::{SceneRect, SceneText, UiImage};
+use crate::render::{SceneRect, SceneText, Sweep, UiImage};
 use crate::texture::TextureCache;
 use lunaris_ecs::{Sym, World};
-use lunaris_sim::components::{Text, Transform, Ui, UiAnchor, UiEdge, UiStyle};
+use lunaris_sim::components::{Text, Transform, Ui, UiAnchor, UiEdge, UiRadial, UiStyle};
 use std::collections::BTreeMap;
 
 /// The `TextFont` of an entity.
@@ -29,6 +29,12 @@ pub(crate) struct UiData<'a> {
     pub scale: Option<f32>,
     /// `UiEdge`: elements pinned to an edge of the picture, or laid out over the whole of it.
     pub edges: BTreeMap<u64, UiEdge>,
+    /// Elements inside a scroll view (`UiScroll`) and the viewport each is cut at (`lunaris_sim::ui_kit3::clip_rects`).
+    pub clips: BTreeMap<u64, [f32; 4]>,
+    /// What a `UiGroup` that is not shown hides: the group's entity and everything below it.
+    pub hidden: std::collections::BTreeSet<u64>,
+    /// `UiRadial`: elements drawn as a sector of a circle (or of the whole rectangle) instead of a bar.
+    pub radials: BTreeMap<u64, UiRadial>,
 }
 
 /// The rectangle of the picture, in pixels, that an element's own fractions (0..1) span.
@@ -105,7 +111,7 @@ fn lay_out(fonts: &mut FontCache, spec: &FontSpec, text: &str, size: f32, pw: f3
 
 /// The letters of laid-out text as picture-pixel quads. `ax` is the picture column the lines are aligned to and `top` the row of the top of the first line.
 #[allow(clippy::too_many_arguments)]
-fn letters(lines: &Lines, uid: u64, color: [f32; 4], ax: i64, align: u32, top: i64, shadow: bool, pw: f32, ph: f32) -> Vec<SceneRect> {
+fn letters(lines: &Lines, uid: u64, color: [f32; 4], ax: i64, align: u32, top: i64, shadow: bool, pw: f32, ph: f32, clip: Option<[f32; 4]>) -> Vec<SceneRect> {
     let off = ((lines.px as f32 / 14.0).round() as i64).max(1);
     let c = finite4(color);
     let (a, shadow_color) = (c[3].clamp(0.0, 1.0), [0.0, 0.0, 0.0, 0.65 * c[3].clamp(0.0, 1.0)]);
@@ -138,6 +144,8 @@ fn letters(lines: &Lines, uid: u64, color: [f32; 4], ax: i64, align: u32, top: i
                     color2: [0.0; 4],
                     radius: 0.0,
                     image: Some(UiImage { tex: g.tex.clone(), uv: g.uv, smooth: false }),
+                    clip,
+                    sweep: None,
                 });
             }
         }
@@ -187,7 +195,7 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
     let mut text_quads: Vec<SceneRect> = Vec::new();
     for (uid, tx0) in data.texts {
         let mut tx = *tx0;
-        if !tx.visible {
+        if !tx.visible || data.hidden.contains(uid) {
             continue;
         }
         let template = sym(tx.value);
@@ -204,22 +212,23 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
             let (fx, fy) = in_frame(&f, sx, sy);
             tx.pos = [fx, fy];
         }
+        let clip = data.clips.get(uid).copied();
         let text = fill_text(world, say, &template);
         if let Some(spec) = data.fonts.get(uid) {
             if tx.pos[0].is_finite() && tx.pos[1].is_finite() {
                 let ax = (tx.pos[0] * pw).round().clamp(-1.0e9, 1.0e9) as i64;
                 let top = (tx.pos[1] * ph).round().clamp(-1.0e9, 1.0e9) as i64;
                 if let Some(lines) = lay_out(&mut textures.fonts, spec, &text, tx.size, pw, ph) {
-                    text_quads.extend(letters(&lines, *uid, tx.color, ax, tx.align, top, tx.shadow, pw, ph));
+                    text_quads.extend(letters(&lines, *uid, tx.color, ax, tx.align, top, tx.shadow, pw, ph, clip));
                     continue;
                 }
             }
         }
-        texts.push(SceneText { uid: *uid, text, tx });
+        texts.push(SceneText { uid: *uid, text, tx, clip });
     }
     for (uid, u0) in data.uis {
         let mut u = *u0;
-        if !u.visible || !u.size[0].is_finite() || !u.size[1].is_finite() || !u.pos[0].is_finite() || !u.pos[1].is_finite() {
+        if !u.visible || data.hidden.contains(uid) || !u.size[0].is_finite() || !u.size[1].is_finite() || !u.pos[0].is_finite() || !u.pos[1].is_finite() {
             continue;
         }
         let f = frame_of(*uid);
@@ -236,14 +245,17 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
         let (x0, y0, x1, y1) = (u.pos[0], u.pos[1], u.pos[0] + u.size[0], u.pos[1] + u.size[1]);
         let (wpx, hpx) = ((x1 - x0) * pw, (y1 - y0) * ph);
         let radius = style.map_or(0.0, |s| if s.radius.is_finite() { (s.radius * ph).clamp(0.0, wpx.min(hpx) * 0.5) } else { 0.0 });
-        let flat = |x0: f32, y0: f32, x1: f32, y1: f32, color: [f32; 4], color2: [f32; 4], radius_px: f32| SceneRect { uid: *uid, x0, y0, x1, y1, color, color2, radius: radius_px / ph, image: None };
-        if let Some(s) = style.filter(|s| s.shadow_color[3] > 0.0 && s.shadow_color.iter().all(|v| v.is_finite()) && s.shadow_offset.iter().all(|v| v.is_finite())) {
+        let clip = data.clips.get(uid).copied();
+        let flat = |x0: f32, y0: f32, x1: f32, y1: f32, color: [f32; 4], color2: [f32; 4], radius_px: f32| SceneRect { uid: *uid, x0, y0, x1, y1, color, color2, radius: radius_px / ph, image: None, clip, sweep: None };
+        // a radial fill (`UiRadial`) is drawn instead of the rectangle's bar, border, shadow, gradient and picture
+        let radial = data.radials.get(uid).copied();
+        if let Some(s) = style.filter(|s| radial.is_none() && s.shadow_color[3] > 0.0 && s.shadow_color.iter().all(|v| v.is_finite()) && s.shadow_offset.iter().all(|v| v.is_finite())) {
             let (dx, dy) = (s.shadow_offset[0] * ph / pw, s.shadow_offset[1]);
             rects.push(flat(x0 + dx, y0 + dy, x1 + dx, y1 + dy, s.shadow_color, [0.0; 4], radius));
         }
         let mut inner = (x0, y0, x1, y1);
         let mut inner_radius = radius;
-        if u.border > 0.0 && u.border_color[3] > 0.0 {
+        if radial.is_none() && u.border > 0.0 && u.border_color[3] > 0.0 {
             let px = (u.border * ph).round().max(1.0);
             rects.push(flat(x0, y0, x1, y1, u.border_color, [0.0; 4], radius));
             inner = (x0 + px / pw, y0 + px / ph, x1 - px / pw, y1 - px / ph);
@@ -262,14 +274,25 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
         let lit = |c: [f32; 4]| [(c[0] * k).min(1.0), (c[1] * k).min(1.0), (c[2] * k).min(1.0), c[3]];
         let color = lit(u.color);
         let color2 = style.map_or([0.0; 4], |s| if s.color2[3] > 0.0 && s.color2.iter().all(|v| v.is_finite()) { lit(s.color2) } else { [0.0; 4] });
-        if fill < 1.0 && u.back_color[3] > 0.0 {
+        if radial.is_none() && fill < 1.0 && u.back_color[3] > 0.0 {
             rects.push(flat(inner.0, inner.1, inner.2, inner.3, u.back_color, [0.0; 4], inner_radius));
         }
         let fill_x1 = inner.0 + (inner.2 - inner.0) * fill;
-        if fill > 0.0 && color[3] > 0.0 {
+        if radial.is_none() && fill > 0.0 && color[3] > 0.0 {
             rects.push(flat(inner.0, inner.1, fill_x1, inner.3, color, color2, inner_radius));
         }
-        if let Some(s) = style {
+        if let Some(rd) = radial.filter(|rd| rd.value.is_finite() && rd.start.is_finite() && rd.inner.is_finite()) {
+            // the full shape behind (the track of a ring), then the part that is filled
+            let sweep = |amount: f32| Sweep { start: rd.start, amount, clockwise: rd.clockwise, shape: rd.shape, inner: rd.inner };
+            let mut part = |color: [f32; 4], amount: f32| {
+                if color[3] > 0.0 && color.iter().all(|v| v.is_finite()) && amount > 0.0 {
+                    rects.push(SceneRect { uid: *uid, x0: inner.0, y0: inner.1, x1: inner.2, y1: inner.3, color, color2: [0.0; 4], radius: 0.0, image: None, clip, sweep: Some(sweep(amount)) });
+                }
+            };
+            part(u.back_color, 1.0);
+            part(color, rd.value.clamp(0.0, 1.0));
+        }
+        if let Some(s) = style.filter(|_| radial.is_none()) {
             let mut name = sym(s.image);
             if name.is_empty() && data.views.contains(uid) {
                 name = crate::views::view_name(*uid);
@@ -304,7 +327,7 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
                         _ => {}
                     }
                 }
-                rects.push(SceneRect { uid: *uid, x0: qx0, y0: qy0, x1: qx1, y1: qy1, color: s.tint, color2: [0.0; 4], radius: radius_px / ph, image: Some(UiImage { tex, uv, smooth: s.smooth }) });
+                rects.push(SceneRect { uid: *uid, x0: qx0, y0: qy0, x1: qx1, y1: qy1, color: s.tint, color2: [0.0; 4], radius: radius_px / ph, image: Some(UiImage { tex, uv, smooth: s.smooth }), clip, sweep: None });
             }
         }
         let template = sym(u.text);
@@ -316,12 +339,12 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
                     // the block of lines is centred in the box
                     let top = (y0 * ph + (u.size[1] * ph - lines.height as f32) * 0.5).round() as i64;
                     let ax = (((x0 + x1) * 0.5) * pw).round() as i64;
-                    rects.extend(letters(&lines, *uid, u.text_color, ax, 1, top, false, pw, ph));
+                    rects.extend(letters(&lines, *uid, u.text_color, ax, 1, top, false, pw, ph, clip));
                     continue;
                 }
             }
             let tx = Text { value: Sym(0), pos: [(x0 + x1) * 0.5, y0 + (u.size[1] - size) * 0.5], size, color: u.text_color, align: 1, shadow: false, visible: true };
-            texts.push(SceneText { uid: *uid, text: label, tx });
+            texts.push(SceneText { uid: *uid, text: label, tx, clip });
         }
     }
     rects.extend(text_quads);
@@ -332,14 +355,22 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
             if let Some(f) = frames.get(&r.uid) {
                 (r.x0, r.x1, r.y0, r.y1) = (mx(f, r.x0), mx(f, r.x1), my(f, r.y0), my(f, r.y1));
                 r.radius *= f.h / full_h;
+                if let Some(c) = r.clip.as_mut() {
+                    *c = [mx(f, c[0]), my(f, c[1]), mx(f, c[2]), my(f, c[3])];
+                }
             }
         }
         for t in texts.iter_mut() {
             if let Some(f) = frames.get(&t.uid) {
                 t.tx.pos = [mx(f, t.tx.pos[0]), my(f, t.tx.pos[1])];
                 t.tx.size *= f.h / full_h;
+                if let Some(c) = t.clip.as_mut() {
+                    *c = [mx(f, c[0]), my(f, c[1]), mx(f, c[2]), my(f, c[3])];
+                }
             }
         }
     }
+    // what lies wholly outside its scroll view's viewport is not drawn at all (the renderers cut what is partly inside)
+    rects.retain(|r| r.clip.is_none_or(|c| r.x1 > c[0] && r.x0 < c[2] && r.y1 > c[1] && r.y0 < c[3]));
     (rects, texts)
 }

@@ -87,6 +87,7 @@ fn classic_pictures_match_the_reference_renderer() {
         ("particles", 150, 640, 360, 1.0, 0.01),
         ("menu", 30, 640, 360, 1.0, 0.005),
         ("ui_showcase", 0, 640, 360, 0.8, 0.004),
+        ("ui_kit3", 3, 640, 360, 1.0, 0.006),
         ("particle_clouds", 0, 640, 360, 1.5, 0.02),
         ("particle_fx", 120, 640, 360, 1.5, 0.02),
         ("views", 0, 640, 360, 1.5, 0.02),
@@ -117,7 +118,7 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
     let out = root.join("target").join("gpu-compare");
     std::fs::create_dir_all(&out).unwrap();
     let high = Quality::high();
-    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0)] {
+    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0)] {
         let mut sim = load(&root, name, ticks);
         let opts = RenderOptions { width: 960, height: 540, ..RenderOptions::default() };
         let mut tex = TextureCache::new(Some(root.clone()));
@@ -285,6 +286,211 @@ fn the_interface_keeps_its_shape_on_other_screens_in_both_renderers() {
             }
         }
     }
+}
+
+/// Scroll views: things that stick out of a viewport on every side (rounded and flat shapes, built-in and TrueType text of a `Ui` and of a `Text`, a picture). The reference renderer crops them
+/// pixel by pixel; the GPU renderer sets scissor rectangles and cuts the letter quads. Both must leak nothing outside the viewport and agree inside it.
+#[test]
+fn scroll_views_cut_the_interface_at_the_viewport_the_same_way_in_both_renderers() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let font = r#","TextFont":{"file":"examples/fonts/pixel.ttf"}"#;
+    let (w, h) = (320u32, 180u32);
+    let make = || {
+        let parent = r#","Parent":{"target":2}"#;
+        let text = format!(
+            r#"{{"lunaris":1,"entities":[
+{{"uid":1,"components":{{"Transform":{{"pos":[0,0,3]}},"Camera":{{"clear":[0.1,0.1,0.2,1]}}}}}},
+{{"uid":2,"components":{{"Ui":{{"pos":[0.1,0.2],"size":[0.55,0.55],"color":[0,0,0,0]}},"UiScroll":{{"drag":false}}}}}},
+{{"uid":3,"components":{{"Ui":{{"pos":[0.0,0.1],"size":[1.0,0.3],"color":[1,0,0,1]}}{parent}}}}},
+{{"uid":4,"components":{{"Ui":{{"pos":[0.5,0.45],"size":[0.4,0.2],"color":[0.2,0.8,0.3,1],"border":0.01,"border_color":[1,1,1,1]}},"UiStyle":{{"radius":0.05,"color2":[0.0,0.3,0.1,1],"shadow_color":[0,0,0,0.6],"shadow_offset":[0.01,0.02]}}{parent}}}}},
+{{"uid":5,"components":{{"Ui":{{"pos":[0.15,0.1],"size":[0.4,0.2],"color":[0,0,0,0],"text":"WWWW","text_size":0.3,"text_color":[1,1,0,1]}}{parent}}}}},
+{{"uid":6,"components":{{"Text":{{"value":"HHHH","pos":[0.2,0.6],"size":0.25,"color":[0,1,1,1],"shadow":true}}{parent}}}}},
+{{"uid":7,"components":{{"Text":{{"value":"Ab","pos":[0.02,0.3],"size":0.3,"color":[1,0,1,1]}}{font}{parent}}}}},
+{{"uid":8,"components":{{"Ui":{{"pos":[0.4,0.1],"size":[0.4,0.25],"color":[0,0,0,0],"text":"Ab","text_size":0.3,"text_color":[0.5,1,0.5,1]}}{font}{parent}}}}},
+{{"uid":9,"components":{{"Ui":{{"pos":[0.5,0.15],"size":[0.3,0.4],"color":[0,0,0,0]}},"UiStyle":{{"image":"checker","tint":[1,1,1,1]}}{parent}}}}}
+]}}"#
+        );
+        let mut sim = Sim::new(1);
+        sim.load_scene(&lunaris_json::parse(&text).unwrap()).unwrap();
+        sim
+    };
+    let mut sim = make();
+    let opts = RenderOptions { width: w, height: h, ..RenderOptions::default() };
+    let mut tex_cpu = TextureCache::new(Some(root.clone()));
+    let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
+    let mut tex_gpu = TextureCache::new(Some(root.clone()));
+    let g = gpu.render_to_image(&mut sim.world, &mut tex_gpu, &opts, &Quality::classic()).expect("gpu render");
+    let out = root.join("target").join("gpu-compare");
+    std::fs::create_dir_all(&out).unwrap();
+    let (d, diff_img) = compare(&cpu.rgba, &g.rgba);
+    png(&out.join("scroll-cpu.png"), w, h, &cpu.rgba);
+    png(&out.join("scroll-classic.png"), w, h, &g.rgba);
+    png(&out.join("scroll-diff.png"), w, h, &diff_img);
+    println!("scroll views: mean abs error {:.3}, {:.2}% of pixels differ by more than 40, worst {}", d.mean, d.outliers * 100.0, d.worst);
+    assert!(d.mean <= 1.0 && d.outliers <= 0.004, "the renderers differ (mean {}, {:.2}% outliers)", d.mean, d.outliers * 100.0);
+    // nothing outside the viewport (x 32..208, y 36..135 on this picture) but the clear colour, in either picture
+    let (vx0, vy0, vx1, vy1) = (32u32, 36u32, 208u32, 135u32);
+    let clear = [26u8, 26, 51];
+    let (mut inside_lit, mut cut) = (0, 0);
+    for y in 0..h {
+        for x in 0..w {
+            let o = ((y * w + x) * 4) as usize;
+            let in_view = (vx0..vx1).contains(&x) && (vy0..vy1).contains(&y);
+            for (name, rgba, tol) in [("reference", &cpu.rgba, 0), ("GPU", &g.rgba, 3)] {
+                let is_clear = (0..3).all(|k| (rgba[o + k] as i32 - clear[k] as i32).abs() <= tol);
+                if !in_view {
+                    assert!(is_clear, "{name} renderer: something is drawn outside the viewport at ({x}, {y}): {:?}", &rgba[o..o + 3]);
+                }
+            }
+            if in_view && !(0..3).all(|k| (cpu.rgba[o + k] as i32 - clear[k] as i32).abs() <= 0) {
+                inside_lit += 1;
+            }
+        }
+    }
+    // and the same things without the clip do reach outside (so the test would notice a missing clip)
+    let mut loose = make();
+    for uid in 3..=9u64 {
+        let e = loose.world.entity(uid).unwrap();
+        loose.world.remove_typed::<lunaris_sim::components::Parent>(e).unwrap();
+    }
+    let mut tex_loose = TextureCache::new(Some(root.clone()));
+    let gl = gpu.render_to_image(&mut loose.world, &mut tex_loose, &opts, &Quality::classic()).expect("gpu render");
+    for y in 0..h {
+        for x in 0..w {
+            let o = ((y * w + x) * 4) as usize;
+            if !((vx0..vx1).contains(&x) && (vy0..vy1).contains(&y)) && !(0..3).all(|k| (gl.rgba[o + k] as i32 - clear[k] as i32).abs() <= 3) {
+                cut += 1;
+            }
+        }
+    }
+    assert!(inside_lit > 3000 && cut > 3000, "{inside_lit} lit pixels inside, {cut} outside without the view");
+}
+
+/// Radial fills: sectors of a circle, rings and clock wipes over a box, clockwise and not, from several angles. The reference renderer tests every pixel; the GPU renderer draws triangles.
+#[test]
+fn radial_fills_are_the_same_shape_in_both_renderers() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let (w, h) = (480u32, 270u32);
+    // (x, y, size in height fractions, radial) on a 16:9 picture: the boxes are square in pixels
+    let dials = [
+        (0.04, 0.06, r#"{"value":0.3}"#),
+        (0.28, 0.06, r#"{"value":0.6,"clockwise":false,"start":45}"#),
+        (0.52, 0.06, r#"{"value":0.4,"start":200,"shape":1}"#),
+        (0.76, 0.06, r#"{"value":0.8,"inner":0.6,"start":90}"#),
+        (0.04, 0.55, r#"{"value":0.95,"inner":0.8,"clockwise":false}"#),
+        (0.28, 0.55, r#"{"value":0.125,"shape":1,"start":315}"#),
+        (0.52, 0.55, r#"{"value":0.5,"start":270,"inner":0.3}"#),
+        (0.76, 0.55, r#"{"value":0.7,"shape":1,"clockwise":false,"start":100}"#),
+    ];
+    let mut entities = vec![r#"{"uid":1,"components":{"Transform":{"pos":[0,0,3]},"Camera":{"clear":[0.1,0.1,0.2,1]}}}"#.to_string()];
+    for (i, (x, y, radial)) in dials.iter().enumerate() {
+        let (bw, bh) = (0.36 * 270.0 / 480.0, 0.36);
+        entities.push(format!(
+            r#"{{"uid":{},"components":{{"Ui":{{"pos":[{x},{y}],"size":[{bw},{bh}],"color":[0.9,{},0.2,0.85],"back_color":[0.15,0.2,0.35,0.9]}},"UiRadial":{radial}}}}}"#,
+            10 + i,
+            0.3 + 0.08 * i as f32
+        ));
+    }
+    let mut sim = Sim::new(1);
+    sim.load_scene(&lunaris_json::parse(&format!(r#"{{"lunaris":1,"entities":[{}]}}"#, entities.join(","))).unwrap()).unwrap();
+    let opts = RenderOptions { width: w, height: h, ..RenderOptions::default() };
+    let mut tex_cpu = TextureCache::new(Some(root.clone()));
+    let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
+    let mut tex_gpu = TextureCache::new(Some(root.clone()));
+    let g = gpu.render_to_image(&mut sim.world, &mut tex_gpu, &opts, &Quality::classic()).expect("gpu render");
+    let out = root.join("target").join("gpu-compare");
+    std::fs::create_dir_all(&out).unwrap();
+    let (d, diff_img) = compare(&cpu.rgba, &g.rgba);
+    png(&out.join("radial-cpu.png"), w, h, &cpu.rgba);
+    png(&out.join("radial-classic.png"), w, h, &g.rgba);
+    png(&out.join("radial-diff.png"), w, h, &diff_img);
+    println!("radial fills: mean abs error {:.3}, {:.2}% of pixels differ by more than 40, worst {}", d.mean, d.outliers * 100.0, d.worst);
+    // eight big dials are mostly edge: the reference renderer anti-aliases the circle and the card fills a polygon, and a pixel whose middle is exactly on a straight edge goes either way
+    assert!(d.mean <= 1.0 && d.outliers <= 0.012, "the renderers differ (mean {}, {:.2}% outliers)", d.mean, d.outliers * 100.0);
+    // the picture is not empty: the dials are really there
+    let lit = cpu.rgba.chunks(4).filter(|p| p[0] > 120).count();
+    assert!(lit > 8000, "{lit} pixels are drawn");
+    // the high quality mode draws them too (no reference to compare with there)
+    let hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
+    png(&out.join("radial-high.png"), w, h, &hi.rgba);
+    assert!(hi.rgba.chunks(4).filter(|p| p[0] > 120).count() > 6000);
+}
+
+/// Drive a scene with the pointer: `(x, y, down)` for each of the given ticks.
+fn point(sim: &mut Sim, x: f64, y: f64, down: bool, ticks: u64) {
+    for (name, v) in [("input.mouse_x", x), ("input.mouse_y", y), ("input.mouse_left", down as u8 as f64)] {
+        sim.world.set_resource(name, Some(v)).unwrap();
+    }
+    sim.step_n(ticks);
+}
+
+/// The example `ui_kit3` in the states a person would see it in: a drop-down open over the scene, a tab switched, the list scrolled to its end with the bar at the bottom. Both renderers must draw each state
+/// the same (the open list is drawn over the other widgets; hidden panels are not drawn at all).
+#[test]
+fn the_ui_kit3_widgets_are_drawn_the_same_in_both_renderers_in_every_state() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let out = root.join("target").join("gpu-compare");
+    std::fs::create_dir_all(&out).unwrap();
+    let (w, h) = (640u32, 360u32);
+    let mut sim = load(&root, "ui_kit3", 3);
+    let opts = RenderOptions { width: w, height: h, ..RenderOptions::default() };
+    let mut check = |sim: &mut Sim, name: &str| {
+        let mut tex_cpu = TextureCache::new(Some(root.clone()));
+        let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
+        let mut tex_gpu = TextureCache::new(Some(root.clone()));
+        let g = gpu.render_to_image(&mut sim.world, &mut tex_gpu, &opts, &Quality::classic()).expect("gpu render");
+        let (d, diff_img) = compare(&cpu.rgba, &g.rgba);
+        png(&out.join(format!("ui_kit3-{name}-cpu.png")), w, h, &cpu.rgba);
+        png(&out.join(format!("ui_kit3-{name}-classic.png")), w, h, &g.rgba);
+        png(&out.join(format!("ui_kit3-{name}-diff.png")), w, h, &diff_img);
+        println!("ui_kit3 {name}: mean abs error {:.3}, {:.2}% of pixels differ by more than 40, worst {}", d.mean, d.outliers * 100.0, d.worst);
+        assert!(d.mean <= 1.0 && d.outliers <= 0.006, "{name}: the renderers differ (mean {}, {:.2}% outliers)", d.mean, d.outliers * 100.0);
+        cpu.rgba
+    };
+    let start = check(&mut sim, "start");
+    // the drop-down open, the pointer on its second option
+    point(&mut sim, 0.49, 0.185, true, 2);
+    point(&mut sim, 0.49, 0.185, false, 4);
+    point(&mut sim, 0.49, 0.325, false, 2);
+    let open = check(&mut sim, "dropdown-open");
+    assert_ne!(start, open, "the open list is in the picture");
+    // closed again by a press outside, the second tab selected
+    point(&mut sim, 0.9, 0.9, true, 2);
+    point(&mut sim, 0.9, 0.9, false, 2);
+    point(&mut sim, 0.49, 0.5275, true, 2);
+    point(&mut sim, 0.49, 0.5275, false, 3);
+    let tab = check(&mut sim, "second-tab");
+    assert_ne!(open, tab);
+    assert_ne!(start, tab);
+    // the list scrolled to its end
+    sim.world.set_resource("input.mouse_wheel", Some(-1.0)).unwrap();
+    point(&mut sim, 0.15, 0.35, false, 40);
+    sim.world.set_resource("input.mouse_wheel", Some(0.0)).unwrap();
+    sim.step_n(2);
+    let end = check(&mut sim, "list-end");
+    assert_ne!(tab, end);
+    // the sword picked up and held over the second slot, then dropped there
+    point(&mut sim, 0.75, 0.239, true, 2);
+    point(&mut sim, 0.88, 0.30, true, 3);
+    let held = check(&mut sim, "item-held");
+    assert_ne!(end, held);
+    point(&mut sim, 0.88, 0.30, false, 3);
+    let dropped = check(&mut sim, "item-dropped");
+    assert_ne!(held, dropped);
+    assert_ne!(end, dropped, "the sword is in the other slot");
+    // the pointer leaves (a press takes a tooltip away until it has), comes back and rests on the sword: its tooltip is up
+    point(&mut sim, 0.5, 0.95, false, 2);
+    point(&mut sim, 0.89, 0.239, false, 45);
+    let tip = check(&mut sim, "tooltip");
+    assert_ne!(dropped, tip, "the tooltip box is in the picture");
+    // the ability used: the ring and the clock wipe part of the way round
+    point(&mut sim, 0.835, 0.612, true, 2);
+    point(&mut sim, 0.835, 0.612, false, 62);
+    let cool = check(&mut sim, "cooldown");
+    assert_ne!(tip, cool);
 }
 
 /// Not a pass/fail test: prints how fast the GPU draws a busy scene compared with the CPU reference (run with --nocapture, in release

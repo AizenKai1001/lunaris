@@ -38,3 +38,7 @@ mod views_tests;
 mod draw_order_tests;
 #[cfg(test)]
 mod ui_scale_tests;
+#[cfg(test)]
+mod ui_scroll_tests;
+#[cfg(test)]
+mod ui_radial_tests;

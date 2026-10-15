@@ -36,6 +36,7 @@ examples/showcase.lunaris.json           state 57a42fa4ba6aeb14  frame c1715350b
 examples/skirmish.lunaris.json           state b932da5decab95a9  frame 8997082fb6180518
 examples/sprites.lunaris.json            state 67d6c0bd1db010f5  frame b9a5517d13220754
 examples/terrain.lunaris.json            state 3e884b84512c282e  frame 5fc1adec6fd8a381
+examples/ui_kit3.lunaris.json            state a7e369605364aca1  frame 15b049380decf92f
 examples/ui_showcase.lunaris.json        state 61032ff25625c455  frame b1388cb44e3fce44
 examples/views.lunaris.json              state e128c3158e3a0419  frame 919018096fc2ff19
 examples/village.lunaris.json            state 3634c3e7823ea531  frame ec0d3ec33cdb55df
