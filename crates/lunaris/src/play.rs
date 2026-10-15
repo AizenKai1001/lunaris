@@ -5,7 +5,7 @@
 //! works everywhere.
 //!
 //!   lunaris play examples/vista.lunaris.json [--size 1280x720] [--mute] [--quality high] [--cpu]
-//!   lunaris play scene.json --hidden --frames 120 --hold d --press enter@30:4 --save-frame shot.png --report     (a self-test: no window shown; `--press KEY@FRAME[:FRAMES]` presses keys at set frames)
+//!   lunaris play scene.json --hidden --frames 120 --hold d --press enter@30:4 --save-frame shot.png --report     (a self-test: no window at all, so no display is needed either; `--press KEY@FRAME[:FRAMES]` presses keys at set frames)
 //!
 //! Game controllers work too (Xbox-style pads: XInput on Windows, the joystick interface on Linux): `input.gamepad.a`, `input.gamepad.lx` and so on, which an
 //! `InputMap` binds (`jump = space, gamepad.a`), and `rumble.low` / `rumble.high` resources shake the pad (Windows). `lunaris-pad` has the names.
@@ -14,7 +14,7 @@
 //! (notches), and a game that writes the resource `cursor.lock` above 0.5 gets the pointer hidden and held in the window (first-person games; Esc still quits). A
 //! `MouseLook` component turns by them.
 //!
-//! Esc quits (unless the game sets the resource `app.quit_on_escape` to 0: then Esc is the key `input.escape`, and the game closes itself with `app.quit` above 0), F11 toggles full screen. Mouse position is `input.mouse_x` / `input.mouse_y` (0..1 across the picture, y down) and the
+//! Esc quits (unless the game sets the resource `app.quit_on_escape` to 0: then Esc is the key `input.escape`, and the game closes itself with `app.quit` above 0), F11 toggles full screen. Mouse position is `input.mouse_x` / `input.mouse_y` (0..1 across the picture, y down; across the safe area of the interface when the game has a `UiScale`) and the
 //! buttons are `input.mouse_left` / `input.mouse_right`.
 use lunaris_api::{Director, Engine};
 use lunaris_audio::{Mixer, Output};
@@ -154,6 +154,101 @@ struct Sound {
     _output: Output,
 }
 
+/// The size a picture of the reference renderer is drawn at for a window of `size`: the window's own, but never more than 1280 x 720 (a window blits it up).
+fn capped_size(size: (u32, u32)) -> (u32, u32) {
+    let (w, h) = (size.0.max(2) as f32, size.1.max(2) as f32);
+    let k = (1280.0 / w).min(720.0 / h).min(1.0);
+    (((w * k) as u32).max(16), ((h * k) as u32).max(16))
+}
+
+/// The keys a self-test presses or lets go of at frame `at`: `--press KEY@FRAME[:FRAMES]` (the key goes down at its frame and up `FRAMES` frames later).
+fn scripted_keys(presses: &[(String, u64, u64)], at: u64) -> Vec<(String, bool)> {
+    presses.iter().flat_map(|(k, first, len)| [(at == *first).then(|| (k.clone(), true)), (at == first + len).then(|| (k.clone(), false))]).flatten().collect()
+}
+
+/// What `--report` prints at the end of a self-test.
+fn print_report(engine: &mut Engine, frames: u64, presented: Option<u64>, sound: Option<&Sound>) {
+    let resources = engine.call("resources", &Json::Null).ok().and_then(|r| r.get("resources").cloned()).unwrap_or(Json::Null);
+    println!("frames {}, tick {}, state hash {:016x}", frames, engine.sim.tick, engine.sim.state_hash());
+    if let Some(n) = presented {
+        println!("presented to the window: {n} pictures");
+    }
+    println!("resources {}", resources.to_string_compact().unwrap_or_default());
+    if let Some(s) = sound {
+        let started: Vec<String> = s.director.stats.started.iter().map(|(k, v)| format!("{k} x{v}")).collect();
+        println!("sound: {} voices started ({}), {} traces, {} room analyses, room rt60 {:.2} s{}", s.director.stats.started.values().sum::<u64>(), started.join(", "), s.director.stats.traces, s.director.stats.room_analyses, s.director.room.rt60, if s.director.warnings.is_empty() { String::new() } else { format!(", warnings: {}", s.director.warnings.join("; ")) });
+    }
+}
+
+/// Save a picture for `--save-frame`.
+fn save_png(path: &std::path::Path, png: Result<Vec<u8>, String>) {
+    match png.and_then(|png| std::fs::write(path, png).map_err(|e| e.to_string())) {
+        Ok(()) => println!("saved the last frame to {}", path.display()),
+        Err(e) => eprintln!("could not save the frame: {e}"),
+    }
+}
+
+/// A self-test without a window (`--hidden` with `--frames`, one player): the simulation steps one tick a frame exactly as it does in a window, the keys of `--hold` and `--press` arrive at
+/// the same frames, the sound director hears the events, and the last picture (`--save-frame`) is drawn offscreen, by the GPU renderer's headless adapter or, with `--cpu` or where there is no
+/// GPU, by the reference renderer. It opens no window and so needs no display server: it runs over ssh, in a container and in CI.
+fn run_headless(opts: Options, mut engine: Engine, mut sound: Option<Sound>, quality: lunaris_gpu::Quality, root: PathBuf) -> ExitCode {
+    let press = |engine: &mut Engine, values: Vec<(String, bool)>| -> Result<(), String> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let obj = Json::Obj(values.into_iter().map(|(k, v)| (k, Json::Bool(v))).collect());
+        engine.call("input", &Json::obj([("values", obj)])).map(|_| ()).map_err(|e| e.to_string())
+    };
+    let frames = opts.frames.unwrap_or(0);
+    let mut played = 0u64;
+    let mut failed: Option<String> = press(&mut engine, opts.hold.iter().map(|k| (k.clone(), true)).collect()).err();
+    while failed.is_none() && played < frames {
+        failed = press(&mut engine, scripted_keys(&opts.presses, played)).err();
+        let first_tick = engine.sim.tick;
+        engine.sim.step();
+        if let Some(sound) = &mut sound {
+            let events: Vec<lunaris_sim::Event> = engine.sim.events.iter().filter(|e| e.tick >= first_tick).cloned().collect();
+            sound.director.update(&mut engine, &events);
+        }
+        played += 1;
+        if engine.sim.world.resource("app.quit").is_some_and(|v| v > 0.5) {
+            break;
+        }
+    }
+    if let Some(e) = failed {
+        eprintln!("error: {e}");
+        return ExitCode::FAILURE;
+    }
+    if let Some(path) = &opts.save_frame {
+        let (w, h) = opts.size;
+        let mut textures = TextureCache::new(Some(root));
+        let mut image: Option<(u32, u32, Vec<u8>)> = None;
+        if !opts.cpu {
+            match lunaris_gpu::GpuRenderer::headless() {
+                Ok(mut gpu) => {
+                    println!("rendering on the GPU: {} ({} quality, no window)", gpu.adapter_name(), opts.quality);
+                    match gpu.render_to_image(&mut engine.sim.world, &mut textures, &lunaris_render::RenderOptions { width: w.max(16), height: h.max(16), ..Default::default() }, &quality) {
+                        Ok(f) => image = Some((f.width, f.height, f.rgba)),
+                        Err(e) => eprintln!("the GPU renderer failed ({e}); using the CPU renderer"),
+                    }
+                }
+                Err(e) => eprintln!("the GPU renderer is not available ({e}); using the CPU renderer"),
+            }
+        }
+        match image {
+            Some((w, h, rgba)) => save_png(path, lunaris_render::encode_png(w, h, &rgba)),
+            None => {
+                let (rw, rh) = capped_size((w, h));
+                save_png(path, engine.render_rgba(rw, rh).map_err(|e| e.to_string()).and_then(|f| f.png()));
+            }
+        }
+    }
+    if opts.report {
+        print_report(&mut engine, played, None, sound.as_ref());
+    }
+    ExitCode::SUCCESS
+}
+
 struct App {
     engine: Engine,
     opts: Options,
@@ -222,11 +317,8 @@ impl App {
     }
 
     fn render_size(&self) -> (u32, u32) {
-        let (w, h) = self.window.as_ref().map(|w| (w.inner_size().width, w.inner_size().height)).unwrap_or(self.opts.size);
-        let (w, h) = (w.max(2) as f32, h.max(2) as f32);
         // draw at the window's size but never more than 1280x720: GDI scales the picture up to the window
-        let k = (1280.0 / w).min(720.0 / h).min(1.0);
-        (((w * k) as u32).max(16), ((h * k) as u32).max(16))
+        capped_size(self.window.as_ref().map(|w| (w.inner_size().width, w.inner_size().height)).unwrap_or(self.opts.size))
     }
 
     /// One frame: advance the simulation, draw, show, play sounds.
@@ -256,7 +348,7 @@ impl App {
         // the mouse's motion since the last frame goes into the first tick of this one, then back to zero
         // keys a self-test presses at set frames (one tick a frame, so the frame is the tick)
         let at = self.frames;
-        let scripted: Vec<(String, bool)> = self.opts.presses.iter().flat_map(|(k, first, len)| [(at == *first).then(|| (k.clone(), true)), (at == first + len).then(|| (k.clone(), false))]).flatten().collect();
+        let scripted = scripted_keys(&self.opts.presses, at);
         if !scripted.is_empty() {
             self.press(scripted);
         }
@@ -487,7 +579,9 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(w) = &self.window {
                     let s = w.inner_size();
-                    let (x, y) = ((position.x as f32 / s.width.max(1) as f32).clamp(0.0, 1.0), (position.y as f32 / s.height.max(1) as f32).clamp(0.0, 1.0));
+                    // the fractions of the window, or of the safe area of the interface when the game has a `UiScale` (docs/UI.md, "Other screens")
+                    let aspect = lunaris_sim::ui_kit::ui_scale_aspect(&mut self.engine.sim.world);
+                    let (x, y) = lunaris_sim::ui_kit::pointer_to_ui(aspect, position.x as f32, position.y as f32, s.width, s.height);
                     if (x - self.mouse.0).abs() > 0.001 || (y - self.mouse.1).abs() > 0.001 {
                         self.mouse = (x, y);
                         self.set_input(vec![("mouse_x".to_string(), x as f64), ("mouse_y".to_string(), y as f64)]);
@@ -606,6 +700,10 @@ pub fn run(mut opts: Options, root: PathBuf, seed: u64, threads: Option<usize>) 
             }
         }
     };
+    // a self-test (`--hidden` with `--frames`) needs no window at all: it is played and drawn offscreen, so it also runs where there is no display
+    if opts.hidden && opts.frames.is_some() && net.is_none() {
+        return run_headless(opts, engine, sound, quality, root_for_textures);
+    }
     let event_loop = match EventLoop::new() {
         Ok(l) => l,
         Err(e) => {
@@ -658,23 +756,11 @@ pub fn run(mut opts: Options, root: PathBuf, seed: u64, threads: Option<usize>) 
             _ => None,
         };
         if let Some(png) = png {
-            match png.and_then(|png| std::fs::write(path, png).map_err(|e| e.to_string())) {
-                Ok(()) => println!("saved the last frame to {}", path.display()),
-                Err(e) => eprintln!("could not save the frame: {e}"),
-            }
+            save_png(path, png);
         }
     }
     if app.opts.report {
-        let resources = app.engine.call("resources", &Json::Null).ok().and_then(|r| r.get("resources").cloned()).unwrap_or(Json::Null);
-        println!("frames {}, tick {}, state hash {:016x}", app.frames, app.engine.sim.tick, app.engine.sim.state_hash());
-        if let Some(g) = &app.gpu {
-            println!("presented to the window: {} pictures", g.frames_presented);
-        }
-        println!("resources {}", resources.to_string_compact().unwrap_or_default());
-        if let Some(s) = &app.sound {
-            let started: Vec<String> = s.director.stats.started.iter().map(|(k, v)| format!("{k} x{v}")).collect();
-            println!("sound: {} voices started ({}), {} traces, {} room analyses, room rt60 {:.2} s{}", s.director.stats.started.values().sum::<u64>(), started.join(", "), s.director.stats.traces, s.director.stats.room_analyses, s.director.room.rt60, if s.director.warnings.is_empty() { String::new() } else { format!(", warnings: {}", s.director.warnings.join("; ")) });
-        }
+        print_report(&mut app.engine, app.frames, app.gpu.as_ref().map(|g| g.frames_presented), app.sound.as_ref());
     }
     ExitCode::SUCCESS
 }
@@ -688,6 +774,73 @@ mod tests {
         assert_eq!(parse_presses("enter@30:4, s@50 ,space@7:1"), vec![("enter".to_string(), 30, 4), ("s".to_string(), 50, 4), ("space".to_string(), 7, 1)]);
         assert_eq!(parse_presses("nonsense,@3,x@y,w@5:0"), vec![("w".to_string(), 5, 1)], "what cannot be read is skipped, a press lasts at least a frame");
         assert!(parse_presses("").is_empty());
+    }
+
+    /// A hidden self-test with `--frames` opens no window, so it works where there is no display (it is the test that runs here, in CI and over ssh), steps one tick a frame like a window does,
+    /// presses the keys when it is told to and draws the last picture offscreen.
+    #[test]
+    fn a_hidden_self_test_needs_no_window_and_plays_like_a_window() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
+        let dir = std::env::temp_dir().join(format!("lunaris-headless-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let options = |frames: u64, presses: &str, save: Option<PathBuf>| Options {
+            scene: "examples/orb_dash.lunaris.json".to_string(),
+            size: (320, 180),
+            hidden: true,
+            mute: true,
+            volume: 1.0,
+            frames: Some(frames),
+            hold: vec!["d".to_string()],
+            presses: parse_presses(presses),
+            save_frame: save,
+            report: false,
+            cpu: true,
+            quality: "classic".to_string(),
+            join: None,
+        };
+        let png = dir.join("last.png");
+        let succeeded = |code: ExitCode| format!("{code:?}") == format!("{:?}", ExitCode::SUCCESS);
+        assert!(succeeded(run(options(90, "space@30:4", Some(png.clone())), root.clone(), 1, Some(1))));
+        let bytes = std::fs::read(&png).expect("the last picture is saved");
+        assert!(bytes.starts_with(&[0x89, b'P', b'N', b'G']), "a PNG");
+        // the same ticks by hand: one tick a frame, the held key down from the start, the other key pressed at frame 30 and let go at frame 34
+        let mut by_hand = Engine::new(1, root.clone());
+        by_hand.sim.threads = 1;
+        by_hand.call("load_scene", &Json::obj([("path", Json::str("examples/orb_dash.lunaris.json"))])).unwrap();
+        by_hand.call("input", &Json::obj([("values", Json::obj([("d", Json::Bool(true))]))])).unwrap();
+        let keys = parse_presses("space@30:4");
+        for at in 0..90 {
+            let pressed = scripted_keys(&keys, at);
+            if !pressed.is_empty() {
+                by_hand.call("input", &Json::obj([("values", Json::Obj(pressed.into_iter().map(|(k, v)| (k, Json::Bool(v))).collect()))])).unwrap();
+            }
+            by_hand.sim.step();
+        }
+        // the picture is the one of the reference renderer at the state those ticks reach
+        let frame = by_hand.render_rgba(320, 180).unwrap();
+        assert_eq!(std::fs::read(&png).unwrap(), frame.png().unwrap(), "the saved picture is what the reference renderer draws after those 90 ticks");
+        // a scene that does not exist is an error, not a hang, and there is still no window
+        let mut missing = options(5, "", None);
+        missing.scene = "no/such/scene.lunaris.json".to_string();
+        assert!(!succeeded(run(missing, root.clone(), 1, Some(1))));
+        // the report of a finished self-test (what `--report` prints) is part of the same path
+        let mut reported = options(10, "", None);
+        reported.report = true;
+        assert!(succeeded(run(reported, root, 1, Some(1))));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn scripted_keys_go_down_at_their_frame_and_up_after_their_length() {
+        let presses = parse_presses("enter@3:2,s@4");
+        assert!(scripted_keys(&presses, 2).is_empty());
+        assert_eq!(scripted_keys(&presses, 3), vec![("enter".to_string(), true)]);
+        assert_eq!(scripted_keys(&presses, 4), vec![("s".to_string(), true)]);
+        assert_eq!(scripted_keys(&presses, 5), vec![("enter".to_string(), false)]);
+        assert_eq!(scripted_keys(&presses, 8), vec![("s".to_string(), false)]);
+        assert_eq!(capped_size((1920, 1080)), (1280, 720));
+        assert_eq!(capped_size((640, 360)), (640, 360));
+        assert_eq!(capped_size((1, 1)), (16, 16));
     }
 
     #[test]

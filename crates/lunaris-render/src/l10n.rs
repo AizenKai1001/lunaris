@@ -80,6 +80,46 @@ mod tests {
     }
 
     #[test]
+    fn a_language_list_switches_every_text_from_a_number_and_a_speaker_can_be_a_key() {
+        let dir = std::env::temp_dir().join(format!("lunaris-l10n-list-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("lang")).unwrap();
+        std::fs::write(dir.join("lang").join("en.json"), r#"{"play": "Play", "npc": {"guard": "Guard", "hello": "Halt!"}}"#).unwrap();
+        std::fs::write(dir.join("lang").join("de.json"), r#"{"play": "Spielen", "npc": {"guard": "Wache", "hello": "Halt!"}}"#).unwrap();
+        std::fs::write(dir.join("lang").join("fr.json"), r#"{"play": "Jouer", "npc": {"guard": "Garde", "hello": "Halte !"}}"#).unwrap();
+        let mut s = world(&["{#play}", "{#npc.guard}"]);
+        let Json::Obj(components) = lunaris_json::parse(r#"{"Localization":{"language":"en"},"LanguageList":{"languages":"en, de, fr"}}"#).unwrap() else { panic!() };
+        s.apply(&lunaris_sim::Command::Spawn { uid: Some(1), components }).unwrap();
+        // a conversation whose speaker and line are keys, shown on two more texts
+        let script = Json::Str("== start
+{#npc.guard}: {#npc.hello}
+-> end".to_string()).to_string_lossy();
+        for (uid, comps) in [
+            (2u64, format!(r#"{{"Dialogue":{{"script":{script},"text_ui":3,"speaker_ui":4,"active":true}}}}"#)),
+            (3, r#"{"Text":{"value":"","visible":false}}"#.to_string()),
+            (4, r#"{"Text":{"value":"","visible":false}}"#.to_string()),
+        ] {
+            let Json::Obj(components) = lunaris_json::parse(&comps).unwrap() else { panic!() };
+            s.apply(&lunaris_sim::Command::Spawn { uid: Some(uid), components }).unwrap();
+        }
+        let mut tex = TextureCache::new(Some(dir));
+        let say = |s: &mut lunaris_sim::Sim, tex: &mut TextureCache| -> Vec<String> {
+            let scene = gather_scene(&mut s.world, tex, &RenderOptions { width: 64, height: 48, ..RenderOptions::default() }).unwrap();
+            scene.texts.iter().map(|t| t.text.clone()).collect()
+        };
+        s.step_n(2);
+        assert_eq!(say(&mut s, &mut tex), vec!["Halt!", "Guard", "Play", "Guard"], "the line and the speaker of the talk (entities 3 and 4), then the two plain texts");
+        // a graph system (here the resource it would set) picks the language by number: the very next picture is in it
+        s.world.set_resource("language.index", Some(1.0)).unwrap();
+        s.step();
+        assert_eq!(say(&mut s, &mut tex), vec!["Halt!", "Wache", "Spielen", "Wache"]);
+        s.world.set_resource("language.index", Some(2.0)).unwrap();
+        s.step();
+        assert_eq!(say(&mut s, &mut tex), vec!["Halte !", "Garde", "Jouer", "Garde"]);
+        assert!(tex.warnings.is_empty(), "{:?}", tex.warnings);
+    }
+
+    #[test]
     fn water_becomes_a_see_through_grid_with_wave_numbers_and_a_flat_one_without_waves() {
         let mut s = lunaris_sim::Sim::new(1);
         for (uid, comps) in [(1u64, r#"{"Transform":{"pos":[0,2,0]},"Water":{"size":[60,30],"wave_height":0.4,"wave_length":6,"phase":1.5,"color":[0,0.3,0.4,0.7]}}"#), (2, r#"{"Transform":{"pos":[0,0,0]},"Water":{"size":[10,10],"wave_height":0}}"#)] {

@@ -9,6 +9,7 @@ pub mod fieldio;
 pub mod gameplay;
 pub mod graph;
 pub mod hull;
+pub mod language;
 mod hull_contact;
 pub mod layers;
 pub mod meshcol;
@@ -62,6 +63,8 @@ mod gameplay_tests;
 mod joint_tests;
 #[cfg(test)]
 mod layers_tests;
+#[cfg(test)]
+mod language_tests;
 #[cfg(test)]
 mod mesh_physics_tests;
 #[cfg(test)]

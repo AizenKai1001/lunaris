@@ -1,8 +1,8 @@
-"""Proves that "Depths" runs from its exported folder alone: it exports the game with `lunaris export`, plays the exported copy in a hidden window (the player program that
-was copied into the folder, started in the folder), taking the menu to level 1 with a scripted key press, and plays the workspace copy the same way. The two must end in the
+"""Proves that "Depths" runs from its exported folder alone: it exports the game with `lunaris export`, plays the exported copy as a hidden self-test (the player program that
+was copied into the folder, started in the folder: no window, so no display is needed), taking the menu to level 1 with a scripted key press, and plays the workspace copy the same way. The two must end in the
 same state hash (the same game, tick for tick), in level 1, with no scene error and an autosave written inside the folder.
 
-    python3 tools/check_depths_export.py [path/to/lunaris]         (on Linux it needs a display for the hidden window: DISPLAY=:0 is tried when there is none)
+    python3 tools/check_depths_export.py [path/to/lunaris]         (a hidden self-test opens no window: it runs without a display, over ssh or in CI)
 """
 import json
 import os
@@ -17,8 +17,6 @@ OUT = os.path.join(ROOT, "dist", "depths_check")
 FRAMES = 260
 ARGS = ["--hidden", "--frames", str(FRAMES), "--mute", "--press", "enter@45:4", "--report"]
 env = dict(os.environ)
-if os.name != "nt" and not env.get("DISPLAY"):
-    env["DISPLAY"] = ":0"
 failed = 0
 
 

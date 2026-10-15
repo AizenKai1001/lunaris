@@ -8,7 +8,10 @@ use lunaris_sim::components::{Animator, Camera, Collider, LocalTransform, MeshRe
 use std::collections::BTreeSet;
 use std::path::Path;
 
+mod draw_order;
+mod language;
 mod layers;
+mod menus;
 mod vehicle;
 
 struct Problems(Vec<Json>);
@@ -294,7 +297,17 @@ impl Engine {
                 if name.is_empty() {
                     problems.add("warning", Some(uid), "SceneSwitch.path is empty, so there is no scene to go to".into(), "the path of a scene file of the workspace, like levels/two.lunaris.json");
                 } else if !lunaris_json::safe_relative(&name).is_ok_and(|n| root.join(n).is_file()) {
-                    problems.add("error", Some(uid), format!("SceneSwitch.path `{name}` is not a file of the workspace (a switch to it would fail and set `scene.error`)"), "a path relative to the workspace, like levels/two.lunaris.json");
+                    if name.ends_with(".lunaris.json") {
+                        // scenes that name each other in a circle (game over -> level -> game over) cannot all exist the first time they are built: a warning, and `export_game` still refuses the game
+                        problems.add(
+                            "warning",
+                            Some(uid),
+                            format!("SceneSwitch.path `{name}` is not a file of the workspace yet: until it is saved a switch to it fails and sets `scene.error`, and `export_game` refuses the game"),
+                            "build every scene file, then run `check` again (scenes that go to each other cannot all exist at the first build)",
+                        );
+                    } else {
+                        problems.add("error", Some(uid), format!("SceneSwitch.path `{name}` is not a file of the workspace, and its name is not a scene's (`*.lunaris.json`), so it is probably a typo (a switch to it would fail and set `scene.error`)"), "a path relative to the workspace, like levels/two.lunaris.json");
+                    }
                 }
             }
         }
@@ -477,7 +490,7 @@ impl Engine {
                             "warning",
                             Some(hi.0),
                             format!("solid bodies of a 2D scene are at different z (entity {} at {}, entity {} at {}): their contacts push along z and they drift apart", lo.0, lo.1, hi.0, hi.1),
-                            "keep bodies in one plane (z 0) and use `z` only for the drawing order of things that do not collide: pickups, decoration, effects",
+                            "keep bodies in one plane (z 0) and put the drawing order in a `DrawLayer` (lower first, the highest on top) instead of in z",
                         );
                     }
                 }
@@ -664,6 +677,9 @@ impl Engine {
             }
         }
         layers::run(&mut self.sim.world, &mut problems)?;
+        draw_order::run(&mut self.sim.world, &mut problems)?;
+        language::run(&mut self.sim.world, &root, &mut problems)?;
+        menus::run(&mut self.sim.world, &mut problems)?;
         // raycast vehicles: the chassis, the wheel table, the numbers; gravity (the lowest-uid PhysicsSettings, like the physics) tells how much weight a spring carries
         {
             let mut gravity = 9.8f32;

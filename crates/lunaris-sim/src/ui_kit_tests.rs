@@ -188,3 +188,123 @@ fn focus_moves_between_buttons_with_actions_and_accept_clicks() {
     s.step();
     assert!(ui(&s, 2).clicked && !ui(&s, 3).clicked, "accept clicks the focused button");
 }
+
+#[test]
+fn a_menu_with_auto_focus_takes_the_focus_by_itself_and_hands_it_on() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"UiNav":{},"UiNavAuto":{}}"#);
+    // a pause menu: two buttons that are hidden until it is wanted
+    spawn(&mut s, 2, r#"{"Ui":{"pos":[0.3,0.3],"size":[0.4,0.1],"button":true,"visible":false}}"#);
+    spawn(&mut s, 3, r#"{"Ui":{"pos":[0.3,0.5],"size":[0.4,0.1],"button":true,"visible":false}}"#);
+    let cur = |s: &Sim| s.world.get::<components::UiNav>(s.world.entity(1).unwrap()).unwrap().current.0;
+    let show = |s: &mut Sim, uid: u64, visible: bool| s.world.get_mut::<Ui>(s.world.entity(uid).unwrap()).unwrap().visible = visible;
+    s.step_n(2);
+    assert_eq!(cur(&s), 0, "no visible button: nothing to focus");
+    // the menu appears: the first button is focused in the same tick, and accept clicks it at once (no direction key first)
+    show(&mut s, 2, true);
+    show(&mut s, 3, true);
+    setr(&mut s, "action.ui_accept.pressed", 1.0);
+    s.step();
+    setr(&mut s, "action.ui_accept.pressed", 0.0);
+    assert_eq!(cur(&s), 2);
+    assert!(ui(&s, 2).hover && ui(&s, 2).clicked && !ui(&s, 3).clicked, "{:?}", ui(&s, 2));
+    // the focus moves on from there with the direction actions as ever
+    setr(&mut s, "action.ui_down.pressed", 1.0);
+    s.step();
+    setr(&mut s, "action.ui_down.pressed", 0.0);
+    assert_eq!(cur(&s), 3);
+    // the focused button goes away: the focus is handed to the next visible one, and then to none
+    show(&mut s, 3, false);
+    s.step();
+    assert_eq!(cur(&s), 2);
+    show(&mut s, 2, false);
+    s.step();
+    assert_eq!(cur(&s), 0);
+    // switched off, it is the old behaviour: the buttons come back and nothing is focused until a direction is pressed
+    s.world.get_mut::<components::UiNavAuto>(s.world.entity(1).unwrap()).unwrap().enabled = false;
+    show(&mut s, 2, true);
+    s.step();
+    assert_eq!(cur(&s), 0);
+}
+
+#[test]
+fn without_the_component_nothing_changes_for_an_existing_menu() {
+    // the same scene with and without a `UiNavAuto { enabled: false }` runs the same
+    let run = |extra: &str| {
+        let mut s = Sim::new(1);
+        spawn(&mut s, 1, &format!(r#"{{"UiNav":{{}}{extra}}}"#));
+        spawn(&mut s, 2, r#"{"Ui":{"pos":[0.3,0.3],"size":[0.4,0.1],"button":true}}"#);
+        s.step_n(5);
+        s.world.get::<components::UiNav>(s.world.entity(1).unwrap()).unwrap().current.0
+    };
+    assert_eq!((run(""), run(r#","UiNavAuto":{"enabled":false}"#), run(r#","UiNavAuto":{}"#)), (0, 0, 2));
+}
+
+#[test]
+fn the_safe_area_is_the_biggest_picture_of_the_made_for_shape_in_the_middle() {
+    use crate::ui_kit::safe_area;
+    let sixteen_nine = 16.0 / 9.0;
+    assert_eq!(safe_area(sixteen_nine, 1920, 1080), (0, 0, 1920, 1080), "the shape it was made for: all of it");
+    assert_eq!(safe_area(sixteen_nine, 640, 480), (0, 60, 640, 360), "4:3: bars above and below");
+    assert_eq!(safe_area(sixteen_nine, 840, 360), (100, 0, 640, 360), "21:9: bars at the sides");
+    assert_eq!(safe_area(sixteen_nine, 900, 1600), (0, 547, 900, 506), "a phone held upright: a thin strip");
+    assert_eq!(safe_area(1.0, 1000, 600), (200, 0, 600, 600));
+    // nonsense is the whole picture
+    for bad in [0.0, -1.0, f32::NAN, f32::INFINITY, 1.0e9] {
+        assert_eq!(safe_area(bad, 640, 480), (0, 0, 640, 480), "{bad}");
+    }
+    assert_eq!(safe_area(sixteen_nine, 0, 480), (0, 0, 0, 480));
+}
+
+#[test]
+fn the_pointer_is_in_fractions_of_the_safe_area_and_outside_zero_to_one_over_the_margins() {
+    use crate::ui_kit::pointer_to_ui;
+    let close = |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 1e-4 && (a.1 - b.1).abs() < 1e-4;
+    let a = Some(16.0 / 9.0);
+    // no scale: the fractions of the window, kept inside
+    assert!(close(pointer_to_ui(None, 420.0, 180.0, 840, 360), (0.5, 0.5)));
+    assert!(close(pointer_to_ui(None, 900.0, -5.0, 840, 360), (1.0, 0.0)));
+    // 21:9 window, 100 pixel margins: the middle is the middle, the left edge of the safe area is 0, a pixel in the margin is below 0
+    assert!(close(pointer_to_ui(a, 420.0, 180.0, 840, 360), (0.5, 0.5)));
+    assert!(close(pointer_to_ui(a, 100.0, 0.0, 840, 360), (0.0, 0.0)));
+    assert!(close(pointer_to_ui(a, 740.0, 360.0, 840, 360), (1.0, 1.0)));
+    assert!(pointer_to_ui(a, 50.0, 180.0, 840, 360).0 < 0.0 && pointer_to_ui(a, 790.0, 180.0, 840, 360).0 > 1.0);
+    // 4:3 window: the margins are above and below
+    assert!(close(pointer_to_ui(a, 320.0, 240.0, 640, 480), (0.5, 0.5)));
+    assert!(pointer_to_ui(a, 320.0, 30.0, 640, 480).1 < 0.0);
+}
+
+#[test]
+fn a_button_is_clicked_where_the_picture_shows_it_and_not_from_the_margin() {
+    // a button at the left edge of the interface and the pointer positions a 21:9 window gives
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"UiScale":{"aspect":1.7777778}}"#);
+    spawn(&mut s, 2, r#"{"Ui":{"pos":[0.0,0.4],"size":[0.1,0.2],"button":true}}"#);
+    let aspect = crate::ui_kit::ui_scale_aspect(&mut s.world);
+    assert!(aspect.is_some_and(|a| (a - 16.0 / 9.0).abs() < 1e-4));
+    for (px, py, hit) in [(110.0, 180.0, true), (60.0, 180.0, false), (0.0, 180.0, false), (200.0, 180.0, false)] {
+        let (x, y) = crate::ui_kit::pointer_to_ui(aspect, px, py, 840, 360);
+        pointer(&mut s, x as f64, y as f64, false);
+        s.step();
+        assert_eq!(ui(&s, 2).hover, hit, "pointer at pixel {px}: ({x}, {y})");
+    }
+}
+
+#[test]
+fn a_layout_container_pads_in_the_shape_of_the_scale_whatever_screen_aspect_says() {
+    let place = |scale: bool| {
+        let mut s = Sim::new(1);
+        if scale {
+            spawn(&mut s, 9, r#"{"UiScale":{"aspect":2.0}}"#);
+        }
+        setr(&mut s, "screen.aspect", 1.0);
+        spawn(&mut s, 1, r#"{"Ui":{"pos":[0.0,0.0],"size":[1.0,1.0]},"UiLayout":{"kind":0,"padding":0.1,"spacing":0.0}}"#);
+        spawn(&mut s, 2, r#"{"Ui":{},"Parent":{"target":1}}"#);
+        s.step();
+        ui(&s, 2)
+    };
+    // the padding is a tenth of the height: in width that is a tenth over the aspect, and the aspect is the scale's when there is one
+    let (plain, scaled) = (place(false), place(true));
+    assert!(close(plain.pos[0], 0.1) && close(scaled.pos[0], 0.05), "{plain:?} {scaled:?}");
+    assert!(close(plain.pos[1], 0.1) && close(scaled.pos[1], 0.1));
+}

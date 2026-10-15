@@ -33,7 +33,7 @@ dist/showcase/
 
 On Windows, run `play.bat` (options after it go to the player: `play.bat --size 1920x1080 --quality high --mute`). The player draws with the GPU renderer and falls back to the CPU one (`--cpu`). The same folder works with `lunaris verify`/`run` for playtests: the scene's relative paths are the same everywhere.
 
-To prove that a folder plays by itself, start its player in a hidden window and let it press keys: `./lunaris play depths.lunaris.json --hidden --frames 260 --mute --press enter@45:4 --report --save-frame shot.png` (on Linux the window needs a display, for example `DISPLAY=:0`). `tools/check_depths_export.py` does exactly this for `examples/depths`, plays the workspace copy the same way and requires the same state hash from both.
+To prove that a folder plays by itself, start its player as a hidden self-test and let it press keys: `./lunaris play depths.lunaris.json --hidden --frames 260 --mute --press enter@45:4 --report --save-frame shot.png` (it opens no window, so it needs no display: it runs over ssh and in CI). `tools/check_depths_export.py` does exactly this for `examples/depths`, plays the workspace copy the same way and requires the same state hash from both.
 
 ## Limits
 

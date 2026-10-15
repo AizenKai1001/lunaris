@@ -46,6 +46,16 @@ mod terrain_tests;
 #[cfg(test)]
 mod ui_tests;
 #[cfg(test)]
+mod draw_order_tests;
+#[cfg(test)]
+mod language_tests;
+#[cfg(test)]
+mod menus_tests;
+#[cfg(test)]
+mod scene_paths_tests;
+#[cfg(test)]
+mod tilecol_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod fuzz_tests;

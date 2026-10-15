@@ -1,9 +1,44 @@
 //! The behaviour of interface widgets, as data on top of `Ui` rectangles: layout containers, sliders, toggles, text fields and focus
 //! navigation with keys or a gamepad. They run every tick after the mouse has been read (`systems::ui`) and before the graph systems, so a graph system
 //! reacts to `UiSlider.value`, `UiToggle.on`, `UiInput.submitted` or `Ui.clicked` in the tick it happens. See `docs/UI.md`.
-use crate::components::{Parent, Ui, UiInput, UiLayout, UiNav, UiSlider, UiToggle};
+use crate::components::{Parent, Ui, UiInput, UiLayout, UiNav, UiNavAuto, UiScale, UiSlider, UiToggle};
 use lunaris_ecs::{Entity, World};
 use std::collections::BTreeMap;
+
+/// The shape the interface was made for, `aspect` of the lowest-numbered `UiScale` (width over height), when the world has one that is a usable number.
+pub fn ui_scale_aspect(world: &mut World) -> Option<f32> {
+    let mut found: Option<(u64, f32)> = None;
+    let _ = world.for_each_uid::<(&UiScale,), _>(|_, uid, (s,)| {
+        if found.is_none_or(|f| uid < f.0) {
+            found = Some((uid, s.aspect));
+        }
+    });
+    found.map(|f| f.1).filter(|a| a.is_finite() && *a > 0.05 && *a < 20.0)
+}
+
+/// The part of a picture of `w` x `h` pixels that the interface is laid out in when a `UiScale` says it was made for `aspect` (width over height): the biggest rectangle of that shape that fits,
+/// in whole pixels, in the middle: `(x, y, width, height)`. A picture of that very shape is all of it.
+pub fn safe_area(aspect: f32, w: u32, h: u32) -> (u32, u32, u32, u32) {
+    if w == 0 || h == 0 || !(aspect.is_finite() && aspect > 0.05 && aspect < 20.0) {
+        return (0, 0, w, h);
+    }
+    let (wf, hf) = (w as f32, h as f32);
+    let (sw, sh) = if wf / hf > aspect { ((hf * aspect).round().clamp(1.0, wf) as u32, h) } else { (w, (wf / aspect).round().clamp(1.0, hf) as u32) };
+    ((w - sw) / 2, (h - sh) / 2, sw, sh)
+}
+
+/// Where the pointer is for the simulation: `x` and `y` in pixels of a window of `w` x `h`. Without a `UiScale` the fractions of the window (0 to 1); with one (its `aspect`) the fractions of the safe area,
+/// which are below 0 or above 1 over the margins (so that nothing at the edge of the interface is hit from there).
+pub fn pointer_to_ui(aspect: Option<f32>, x: f32, y: f32, w: u32, h: u32) -> (f32, f32) {
+    let (wf, hf) = (w.max(1) as f32, h.max(1) as f32);
+    match aspect {
+        None => ((x / wf).clamp(0.0, 1.0), (y / hf).clamp(0.0, 1.0)),
+        Some(a) => {
+            let (ax, ay, aw, ah) = safe_area(a, w, h);
+            (((x - ax as f32) / aw.max(1) as f32).clamp(-4.0, 5.0), ((y - ay as f32) / ah.max(1) as f32).clamp(-4.0, 5.0))
+        }
+    }
+}
 
 fn pointer(world: &World) -> Option<(f32, f32)> {
     let (x, y) = (world.resource("input.mouse_x")?, world.resource("input.mouse_y")?);
@@ -45,7 +80,8 @@ fn layout(world: &mut World) {
         d
     };
     containers.sort_by_key(|(uid, _)| (depth(*uid), *uid));
-    let aspect = world.resource("screen.aspect").filter(|a| a.is_finite() && *a > 0.1).unwrap_or(1.0) as f32;
+    // with a `UiScale` the interface is laid out in a picture of the shape it names; otherwise the resource `screen.aspect` says what shape the picture is
+    let aspect = ui_scale_aspect(world).map(|a| a as f64).or_else(|| world.resource("screen.aspect").filter(|a| a.is_finite() && *a > 0.1)).unwrap_or(1.0) as f32;
     for (uid, l) in containers {
         let Some(mut list) = kids.remove(&uid) else { continue };
         let Some(c) = world.entity(uid).and_then(|e| world.get::<Ui>(e)).map(|u| (u.pos, u.size)) else { continue };
@@ -93,6 +129,10 @@ fn nav(world: &mut World) {
     let mut cur = nav.current.0;
     if cur != 0 && !cands.iter().any(|c| c.0 == cur) {
         cur = 0;
+    }
+    // a menu that takes the focus by itself (`UiNavAuto`): when nothing is focused, the first visible button is
+    if cur == 0 && world.get::<UiNavAuto>(ne).is_some_and(|a| a.enabled) {
+        cur = cands.first().map_or(0, |c| c.0);
     }
     let dirs: [(&str, [f32; 2]); 4] = [("ui_up", [0.0, -1.0]), ("ui_down", [0.0, 1.0]), ("ui_left", [-1.0, 0.0]), ("ui_right", [1.0, 0.0])];
     let want = dirs.iter().find(|(a, _)| pressed(world, a)).map(|(_, d)| *d);

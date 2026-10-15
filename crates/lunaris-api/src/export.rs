@@ -34,24 +34,34 @@ fn collect_strings(j: &Json, out: &mut BTreeSet<String>) {
 /// Sort the strings of a scene into the files of the workspace it uses (`wanted`) and the file names it uses that do not exist (`missing`). A string with a slash that is the path of a
 /// `.json` file without its ending is a language (`Localization.language`: `examples/depths/lang/en`): that file and the other `.json` files of its folder (the other languages) are wanted.
 fn absorb_strings(root: &Path, strings: &BTreeSet<String>, wanted: &mut BTreeSet<String>, missing: &mut BTreeSet<String>) {
-    for s in strings {
-        let Ok(norm) = lunaris_json::safe_relative(s) else { continue };
-        if root.join(&norm).is_file() {
-            wanted.insert(norm);
-        } else if has_asset_extension(&norm) && !norm.contains(' ') {
-            missing.insert(norm);
-        } else if norm.contains('/') && root.join(format!("{norm}.json")).is_file() {
-            let dir = norm.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
-            if let Ok(rd) = std::fs::read_dir(root.join(dir)) {
-                for e in rd.filter_map(|e| e.ok()) {
-                    let n = e.file_name().to_string_lossy().to_string();
-                    if n.ends_with(".json") && e.path().is_file() {
-                        wanted.insert(format!("{dir}/{n}"));
+    for whole in strings {
+        // a `LanguageList.languages` is several language names in one string
+        let pieces: Vec<&str> = if whole.contains(',') { whole.split(',').map(str::trim).collect() } else { vec![whole.as_str()] };
+        for s in pieces {
+            let Ok(norm) = lunaris_json::safe_relative(s) else { continue };
+            if root.join(&norm).is_file() {
+                wanted.insert(norm);
+            } else if has_asset_extension(&norm) && !norm.contains(' ') {
+                missing.insert(norm);
+            } else if norm.contains('/') && root.join(format!("{norm}.json")).is_file() {
+                let dir = norm.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+                if let Ok(rd) = std::fs::read_dir(root.join(dir)) {
+                    for e in rd.filter_map(|e| e.ok()) {
+                        let n = e.file_name().to_string_lossy().to_string();
+                        if n.ends_with(".json") && e.path().is_file() {
+                            wanted.insert(format!("{dir}/{n}"));
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/// The `SceneSwitch.path`s of a scene document.
+fn switch_paths(doc: &Json) -> Vec<String> {
+    let list = doc.get("entities").and_then(|e| e.as_array()).unwrap_or(&[]);
+    list.iter().filter_map(|en| en.get("components")?.get("SceneSwitch")?.get("path")?.as_str().map(str::to_string)).filter(|p| !p.is_empty()).collect()
 }
 
 fn has_asset_extension(s: &str) -> bool {
@@ -119,6 +129,13 @@ impl Engine {
         }
 
         let scene = self.sim.scene_json();
+        // the scenes the game switches to must exist (`check` only warns about a scene file that is not built yet)
+        let mut missing_scenes: BTreeSet<String> = BTreeSet::new();
+        for p in switch_paths(&scene) {
+            if !lunaris_json::safe_relative(&p).is_ok_and(|n| self.root.join(n).is_file()) {
+                missing_scenes.insert(p);
+            }
+        }
         let mut candidates = BTreeSet::new();
         collect_strings(&scene, &mut candidates);
         let mut wanted: BTreeSet<String> = BTreeSet::new();
@@ -138,10 +155,18 @@ impl Engine {
                 if doc.get("entities").is_none() {
                     continue; // a language file, a save, some data: not a scene
                 }
+                for p in switch_paths(&doc) {
+                    if !lunaris_json::safe_relative(&p).is_ok_and(|n| self.root.join(n).is_file()) {
+                        missing_scenes.insert(p);
+                    }
+                }
                 let mut strings = BTreeSet::new();
                 collect_strings(&doc, &mut strings);
                 absorb_strings(&self.root, &strings, &mut wanted, &mut missing);
             }
+        }
+        if let Some(first) = missing_scenes.iter().next().filter(|_| !force) {
+            return Err(EcsError::new("scene_missing", format!("the game switches to {} scene file(s) that do not exist, for example `{first}`", missing_scenes.len())).hint("save that scene (`save_scene`), or pass force: true to export anyway"));
         }
         // the language files of a game with a `Localization`
         let mut languages = 0usize;

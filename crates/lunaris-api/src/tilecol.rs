@@ -3,7 +3,8 @@
 //! navigation and `raycast` see it. Run it again after the map changes: the boxes it made before are removed first. Undoable as one step.
 //!
 //! The boxes are plain entities named `tile collider <uid>`, beside the tilemap (not children), in the plane of the tilemap entity: the map's own rotation and
-//! scale are not used.
+//! scale are not used. They take the numbers after the last entity, unless `first_uid` says where to start (a builder that then spawns entities with numbers of its
+//! own can keep clear of them); a number that is taken is refused before anything is made.
 use crate::engine::{uid_json, Args, Engine};
 use lunaris_ecs::{EcsError, Result};
 use lunaris_json::Json;
@@ -91,6 +92,10 @@ impl Engine {
             Some(_) => return Err(EcsError::new("type_mismatch", "`components` must be an object of extra components for every box, like {\"Ground\":{}}").at("components")),
         };
         let clear = !matches!(a.0.get("clear"), Some(Json::Bool(false)));
+        let first_uid: Option<u64> = match a.0.get("first_uid") {
+            None | Some(Json::Null) => None,
+            Some(v) => Some(v.as_u64().filter(|u| *u > 0).ok_or_else(|| EcsError::new("bad_value", "`first_uid` must be a positive whole number").at("first_uid"))?),
+        };
         let text = self.sim.world.strings().get(map.data.0).to_string();
         let cells: Vec<i64> = text.split(|c: char| c.is_whitespace() || c == ',').filter(|t| !t.is_empty()).map(|t| t.parse::<i64>().unwrap_or(-1)).chain(std::iter::repeat(-1)).take(w * h).collect();
         let is_solid = |x: usize, y: usize| {
@@ -103,6 +108,7 @@ impl Engine {
         let name = format!("tile collider {uid}");
         let mut cmds: Vec<Command> = Vec::new();
         let mut removed = 0usize;
+        let mut old_uids: Vec<u64> = Vec::new();
         if clear {
             let mut named: Vec<(u64, u32)> = Vec::new();
             self.sim.world.for_each_uid::<(&Name,), _>(|_, u, (n,)| named.push((u, n.value.0)))?;
@@ -110,11 +116,21 @@ impl Engine {
             let mut old: Vec<u64> = named.into_iter().filter(|(_, sym)| strings.get(*sym) == name).map(|(u, _)| u).collect();
             old.sort_unstable();
             removed = old.len();
+            old_uids = old.clone();
             cmds.extend(old.into_iter().map(|u| Command::Despawn { uid: u }));
+        }
+        // the numbers asked for must be free (the old boxes, which are removed first, do not count): all or nothing
+        if let Some(first) = first_uid {
+            let last = first.saturating_add((blocks.len() as u64).saturating_sub(1));
+            if let Some(taken) = (first..=last).find(|u| !blocks.is_empty() && !old_uids.contains(u) && self.sim.world.entity(*u).is_some()) {
+                return Err(EcsError::new("duplicate_uid", format!("an entity with uid {taken} already exists, and the {} boxes would take the uids {first} to {last}", blocks.len()))
+                    .at("first_uid")
+                    .hint("choose a `first_uid` with that many free numbers in a row, above your own entities for example, or leave it out"));
+            }
         }
         let round = |v: f64| Json::Float((v * 10_000.0).round() / 10_000.0);
         let tile = map.tile as f64;
-        for b in &blocks {
+        for (i, b) in blocks.iter().enumerate() {
             let (cols, rows) = ((b.x1 - b.x0 + 1) as f64, (b.y1 - b.y0 + 1) as f64);
             let cx = pos[0] as f64 + (b.x0 as f64 + cols / 2.0 - w as f64 / 2.0) * tile;
             let cy = pos[1] as f64 + (h as f64 / 2.0 - b.y0 as f64 - rows / 2.0) * tile;
@@ -129,7 +145,7 @@ impl Engine {
                     None => parts.push((k.clone(), v.clone())),
                 }
             }
-            cmds.push(Command::Spawn { uid: None, components: parts });
+            cmds.push(Command::Spawn { uid: first_uid.map(|f| f + i as u64), components: parts });
         }
         let mut out = Json::obj([("tilemap", uid_json(uid)), ("solid_cells", Json::from(solid_cells)), ("boxes", Json::from(blocks.len())), ("removed", Json::from(removed))]);
         if cmds.is_empty() {

@@ -1398,3 +1398,87 @@ component! {
         pub slip: [f32; 8] = [0.0; 8],
     }
 }
+
+// ------------------------------------------------------------------------------------------------ 2D draw order apart from z
+// A new component for the drawing order of sprites, tile maps, decals and particle clouds (docs/GAMEPLAY.md, "Draw order"). Kept at the end of the file.
+
+component! {
+    /// The drawing order of a `Sprite`, `Tilemap`, `Decal` or `Particles` cloud, **apart from its position** (docs/GAMEPLAY.md, "Draw order"). A 2D thing is drawn far to near by its
+    /// depth along the camera's view, which is its `Transform.pos[2]`, and `z` is also a position in 3D that solid bodies are pushed along: a hero given a bigger `z` than the guards
+    /// to be drawn on top makes every contact push them apart and out of the plane. `layer` is the order and nothing else: things are drawn from the **lowest `layer` to the highest** (the
+    /// highest on top, whatever their `z`), and things with the same `layer` are drawn by depth, then by entity number, as ever. An entity without this component is layer 0, so a
+    /// scene that never uses it is drawn exactly as before (the picture hash of every example is unchanged), and a thing with `layer` 0 is mixed with them by depth. A `Particles`
+    /// cloud without it is drawn after everything else, as ever; with it the cloud takes its place among the sprites (smoke behind the hero, sparks in front). Both renderers
+    /// draw by this order. A `Ui` and a `Text` are the screen's overlay, drawn over the whole picture in their own order (`Ui.layer`), and ignore it (`check` says so). For a top-down game
+    /// set `layer` to minus the entity's y each tick in a graph system so that what stands lower on the screen is in front; for a platformer give the background, the
+    /// ground, the actors and the effects a layer each.
+    pub struct DrawLayer {
+        pub layer: f32 = 0.0,
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ the language from inside a game
+// New component for choosing the language with a number (docs/GAMEPLAY.md, "Languages"; the code is `language.rs`). Kept at the end of the file.
+
+component! {
+    /// The languages a game offers, so that the language can be switched **from a graph system** (docs/GAMEPLAY.md, "Languages"). Put it on the entity that has the `Localization`:
+    /// `languages` is the list, separated by commas and in the order of your menu (`"en, de, fr"`; names as in `Localization.language`, so `"mygame/lang/en, mygame/lang/de"` works).
+    /// The resource **`language.index`** says which one is on (0 is the first): a graph system or a button sets it (`$language.index = 1;`), and every tick, after the graph
+    /// systems, the engine makes `Localization.language` the name at that place (a number out of range goes to the nearest end), so the picture of that very tick is in the new
+    /// language. Until a game sets the resource the language the `Localization` starts with counts, and the resource then says its place in the list. The engine also keeps
+    /// **`language.count`**, the number of languages, so that `language.index = (language.index + 1) mod language.count` cycles. The resources are saved with a saved game and
+    /// carried to the next scene like every other, so the choice stays. A scene without this component is not touched.
+    pub struct LanguageList {
+        pub languages: Sym = Sym(0),
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ menus and scenes: smaller conveniences
+// New components that make focus and scene changes easier without touching `UiNav` or `SceneSwitch` (a new field there would change the state hash of every scene that has them). Kept at the end of the file.
+
+component! {
+    /// Put it beside the `UiNav`: a menu that **takes the focus by itself** (docs/UI.md). Without it `UiNav.current` stays empty until a direction is pressed, so `ui_accept` on a freshly shown
+    /// menu does nothing and a pause menu whose buttons appear loses the focus; with it, whenever no button is focused (at the start, or because the focused one was hidden) the engine focuses the
+    /// visible button with the lowest uid. `enabled` false turns it off again.
+    pub struct UiNavAuto {
+        pub enabled: bool = true,
+    }
+}
+
+component! {
+    /// Beside a `SceneSwitch`: the resources that take **the new scene's value** when the switch happens (docs/GAMEPLAY.md, "Changing scenes"). A switch carries every resource over, and they win over
+    /// the new scene's own defaults, so a scene could not reset anything by declaring it (`paused`, `leave`, `time.scale`, a timer). `resources` names them, separated by spaces or commas
+    /// (`"paused leave time.scale"`; a name ending in `*` is a prefix: `"fx.*"`): each one is what the new scene says it is, and absent (reading 0, or the default of an engine resource such as
+    /// `time.scale`) when the new scene does not say.
+    pub struct SceneReset {
+        pub resources: Sym = Sym(0),
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ the interface on other screens
+// New components so that the interface keeps its shape on a picture that is not the shape it was made for (docs/UI.md, "Other screens"). Kept at the end of the file.
+
+component! {
+    /// Keep the interface in the shape it was made for (docs/UI.md, "Other screens"; one entity, the lowest uid wins). `Ui` and `Text` positions and sizes are fractions of the picture's width and
+    /// height, so on a window that is not the shape the game was designed for a square button turns into a rectangle. With a `UiScale`, `aspect` (width over height, 1.7778 for 16:9, 1.3333
+    /// for 4:3) is the shape the interface was made for, and every `Ui` and `Text` is laid out inside the biggest rectangle of that shape that fits the picture, in its middle (its **safe area**), as if that
+    /// were the whole picture: boxes keep their proportions, the letters keep their size, and what is left over at the sides or at the top and bottom is the picture's own (the world is still drawn
+    /// across all of it). The mouse follows: `input.mouse_x` and `input.mouse_y` are fractions of the safe area (outside 0..1 over the margins), which `lunaris play` does for you. A scene without it
+    /// is drawn exactly as before; a picture of the same shape is drawn exactly as without it. `UiEdge` moves single elements to the edges of the picture.
+    pub struct UiScale {
+        pub aspect: f32 = 1.7778,
+    }
+}
+
+component! {
+    /// Beside a `Ui` or a `Text` when the world has a `UiScale`: where the element sits on a picture that is wider or taller than the safe area (docs/UI.md, "Other screens"). `x` and `y` say which edge of the
+    /// picture it keeps its distance from: 0 the left (top) edge, 1 the right (bottom) edge, 0.5 the middle (the default, which is no `UiEdge` at all): a health bar at the left of the safe area with `x` 0 sits the same
+    /// distance from the left edge of the **picture**, however wide the window. It keeps its size. With `screen` true the element is not in the safe area at all: its `pos` and `size` are fractions of the whole picture
+    /// (a backdrop, a fade, a vignette that must cover the margins too). A pinned or screen element is drawn there but its mouse rectangle stays where the simulation keeps it, so use them for bars and
+    /// backdrops, not buttons.
+    pub struct UiEdge {
+        pub x: f32 = 0.5,
+        pub y: f32 = 0.5,
+        pub screen: bool = false,
+    }
+}

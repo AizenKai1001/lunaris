@@ -34,3 +34,7 @@ mod meshcol_tests;
 mod particle_tests;
 #[cfg(test)]
 mod views_tests;
+#[cfg(test)]
+mod draw_order_tests;
+#[cfg(test)]
+mod ui_scale_tests;

@@ -41,10 +41,17 @@ pub struct Node {
     pub items: Vec<Item>,
 }
 
-/// Is `s` the start of a line of speech, `Name: words`? A name is up to 24 letters, digits, spaces, dots, apostrophes or underscores.
+/// Is `name` a translation key written as a speaker, `{#npc.guard}` (letters, digits, dots, underscores and hyphens between the braces)? The renderer turns it into
+/// the name in the language that is on, like any `{#key}` in a text.
+fn is_key_name(name: &str) -> bool {
+    name.strip_prefix("{#").and_then(|k| k.strip_suffix('}')).is_some_and(|k| !k.is_empty() && k.chars().count() <= 48 && k.chars().all(|c| c.is_alphanumeric() || matches!(c, '.' | '_' | '-')))
+}
+
+/// Is `s` the start of a line of speech, `Name: words`? A name is up to 24 letters, digits, spaces, dots, apostrophes or underscores, or a `{#key}`.
 fn speech(line: &str) -> Option<(&str, &str)> {
     let (name, words) = line.split_once(':')?;
-    let ok = !name.is_empty() && name.chars().count() <= 24 && name.chars().all(|c| c.is_alphanumeric() || matches!(c, ' ' | '.' | '\'' | '_')) && name.trim() == name && words.starts_with(' ');
+    let plain = !name.is_empty() && name.chars().count() <= 24 && name.chars().all(|c| c.is_alphanumeric() || matches!(c, ' ' | '.' | '\'' | '_')) && name.trim() == name;
+    let ok = (plain || is_key_name(name)) && words.starts_with(' ');
     ok.then_some((name, words.trim()))
 }
 

@@ -166,11 +166,35 @@ impl Engine {
     /// Run one tool. Unknown tools and bad arguments return an `EcsError` with a hint. Every tool that is not read-only advances
     /// the revision counter, also when it fails part way.
     pub fn call(&mut self, tool: &str, args: &Json) -> Result<Json> {
-        let out = self.dispatch(tool, args);
+        let out = self.dispatch(tool, args).map_err(|e| self.explain_duplicate_uid(e));
         if !READ_ONLY_TOOLS.contains(&tool) {
             self.revision += 1;
         }
         out
+    }
+
+    /// A `duplicate_uid` error that says who holds the number: the entity's name and, for the boxes of `tilemap_colliders` (they take the numbers after the last entity, so entities
+    /// that a builder spawns afterwards with numbers of its own can clash with them), what to do about it.
+    fn explain_duplicate_uid(&self, mut e: EcsError) -> EcsError {
+        if e.code != "duplicate_uid" {
+            return e;
+        }
+        let Some(uid) = e.message.split_whitespace().find_map(|w| w.parse::<u64>().ok()) else { return e };
+        let w = &self.sim.world;
+        let Some(holder) = w.entity(uid) else { return e };
+        let name_of = |ent| w.get::<lunaris_sim::components::Name>(ent).map(|n| w.strings().get(n.value.0).to_string()).unwrap_or_default();
+        let name = name_of(holder);
+        if let Some(map) = name.strip_prefix("tile collider ") {
+            let last = w.entities_by_uid().into_iter().filter(|ent| name_of(*ent).starts_with("tile collider ")).filter_map(|ent| w.uid_of(ent)).max().unwrap_or(uid);
+            e.message = format!("{} (it is a box named `{name}`, made by the `tilemap_colliders` tool)", e.message);
+            e.hint.get_or_insert_with(|| format!("`tilemap_colliders` gave the boxes of the Tilemap {map} the numbers after the last entity (up to {last}), and an entity made by number clashes with them: use numbers above {last}, or make the boxes with `first_uid` set above everything you will spawn (or after your entities)"));
+        } else if !name.is_empty() {
+            e.message = format!("{} (it is `{name}`)", e.message);
+            e.hint.get_or_insert_with(|| "choose another uid, or leave `uid` out and the engine picks a free one".to_string());
+        } else {
+            e.hint.get_or_insert_with(|| "choose another uid, or leave `uid` out and the engine picks a free one".to_string());
+        }
+        e
     }
 
     fn dispatch(&mut self, tool: &str, args: &Json) -> Result<Json> {

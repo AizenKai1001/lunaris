@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use lunaris_ecs::World;
 use lunaris_render::math::{length, sub, V3};
 use lunaris_render::mesh::Mesh;
-use lunaris_render::render::{gather_scene, MeshRef, RenderOptions, Scene};
+use lunaris_render::render::{gather_scene, MeshRef, RenderOptions, Scene, SceneParticles};
 use lunaris_render::Frame;
 use lunaris_render::texture::Texture;
 use lunaris_render::{font, TextureCache};
@@ -551,6 +551,26 @@ impl GpuRenderer {
         MeshId::Tile(key)
     }
 
+    /// One particle cloud as an object of the list (its quads are in world space already) and the batch that draws it.
+    fn cloud_batch(&mut self, p: &SceneParticles, high: bool, frame: u64, objects: &mut Vec<ObjectData>) -> Batch {
+        let id = self.ensure_mesh(&p.mesh, frame);
+        let tkey = self.texture_group(p.tex.as_ref(), high, SamplerKind::LinearClamp, frame);
+        let data = ObjectData {
+            model: lunaris_render::math::M4::identity().0,
+            n0: [1.0, 0.0, 0.0, 0.0],
+            n1: [0.0, 1.0, 0.0, 0.0],
+            n2: [0.0, 0.0, 1.0, 0.0],
+            color: [1.0; 4],
+            mat: [0.0; 4],
+            misc: [1.0, 1.0, 1.0, 0.0],
+            uvrect: [0.0, 0.0, 1.0, 1.0],
+            ids: [0, 0, 0, 0],
+        };
+        let batch = Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false };
+        objects.push(data);
+        batch
+    }
+
     fn mesh(&self, id: MeshId) -> &GpuMesh {
         match id {
             MeshId::Obj(k) => &self.meshes[&k],
@@ -902,8 +922,14 @@ impl GpuRenderer {
             objects.push(it.data);
         }
         let casters = Casters { spheres: items.iter().filter(|i| i.cast).map(|i| i.sphere).collect() };
-        let mut layer_batches: Vec<Batch> = Vec::new();
-        for l in &scene.layers {
+        // the sprite and tile layers in drawing order; a particle cloud with a `DrawLayer` stands among them (each step names the pipeline that draws it)
+        let mut layer_steps: Vec<(PipeId, Batch)> = Vec::new();
+        let mut among = scene.particles.iter().filter(|p| p.slot.is_some()).peekable();
+        for (i, l) in scene.layers.iter().enumerate() {
+            while let Some(p) = among.next_if(|p| p.slot.is_some_and(|s| s <= i)) {
+                let batch = self.cloud_batch(p, high, frame_no, &mut objects);
+                layer_steps.push((if p.additive { PipeId::ParticleAdd } else { PipeId::Particle }, batch));
+            }
             slots.push(l.uid);
             let id = if l.mesh_key != 0 { self.ensure_tile_mesh(&l.mesh, l.mesh_key, frame_no) } else { self.ensure_mesh(&l.mesh, frame_no) };
             let tkey = self.texture_group(l.tex.as_ref(), high, SamplerKind::NearestClamp, frame_no);
@@ -920,32 +946,22 @@ impl GpuRenderer {
                 uvrect: l.uv,
                 ids: [slots.len() as u32, 0, 0, 0],
             };
-            let same = layer_batches.last().is_some_and(|b| b.mesh == id && b.tex == tkey);
+            let same = matches!(layer_steps.last(), Some((PipeId::Sprite, b)) if b.mesh == id && b.tex == tkey);
             if same {
-                layer_batches.last_mut().expect("checked").count += 1;
+                layer_steps.last_mut().expect("checked").1.count += 1;
             } else {
-                layer_batches.push(Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false });
+                layer_steps.push((PipeId::Sprite, Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false }));
             }
             objects.push(data);
         }
-        // particle clouds: one object each (the quads are in world space already), alpha-blended ones first, then the added light
+        for p in among {
+            let batch = self.cloud_batch(p, high, frame_no, &mut objects);
+            layer_steps.push((if p.additive { PipeId::ParticleAdd } else { PipeId::Particle }, batch));
+        }
+        // the other particle clouds: one object each (the quads are in world space already), after everything, alpha-blended ones first, then the added light
         let (mut particle_alpha, mut particle_add): (Vec<Batch>, Vec<Batch>) = (Vec::new(), Vec::new());
-        for p in &scene.particles {
-            let id = self.ensure_mesh(&p.mesh, frame_no);
-            let tkey = self.texture_group(p.tex.as_ref(), high, SamplerKind::LinearClamp, frame_no);
-            let data = ObjectData {
-                model: lunaris_render::math::M4::identity().0,
-                n0: [1.0, 0.0, 0.0, 0.0],
-                n1: [0.0, 1.0, 0.0, 0.0],
-                n2: [0.0, 0.0, 1.0, 0.0],
-                color: [1.0; 4],
-                mat: [0.0; 4],
-                misc: [1.0, 1.0, 1.0, 0.0],
-                uvrect: [0.0, 0.0, 1.0, 1.0],
-                ids: [0, 0, 0, 0],
-            };
-            let batch = Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false };
-            objects.push(data);
+        for p in scene.particles.iter().filter(|p| p.slot.is_none()) {
+            let batch = self.cloud_batch(p, high, frame_no, &mut objects);
             if p.additive {
                 particle_add.push(batch);
             } else {
@@ -1133,10 +1149,10 @@ impl GpuRenderer {
         }
         self.need(PipeId::Mesh, samples, None)?;
         self.need(PipeId::Sprite, samples, None)?;
-        if !particle_alpha.is_empty() {
+        if !particle_alpha.is_empty() || layer_steps.iter().any(|s| s.0 == PipeId::Particle) {
             self.need(PipeId::Particle, samples, None)?;
         }
-        if !particle_add.is_empty() {
+        if !particle_add.is_empty() || layer_steps.iter().any(|s| s.0 == PipeId::ParticleAdd) {
             self.need(PipeId::ParticleAdd, samples, None)?;
         }
         if have_clear {
@@ -1321,7 +1337,14 @@ impl GpuRenderer {
                 draw_batches(&mut pass, &clear_batches, false, true);
             }
             pass.set_pipeline(self.pipe(PipeId::Sprite, samples, None));
-            draw_batches(&mut pass, &layer_batches, false, true);
+            let mut current = PipeId::Sprite;
+            for (pipe, batch) in &layer_steps {
+                if *pipe != current {
+                    pass.set_pipeline(self.pipe(*pipe, samples, None));
+                    current = *pipe;
+                }
+                draw_batches(&mut pass, std::slice::from_ref(batch), false, true);
+            }
             if !particle_alpha.is_empty() {
                 pass.set_pipeline(self.pipe(PipeId::Particle, samples, None));
                 draw_batches(&mut pass, &particle_alpha, false, true);
@@ -1402,7 +1425,9 @@ impl GpuRenderer {
                 draw_batches(&mut pass, &mesh_batches, false, true);
                 draw_batches(&mut pass, &clear_batches, false, true);
                 pass.set_pipeline(self.pipe(PipeId::IdSprite, 1, None));
-                draw_batches(&mut pass, &layer_batches, false, true);
+                for (_, batch) in layer_steps.iter().filter(|s| s.0 == PipeId::Sprite) {
+                    draw_batches(&mut pass, std::slice::from_ref(batch), false, true);
+                }
                 if n_id_verts > 0 {
                     pass.set_pipeline(self.pipe(PipeId::IdText, 1, None));
                     pass.set_bind_group(0, &self.text_bg, &[]);

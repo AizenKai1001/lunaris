@@ -152,3 +152,30 @@ fn the_script_language_reports_what_is_wrong() {
         assert!(e.to_lowercase().contains(&word.to_lowercase()), "{bad:?}: {e}");
     }
 }
+
+#[test]
+fn a_speaker_may_be_a_translation_key_and_the_screen_gets_the_key_as_written() {
+    use crate::dialogue::Item;
+    let nodes = parse_dialogue("== start
+{#npc.guard}: Halt!
+{score}: five
+Short: ok
+A name that is far too long to be one: no
+{#bad key}: x
+{#npc.guard}:no space
+-> end").unwrap();
+    let says: Vec<(String, String)> = nodes[0].items.iter().filter_map(|i| if let Item::Say { speaker, text } = i { Some((speaker.clone(), text.clone())) } else { None }).collect();
+    let want = [("{#npc.guard}", "Halt!"), ("", "{score}: five"), ("Short", "ok"), ("", "A name that is far too long to be one: no"), ("", "{#bad key}: x"), ("", "{#npc.guard}:no space")];
+    assert_eq!(says, want.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect::<Vec<_>>());
+    // on the screen it is the text as written: the renderer makes it the name of the language that is on
+    let mut s = Sim::new(1);
+    let script = Json::Str("== start
+{#npc.guard}: {#npc.hello}
+-> end".to_string()).to_string_lossy();
+    spawn(&mut s, 1, &format!(r#"{{"Dialogue":{{"script":{script},"text_ui":2,"speaker_ui":3}}}}"#));
+    spawn(&mut s, 2, r#"{"Text":{"value":"","visible":false}}"#);
+    spawn(&mut s, 3, r#"{"Text":{"value":"","visible":false}}"#);
+    set(&mut s, "Dialogue", r#"{"active":true}"#);
+    s.step();
+    assert_eq!((shown(&s, 3).as_deref(), shown(&s, 2).as_deref()), (Some("{#npc.guard}"), Some("{#npc.hello}")));
+}

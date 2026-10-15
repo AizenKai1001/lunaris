@@ -6,7 +6,7 @@ use crate::math::*;
 use crate::render::{SceneRect, SceneText, UiImage};
 use crate::texture::TextureCache;
 use lunaris_ecs::{Sym, World};
-use lunaris_sim::components::{Text, Transform, Ui, UiAnchor, UiStyle};
+use lunaris_sim::components::{Text, Transform, Ui, UiAnchor, UiEdge, UiStyle};
 use std::collections::BTreeMap;
 
 /// The `TextFont` of an entity.
@@ -25,6 +25,19 @@ pub(crate) struct UiData<'a> {
     pub anchors: BTreeMap<u64, UiAnchor>,
     /// Entities that have a `CameraView`: a `Ui` among them shows its own view.
     pub views: std::collections::BTreeSet<u64>,
+    /// The shape the interface was made for (`UiScale.aspect`), when the world has one: the elements are laid out in the safe area of that shape.
+    pub scale: Option<f32>,
+    /// `UiEdge`: elements pinned to an edge of the picture, or laid out over the whole of it.
+    pub edges: BTreeMap<u64, UiEdge>,
+}
+
+/// The rectangle of the picture, in pixels, that an element's own fractions (0..1) span.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct Frame {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
 }
 
 /// Where a point of the world is in the picture, as fractions from the top left; `None` behind the camera.
@@ -145,6 +158,30 @@ fn fill_text(world: &World, say: &dyn Fn(String) -> String, template: &str) -> S
 pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4, pw: f32, ph: f32, data: &UiData<'_>, say: &dyn Fn(String) -> String) -> (Vec<SceneRect>, Vec<SceneText>) {
     let mut rects: Vec<SceneRect> = Vec::new();
     let mut texts: Vec<SceneText> = Vec::new();
+    // with a `UiScale` an element is laid out in the safe area of the shape the interface was made for (or at an edge of the picture, or over all of it): `frame_of` says which rectangle of
+    // the picture its fractions span, the layout below works in that rectangle as if it were the whole picture, and the result is mapped back at the end
+    let (full_w, full_h) = (pw, ph);
+    let full = Frame { x: 0.0, y: 0.0, w: full_w, h: full_h };
+    let area = data.scale.map(|a| lunaris_sim::ui_kit::safe_area(a, pw as u32, ph as u32)).filter(|a| *a != (0, 0, pw as u32, ph as u32));
+    let frame_of = |uid: u64| -> Frame {
+        let Some((ax, ay, aw, ah)) = area else { return full };
+        let edge = data.edges.get(&uid);
+        if edge.is_some_and(|e| e.screen) {
+            return full;
+        }
+        let (left, top) = (ax as f32, ay as f32);
+        let (right, bottom) = (full_w - (ax + aw) as f32, full_h - (ay + ah) as f32);
+        // pinned to an edge: the margin on that side is taken away from the front (x or y of 0), or all of it is put in front (1)
+        let place = |pin: f32, before: f32, after: f32| if pin.is_finite() && pin != 0.5 { pin.clamp(0.0, 1.0) * (before + after) } else { before };
+        let (x, y) = match edge {
+            Some(e) => (place(e.x, left, right), place(e.y, top, bottom)),
+            None => (left, top),
+        };
+        Frame { x, y, w: aw as f32, h: ah as f32 }
+    };
+    let mut frames: BTreeMap<u64, Frame> = BTreeMap::new();
+    // a point of the whole picture (fractions) as fractions of a frame
+    let in_frame = |f: &Frame, sx: f32, sy: f32| ((sx * full_w - f.x) / f.w, (sy * full_h - f.y) / f.h);
     let sym = |s: Sym| world.strings().get(s.0).to_string();
     // texts first (the order they have always been drawn in), their letters go over every rectangle at the end
     let mut text_quads: Vec<SceneRect> = Vec::new();
@@ -157,9 +194,15 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
         if template.is_empty() {
             continue;
         }
+        let f = frame_of(*uid);
+        let (pw, ph) = (f.w, f.h);
+        if f != full {
+            frames.insert(*uid, f);
+        }
         if let Some(a) = data.anchors.get(uid) {
             let Some((sx, sy)) = anchor_screen(world, view_proj, a) else { continue };
-            tx.pos = [sx, sy];
+            let (fx, fy) = in_frame(&f, sx, sy);
+            tx.pos = [fx, fy];
         }
         let text = fill_text(world, say, &template);
         if let Some(spec) = data.fonts.get(uid) {
@@ -179,9 +222,15 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
         if !u.visible || !u.size[0].is_finite() || !u.size[1].is_finite() || !u.pos[0].is_finite() || !u.pos[1].is_finite() {
             continue;
         }
+        let f = frame_of(*uid);
+        let (pw, ph) = (f.w, f.h);
+        if f != full {
+            frames.insert(*uid, f);
+        }
         if let Some(a) = data.anchors.get(uid) {
             let Some((sx, sy)) = anchor_screen(world, view_proj, a) else { continue };
-            u.pos = [sx - u.size[0] * 0.5, sy - u.size[1] * 0.5];
+            let (fx, fy) = in_frame(&f, sx, sy);
+            u.pos = [fx - u.size[0] * 0.5, fy - u.size[1] * 0.5];
         }
         let style = data.styles.get(uid).copied().or_else(|| data.views.contains(uid).then(UiStyle::default));
         let (x0, y0, x1, y1) = (u.pos[0], u.pos[1], u.pos[0] + u.size[0], u.pos[1] + u.size[1]);
@@ -276,5 +325,21 @@ pub(crate) fn gather(world: &World, textures: &mut TextureCache, view_proj: &M4,
         }
     }
     rects.extend(text_quads);
+    // back from the frames the elements were laid out in to fractions of the whole picture (the sizes that are fractions of a height follow the frame's height)
+    if !frames.is_empty() {
+        let (mx, my) = (|f: &Frame, x: f32| (f.x + x * f.w) / full_w, |f: &Frame, y: f32| (f.y + y * f.h) / full_h);
+        for r in rects.iter_mut() {
+            if let Some(f) = frames.get(&r.uid) {
+                (r.x0, r.x1, r.y0, r.y1) = (mx(f, r.x0), mx(f, r.x1), my(f, r.y0), my(f, r.y1));
+                r.radius *= f.h / full_h;
+            }
+        }
+        for t in texts.iter_mut() {
+            if let Some(f) = frames.get(&t.uid) {
+                t.tx.pos = [mx(f, t.tx.pos[0]), my(f, t.tx.pos[1])];
+                t.tx.size *= f.h / full_h;
+            }
+        }
+    }
     (rects, texts)
 }

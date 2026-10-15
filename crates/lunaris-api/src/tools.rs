@@ -215,6 +215,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
                 ("components", Json::obj([("type", Json::str("object")), ("description", Json::str("Extra components for every box, like {\"Ground\":{}}."))])),
                 ("depth", Json::obj([("type", Json::str("number")), ("description", Json::str("Size of the boxes across the map (default: the tile size)."))])),
                 ("clear", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Remove the boxes this tool made for this map before (default true)."))])),
+                ("first_uid", Json::obj([("type", Json::str("integer")), ("description", Json::str("Give the boxes the uids first_uid, first_uid + 1, ... (all must be free, or nothing is made). Without it they take the numbers after the last entity, which a builder that spawns entities with its own numbers afterwards can clash with: pick a number above everything you will spawn, or make the boxes last."))])),
             ],
             &["uid"],
         ),

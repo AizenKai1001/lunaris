@@ -435,6 +435,7 @@ impl Sim {
         stage!("input actions", crate::gameplay::actions(&mut self.world));
         stage!("interface widgets", crate::ui_kit::update(&mut self.world, self.tick));
         stage!("graph systems (all)", graph::run_all(&mut self.world, &mut self.scripts, &self.contacts, self.tick, dt, self.seed, self.threads));
+        stage!("language", crate::language::update(&mut self.world));
         if let Some(p) = prof.as_mut() {
             for s in self.scripts.systems.iter().filter(|s| s.enabled) {
                 p.add(&format!("graph system {}", s.name), s.last_ms);
@@ -815,6 +816,12 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<ConvexCollider>().expect("standard component");
     world.register_native::<CollisionLayer>().expect("standard component");
     world.register_native::<Vehicle>().expect("standard component");
+    world.register_native::<crate::components::DrawLayer>().expect("standard component");
+    world.register_native::<crate::components::LanguageList>().expect("standard component");
+    world.register_native::<crate::components::UiNavAuto>().expect("standard component");
+    world.register_native::<crate::components::SceneReset>().expect("standard component");
+    world.register_native::<crate::components::UiScale>().expect("standard component");
+    world.register_native::<crate::components::UiEdge>().expect("standard component");
 }
 
 impl RecordedRead {

@@ -9,7 +9,7 @@ use crate::math::*;
 use crate::mesh::{builtin, Mesh};
 use crate::texture::{Texture, TextureCache};
 use lunaris_ecs::{EcsError, Result, World};
-use lunaris_sim::components::{Water, AnimLayers, Animator, Camera, Environment, Joint, Light, Localization, MeshRenderer, Sprite, Terrain, CameraView, Decal, Ik, Parallax, Particles, Text, TextFont, Tilemap, Transform, Ui, UiAnchor, UiStyle};
+use lunaris_sim::components::{Water, AnimLayers, Animator, Camera, DrawLayer, Environment, Joint, Light, Localization, MeshRenderer, Sprite, Terrain, CameraView, Decal, Ik, Parallax, Particles, Text, TextFont, Tilemap, Transform, Ui, UiAnchor, UiEdge, UiStyle};
 use lunaris_sim::detmath;
 use std::sync::Arc;
 
@@ -646,6 +646,29 @@ pub struct SceneParticles {
     pub mesh: MeshRef,
     pub tex: Option<Arc<Texture>>,
     pub additive: bool,
+    /// `None`: drawn after every layer, in entity order (a cloud without a `DrawLayer`). `Some(k)`: the cloud has a `DrawLayer` and is
+    /// drawn among the layers, after the first `k` of `Scene::layers` and before the rest; the clouds with a slot come last in
+    /// `Scene::particles`, in the order they are drawn (so slots never go down).
+    pub slot: Option<usize>,
+    /// Where the cloud comes in the drawing order (`Some` exactly when `slot` is).
+    pub key: Option<DrawKey>,
+}
+
+/// Where a sprite, tile map or particle cloud comes in the drawing order: its `DrawLayer` (0 for an entity that has none), then its depth along the
+/// view (negative in front of the camera, so the far things come first), then its entity number.
+#[derive(Clone, Copy, Debug)]
+pub struct DrawKey {
+    pub layer: f32,
+    pub depth: f32,
+    pub uid: u64,
+}
+
+impl DrawKey {
+    /// The drawing order: lower first, so what compares greater is drawn later, on top.
+    pub fn cmp_order(&self, other: &DrawKey) -> std::cmp::Ordering {
+        use std::cmp::Ordering::Equal;
+        self.layer.partial_cmp(&other.layer).unwrap_or(Equal).then(self.depth.partial_cmp(&other.depth).unwrap_or(Equal)).then(self.uid.cmp(&other.uid))
+    }
 }
 
 /// A shape of the on-screen interface (`Ui`, and the letters of TrueType text), in fractions of the picture, drawn over the 3D picture and under the
@@ -1020,7 +1043,14 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         Sprite(Sprite, Transform),
         Tiles(Tilemap, Transform, Arc<Mesh>, u64),
     }
-    let mut layers: Vec<(f32, u64, Layer)> = Vec::new();
+    let mut layers: Vec<(DrawKey, Layer)> = Vec::new();
+    // `DrawLayer`: the drawing order apart from the position (an entity without it is layer 0, so a scene that has none is sorted as it always was)
+    let mut draw_layers: std::collections::BTreeMap<u64, f32> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&DrawLayer,), _>(|_, uid, (d,)| {
+        if d.layer.is_finite() {
+            draw_layers.insert(uid, d.layer);
+        }
+    })?;
     // parallax: a layer is drawn shifted against the camera's movement, as if it lay at another depth
     let mut parallax: std::collections::BTreeMap<u64, Parallax> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&Parallax,), _>(|_, uid, (p,)| {
@@ -1058,9 +1088,10 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         }
         t
     };
+    let draw_key = |uid: u64, t: &Transform| DrawKey { layer: draw_layers.get(&uid).copied().unwrap_or(0.0), depth: view.transform_point(t.pos)[2], uid }; // depth is negative in front of the camera
     for (uid, s, t) in sprites_raw.into_iter().filter(|(_, s, _)| s.visible) {
         let t = shifted(uid, t);
-        layers.push((view.transform_point(t.pos)[2], uid, Layer::Sprite(s, t))); // z is negative in front of the camera
+        layers.push((draw_key(uid, &t), Layer::Sprite(s, t)));
     }
     for (uid, m, t) in tilemaps_raw.into_iter().filter(|(_, m, _)| m.visible) {
         let t = shifted(uid, t);
@@ -1070,11 +1101,12 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             continue;
         }
         let key = tile_key(&m, &data);
-        layers.push((view.transform_point(t.pos)[2], uid, Layer::Tiles(m, t, Arc::new(mesh), key)));
+        layers.push((draw_key(uid, &t), Layer::Tiles(m, t, Arc::new(mesh), key)));
     }
-    layers.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.cmp(&b.1)));
+    layers.sort_by(|a, b| a.0.cmp_order(&b.0));
+    let layer_keys: Vec<DrawKey> = layers.iter().map(|l| l.0).collect();
     let mut layer_tex: Vec<Option<Arc<Texture>>> = Vec::with_capacity(layers.len());
-    for (_, _, l) in &layers {
+    for (_, l) in &layers {
         let sym = match l {
             Layer::Sprite(s, _) => s.texture.0,
             Layer::Tiles(m, _, _, _) => m.texture.0,
@@ -1307,7 +1339,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         });
     }
     let mut scene_layers: Vec<SceneLayer> = Vec::with_capacity(layers.len());
-    for ((_, uid, layer), tex) in layers.into_iter().zip(layer_tex) {
+    for ((key, layer), tex) in layers.into_iter().zip(layer_tex) {
+        let uid = key.uid;
         match layer {
             Layer::Sprite(s, tr) => scene_layers.push(SceneLayer {
                 uid,
@@ -1353,7 +1386,15 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     world.for_each_uid::<(&CameraView,), _>(|_, uid, _| {
         views.insert(uid);
     })?;
-    let data = crate::ui::UiData { uis: &uis_raw, texts: &texts_raw, styles, fonts, anchors, views };
+    // the shape the interface was made for (`UiScale`, the lowest uid counts), and the elements pinned to an edge of the picture (`UiEdge`)
+    let scale = lunaris_sim::ui_kit::ui_scale_aspect(world);
+    let mut edges: std::collections::BTreeMap<u64, UiEdge> = Default::default();
+    if scale.is_some() {
+        world.for_each_uid::<(&UiEdge,), _>(|_, uid, (e,)| {
+            edges.insert(uid, *e);
+        })?;
+    }
+    let data = crate::ui::UiData { uis: &uis_raw, texts: &texts_raw, styles, fonts, anchors, views, scale, edges };
     // a picture drawn for a `CameraView` has no interface
     let (scene_rects, scene_texts) = if textures.nested { (Vec::new(), Vec::new()) } else { crate::ui::gather(world, textures, &view_proj, pw, ph, &data, &say) };
     let mut font_warnings = std::mem::take(&mut textures.fonts.warnings);
@@ -1387,8 +1428,18 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             if mesh.pos.is_empty() {
                 continue;
             }
-            scene_particles.push(SceneParticles { uid: *uid, mesh: MeshRef::Dynamic { key: *uid, mesh: Arc::new(mesh) }, tex: Some(tex), additive: p.additive });
+            // a cloud with a `DrawLayer` takes its place among the sprites and tile maps: after the layers whose key comes before its own
+            let slot = draw_layers.contains_key(uid).then(|| {
+                let key = draw_key(*uid, tr);
+                (key, layer_keys.partition_point(|k| k.cmp_order(&key) == std::cmp::Ordering::Less))
+            });
+            scene_particles.push(SceneParticles { uid: *uid, mesh: MeshRef::Dynamic { key: *uid, mesh: Arc::new(mesh) }, tex: Some(tex), additive: p.additive, slot: slot.map(|s| s.1), key: slot.map(|s| s.0) });
         }
+        // the clouds that stay on top of everything (in entity order, as ever) first, then the ones among the layers in drawing order
+        let (mut among, mut on_top): (Vec<SceneParticles>, Vec<SceneParticles>) = scene_particles.drain(..).partition(|p| p.slot.is_some());
+        among.sort_by(|a, b| a.key.zip(b.key).map_or(std::cmp::Ordering::Equal, |(x, y)| x.cmp_order(&y)));
+        on_top.append(&mut among);
+        scene_particles = on_top;
     }
     Ok(Scene { cam, view, proj, view_proj, lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, warnings })
 }
@@ -1418,15 +1469,25 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
         let rows = screen_rows(mesh, &mvp_of(&m.model), rh);
         draws.push(Draw { uid: m.uid, rows, kind: DrawKind::Mesh { mesh, model: m.model, color: m.color, shininess: m.shininess, emissive: m.emissive, tex: m.tex.as_deref(), uv_scale: m.uv_scale } });
     }
-    for l in &scene.layers {
+    fn cloud<'a>(p: &'a SceneParticles, view_proj: &M4, rh: usize) -> Draw<'a> {
+        let mesh = p.mesh.get();
+        Draw { uid: p.uid, rows: screen_rows(mesh, view_proj, rh), kind: DrawKind::Particles { mesh, tex: p.tex.as_deref(), additive: p.additive } }
+    }
+    // the sprites and tile maps in drawing order, with the clouds that have a `DrawLayer` between them; the other clouds come after all of it
+    let mut among = scene.particles.iter().filter(|p| p.slot.is_some()).peekable();
+    for (i, l) in scene.layers.iter().enumerate() {
+        while let Some(p) = among.next_if(|p| p.slot.is_some_and(|s| s <= i)) {
+            draws.push(cloud(p, &view_proj, rh));
+        }
         let mesh = l.mesh.get();
         let rows = screen_rows(mesh, &mvp_of(&l.model), rh);
         draws.push(Draw { uid: l.uid, rows, kind: DrawKind::Sprite { mesh, model: l.model, color: l.color, tex: l.tex.as_deref(), uv: l.uv } });
     }
-    for p in &scene.particles {
-        let mesh = p.mesh.get();
-        let rows = screen_rows(mesh, &view_proj, rh);
-        draws.push(Draw { uid: p.uid, rows, kind: DrawKind::Particles { mesh, tex: p.tex.as_deref(), additive: p.additive } });
+    for p in among {
+        draws.push(cloud(p, &view_proj, rh));
+    }
+    for p in scene.particles.iter().filter(|p| p.slot.is_none()) {
+        draws.push(cloud(p, &view_proj, rh));
     }
     for r in &scene.rects {
         draws.push(Draw { uid: r.uid, rows: None, kind: DrawKind::Rect(r) });
