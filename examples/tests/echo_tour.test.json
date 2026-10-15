@@ -1,0 +1,18 @@
+{
+  "name": "Echo tour: the listener walks east at 3 m/s through the bathroom, the living room, the hall and out into the courtyard, and stops there",
+  "scene": "examples/echo_tour.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "step": 60 },
+    { "expect": { "resource": "x", "approx": [3, 0.6], "message": "one second at 3 m/s from x = 1 (the resource is the floor of the position of the tick before)" } },
+    { "expect": { "name": "Camera", "field": "Transform.pos[0]", "approx": [4, 0.05] } },
+    { "step": 240 },
+    { "expect": { "resource": "x", "approx": [16, 0.6], "message": "past the living room, in the hall" } },
+    { "step": 720 },
+    { "expect": { "name": "Camera", "field": "Transform.pos[0]", "approx": [52, 0.01], "message": "the walk ends in the courtyard at x = 52 after 17 seconds" } },
+    { "step": 60 },
+    { "expect": { "name": "Camera", "field": "Transform.pos[0]", "approx": [52, 0.01], "message": "and it stays there" } }
+  ]
+}

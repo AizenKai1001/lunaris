@@ -1,0 +1,29 @@
+{
+  "name": "Orb Dash: a complete level, WASD moves the ball, orbs are collected, the clock runs",
+  "scene": "examples/orb_dash.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "note": "the level as built" },
+    { "expect": { "count": { "with": ["Orb"] }, "eq": 12, "message": "twelve orbs to collect" } },
+    { "expect": { "resource": "score", "eq": 0 } },
+    { "expect": { "resource": "time_left", "eq": 45 } },
+    { "expect": { "check": "errors", "eq": 0, "message": "the checker finds nothing wrong" } },
+    { "expect": { "name": "Player", "field": "Transform.pos[0]", "approx": [0, 0.001] } },
+
+    { "note": "hold D for one second: the ball rolls right and picks up the first orb on its way" },
+    { "input": { "d": true } },
+    { "step": 60 },
+    { "expect": { "resource": "player.x", "between": [5, 6.5] } },
+    { "expect": { "resource": "score", "ge": 1 } },
+    { "expect": { "events": "coin", "ge": 1, "message": "picking an orb up makes the coin sound" } },
+    { "input": { "d": false } },
+
+    { "note": "the clock keeps running" },
+    { "until": { "resource": "time_left", "le": 40, "max_ticks": 400 } },
+    { "expect": { "resource": "time_left", "between": [39.9, 40.0] } },
+
+    { "note": "the tools refuse nonsense with a stable code" },
+    { "call": { "tool": "spawn", "args": { "components": { "Transfrom": {} } }, "error": "unknown_component" } }
+  ]
+}

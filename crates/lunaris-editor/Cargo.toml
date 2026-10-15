@@ -1,0 +1,13 @@
+[package]
+name = "lunaris-editor"
+description = "A browser-based editor for Lunaris: a tiny local web server that bridges one HTML page to the engine's tool API."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-api = { path = "../lunaris-api" }
+
+[lints]
+workspace = true

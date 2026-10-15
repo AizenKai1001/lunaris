@@ -1,0 +1,377 @@
+{
+  "lunaris": 1,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "rot": [
+            -0.5,
+            0.3,
+            0.1,
+            0.8
+          ]
+        },
+        "Light": {
+          "kind": 0,
+          "color": [
+            1.0,
+            0.95,
+            0.85
+          ],
+          "intensity": 2.0
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Name": {
+          "value": "Yard"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            24,
+            1,
+            24
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "plane",
+          "color": [
+            0.35,
+            0.5,
+            0.35,
+            1
+          ],
+          "shininess": 8
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Name": {
+          "value": "Crate"
+        },
+        "Transform": {
+          "pos": [
+            -1.5,
+            0.5,
+            0
+          ],
+          "rot": [
+            0,
+            0.26,
+            0,
+            0.97
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9,
+            0.55,
+            0.2,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Name": {
+          "value": "Ball"
+        },
+        "Transform": {
+          "pos": [
+            1.2,
+            0.6,
+            1.0
+          ],
+          "scale": [
+            1.2,
+            1.2,
+            1.2
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2,
+            0.5,
+            0.95,
+            1
+          ],
+          "shininess": 48
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Name": {
+          "value": "Post"
+        },
+        "Transform": {
+          "pos": [
+            3.0,
+            1.0,
+            -1.5
+          ],
+          "scale": [
+            0.5,
+            2.0,
+            0.5
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.85,
+            0.2,
+            0.25,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Name": {
+          "value": "Main camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            4.5,
+            11
+          ],
+          "rot": [
+            -0.10173027952817211,
+            0.06735909663927936,
+            0.006904207252881693,
+            0.9925049290805912
+          ]
+        },
+        "Camera": {
+          "fov_y": 55,
+          "clear": [
+            0.45,
+            0.6,
+            0.8,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Name": {
+          "value": "Security camera"
+        },
+        "Transform": {
+          "pos": [
+            7,
+            3.0,
+            6
+          ],
+          "rot": [
+            -0.12575647697759723,
+            0.397276141450667,
+            0.05506011321761661,
+            0.9073727788867793
+          ]
+        },
+        "Camera": {
+          "active": false,
+          "fov_y": 60,
+          "clear": [
+            0.1,
+            0.1,
+            0.12,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Name": {
+          "value": "Map camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            40,
+            0
+          ],
+          "rot": [
+            -0.7071068,
+            0,
+            0,
+            0.7071068
+          ]
+        },
+        "Camera": {
+          "active": false,
+          "ortho": true,
+          "ortho_height": 14,
+          "clear": [
+            0.1,
+            0.35,
+            0.15,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Name": {
+          "value": "Monitor view"
+        },
+        "CameraView": {
+          "camera": 7,
+          "width": 160,
+          "height": 120
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Name": {
+          "value": "Monitor"
+        },
+        "Transform": {
+          "pos": [
+            -6.5,
+            3.3,
+            0
+          ],
+          "scale": [
+            4.0,
+            3.0,
+            1.0
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "quad",
+          "texture": "view:9",
+          "emissive": 0.9,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Name": {
+          "value": "Monitor frame"
+        },
+        "Transform": {
+          "pos": [
+            -6.5,
+            3.3,
+            -0.08
+          ],
+          "scale": [
+            4.4,
+            3.4,
+            1.0
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "quad",
+          "color": [
+            0.08,
+            0.08,
+            0.1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Name": {
+          "value": "Minimap"
+        },
+        "Ui": {
+          "pos": [
+            0.76,
+            0.04
+          ],
+          "size": [
+            0.21,
+            0.37
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "border": 0.004,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "CameraView": {
+          "camera": 8,
+          "width": 128,
+          "height": 128
+        },
+        "UiStyle": {
+          "radius": 0.02
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Name": {
+          "value": "Monitor label"
+        },
+        "Text": {
+          "value": "CAM 2",
+          "pos": [
+            0.04,
+            0.05
+          ],
+          "size": 0.06,
+          "color": [
+            1,
+            0.3,
+            0.3,
+            1
+          ],
+          "shadow": true
+        }
+      }
+    }
+  ]
+}

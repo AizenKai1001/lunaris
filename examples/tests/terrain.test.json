@@ -1,0 +1,172 @@
+{
+  "name": "Terrain: balls come to rest on the meadow (15 m up, level ground), a ball on a steep slope rolls away, the hero stands on the ground and walks across it",
+  "scene": "examples/terrain.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 240
+    },
+    {
+      "expect": {
+        "name": "Ball 1",
+        "field": "Transform.pos[1]",
+        "approx": [
+          25.7,
+          0.06
+        ],
+        "message": "ball 1 lies on the meadow: the ground is 25.200 m up, the ball 0.5 m across its middle"
+      }
+    },
+    {
+      "expect": {
+        "name": "Ball 2",
+        "field": "Transform.pos[1]",
+        "approx": [
+          25.7,
+          0.06
+        ],
+        "message": "ball 2 lies on the meadow: the ground is 25.200 m up, the ball 0.5 m across its middle"
+      }
+    },
+    {
+      "expect": {
+        "name": "Ball 3",
+        "field": "Transform.pos[1]",
+        "approx": [
+          25.7,
+          0.06
+        ],
+        "message": "ball 3 lies on the meadow: the ground is 25.200 m up, the ball 0.5 m across its middle"
+      }
+    },
+    {
+      "expect": {
+        "name": "Ball 4",
+        "field": "Transform.pos[1]",
+        "approx": [
+          25.7,
+          0.06
+        ],
+        "message": "ball 4 lies on the meadow: the ground is 25.200 m up, the ball 0.5 m across its middle"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rolling ball",
+        "field": "Transform.pos[1]",
+        "lt": 40.391,
+        "message": "the ball set on a steep slope rolled down it"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "CharacterBody.grounded",
+        "eq": true,
+        "message": "the hero stands on the ground"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[1]",
+        "approx": [
+          25.2,
+          0.03
+        ],
+        "message": "with its feet on the meadow"
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 150
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "CharacterBody.grounded",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "between": [
+          10.0,
+          16.0
+        ],
+        "message": "walked east for 2.5 s at 6 m/s"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[1]",
+        "between": [
+          3.19,
+          31.854
+        ],
+        "message": "and is still on the ground"
+      }
+    },
+    {
+      "input": {
+        "d": false,
+        "a": true
+      }
+    },
+    {
+      "step": 150
+    },
+    {
+      "input": {
+        "a": false,
+        "s": true
+      }
+    },
+    {
+      "step": 480
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "CharacterBody.grounded",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[2]",
+        "between": [
+          40.0,
+          60.0
+        ],
+        "message": "walked 8 s towards +z, up the rim of the meadow's bowl (about 20 degrees)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[1]",
+        "between": [
+          21.73,
+          23.622
+        ],
+        "message": "and climbed with the ground to 21.8 m or more"
+      }
+    }
+  ]
+}

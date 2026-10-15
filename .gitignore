@@ -1,0 +1,12 @@
+target/
+*.log
+__pycache__/
+*.pyc
+runs/
+obj/
+bin/
+!crates/*/src/bin/
+
+.claude/worktrees/
+
+*probe_tmp*

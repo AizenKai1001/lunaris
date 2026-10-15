@@ -1,0 +1,13 @@
+[package]
+name = "lunaris-wasm"
+description = "A sandboxed WebAssembly host for Lunaris systems: modules written in any language that compiles to WebAssembly run inside the deterministic tick with a fuel budget, a memory cap and no access to anything but the batch they are given."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-sim = { path = "../lunaris-sim" }
+wasmi = { version = "2.0.0", features = ["deterministic", "portable-dispatch"] }
+
+[lints]
+workspace = true

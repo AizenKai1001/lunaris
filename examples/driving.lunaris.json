@@ -1,0 +1,4958 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Car",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Gate",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Prop",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 291,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.20000000298023224,
+            0.41999998688697815,
+            0.8500000238418579
+          ],
+          "sky_horizon": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "ground": [
+            0.30000001192092896,
+            0.27000001072883606,
+            0.23999999463558197
+          ],
+          "ambient": 1,
+          "exposure": 1,
+          "clouds": 0.4000000059604645,
+          "fog": 0.001500000013038516,
+          "fog_color": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "shadows": true,
+          "shadow_distance": 80,
+          "ssao": 1,
+          "bloom": 0.30000001192092896,
+          "bloom_threshold": 1,
+          "vignette": 0.20000000298023224,
+          "saturation": 1,
+          "tonemap": 0,
+          "dof": 0,
+          "focus": 10,
+          "focus_range": 4
+        },
+        "Name": {
+          "value": "Environment"
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 3,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.44999998807907104,
+            0.3499999940395355,
+            0.11999999731779099,
+            0.800000011920929
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "Name": {
+          "value": "Hills"
+        },
+        "Terrain": {
+          "heightmap": "examples/terrain/driving.png",
+          "size": [
+            256,
+            256
+          ],
+          "height": 16,
+          "step": 1,
+          "color": [
+            0.4000000059604645,
+            0.550000011920929,
+            0.3199999928474426,
+            1
+          ],
+          "texture": "grass",
+          "uv_scale": [
+            90,
+            90
+          ],
+          "friction": 0.8999999761581421,
+          "restitution": 0.10000000149011612,
+          "solid": true,
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.3400000035762787,
+            0.3499999940395355,
+            0.3799999952316284,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8500000238418579,
+          "texture": "concrete",
+          "uv_scale": [
+            3,
+            60
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Road"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.012000000104308128,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.019999999552965164,
+            190
+          ]
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.05000000074505806,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Car": {},
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1.7999999523162842,
+            0.699999988079071,
+            4.199999809265137
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 2,
+          "mask": 26
+        },
+        "Name": {
+          "value": "Car"
+        },
+        "RigidBody": {
+          "mass": 1200,
+          "restitution": 0,
+          "friction": 0.30000001192092896,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.7360000014305115,
+            40
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Vehicle": {
+          "wheels": "# a family car: wheelbase 2.6 m, track 1.6 m\ndefaults: radius=0.35 rest=0.3 travel=0.2 spring=35000 damper=3200 grip=1.2\nfl: -0.8 -0.15 -1.3 steer=1 brake=1 entity=21\nfr: 0.8 -0.15 -1.3 steer=1 brake=1 entity=22\nrl: -0.8 -0.15 1.3 drive=1 brake=0.7 handbrake=1 entity=23\nrr: 0.8 -0.15 1.3 drive=1 brake=0.7 handbrake=1 entity=24",
+          "throttle": 0,
+          "steer": 0,
+          "brake": 0,
+          "handbrake": 0,
+          "engine_force": 9000,
+          "power": 90000,
+          "top_speed": 55,
+          "reverse_speed": 10,
+          "brake_force": 16000,
+          "handbrake_force": 12000,
+          "steer_max": 32,
+          "steer_fade": 0.4000000059604645,
+          "steer_fade_speed": 40,
+          "steer_rate": 180,
+          "anti_roll": 6000,
+          "downforce": 0,
+          "air_drag": 0.4000000059604645,
+          "rolling": 0.014999999664723873,
+          "roll_influence": 0.5,
+          "handbrake_grip": 0.44999998807907104,
+          "speed": 0,
+          "steering": 0,
+          "on_ground": 0,
+          "contact": 0,
+          "compression": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "spin": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "slip": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0.019999999552965164,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.7999999523162842,
+            0.5,
+            4.199999809265137
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.75,
+            0.11999999731779099,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.5,
+          "roughness": 0.30000001192092896,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Body"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.7559999823570251,
+            40
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.7999999523162842,
+            0.5,
+            4.199999809265137
+          ]
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0.41999998688697815,
+            0.25
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.5,
+            0.41999998688697815,
+            2.0999999046325684
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.20000000298023224,
+            0.2800000011920929,
+            0.36000001430511475,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.20000000298023224,
+          "roughness": 0.10000000149011612,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cabin"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.156000018119812,
+            40.25
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.5,
+            0.41999998688697815,
+            2.0999999046325684
+          ]
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            -0.6000000238418579,
+            0.07999999821186066,
+            -2.119999885559082
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3199999928474426,
+            0.14000000059604645,
+            0.05999999865889549
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            1,
+            0.9700000286102295,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 2.5,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Headlight 1"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            -0.6000000238418579,
+            0.8159999847412109,
+            37.880001068115234
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3199999928474426,
+            0.14000000059604645,
+            0.05999999865889549
+          ]
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0.6000000238418579,
+            0.07999999821186066,
+            -2.119999885559082
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3199999928474426,
+            0.14000000059604645,
+            0.05999999865889549
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            1,
+            0.9700000286102295,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 2.5,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Headlight 2"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            0.6000000238418579,
+            0.8159999847412109,
+            37.880001068115234
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3199999928474426,
+            0.14000000059604645,
+            0.05999999865889549
+          ]
+        }
+      }
+    },
+    {
+      "uid": 15,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            -0.6000000238418579,
+            0.11999999731779099,
+            2.119999885559082
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3400000035762787,
+            0.10000000149011612,
+            0.05000000074505806
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            1,
+            0.10000000149011612,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 1.5,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Tail light 1"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            -0.6000000238418579,
+            0.8560000061988831,
+            42.119998931884766
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3400000035762787,
+            0.10000000149011612,
+            0.05000000074505806
+          ]
+        }
+      }
+    },
+    {
+      "uid": 16,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0.6000000238418579,
+            0.11999999731779099,
+            2.119999885559082
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3400000035762787,
+            0.10000000149011612,
+            0.05000000074505806
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            1,
+            0.10000000149011612,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 1.5,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Tail light 2"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            0.6000000238418579,
+            0.8560000061988831,
+            42.119998931884766
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3400000035762787,
+            0.10000000149011612,
+            0.05000000074505806
+          ]
+        }
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            -0.800000011920929,
+            -0.4000000059604645,
+            -1.2999999523162842
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Wheel front left"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            -0.800000011920929,
+            0.335999995470047,
+            38.70000076293945
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0.800000011920929,
+            -0.4000000059604645,
+            -1.2999999523162842
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Wheel front right"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            0.800000011920929,
+            0.335999995470047,
+            38.70000076293945
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            -0.800000011920929,
+            -0.4000000059604645,
+            1.2999999523162842
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Wheel rear left"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            -0.800000011920929,
+            0.335999995470047,
+            41.29999923706055
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 24,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0.800000011920929,
+            -0.4000000059604645,
+            1.2999999523162842
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Wheel rear right"
+        },
+        "Parent": {
+          "target": 10
+        },
+        "Transform": {
+          "pos": [
+            0.800000011920929,
+            0.335999995470047,
+            41.29999923706055
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 25,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071067690849304,
+            0.7071067690849304
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.05999999865889549,
+            0.05999999865889549,
+            0.07000000029802322,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Tyre front left"
+        },
+        "Parent": {
+          "target": 21
+        },
+        "Transform": {
+          "pos": [
+            -0.800000011920929,
+            0.335999995470047,
+            38.70000076293945
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071068286895752,
+            0.7071068286895752
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        }
+      }
+    },
+    {
+      "uid": 26,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071067690849304,
+            0.7071067690849304
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.05999999865889549,
+            0.05999999865889549,
+            0.07000000029802322,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Tyre front right"
+        },
+        "Parent": {
+          "target": 22
+        },
+        "Transform": {
+          "pos": [
+            0.800000011920929,
+            0.335999995470047,
+            38.70000076293945
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071068286895752,
+            0.7071068286895752
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        }
+      }
+    },
+    {
+      "uid": 27,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071067690849304,
+            0.7071067690849304
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.05999999865889549,
+            0.05999999865889549,
+            0.07000000029802322,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Tyre rear left"
+        },
+        "Parent": {
+          "target": 23
+        },
+        "Transform": {
+          "pos": [
+            -0.800000011920929,
+            0.335999995470047,
+            41.29999923706055
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071068286895752,
+            0.7071068286895752
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        }
+      }
+    },
+    {
+      "uid": 28,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071067690849304,
+            0.7071067690849304
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.05999999865889549,
+            0.05999999865889549,
+            0.07000000029802322,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Tyre rear right"
+        },
+        "Parent": {
+          "target": 24
+        },
+        "Transform": {
+          "pos": [
+            0.800000011920929,
+            0.335999995470047,
+            41.29999923706055
+          ],
+          "rot": [
+            0,
+            0,
+            0.7071068286895752,
+            0.7071068286895752
+          ],
+          "scale": [
+            0.699999988079071,
+            0.25999999046325684,
+            0.699999988079071
+          ]
+        }
+      }
+    },
+    {
+      "uid": 29,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.800000011920929,
+            0.8500000238418579,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.8999999761581421,
+          "roughness": 0.30000001192092896,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hub front left"
+        },
+        "Parent": {
+          "target": 21
+        },
+        "Transform": {
+          "pos": [
+            -0.800000011920929,
+            0.335999995470047,
+            38.70000076293945
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        }
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.800000011920929,
+            0.8500000238418579,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.8999999761581421,
+          "roughness": 0.30000001192092896,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hub front right"
+        },
+        "Parent": {
+          "target": 22
+        },
+        "Transform": {
+          "pos": [
+            0.800000011920929,
+            0.335999995470047,
+            38.70000076293945
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        }
+      }
+    },
+    {
+      "uid": 31,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.800000011920929,
+            0.8500000238418579,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.8999999761581421,
+          "roughness": 0.30000001192092896,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hub rear left"
+        },
+        "Parent": {
+          "target": 23
+        },
+        "Transform": {
+          "pos": [
+            -0.800000011920929,
+            0.335999995470047,
+            41.29999923706055
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        }
+      }
+    },
+    {
+      "uid": 32,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.800000011920929,
+            0.8500000238418579,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.8999999761581421,
+          "roughness": 0.30000001192092896,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hub rear right"
+        },
+        "Parent": {
+          "target": 24
+        },
+        "Transform": {
+          "pos": [
+            0.800000011920929,
+            0.335999995470047,
+            41.29999923706055
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.30000001192092896,
+            0.5199999809265137,
+            0.07000000029802322
+          ]
+        }
+      }
+    },
+    {
+      "uid": 100,
+      "components": {
+        "InputMap": {
+          "bindings": "throttle = w, arrowup, gamepad.rt\nreverse = s, arrowdown, gamepad.lt\nsteer = d, arrowright, a:-1, arrowleft:-1, gamepad.lx\nhandbrake = space, gamepad.a\nreset = r, gamepad.y"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 101,
+      "components": {
+        "Camera": {
+          "fov_y": 62,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.550000011920929,
+            0.699999988079071,
+            0.8799999952316284,
+            1
+          ]
+        },
+        "CameraRig": {
+          "target": 10,
+          "mode": 1,
+          "offset": [
+            0,
+            4,
+            8
+          ],
+          "look_at": true,
+          "look_offset": [
+            0,
+            0.8999999761581421,
+            0
+          ],
+          "follow_speed": 7,
+          "yaw": 0,
+          "pitch": 0.30000001192092896,
+          "distance": 9.5,
+          "shake": 0,
+          "shake_decay": 1.5,
+          "shake_amount": 0.4000000059604645
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            4,
+            52
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 102,
+      "components": {
+        "Name": {
+          "value": "Speed"
+        },
+        "Text": {
+          "value": "{car.kmh} km/h     gates {gates} of 2",
+          "pos": [
+            0.029999999329447746,
+            0.03999999910593033
+          ],
+          "size": 0.054999999701976776,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    },
+    {
+      "uid": 103,
+      "components": {
+        "Name": {
+          "value": "Hint"
+        },
+        "Text": {
+          "value": "W drive   S brake, then reverse   A D steer   Space handbrake   R put the car back",
+          "pos": [
+            0.5,
+            0.9399999976158142
+          ],
+          "size": 0.02800000086426735,
+          "color": [
+            1,
+            1,
+            1,
+            0.8500000238418579
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    },
+    {
+      "uid": 200,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 1"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            40
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 201,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 2"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            30.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 202,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 3"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            21
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 203,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 4"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            11.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 204,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 5"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            2
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 205,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 6"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -7.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 206,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 7"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -17
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 207,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 8"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -26.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 208,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 9"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -36
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 209,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 10"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -45.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 210,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 11"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -55
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 211,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 12"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -64.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 212,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 13"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -74
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 213,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 14"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -83.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 214,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 15"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -93
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 215,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 16"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -102.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 216,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 17"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -112
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 217,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.9200000166893005,
+            0.8999999761581421,
+            0.800000011920929,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.6000000238418579,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Dash 18"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.029999999329447746,
+            -121.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.25,
+            0.009999999776482582,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 230,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.699999988079071,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Rumble 1"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.03500000014901161,
+            -12
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.07000000029802322,
+            0.4000000059604645
+          ]
+        }
+      }
+    },
+    {
+      "uid": 231,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.699999988079071,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Rumble 2"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.03500000014901161,
+            -13.300000190734863
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.07000000029802322,
+            0.4000000059604645
+          ]
+        }
+      }
+    },
+    {
+      "uid": 232,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.699999988079071,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Rumble 3"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.03500000014901161,
+            -14.600000381469727
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.07000000029802322,
+            0.4000000059604645
+          ]
+        }
+      }
+    },
+    {
+      "uid": 233,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.699999988079071,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Rumble 4"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.03500000014901161,
+            -15.899999618530273
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.07000000029802322,
+            0.4000000059604645
+          ]
+        }
+      }
+    },
+    {
+      "uid": 234,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.699999988079071,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Rumble 5"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.03500000014901161,
+            -17.200000762939453
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.07000000029802322,
+            0.4000000059604645
+          ]
+        }
+      }
+    },
+    {
+      "uid": 235,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.699999988079071,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Rumble 6"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.03500000014901161,
+            -18.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            0.07000000029802322,
+            0.4000000059604645
+          ]
+        }
+      }
+    },
+    {
+      "uid": 240,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            1,
+            0.44999998807907104,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cone 1"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 4,
+          "restitution": 0.20000000298023224,
+          "friction": 0.5,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -2.5,
+            0.36000001430511475,
+            -24
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.7200000286102295,
+            0.44999998807907104
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 241,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            1,
+            0.44999998807907104,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cone 2"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 4,
+          "restitution": 0.20000000298023224,
+          "friction": 0.5,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            2.5,
+            0.36000001430511475,
+            -28
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.7200000286102295,
+            0.44999998807907104
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 242,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            1,
+            0.44999998807907104,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cone 3"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 4,
+          "restitution": 0.20000000298023224,
+          "friction": 0.5,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -2.5,
+            0.36000001430511475,
+            -32
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.7200000286102295,
+            0.44999998807907104
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 243,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            1,
+            0.44999998807907104,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cone 4"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 4,
+          "restitution": 0.20000000298023224,
+          "friction": 0.5,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            2.5,
+            0.36000001430511475,
+            -36
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.7200000286102295,
+            0.44999998807907104
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 244,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            1,
+            0.44999998807907104,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cone 5"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 4,
+          "restitution": 0.20000000298023224,
+          "friction": 0.5,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -2.5,
+            0.36000001430511475,
+            -40
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.7200000286102295,
+            0.44999998807907104
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 245,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            1,
+            0.44999998807907104,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Cone 6"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 4,
+          "restitution": 0.20000000298023224,
+          "friction": 0.5,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            2.5,
+            0.36000001430511475,
+            -44
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.7200000286102295,
+            0.44999998807907104
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 260,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 1"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            0.5,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 261,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 2"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            1.5099999904632568,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 262,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 3"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            2.5199999809265137,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 263,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 4"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -7.980000019073486,
+            0.5,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 264,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 5"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -7.980000019073486,
+            1.5099999904632568,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 265,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 6"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -7.980000019073486,
+            2.5199999809265137,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 266,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 7"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -6.960000038146973,
+            0.5,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 267,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 8"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -6.960000038146973,
+            1.5099999904632568,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 268,
+      "components": {
+        "AngularVelocity": {
+          "w": [
+            0,
+            0,
+            0
+          ],
+          "damping": 0.30000001192092896,
+          "stash": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 4,
+          "mask": 22
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.6499999761581421,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "wood",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 9"
+        },
+        "Prop": {},
+        "RigidBody": {
+          "mass": 18,
+          "restitution": 0.05000000074505806,
+          "friction": 0.6000000238418579,
+          "gravity_scale": 1,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            -6.960000038146973,
+            2.5199999809265137,
+            -30
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 280,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "CollisionLayer": {
+          "layer": 3,
+          "mask": 4
+        },
+        "Gate": {},
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            0.2199999988079071
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.6000000238418579,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate 1"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2,
+            -8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            4,
+            0.30000001192092896
+          ]
+        }
+      }
+    },
+    {
+      "uid": 281,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "CollisionLayer": {
+          "layer": 3,
+          "mask": 4
+        },
+        "Gate": {},
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            0.2199999988079071
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.6000000238418579,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate 2"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2,
+            -52
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            12,
+            4,
+            0.30000001192092896
+          ]
+        }
+      }
+    },
+    {
+      "uid": 282,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.949999988079071,
+            0.30000001192092896,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate post 1"
+        },
+        "Transform": {
+          "pos": [
+            -6.199999809265137,
+            2,
+            -8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3499999940395355,
+            4,
+            0.3499999940395355
+          ]
+        }
+      }
+    },
+    {
+      "uid": 283,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.949999988079071,
+            0.30000001192092896,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate post 1"
+        },
+        "Transform": {
+          "pos": [
+            6.199999809265137,
+            2,
+            -8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3499999940395355,
+            4,
+            0.3499999940395355
+          ]
+        }
+      }
+    },
+    {
+      "uid": 284,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.949999988079071,
+            0.30000001192092896,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate post 2"
+        },
+        "Transform": {
+          "pos": [
+            -6.199999809265137,
+            2,
+            -52
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3499999940395355,
+            4,
+            0.3499999940395355
+          ]
+        }
+      }
+    },
+    {
+      "uid": 285,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.949999988079071,
+            0.30000001192092896,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate post 2"
+        },
+        "Transform": {
+          "pos": [
+            6.199999809265137,
+            2,
+            -52
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.3499999940395355,
+            4,
+            0.3499999940395355
+          ]
+        }
+      }
+    },
+    {
+      "uid": 290,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "CollisionLayer": {
+          "layer": 1,
+          "mask": 20
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.550000011920929,
+            0.5,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "concrete",
+          "uv_scale": [
+            2,
+            4
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Jump"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.0155503749847412,
+            -62.899864196777344
+          ],
+          "rot": [
+            0.12186934053897858,
+            0,
+            0,
+            0.9925461411476135
+          ],
+          "scale": [
+            8,
+            0.4000000059604645,
+            10
+          ]
+        }
+      }
+    }
+  ],
+  "resources": {
+    "gates": 0
+  },
+  "systems": [
+    {
+      "name": "drive",
+      "doc": "The pedals and the wheel: the actions of the `InputMap` become the car's controls.",
+      "each": [
+        "Vehicle"
+      ],
+      "order": 10,
+      "do": [
+        {
+          "set": "Vehicle.throttle",
+          "to": {
+            "sub": [
+              {
+                "res": "action.throttle"
+              },
+              {
+                "res": "action.reverse"
+              }
+            ]
+          }
+        },
+        {
+          "set": "Vehicle.steer",
+          "to": {
+            "res": "action.steer"
+          }
+        },
+        {
+          "set": "Vehicle.handbrake",
+          "to": {
+            "res": "action.handbrake"
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "reset",
+      "doc": "R puts the car back on the start line, upright and still.",
+      "each": [
+        "Car",
+        "Transform",
+        "Velocity",
+        "AngularVelocity"
+      ],
+      "order": 11,
+      "do": [
+        {
+          "if": {
+            "gt": [
+              {
+                "res": "action.reset"
+              },
+              0.5
+            ]
+          },
+          "then": [
+            {
+              "set": "Transform.pos[0]",
+              "to": 0
+            },
+            {
+              "set": "Transform.pos[1]",
+              "to": 0.8
+            },
+            {
+              "set": "Transform.pos[2]",
+              "to": 40
+            },
+            {
+              "set": "Transform.rot[0]",
+              "to": 0
+            },
+            {
+              "set": "Transform.rot[1]",
+              "to": 0
+            },
+            {
+              "set": "Transform.rot[2]",
+              "to": 0
+            },
+            {
+              "set": "Transform.rot[3]",
+              "to": 1
+            },
+            {
+              "set": "Velocity.lin[0]",
+              "to": 0
+            },
+            {
+              "set": "Velocity.lin[1]",
+              "to": 0
+            },
+            {
+              "set": "Velocity.lin[2]",
+              "to": 0
+            },
+            {
+              "set": "AngularVelocity.w[0]",
+              "to": 0
+            },
+            {
+              "set": "AngularVelocity.w[1]",
+              "to": 0
+            },
+            {
+              "set": "AngularVelocity.w[2]",
+              "to": 0
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "car_status",
+      "doc": "What the HUD and the camera need to know about the car.",
+      "each": [
+        "Car",
+        "Vehicle",
+        "Transform"
+      ],
+      "order": 20,
+      "do": [
+        {
+          "res_set": "car.kmh",
+          "to": {
+            "floor": {
+              "mul": [
+                {
+                  "abs": {
+                    "get": "Vehicle.speed"
+                  }
+                },
+                3.6
+              ]
+            }
+          }
+        },
+        {
+          "res_set": "car.x",
+          "to": {
+            "get": "Transform.pos[0]"
+          }
+        },
+        {
+          "res_set": "car.z",
+          "to": {
+            "get": "Transform.pos[2]"
+          }
+        },
+        {
+          "let": "fx",
+          "be": {
+            "neg": {
+              "mul": [
+                2,
+                {
+                  "add": [
+                    {
+                      "mul": [
+                        {
+                          "get": "Transform.rot[0]"
+                        },
+                        {
+                          "get": "Transform.rot[2]"
+                        }
+                      ]
+                    },
+                    {
+                      "mul": [
+                        {
+                          "get": "Transform.rot[3]"
+                        },
+                        {
+                          "get": "Transform.rot[1]"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "let": "fz",
+          "be": {
+            "neg": {
+              "sub": [
+                1,
+                {
+                  "mul": [
+                    2,
+                    {
+                      "add": [
+                        {
+                          "mul": [
+                            {
+                              "get": "Transform.rot[0]"
+                            },
+                            {
+                              "get": "Transform.rot[0]"
+                            }
+                          ]
+                        },
+                        {
+                          "mul": [
+                            {
+                              "get": "Transform.rot[1]"
+                            },
+                            {
+                              "get": "Transform.rot[1]"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "res_set": "car.heading",
+          "to": {
+            "atan2": [
+              {
+                "var": "fx"
+              },
+              {
+                "neg": {
+                  "var": "fz"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "res_set": "car.yaw",
+          "to": {
+            "atan2": [
+              {
+                "neg": {
+                  "var": "fx"
+                }
+              },
+              {
+                "neg": {
+                  "var": "fz"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "chase",
+      "doc": "The camera swings round behind the car, the short way.",
+      "each": [
+        "CameraRig"
+      ],
+      "order": 25,
+      "do": [
+        {
+          "let": "turn",
+          "be": {
+            "sub": [
+              {
+                "res": "car.yaw"
+              },
+              {
+                "get": "CameraRig.yaw"
+              }
+            ]
+          }
+        },
+        {
+          "let": "short",
+          "be": {
+            "sub": [
+              {
+                "var": "turn"
+              },
+              {
+                "mul": [
+                  6.2831853,
+                  {
+                    "round": {
+                      "div": [
+                        {
+                          "var": "turn"
+                        },
+                        6.2831853
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "set": "CameraRig.yaw",
+          "to": {
+            "add": [
+              {
+                "get": "CameraRig.yaw"
+              },
+              {
+                "mul": [
+                  {
+                    "var": "short"
+                  },
+                  {
+                    "sub": [
+                      1,
+                      {
+                        "exp": {
+                          "mul": [
+                            -3.5,
+                            {
+                              "dt": true
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "gate_passed",
+      "doc": "Driving through a gate counts it and takes the gate down. Cones and crates are on another layer: they never set a gate off.",
+      "on_contact": {
+        "a": [
+          "Gate"
+        ],
+        "b": [
+          "Car"
+        ]
+      },
+      "order": 30,
+      "do": [
+        {
+          "res_add": "gates",
+          "by": 1
+        },
+        {
+          "emit": "gate"
+        },
+        {
+          "despawn": "a"
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

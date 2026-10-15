@@ -1,0 +1,23 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Planet",
+      "doc": "Marks an entity as a planet and records its mass.",
+      "fields": [
+        { "name": "mass", "type": "f32", "default": 1 },
+        { "name": "kind", "type": "str" }
+      ]
+    }
+  ],
+  "next_uid": 10,
+  "entities": [
+    { "uid": 1, "components": { "Name": { "value": "Sun" }, "Transform": { "scale": [4, 4, 4] }, "Planet": { "mass": 1000, "kind": "star" } } },
+    { "uid": 2, "components": { "Name": { "value": "Mercury" }, "Transform": { "pos": [8, 0, 0] }, "Velocity": { "lin": [0, 6, 0] }, "Wander": { "strength": 0.2 }, "Planet": { "mass": 1, "kind": "rock" } } },
+    { "uid": 3, "components": { "Name": { "value": "Venus" }, "Transform": { "pos": [12, 0, 0] }, "Velocity": { "lin": [0, 5, 0] }, "Wander": { "strength": 0.2 }, "Planet": { "mass": 3, "kind": "rock" } } },
+    { "uid": 4, "components": { "Name": { "value": "Earth" }, "Transform": { "pos": [16, 0, 0] }, "Velocity": { "lin": [0, 4.2, 0], "ang": [0, 0, 1] }, "Wander": { "strength": 0.2 }, "Planet": { "mass": 3, "kind": "rock" } } },
+    { "uid": 5, "components": { "Name": { "value": "Mars" }, "Transform": { "pos": [22, 0, 0] }, "Velocity": { "lin": [0, 3.6, 0] }, "Wander": { "strength": 0.2 }, "Planet": { "mass": 1, "kind": "rock" } } },
+    { "uid": 6, "components": { "Name": { "value": "Jupiter" }, "Transform": { "pos": [40, 0, 0], "scale": [2, 2, 2] }, "Velocity": { "lin": [0, 2.6, 0], "ang": [0, 0, 0.5] }, "Planet": { "mass": 300, "kind": "gas" } } },
+    { "uid": 7, "components": { "Name": { "value": "Saturn" }, "Transform": { "pos": [60, 0, 0], "scale": [1.8, 1.8, 1.8] }, "Velocity": { "lin": [0, 2.1, 0] }, "Planet": { "mass": 90, "kind": "gas" } } }
+  ]
+}

@@ -1,0 +1,11 @@
+{"lunaris": 1, "entities": [
+ {"uid": 1, "components": {"Name": {"value": "Camera"}, "Transform": {"pos": [0, 2.5, 9], "rot": [-0.12, 0, 0, 0.99]}, "Camera": {"fov_y": 45}}},
+ {"uid": 2, "components": {"Name": {"value": "Sun"}, "Transform": {"rot": [-0.5, 0.3, 0.1, 0.8]}, "Light": {"kind": 0, "color": [1, 0.95, 0.85], "intensity": 2.4}}},
+ {"uid": 3, "components": {"Name": {"value": "Environment"}, "Environment": {"sky": true, "dof": 1.0, "focus": 9.0, "focus_range": 1.5, "bloom": 0.3}}},
+ {"uid": 4, "components": {"Name": {"value": "Floor"}, "Transform": {"pos": [0, -0.5, -20], "scale": [60, 1, 90]}, "MeshRenderer": {"mesh": "cube", "texture": "tiles", "uv_scale": [30, 45], "color": [0.8, 0.85, 1, 1], "roughness": 0.6}}},
+ {"uid": 10, "components": {"Name": {"value": "Near"}, "Transform": {"pos": [-1.6, 0.6, 5]}, "MeshRenderer": {"mesh": "sphere", "color": [0.9, 0.3, 0.25, 1], "roughness": 0.35}}},
+ {"uid": 11, "components": {"Name": {"value": "Focus"}, "Transform": {"pos": [0, 0.6, 0]}, "MeshRenderer": {"mesh": "sphere", "color": [0.95, 0.85, 0.3, 1], "roughness": 0.25}}},
+ {"uid": 12, "components": {"Name": {"value": "Far 1"}, "Transform": {"pos": [1.8, 0.6, -8]}, "MeshRenderer": {"mesh": "sphere", "color": [0.3, 0.7, 0.95, 1], "roughness": 0.3}}},
+ {"uid": 13, "components": {"Name": {"value": "Far 2"}, "Transform": {"pos": [-2.5, 0.6, -16]}, "MeshRenderer": {"mesh": "sphere", "color": [0.4, 0.9, 0.4, 1], "roughness": 0.3}}},
+ {"uid": 14, "components": {"Name": {"value": "Far 3"}, "Transform": {"pos": [3, 0.6, -26]}, "MeshRenderer": {"mesh": "sphere", "color": [0.9, 0.5, 0.9, 1], "roughness": 0.3}}}
+]}

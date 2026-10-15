@@ -1,0 +1,38 @@
+{
+  "lunaris": 1,
+  "components": [
+    { "name": "Ball", "doc": "A bouncing ball: how much energy it keeps per bounce.", "fields": [ { "name": "bounce", "type": "f32", "default": 0.8 } ] }
+  ],
+  "systems": [
+    {
+      "name": "gravity",
+      "doc": "Constant downward acceleration.",
+      "each": ["Transform", "Velocity"],
+      "do": [
+        { "set": "Velocity.lin[1]", "to": { "sub": [ { "get": "Velocity.lin[1]" }, { "mul": [9.8, { "dt": true }] } ] } }
+      ]
+    },
+    {
+      "name": "bounce_on_floor",
+      "doc": "Reflect the vertical velocity when a ball touches the floor at y = 0.5.",
+      "each": ["Transform", "Velocity", "Ball"],
+      "order": 110,
+      "do": [
+        { "if": { "lt": [ { "get": "Transform.pos[1]" }, 0.5 ] },
+          "then": [
+            { "set": "Transform.pos[1]", "to": 0.5 },
+            { "set": "Velocity.lin[1]", "to": { "mul": [ { "abs": { "get": "Velocity.lin[1]" } }, { "get": "Ball.bounce" } ] } }
+          ] }
+      ]
+    }
+  ],
+  "next_uid": 20,
+  "entities": [
+    { "uid": 1, "components": { "Name": { "value": "Camera" }, "Transform": { "pos": [0, 3, 14] }, "Camera": { "fov_y": 50 } } },
+    { "uid": 2, "components": { "Name": { "value": "Floor" }, "Transform": { "pos": [0, 0, 0], "scale": [30, 1, 12] }, "MeshRenderer": { "mesh": "plane", "color": [0.3, 0.45, 0.35, 1], "shininess": 8 } } },
+    { "uid": 3, "components": { "Name": { "value": "Sun" }, "Transform": { "rot": [-0.45, 0.25, 0, 0.855] }, "Light": { "kind": 0, "intensity": 1.1, "color": [1, 0.96, 0.9] } } },
+    { "uid": 10, "components": { "Name": { "value": "Heavy ball" }, "Transform": { "pos": [-4, 7, 0], "scale": [1.2, 1.2, 1.2] }, "Velocity": { "lin": [0.6, 0, 0] }, "Ball": { "bounce": 0.55 }, "MeshRenderer": { "mesh": "sphere", "color": [0.25, 0.45, 0.95, 1], "shininess": 64 } } },
+    { "uid": 11, "components": { "Name": { "value": "Bouncy ball" }, "Transform": { "pos": [0, 9, 0] }, "Velocity": { "lin": [0.2, 0, 0] }, "Ball": { "bounce": 0.92 }, "MeshRenderer": { "mesh": "sphere", "color": [0.95, 0.35, 0.25, 1], "shininess": 64 } } },
+    { "uid": 12, "components": { "Name": { "value": "Cube" }, "Transform": { "pos": [4, 5, 0], "rot": [0.2, 0.3, 0.1, 0.92] }, "Velocity": { "lin": [-0.5, 0, 0], "ang": [0.8, 1.2, 0] }, "Ball": { "bounce": 0.7 }, "MeshRenderer": { "mesh": "cube", "color": [0.95, 0.8, 0.25, 1] } } }
+  ]
+}

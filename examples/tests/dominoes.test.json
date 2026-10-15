@@ -1,0 +1,164 @@
+{
+  "name": "Dominoes: a ball rolls down a ramp and knocks over a winding row of dominoes, the last one pushes a hinged door open to its limit, a chain of capsules swings on ball-and-socket joints",
+  "scene": "examples/dominoes.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 60
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "Transform.pos[0]",
+        "between": [
+          -4.4,
+          -3.6
+        ],
+        "message": "the ball is rolling down the ramp"
+      }
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "AngularVelocity.w[2]",
+        "lt": -5,
+        "message": "and spinning clockwise about z, as a ball rolling toward +x does (a rolling ball turns at speed / radius)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 17",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.31,
+          0.01
+        ],
+        "message": "the dominoes stand"
+      }
+    },
+    {
+      "step": 90
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "Transform.pos[0]",
+        "gt": 0.0,
+        "message": "the ball has reached the first domino"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 17",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.31,
+          0.01
+        ],
+        "message": "the last domino still stands: the wave has not got there yet"
+      }
+    },
+    {
+      "expect": {
+        "name": "Door",
+        "field": "Transform.rot[1]",
+        "approx": [
+          0.497,
+          0.01
+        ],
+        "message": "and the door is shut"
+      }
+    },
+    {
+      "step": 200
+    },
+    {
+      "expect": {
+        "name": "Domino 1",
+        "field": "Transform.pos[1]",
+        "lt": 0.26,
+        "message": "this domino has fallen (lying or leaning on the next: its centre is lower than 0.26 m)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 5",
+        "field": "Transform.pos[1]",
+        "lt": 0.26,
+        "message": "this domino has fallen (lying or leaning on the next: its centre is lower than 0.26 m)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 9",
+        "field": "Transform.pos[1]",
+        "lt": 0.26,
+        "message": "this domino has fallen (lying or leaning on the next: its centre is lower than 0.26 m)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 13",
+        "field": "Transform.pos[1]",
+        "lt": 0.26,
+        "message": "this domino has fallen (lying or leaning on the next: its centre is lower than 0.26 m)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 17",
+        "field": "Transform.pos[1]",
+        "lt": 0.26,
+        "message": "this domino has fallen (lying or leaning on the next: its centre is lower than 0.26 m)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Domino 17",
+        "field": "Transform.pos[1]",
+        "lt": 0.1,
+        "message": "the last one has nothing to lean on: flat on the floor"
+      }
+    },
+    {
+      "expect": {
+        "name": "Door",
+        "field": "Transform.rot[1]",
+        "approx": [
+          0.955,
+          0.02
+        ],
+        "message": "the door was pushed open to its limit of 1.5 radians and not past it"
+      }
+    },
+    {
+      "expect": {
+        "name": "Chain 1",
+        "field": "Transform.pos[1]",
+        "approx": [
+          2.1,
+          0.05
+        ],
+        "message": "the chain hangs from the gantry"
+      }
+    },
+    {
+      "expect": {
+        "name": "Chain 4",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.5,
+          1.5
+        ],
+        "message": "and its end swings free below it"
+      }
+    }
+  ]
+}

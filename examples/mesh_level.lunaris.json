@@ -1,0 +1,930 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.2,
+      0.42,
+      0.84
+     ],
+     "sky_horizon": [
+      0.82,
+      0.88,
+      0.96
+     ],
+     "ground": [
+      0.3,
+      0.28,
+      0.25
+     ],
+     "clouds": 0.25,
+     "fog": 0.003,
+     "fog_color": [
+      0.82,
+      0.88,
+      0.96
+     ],
+     "bloom": 0.1
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.55,
+      0.3,
+      0.16,
+      0.76
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.94,
+      0.84
+     ],
+     "intensity": 2.6
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Courtyard"
+    },
+    "Transform": {},
+    "MeshRenderer": {
+     "mesh": "examples/models/mesh_level.glb",
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.85
+    },
+    "MeshCollider": {
+     "mesh": "examples/models/mesh_level.glb",
+     "friction": 0.7,
+     "restitution": 0.1
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Ball"
+    },
+    "Transform": {
+     "pos": [
+      -9.5,
+      1.503,
+      -4.5
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Velocity": {
+     "lin": [
+      1.5,
+      0,
+      0
+     ]
+    },
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.6,
+     "restitution": 0.15
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.88,
+      0.16,
+      0.12,
+      1
+     ],
+     "metallic": 0.3,
+     "roughness": 0.3
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Pit ball"
+    },
+    "Transform": {
+     "pos": [
+      6.5,
+      3.0,
+      0.2
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.6,
+     "restitution": 0.2
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.8,
+      0.2,
+      1
+     ],
+     "metallic": 0.3,
+     "roughness": 0.3
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Crate 1"
+    },
+    "Transform": {
+     "pos": [
+      -10.5,
+      1.5,
+      -1.2
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.7,
+     "restitution": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.52,
+      0.3,
+      1
+     ],
+     "texture": "wood",
+     "roughness": 0.6
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Crate 2"
+    },
+    "Transform": {
+     "pos": [
+      -10.5,
+      2.101,
+      -1.2
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.7,
+     "restitution": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.52,
+      0.3,
+      1
+     ],
+     "texture": "wood",
+     "roughness": 0.6
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Crate 3"
+    },
+    "Transform": {
+     "pos": [
+      -10.5,
+      2.702,
+      -1.2
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.7,
+     "restitution": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.52,
+      0.3,
+      1
+     ],
+     "texture": "wood",
+     "roughness": 0.6
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Tumbler"
+    },
+    "Transform": {
+     "pos": [
+      1.5,
+      1.25,
+      7.0
+     ],
+     "scale": [
+      0.5,
+      0.5,
+      0.5
+     ]
+    },
+    "Velocity": {
+     "lin": [
+      0,
+      0,
+      -8.0
+     ]
+    },
+    "AngularVelocity": {
+     "damping": 0.2
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.5,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.3,
+      0.55,
+      0.85,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Capsule"
+    },
+    "Transform": {
+     "pos": [
+      9.5,
+      2.0,
+      5.0
+     ],
+     "rot": [
+      0,
+      0,
+      0.564642,
+      0.825336
+     ],
+     "scale": [
+      0.4,
+      1.2,
+      0.4
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.6,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.4,
+      0.8,
+      0.45,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Rock 1"
+    },
+    "Transform": {
+     "pos": [
+      -2.5,
+      4.0,
+      2.5
+     ],
+     "rot": [
+      0.2,
+      0.1,
+      0.3,
+      0.92
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "ConvexCollider": {
+     "mesh": "examples/models/rock.glb"
+    },
+    "RigidBody": {
+     "mass": 2.0,
+     "friction": 0.7,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/rock.glb",
+     "color": [
+      0.75,
+      0.74,
+      0.72,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Rock 2"
+    },
+    "Transform": {
+     "pos": [
+      -1.2,
+      6.0,
+      3.4
+     ],
+     "rot": [
+      0.5,
+      0.0,
+      0.1,
+      0.86
+     ],
+     "scale": [
+      1.4,
+      1.4,
+      1.4
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "ConvexCollider": {
+     "mesh": "examples/models/rock.glb"
+    },
+    "RigidBody": {
+     "mass": 5.487999999999999,
+     "friction": 0.7,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/rock.glb",
+     "color": [
+      0.75,
+      0.74,
+      0.72,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Rock 3"
+    },
+    "Transform": {
+     "pos": [
+      0.2,
+      5.0,
+      -1.0
+     ],
+     "rot": [
+      0.0,
+      0.3,
+      0.5,
+      0.81
+     ],
+     "scale": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "ConvexCollider": {
+     "mesh": "examples/models/rock.glb"
+    },
+    "RigidBody": {
+     "mass": 1.0240000000000002,
+     "friction": 0.7,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/rock.glb",
+     "color": [
+      0.75,
+      0.74,
+      0.72,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Wedge"
+    },
+    "Transform": {
+     "pos": [
+      -6.0,
+      0.7049999999999998,
+      -0.8
+     ],
+     "rot": [
+      0,
+      0,
+      -0.122183,
+      0.992508
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.3
+    },
+    "ConvexCollider": {
+     "mesh": "examples/models/wedge.glb"
+    },
+    "RigidBody": {
+     "mass": 1.0,
+     "friction": 0.5,
+     "restitution": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/wedge.glb",
+     "color": [
+      0.9,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.5
+    }
+   }
+  },
+  {
+   "uid": 15,
+   "components": {
+    "Name": {
+     "value": "Guard"
+    },
+    "Transform": {
+     "pos": [
+      -1.0,
+      0.0,
+      -1.5
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.35,
+     "height": 1.8,
+     "step_height": 0.4
+    },
+    "NavAgent": {
+     "target": [
+      -10.5,
+      1.2,
+      -3.5
+     ],
+     "active": true,
+     "speed": 2.5,
+     "radius": 0.4,
+     "height": 1.8
+    }
+   }
+  },
+  {
+   "uid": 16,
+   "components": {
+    "Name": {
+     "value": "Guard body"
+    },
+    "Transform": {
+     "pos": [
+      -1.0,
+      0.9,
+      -1.5
+     ],
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "Parent": {
+     "target": 15
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.35,
+      0.85,
+      1
+     ],
+     "roughness": 0.5
+    }
+   }
+  },
+  {
+   "uid": 17,
+   "components": {
+    "Name": {
+     "value": "Hero"
+    },
+    "Transform": {
+     "pos": [
+      9.5,
+      0.0,
+      -5.5
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.35,
+     "height": 1.8,
+     "step_height": 0.4
+    }
+   }
+  },
+  {
+   "uid": 18,
+   "components": {
+    "Name": {
+     "value": "Hero body"
+    },
+    "Transform": {
+     "pos": [
+      9.5,
+      0.9,
+      -5.5
+     ],
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "Parent": {
+     "target": 17
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.95,
+      0.5,
+      0.25,
+      1
+     ],
+     "roughness": 0.5
+    }
+   }
+  },
+  {
+   "uid": 19,
+   "components": {
+    "Name": {
+     "value": "Hero head"
+    },
+    "Transform": {
+     "pos": [
+      9.5,
+      2.0,
+      -5.5
+     ],
+     "scale": [
+      0.55,
+      0.55,
+      0.55
+     ]
+    },
+    "Parent": {
+     "target": 17
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      1.95,
+      0
+     ],
+     "scale": [
+      0.55,
+      0.55,
+      0.55
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.85,
+      0.7,
+      1
+     ],
+     "roughness": 0.45
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0.0,
+      13.0,
+      15.0
+     ],
+     "rot": [
+      -0.33652,
+      0,
+      0,
+      0.94168
+     ]
+    },
+    "Camera": {
+     "fov_y": 52,
+     "clear": [
+      0.5,
+      0.65,
+      0.85,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Hint"
+    },
+    "Text": {
+     "value": "WASD walk   Space jump",
+     "pos": [
+      0.5,
+      0.04
+     ],
+     "size": 0.04,
+     "align": 1,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "shadow": true
+    }
+   }
+  }
+ ],
+ "systems": [
+  {
+   "name": "walk_input",
+   "doc": "Keys into the character controller: A/D and W/S set the walking speed (4 m/s), Space asks for a jump (6 m/s up) when on the ground. The guard is steered by its NavAgent after this system, which wins.",
+   "each": [
+    "CharacterBody"
+   ],
+   "do": [
+    {
+     "set": "CharacterBody.walk[0]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.d"
+         },
+         {
+          "res": "input.a"
+         }
+        ]
+       },
+       4
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[1]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.s"
+         },
+         {
+          "res": "input.w"
+         }
+        ]
+       },
+       4
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "input.space"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "CharacterBody.jump",
+       "to": 6
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

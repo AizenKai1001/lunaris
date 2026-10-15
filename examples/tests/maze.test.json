@@ -1,0 +1,20 @@
+{
+  "name": "Maze: the Seeker patrols four flags through a serpentine of walls by itself, and the Hero is sent across the whole maze with one NavAgent change",
+  "scene": "examples/maze.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "call": { "tool": "path", "args": { "from": [-9, 0, -9], "to": [9, 0, 9] } } },
+    { "call": { "tool": "path", "args": { "from": [-9, 0, -9], "to": [9, 3, 9] }, "error": "nav_no_goal" } },
+    { "step": 30 },
+    { "expect": { "name": "Seeker", "field": "NavAgent.status", "eq": 1, "message": "the patrol system gave the idle Seeker its first target and it is walking" } },
+    { "call": { "tool": "set", "args": { "uid": 17, "component": "NavAgent", "value": { "target": [-9, 0, 9], "active": true } } } },
+    { "step": 1500 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "approx": [-9, 0.6], "message": "the Hero crossed the maze through the three gaps" } },
+    { "expect": { "name": "Hero", "field": "Transform.pos[2]", "approx": [9, 0.6] } },
+    { "expect": { "name": "Hero", "field": "NavAgent.status", "eq": 2 } },
+    { "expect": { "resource": "legs", "ge": 3, "message": "the Seeker has reached at least three flags in 25 seconds" } },
+    { "expect": { "check": "errors", "eq": 0 } }
+  ]
+}

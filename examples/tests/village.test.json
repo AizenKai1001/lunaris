@@ -1,0 +1,323 @@
+{
+  "name": "Village: walk to the elder, take the quest, fetch the bucket from the well, bring it back and get paid (dialogue, sensor, contacts, events, particles)",
+  "scene": "examples/village.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 5
+    },
+    {
+      "expect": {
+        "resource": "near",
+        "eq": 1,
+        "message": "the hero walked up to the elder and its sensor sees them"
+      }
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 0
+      }
+    },
+    {
+      "input": {
+        "e": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "e": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 1,
+        "message": "E started the talk"
+      }
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "1": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "1": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 0,
+        "message": "the talk is over"
+      }
+    },
+    {
+      "expect": {
+        "resource": "quest",
+        "eq": 1,
+        "message": "and the quest has begun"
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 80
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "resource": "quest",
+        "eq": 2,
+        "message": "the hero picked the bucket up by walking into it"
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 95
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 5
+    },
+    {
+      "expect": {
+        "resource": "near",
+        "eq": 1,
+        "message": "back at the elder"
+      }
+    },
+    {
+      "input": {
+        "e": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "e": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "1": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "1": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 4
+    },
+    {
+      "expect": {
+        "resource": "coins",
+        "eq": 10,
+        "message": "the elder paid"
+      }
+    },
+    {
+      "expect": {
+        "resource": "quest",
+        "eq": 3
+      }
+    },
+    {
+      "step": 30
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 2
+    },
+    {
+      "step": 3
+    },
+    {
+      "expect": {
+        "name": "Celebration",
+        "field": "Particles.time",
+        "between": [
+          0,
+          2.5
+        ],
+        "message": "the event `quest_done` restarted the celebration of particles (its clock was at 99)"
+      }
+    },
+    {
+      "expect": {
+        "resource": "talking",
+        "eq": 0
+      }
+    }
+  ]
+}

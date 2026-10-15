@@ -1,0 +1,996 @@
+{
+  "name": "Skirmish: grunts hunt the hero, bolts kill them, the score counts and the bolts expire",
+  "scene": "examples/skirmish.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 20,
+          "component": "HitPoints",
+          "value": {
+            "value": 1000,
+            "max": 1000
+          }
+        }
+      }
+    },
+    {
+      "step": 60
+    },
+    {
+      "input": {
+        "space": true
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "step": 8
+    },
+    {
+      "expect": {
+        "resource": "score",
+        "ge": 1,
+        "message": "the hero's bolts killed grunts"
+      }
+    },
+    {
+      "expect": {
+        "resource": "hero.hp",
+        "gt": 0,
+        "message": "and the hero is alive (a tougher hero than in the game: this bot only spins and fires)"
+      }
+    },
+    {
+      "expect": {
+        "resource": "hero.hp",
+        "lt": 1000,
+        "message": "but the grunts did bite it: a bite and its grace set in the same tick count"
+      }
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "Enemy"
+          ]
+        },
+        "between": [
+          1,
+          12
+        ],
+        "message": "the gates keep making grunts, never more than 4 each"
+      }
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "Bolt"
+          ]
+        },
+        "ge": 1,
+        "message": "bolts are in the air while the key is held"
+      }
+    },
+    {
+      "input": {
+        "space": false
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "expect": {
+        "count": {
+          "with": [
+            "Bolt"
+          ]
+        },
+        "eq": 0,
+        "message": "and they expire by their lifetime when it is released"
+      }
+    }
+  ]
+}

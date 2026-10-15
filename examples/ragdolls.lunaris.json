@@ -1,0 +1,2277 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.2,
+      0.42,
+      0.84
+     ],
+     "sky_horizon": [
+      0.82,
+      0.88,
+      0.96
+     ],
+     "ground": [
+      0.3,
+      0.3,
+      0.28
+     ],
+     "clouds": 0.25,
+     "fog": 0.003,
+     "fog_color": [
+      0.82,
+      0.88,
+      0.96
+     ],
+     "bloom": 0.1
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      0.35,
+      0.15,
+      0.77
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.94,
+      0.84
+     ],
+     "intensity": 2.4
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Floor"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.5,
+      0
+     ],
+     "scale": [
+      30,
+      1,
+      16
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "texture": "stone",
+     "uv_scale": [
+      12,
+      6
+     ],
+     "color": [
+      0.8,
+      0.78,
+      0.74,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "friction": 0.9,
+     "restitution": 0.02
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Step"
+    },
+    "Transform": {
+     "pos": [
+      0.2,
+      0.2,
+      0
+     ],
+     "scale": [
+      2.4,
+      0.4,
+      3.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.5,
+      0.45,
+      1
+     ],
+     "roughness": 0.7
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "friction": 0.9,
+     "restitution": 0.02
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Wall"
+    },
+    "Transform": {
+     "pos": [
+      4.2,
+      0.35,
+      0
+     ],
+     "scale": [
+      0.3,
+      0.7,
+      3.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.62,
+      0.38,
+      0.3,
+      1
+     ],
+     "roughness": 0.7
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "friction": 0.9,
+     "restitution": 0.02
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Red pelvis"
+    },
+    "Transform": {
+     "pos": [
+      -3.336,
+      2.1206,
+      0.0
+     ],
+     "scale": [
+      0.34,
+      0.2,
+      0.2
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 9.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.85,
+      0.22,
+      0.2,
+      1
+     ],
+     "roughness": 0.55
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Red torso"
+    },
+    "Transform": {
+     "pos": [
+      -3.4561,
+      2.4494,
+      0.0
+     ],
+     "scale": [
+      0.36,
+      0.5,
+      0.22
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 14.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.85,
+      0.22,
+      0.2,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 6,
+     "anchor": [
+      -3.3772,
+      2.2333,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Red head"
+    },
+    "Transform": {
+     "pos": [
+      -3.5898,
+      2.8157,
+      0.0
+     ],
+     "scale": [
+      0.24,
+      0.24,
+      0.24
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 4.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 7,
+     "anchor": [
+      -3.5418,
+      2.6842,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Red left upper arm"
+    },
+    "Transform": {
+     "pos": [
+      -3.7268,
+      2.4038,
+      0.0
+     ],
+     "scale": [
+      0.1,
+      0.3,
+      0.1
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.2,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.22,
+      0.2,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 7,
+     "anchor": [
+      -3.7748,
+      2.5353,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Red left forearm"
+    },
+    "Transform": {
+     "pos": [
+      -3.6308,
+      2.1407,
+      0.0
+     ],
+     "scale": [
+      0.09,
+      0.28,
+      0.09
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 9,
+     "anchor": [
+      -3.6788,
+      2.2722,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Red left thigh"
+    },
+    "Transform": {
+     "pos": [
+      -3.3477,
+      1.8608,
+      0.0
+     ],
+     "scale": [
+      0.15,
+      0.42,
+      0.15
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 6.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.22,
+      0.2,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 6,
+     "anchor": [
+      -3.4094,
+      2.0299,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Red left shin"
+    },
+    "Transform": {
+     "pos": [
+      -3.2037,
+      1.4663,
+      0.0
+     ],
+     "scale": [
+      0.12,
+      0.42,
+      0.12
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 3.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.3,
+      0.38,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 11,
+     "anchor": [
+      -3.2757,
+      1.6636,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Red right upper arm"
+    },
+    "Transform": {
+     "pos": [
+      -3.2196,
+      2.5889,
+      0.0
+     ],
+     "scale": [
+      0.1,
+      0.3,
+      0.1
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.2,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.22,
+      0.2,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 7,
+     "anchor": [
+      -3.2676,
+      2.7204,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Red right forearm"
+    },
+    "Transform": {
+     "pos": [
+      -3.1236,
+      2.3259,
+      0.0
+     ],
+     "scale": [
+      0.09,
+      0.28,
+      0.09
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 13,
+     "anchor": [
+      -3.1716,
+      2.4574,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 15,
+   "components": {
+    "Name": {
+     "value": "Red right thigh"
+    },
+    "Transform": {
+     "pos": [
+      -3.1598,
+      1.9294,
+      0.0
+     ],
+     "scale": [
+      0.15,
+      0.42,
+      0.15
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 6.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.22,
+      0.2,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 6,
+     "anchor": [
+      -3.2215,
+      2.0985,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 16,
+   "components": {
+    "Name": {
+     "value": "Red right shin"
+    },
+    "Transform": {
+     "pos": [
+      -3.0158,
+      1.5349,
+      0.0
+     ],
+     "scale": [
+      0.12,
+      0.42,
+      0.12
+     ],
+     "rot": [
+      0,
+      0,
+      0.174108,
+      0.984727
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 3.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.3,
+      0.38,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 15,
+     "anchor": [
+      -3.0878,
+      1.7322,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 17,
+   "components": {
+    "Name": {
+     "value": "Blue pelvis"
+    },
+    "Transform": {
+     "pos": [
+      0.3947,
+      3.5605,
+      0.0
+     ],
+     "scale": [
+      0.34,
+      0.2,
+      0.2
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 9.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.22,
+      0.45,
+      0.9,
+      1
+     ],
+     "roughness": 0.55
+    }
+   }
+  },
+  {
+   "uid": 18,
+   "components": {
+    "Name": {
+     "value": "Blue torso"
+    },
+    "Transform": {
+     "pos": [
+      0.4642,
+      3.9035,
+      0.0
+     ],
+     "scale": [
+      0.36,
+      0.5,
+      0.22
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 14.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.22,
+      0.45,
+      0.9,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 17,
+     "anchor": [
+      0.4185,
+      3.6781,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 19,
+   "components": {
+    "Name": {
+     "value": "Blue head"
+    },
+    "Transform": {
+     "pos": [
+      0.5417,
+      4.2857,
+      0.0
+     ],
+     "scale": [
+      0.24,
+      0.24,
+      0.24
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 4.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 18,
+     "anchor": [
+      0.5139,
+      4.1485,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Blue left upper arm"
+    },
+    "Transform": {
+     "pos": [
+      0.2095,
+      4.0061,
+      0.0
+     ],
+     "scale": [
+      0.1,
+      0.3,
+      0.1
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.2,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.22,
+      0.45,
+      0.9,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 18,
+     "anchor": [
+      0.2374,
+      4.1433,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Blue left forearm"
+    },
+    "Transform": {
+     "pos": [
+      0.1539,
+      3.7317,
+      0.0
+     ],
+     "scale": [
+      0.09,
+      0.28,
+      0.09
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 20,
+     "anchor": [
+      0.1817,
+      3.8689,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Blue left thigh"
+    },
+    "Transform": {
+     "pos": [
+      0.249,
+      3.3451,
+      0.0
+     ],
+     "scale": [
+      0.15,
+      0.42,
+      0.15
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 6.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.22,
+      0.45,
+      0.9,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 17,
+     "anchor": [
+      0.2848,
+      3.5215,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 23,
+   "components": {
+    "Name": {
+     "value": "Blue left shin"
+    },
+    "Transform": {
+     "pos": [
+      0.1656,
+      2.9335,
+      0.0
+     ],
+     "scale": [
+      0.12,
+      0.42,
+      0.12
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 3.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.3,
+      0.38,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 22,
+     "anchor": [
+      0.2073,
+      3.1393,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 24,
+   "components": {
+    "Name": {
+     "value": "Blue right upper arm"
+    },
+    "Transform": {
+     "pos": [
+      0.7388,
+      3.8989,
+      0.0
+     ],
+     "scale": [
+      0.1,
+      0.3,
+      0.1
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.2,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.22,
+      0.45,
+      0.9,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 18,
+     "anchor": [
+      0.7666,
+      4.0361,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 25,
+   "components": {
+    "Name": {
+     "value": "Blue right forearm"
+    },
+    "Transform": {
+     "pos": [
+      0.6832,
+      3.6244,
+      0.0
+     ],
+     "scale": [
+      0.09,
+      0.28,
+      0.09
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 24,
+     "anchor": [
+      0.711,
+      3.7616,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 26,
+   "components": {
+    "Name": {
+     "value": "Blue right thigh"
+    },
+    "Transform": {
+     "pos": [
+      0.445,
+      3.3054,
+      0.0
+     ],
+     "scale": [
+      0.15,
+      0.42,
+      0.15
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 6.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.22,
+      0.45,
+      0.9,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 17,
+     "anchor": [
+      0.4808,
+      3.4818,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 27,
+   "components": {
+    "Name": {
+     "value": "Blue right shin"
+    },
+    "Transform": {
+     "pos": [
+      0.3616,
+      2.8938,
+      0.0
+     ],
+     "scale": [
+      0.12,
+      0.42,
+      0.12
+     ],
+     "rot": [
+      0,
+      0,
+      -0.099833,
+      0.995004
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 3.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.3,
+      0.38,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 26,
+     "anchor": [
+      0.4033,
+      3.0996,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 28,
+   "components": {
+    "Name": {
+     "value": "Green pelvis"
+    },
+    "Transform": {
+     "pos": [
+      2.0467,
+      2.4088,
+      0.4
+     ],
+     "scale": [
+      0.34,
+      0.2,
+      0.2
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 9.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.25,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.55
+    }
+   }
+  },
+  {
+   "uid": 29,
+   "components": {
+    "Name": {
+     "value": "Green torso"
+    },
+    "Transform": {
+     "pos": [
+      1.849,
+      2.6977,
+      0.4
+     ],
+     "scale": [
+      0.36,
+      0.5,
+      0.22
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 14.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.25,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 28,
+     "anchor": [
+      1.9789,
+      2.5079,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Green head"
+    },
+    "Transform": {
+     "pos": [
+      1.6288,
+      3.0196,
+      0.4
+     ],
+     "scale": [
+      0.24,
+      0.24,
+      0.24
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 4.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 29,
+     "anchor": [
+      1.7079,
+      2.904,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Green left upper arm"
+    },
+    "Transform": {
+     "pos": [
+      1.598,
+      2.5865,
+      0.4
+     ],
+     "scale": [
+      0.1,
+      0.3,
+      0.1
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.2,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.25,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 29,
+     "anchor": [
+      1.5189,
+      2.7021,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 32,
+   "components": {
+    "Name": {
+     "value": "Green left forearm"
+    },
+    "Transform": {
+     "pos": [
+      1.7561,
+      2.3554,
+      0.4
+     ],
+     "scale": [
+      0.09,
+      0.28,
+      0.09
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 31,
+     "anchor": [
+      1.677,
+      2.471,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 33,
+   "components": {
+    "Name": {
+     "value": "Green left thigh"
+    },
+    "Transform": {
+     "pos": [
+      2.0996,
+      2.1543,
+      0.4
+     ],
+     "scale": [
+      0.15,
+      0.42,
+      0.15
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 6.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.25,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 28,
+     "anchor": [
+      1.998,
+      2.3028,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 34,
+   "components": {
+    "Name": {
+     "value": "Green left shin"
+    },
+    "Transform": {
+     "pos": [
+      2.3368,
+      1.8076,
+      0.4
+     ],
+     "scale": [
+      0.12,
+      0.42,
+      0.12
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 3.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.3,
+      0.38,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 33,
+     "anchor": [
+      2.2182,
+      1.981,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 35,
+   "components": {
+    "Name": {
+     "value": "Green right upper arm"
+    },
+    "Transform": {
+     "pos": [
+      2.0436,
+      2.8914,
+      0.4
+     ],
+     "scale": [
+      0.1,
+      0.3,
+      0.1
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.2,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.25,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 29,
+     "anchor": [
+      1.9646,
+      3.007,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 36,
+   "components": {
+    "Name": {
+     "value": "Green right forearm"
+    },
+    "Transform": {
+     "pos": [
+      2.2017,
+      2.6603,
+      0.4
+     ],
+     "scale": [
+      0.09,
+      0.28,
+      0.09
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.72,
+      0.58,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 35,
+     "anchor": [
+      2.1227,
+      2.7759,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 37,
+   "components": {
+    "Name": {
+     "value": "Green right thigh"
+    },
+    "Transform": {
+     "pos": [
+      2.2647,
+      2.2672,
+      0.4
+     ],
+     "scale": [
+      0.15,
+      0.42,
+      0.15
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 6.0,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.25,
+      0.7,
+      0.3,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 28,
+     "anchor": [
+      2.1631,
+      2.4158,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 38,
+   "components": {
+    "Name": {
+     "value": "Green right shin"
+    },
+    "Transform": {
+     "pos": [
+      2.5018,
+      1.9206,
+      0.4
+     ],
+     "scale": [
+      0.12,
+      0.42,
+      0.12
+     ],
+     "rot": [
+      0,
+      0,
+      0.29552,
+      0.955336
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.35
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 3.5,
+     "friction": 0.7,
+     "restitution": 0.05,
+     "drag": 0.0
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.3,
+      0.38,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 37,
+     "anchor": [
+      2.3833,
+      2.0939,
+      0.4
+     ]
+    }
+   }
+  },
+  {
+   "uid": 39,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0.2,
+      3.2,
+      7.6
+     ],
+     "rot": [
+      -0.1494,
+      0,
+      0,
+      0.9888
+     ]
+    },
+    "Camera": {
+     "fov_y": 52,
+     "clear": [
+      0.5,
+      0.65,
+      0.85,
+      1
+     ]
+    }
+   }
+  }
+ ]
+}

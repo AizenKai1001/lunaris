@@ -1,0 +1,17 @@
+[package]
+name = "swarm_wasm"
+version = "0.0.1"
+edition = "2021"
+description = "A Lunaris sandboxed WebAssembly system written in Rust: entities steer towards a target. No dependencies, no_std; build with tools/build_wasm.py."
+
+[lib]
+crate-type = ["cdylib"]
+
+# a workspace of its own, so the engine's workspace does not try to build it
+[workspace]
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"
+codegen-units = 1

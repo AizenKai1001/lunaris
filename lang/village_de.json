@@ -1,0 +1,29 @@
+{
+  "hud": {
+    "coins": "Muenzen"
+  },
+  "hint": {
+    "talk": "E druecken zum Sprechen"
+  },
+  "quest": {
+    "fetch": "Aufgabe: Wasser vom Brunnen holen",
+    "back": "Aufgabe: Das Wasser zur Aeltesten bringen"
+  },
+  "name": {
+    "elder": "Aelteste Maren"
+  },
+  "choice": {
+    "help": "Ich helfe",
+    "later": "Vielleicht spaeter",
+    "give": "Hier ist dein Wasser"
+  },
+  "elder": {
+    "hello": "Willkommen, Reisender.",
+    "need": "Unser Eimer steht am Brunnen. Kannst du mir Wasser holen?",
+    "accept": "Danke! Der Brunnen ist im Osten.",
+    "reminder": "Der Brunnen ist im Osten. Beeil dich bitte.",
+    "water": "Du hast das Wasser!",
+    "thanks": "Wunderbar. Nimm diese Muenzen als Dank.",
+    "after": "Nochmals danke, Freund."
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Duel: each player's keys move only their own hero (input.* is the first player, input.p2.* the second), orbs score for whoever touches them and vanish",
+  "scene": "examples/duel.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "step": 20 },
+    { "expect": { "name": "Orange", "field": "CharacterBody.grounded", "eq": true, "message": "both heroes stand on the floor" } },
+    { "expect": { "name": "Blue", "field": "CharacterBody.grounded", "eq": true } },
+    { "expect": { "resource": "score1", "eq": 0 } },
+    { "expect": { "resource": "score2", "eq": 0 } },
+
+    { "input": { "d": true } },
+    { "step": 30 },
+    { "expect": { "name": "Orange", "field": "Transform.pos[0]", "between": [-8.5, -7.5], "message": "the first player's D moves orange to the right (6 m/s for half a second)" } },
+    { "expect": { "name": "Blue", "field": "Transform.pos[0]", "approx": [11, 0.01], "message": "blue has not moved: it answers only to input.p2.*" } },
+
+    { "input": { "p2.a": true } },
+    { "step": 120 },
+    { "expect": { "resource": "score1", "ge": 1, "message": "orange ran through the orb at x = -8" } },
+    { "expect": { "resource": "score2", "ge": 1, "message": "blue ran through the orb at x = 8" } },
+    { "expect": { "exists": "Orb 7", "eq": false, "message": "a collected orb is gone (orb 7 sits at x = -8)" } },
+    { "expect": { "exists": "Orb 1", "eq": false, "message": "orb 1 sits at x = 8" } },
+    { "expect": { "exists": "Orb 2", "eq": true, "message": "orbs nobody touched are still there" } }
+  ]
+}

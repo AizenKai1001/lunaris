@@ -1,0 +1,13 @@
+{
+  "name": "Orb Dash: doing nothing loses when the clock reaches zero",
+  "scene": "examples/orb_dash.lunaris.json",
+  "seed": 1,
+  "steps": [
+    { "until": { "resource": "time_left", "le": 0, "max_ticks": 3000 } },
+    { "step": 10 },
+    { "expect": { "resource": "lost_flag", "eq": 1, "message": "the lose banner is switched on" } },
+    { "expect": { "events": "lose", "ge": 1 } },
+    { "expect": { "resource": "score", "eq": 0 } },
+    { "expect": { "check": "errors", "eq": 0 } }
+  ]
+}

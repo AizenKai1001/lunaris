@@ -1,0 +1,1247 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Prop",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 45,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.25,
+            0.4000000059604645,
+            0.75
+          ],
+          "sky_horizon": [
+            0.75,
+            0.8199999928474426,
+            0.9200000166893005
+          ],
+          "ground": [
+            0.30000001192092896,
+            0.27000001072883606,
+            0.23999999463558197
+          ],
+          "ambient": 0.8999999761581421,
+          "exposure": 1,
+          "clouds": 0.3499999940395355,
+          "fog": 0.004000000189989805,
+          "fog_color": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "shadows": true,
+          "shadow_distance": 80,
+          "ssao": 1,
+          "bloom": 0.20000000298023224,
+          "bloom_threshold": 1,
+          "vignette": 0.20000000298023224,
+          "saturation": 1,
+          "tonemap": 0,
+          "dof": 0,
+          "focus": 10,
+          "focus_range": 4
+        },
+        "Name": {
+          "value": "Environment"
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 2.5999999046325684,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.5,
+            0.3499999940395355,
+            0.15000000596046448,
+            0.7799999713897705
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Light": {
+          "kind": 1,
+          "color": [
+            1,
+            0.8500000238418579,
+            0.6000000238418579
+          ],
+          "intensity": 3,
+          "range": 12,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Lamp"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            4.199999809265137,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            26,
+            1,
+            26
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.6200000047683716,
+            0.6200000047683716,
+            0.6600000262260437,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "stone",
+          "uv_scale": [
+            12,
+            12
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Floor"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            -0.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            26,
+            1,
+            26
+          ]
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            26,
+            5,
+            0.5
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8500000238418579,
+            0.75,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            10,
+            2
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 1"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2.5,
+            -13.25
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            26,
+            5,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            26,
+            5,
+            0.5
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8500000238418579,
+            0.75,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            10,
+            2
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 2"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2.5,
+            13.25
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            26,
+            5,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            0.5,
+            5,
+            26
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8500000238418579,
+            0.75,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            2,
+            10
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 3"
+        },
+        "Transform": {
+          "pos": [
+            -13.25,
+            2.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            5,
+            26
+          ]
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            0.5,
+            5,
+            26
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8500000238418579,
+            0.75,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            2,
+            10
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 4"
+        },
+        "Transform": {
+          "pos": [
+            13.25,
+            2.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            5,
+            26
+          ]
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.7799999713897705,
+            0.800000011920929,
+            0.8600000143051147,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 1"
+        },
+        "Transform": {
+          "pos": [
+            -6,
+            2,
+            -5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.7799999713897705,
+            0.800000011920929,
+            0.8600000143051147,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 2"
+        },
+        "Transform": {
+          "pos": [
+            6,
+            2,
+            -5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ]
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.7799999713897705,
+            0.800000011920929,
+            0.8600000143051147,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 3"
+        },
+        "Transform": {
+          "pos": [
+            -6,
+            2,
+            4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ]
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.7799999713897705,
+            0.800000011920929,
+            0.8600000143051147,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 4"
+        },
+        "Transform": {
+          "pos": [
+            6,
+            2,
+            4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.2000000476837158,
+            4,
+            1.2000000476837158
+          ]
+        }
+      }
+    },
+    {
+      "uid": 20,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.30000001192092896,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 1"
+        },
+        "Prop": {},
+        "Transform": {
+          "pos": [
+            -2.5,
+            0.5,
+            -8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.25,
+            0.6499999761581421,
+            0.8999999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 2"
+        },
+        "Prop": {},
+        "Transform": {
+          "pos": [
+            0,
+            0.5,
+            -9.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.949999988079071,
+            0.800000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 3"
+        },
+        "Prop": {},
+        "Transform": {
+          "pos": [
+            2.5,
+            0.5,
+            -8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.3499999940395355,
+            0.800000011920929,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crate 4"
+        },
+        "Prop": {},
+        "Transform": {
+          "pos": [
+            0,
+            0.5,
+            -6
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1.600000023841858,
+            1.600000023841858,
+            1.600000023841858
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.949999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0.8999999761581421,
+          "roughness": 0.15000000596046448,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Ball"
+        },
+        "Prop": {},
+        "Transform": {
+          "pos": [
+            0,
+            1.2000000476837158,
+            -2.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.600000023841858,
+            1.600000023841858,
+            1.600000023841858
+          ]
+        }
+      }
+    },
+    {
+      "uid": 40,
+      "components": {
+        "CharacterBody": {
+          "radius": 0.3499999940395355,
+          "height": 1.7999999523162842,
+          "walk": [
+            0,
+            0
+          ],
+          "jump": 0,
+          "gravity_scale": 1,
+          "step_height": 0.4000000059604645,
+          "max_slope": 50,
+          "fall": 0,
+          "grounded": false
+        },
+        "Hero": {},
+        "Name": {
+          "value": "Player"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 41,
+      "components": {
+        "Camera": {
+          "fov_y": 72,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.05000000074505806,
+            0.05000000074505806,
+            0.07999999821186066,
+            1
+          ]
+        },
+        "LocalTransform": {
+          "pos": [
+            0,
+            1.6200000047683716,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "MouseLook": {
+          "sensitivity": 0.002199999988079071,
+          "stick_speed": 2.5,
+          "pitch_min": -1.5,
+          "pitch_max": 1.5,
+          "invert_y": false,
+          "enabled": true,
+          "body": 0,
+          "yaw": 0,
+          "pitch": 0,
+          "forward": [
+            0,
+            0,
+            -1
+          ],
+          "right": [
+            1,
+            0,
+            0
+          ]
+        },
+        "Name": {
+          "value": "Eyes"
+        },
+        "Parent": {
+          "target": 40
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.6200000047683716,
+            9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 42,
+      "components": {
+        "InputMap": {
+          "bindings": "move_x = d, a:-1, gamepad.lx\nmove_y = w, s:-1, gamepad.ly\njump = space, gamepad.a\ndeadzone = 0.15"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 43,
+      "components": {
+        "Name": {
+          "value": "Crosshair"
+        },
+        "Text": {
+          "value": "+",
+          "pos": [
+            0.5,
+            0.4699999988079071
+          ],
+          "size": 0.05000000074505806,
+          "color": [
+            1,
+            1,
+            1,
+            0.8500000238418579
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    },
+    {
+      "uid": 44,
+      "components": {
+        "Name": {
+          "value": "Hint"
+        },
+        "Text": {
+          "value": "WASD walk   mouse look   Space jump   Esc quit",
+          "pos": [
+            0.5,
+            0.9399999976158142
+          ],
+          "size": 0.029999999329447746,
+          "color": [
+            1,
+            1,
+            1,
+            0.800000011920929
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "resources": {
+    "cursor.lock": 1,
+    "look.fz": -1,
+    "look.rx": 1
+  },
+  "systems": [
+    {
+      "name": "look_axes",
+      "doc": "Which way is ahead and to the right on the ground, from the look.",
+      "each": [
+        "MouseLook"
+      ],
+      "order": 9,
+      "do": [
+        {
+          "res_set": "look.fx",
+          "to": {
+            "get": "MouseLook.forward[0]"
+          }
+        },
+        {
+          "res_set": "look.fz",
+          "to": {
+            "get": "MouseLook.forward[2]"
+          }
+        },
+        {
+          "res_set": "look.rx",
+          "to": {
+            "get": "MouseLook.right[0]"
+          }
+        },
+        {
+          "res_set": "look.rz",
+          "to": {
+            "get": "MouseLook.right[2]"
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "walk",
+      "doc": "The keys (or the pad) walk the body along them; Space jumps.",
+      "each": [
+        "Hero",
+        "CharacterBody"
+      ],
+      "order": 10,
+      "do": [
+        {
+          "set": "CharacterBody.walk[0]",
+          "to": {
+            "mul": [
+              {
+                "add": [
+                  {
+                    "mul": [
+                      {
+                        "res": "look.rx"
+                      },
+                      {
+                        "res": "action.move_x"
+                      }
+                    ]
+                  },
+                  {
+                    "mul": [
+                      {
+                        "res": "look.fx"
+                      },
+                      {
+                        "res": "action.move_y"
+                      }
+                    ]
+                  }
+                ]
+              },
+              5
+            ]
+          }
+        },
+        {
+          "set": "CharacterBody.walk[1]",
+          "to": {
+            "mul": [
+              {
+                "add": [
+                  {
+                    "mul": [
+                      {
+                        "res": "look.rz"
+                      },
+                      {
+                        "res": "action.move_x"
+                      }
+                    ]
+                  },
+                  {
+                    "mul": [
+                      {
+                        "res": "look.fz"
+                      },
+                      {
+                        "res": "action.move_y"
+                      }
+                    ]
+                  }
+                ]
+              },
+              5
+            ]
+          }
+        },
+        {
+          "if": {
+            "gt": [
+              {
+                "res": "action.jump.pressed"
+              },
+              0.5
+            ]
+          },
+          "then": [
+            {
+              "set": "CharacterBody.jump",
+              "to": 5.5
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

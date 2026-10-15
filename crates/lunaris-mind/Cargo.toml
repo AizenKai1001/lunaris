@@ -1,0 +1,14 @@
+[package]
+name = "lunaris-mind"
+description = "Lets a language model drive one body in a Lunaris world through the same tool API, with permissions and a replayable record."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-ecs = { path = "../lunaris-ecs" }
+lunaris-api = { path = "../lunaris-api" }
+
+[lints]
+workspace = true

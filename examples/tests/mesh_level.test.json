@@ -1,0 +1,302 @@
+{
+  "name": "Mesh level: a ball rolls down the ramp of a model-file courtyard into a low wall, another comes to rest at the bottom of the pit, crates stay stacked on the platform, a box tumbles down the steps, three convex rocks settle on the floor and a wedge stays on the ramp, the guard walks up the ramp by itself, the hero stands on the floor and is stopped by the wall",
+  "scene": "examples/mesh_level.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 90
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "Transform.pos[0]",
+        "between": [
+          -8.0,
+          -2.0
+        ],
+        "message": "the ball is rolling down the ramp"
+      }
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.28,
+          1.6
+        ],
+        "message": "on the surface of the ramp, not through it"
+      }
+    },
+    {
+      "step": 510
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "Transform.pos[0]",
+        "between": [
+          -1.0,
+          2.75
+        ],
+        "message": "the ball ran across the floor and stopped at the low wall (x = 3)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Ball",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.3,
+          0.03
+        ],
+        "message": "and lies on the floor"
+      }
+    },
+    {
+      "expect": {
+        "name": "Pit ball",
+        "field": "Transform.pos[1]",
+        "approx": [
+          -1.7,
+          0.03
+        ],
+        "message": "the other ball fell into the pit and lies on its floor (2 m down)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Pit ball",
+        "field": "Transform.pos[0]",
+        "between": [
+          5.3,
+          7.7
+        ],
+        "message": "inside the pit"
+      }
+    },
+    {
+      "expect": {
+        "name": "Crate 1",
+        "field": "Transform.pos[1]",
+        "approx": [
+          1.5,
+          0.02
+        ],
+        "message": "the bottom crate stands on the platform (1.2 m up)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Crate 3",
+        "field": "Transform.pos[1]",
+        "approx": [
+          2.7,
+          0.04
+        ],
+        "message": "and the third is still on top of the other two"
+      }
+    },
+    {
+      "expect": {
+        "name": "Tumbler",
+        "field": "Transform.pos[2]",
+        "lt": 2.4,
+        "message": "the box slid off the ledge and went down the steps"
+      }
+    },
+    {
+      "expect": {
+        "name": "Tumbler",
+        "field": "Transform.pos[1]",
+        "lt": 0.6,
+        "message": "and lies on the floor at the bottom"
+      }
+    },
+    {
+      "expect": {
+        "name": "Capsule",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.2,
+          0.03
+        ],
+        "message": "the capsule fell over and lies on the floor (0.2 m radius)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rock 1",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.12,
+          0.55
+        ],
+        "message": "rock 1 has tumbled and lies on the floor on one of its faces (its centre is between 0.12 and 0.55 m up, whichever face)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rock 2",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.168,
+          0.77
+        ],
+        "message": "rock 2 has tumbled and lies on the floor on one of its faces (its centre is between 0.17 and 0.77 m up, whichever face)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rock 3",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.096,
+          0.44
+        ],
+        "message": "rock 3 has tumbled and lies on the floor on one of its faces (its centre is between 0.10 and 0.44 m up, whichever face)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rock 1",
+        "field": "Velocity.lin[1]",
+        "between": [
+          -0.05,
+          0.05
+        ],
+        "message": "and is not moving up or down"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rock 2",
+        "field": "Velocity.lin[1]",
+        "between": [
+          -0.05,
+          0.05
+        ],
+        "message": "and is not moving up or down"
+      }
+    },
+    {
+      "expect": {
+        "name": "Rock 3",
+        "field": "Velocity.lin[1]",
+        "between": [
+          -0.05,
+          0.05
+        ],
+        "message": "and is not moving up or down"
+      }
+    },
+    {
+      "expect": {
+        "name": "Wedge",
+        "field": "Transform.pos[0]",
+        "between": [
+          -6.08,
+          -5.92
+        ],
+        "message": "the wedge is still where it was put on the ramp: friction (0.5 against 0.7) is more than the slope's 14 degrees ask for"
+      }
+    },
+    {
+      "expect": {
+        "name": "Wedge",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.705,
+          0.04
+        ],
+        "message": "and lies on the ramp's surface, not in it"
+      }
+    },
+    {
+      "expect": {
+        "name": "Guard",
+        "field": "NavAgent.status",
+        "eq": 2,
+        "message": "the guard arrived at its target on the platform"
+      }
+    },
+    {
+      "expect": {
+        "name": "Guard",
+        "field": "Transform.pos[1]",
+        "approx": [
+          1.2,
+          0.03
+        ],
+        "message": "walked up the ramp: its feet are on the platform"
+      }
+    },
+    {
+      "expect": {
+        "name": "Guard",
+        "field": "CharacterBody.grounded",
+        "eq": true
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.0,
+          0.02
+        ],
+        "message": "the hero stands on the floor"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "CharacterBody.grounded",
+        "eq": true
+      }
+    },
+    {
+      "input": {
+        "a": true
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "input": {
+        "a": false
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[0]",
+        "between": [
+          3.6,
+          4.0
+        ],
+        "message": "the hero walked west at 4 m/s and was stopped by the low wall (it ends at 3.4 m, its own radius 0.35 m away from it)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Hero",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.0,
+          0.05
+        ],
+        "message": "still on the floor: the wall is higher than the 0.4 m it can step up"
+      }
+    }
+  ]
+}

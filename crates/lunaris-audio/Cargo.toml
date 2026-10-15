@@ -1,0 +1,13 @@
+[package]
+name = "lunaris-audio"
+description = "Sound for Lunaris: a WAV reader and writer, the built-in synthesiser, a stereo mixer with 3D positioned voices, and a sound-card output. The only third-party code is the Ogg Vorbis and MP3 decoders (lewton, puremp3: pure Rust)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+lewton = "0.10"
+puremp3 = "0.1"

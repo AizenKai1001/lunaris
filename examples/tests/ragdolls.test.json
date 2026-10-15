@@ -1,0 +1,193 @@
+{
+  "name": "Ragdolls: three dummies of boxes and capsules on ball-and-socket joints are dropped and go limp without exploding",
+  "scene": "examples/ragdolls.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 420
+    },
+    {
+      "expect": {
+        "name": "Red pelvis",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.05,
+          0.9
+        ],
+        "message": "Red: the figure went limp and is low (not flung into the air, not through the floor)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Red head",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.05,
+          1.7
+        ],
+        "message": "Red: the head is where a head can be"
+      }
+    },
+    {
+      "expect": {
+        "name": "Red left shin",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Red left shin: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Red right forearm",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Red right forearm: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Red left thigh",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Red left thigh: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Blue pelvis",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.05,
+          0.9
+        ],
+        "message": "Blue: the figure went limp and is low (not flung into the air, not through the floor)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Blue head",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.05,
+          1.7
+        ],
+        "message": "Blue: the head is where a head can be"
+      }
+    },
+    {
+      "expect": {
+        "name": "Blue left shin",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Blue left shin: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Blue right forearm",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Blue right forearm: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Blue left thigh",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Blue left thigh: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Green pelvis",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.05,
+          0.9
+        ],
+        "message": "Green: the figure went limp and is low (not flung into the air, not through the floor)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Green head",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.05,
+          1.7
+        ],
+        "message": "Green: the head is where a head can be"
+      }
+    },
+    {
+      "expect": {
+        "name": "Green left shin",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Green left shin: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Green right forearm",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Green right forearm: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Green left thigh",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.03,
+          1.7
+        ],
+        "message": "Green left thigh: above the floor, nowhere wild"
+      }
+    },
+    {
+      "expect": {
+        "name": "Red pelvis",
+        "field": "Transform.pos[0]",
+        "between": [
+          -9,
+          9
+        ],
+        "message": "the dummies stayed on the stage"
+      }
+    }
+  ]
+}

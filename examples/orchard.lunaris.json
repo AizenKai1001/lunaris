@@ -1,0 +1,1177 @@
+{
+ "lunaris": 1,
+ "components": [
+  {
+   "name": "Spawner",
+   "doc": "Marks the entity that rains balls.",
+   "fields": []
+  },
+  {
+   "name": "Ball",
+   "doc": "A dropped ball; removed when it is old.",
+   "fields": [
+    {
+     "name": "age",
+     "type": "f32",
+     "default": 0
+    }
+   ]
+  }
+ ],
+ "next_uid": 8,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.14,
+      0.34,
+      0.74
+     ],
+     "sky_horizon": [
+      0.78,
+      0.86,
+      0.92
+     ],
+     "ground": [
+      0.25,
+      0.3,
+      0.2
+     ],
+     "clouds": 0.45,
+     "fog": 0.006,
+     "fog_color": [
+      0.78,
+      0.86,
+      0.92
+     ],
+     "bloom": 0.15
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      0.3,
+      0.1,
+      0.8
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.94,
+      0.82
+     ],
+     "intensity": 2.4
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Ground"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.5,
+      0
+     ],
+     "scale": [
+      60,
+      1,
+      60
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "texture": "grass",
+     "uv_scale": [
+      30,
+      30
+     ],
+     "color": [
+      0.8,
+      0.9,
+      0.75,
+      1
+     ],
+     "roughness": 0.95
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Physics"
+    },
+    "PhysicsSettings": {
+     "gravity": [
+      0,
+      -9.8,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      12,
+      26
+     ],
+     "rot": [
+      -0.25,
+      0,
+      0,
+      0.968
+     ]
+    },
+    "Camera": {
+     "fov_y": 55,
+     "clear": [
+      0.5,
+      0.65,
+      0.85,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Spawner"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ]
+    },
+    "Spawner": {}
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Count"
+    },
+    "Text": {
+     "value": "balls dropped {dropped}",
+     "pos": [
+      0.02,
+      0.03
+     ],
+     "size": 0.05,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "align": 0,
+     "shadow": true
+    }
+   }
+  }
+ ],
+ "resources": {
+  "dropped": 0
+ },
+ "prefabs": {
+  "Tree": {
+   "components": {
+    "Name": {
+     "value": "Tree"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ]
+    }
+   },
+   "children": [
+    {
+     "name": "Trunk",
+     "components": {
+      "LocalTransform": {
+       "pos": [
+        0,
+        1.2,
+        0
+       ],
+       "scale": [
+        0.45,
+        2.4,
+        0.45
+       ]
+      },
+      "MeshRenderer": {
+       "mesh": "cylinder",
+       "color": [
+        0.42,
+        0.28,
+        0.18,
+        1
+       ],
+       "roughness": 0.9
+      },
+      "Collider": {
+       "shape": 1,
+       "size": [
+        1,
+        1,
+        1
+       ]
+      }
+     }
+    },
+    {
+     "name": "Crown",
+     "components": {
+      "LocalTransform": {
+       "pos": [
+        0,
+        3.3,
+        0
+       ],
+       "scale": [
+        2.4,
+        2.4,
+        2.4
+       ]
+      },
+      "MeshRenderer": {
+       "mesh": "sphere",
+       "color": [
+        0.2,
+        0.55,
+        0.22,
+        1
+       ],
+       "roughness": 0.85
+      },
+      "Collider": {
+       "shape": 0,
+       "size": [
+        1,
+        1,
+        1
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "Ball": {
+   "components": {
+    "Name": {
+     "value": "Ball"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      8,
+      0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Velocity": {},
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.35,
+      0.25,
+      1
+     ],
+     "roughness": 0.3,
+     "emissive": 0.25
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 1,
+     "restitution": 0.6,
+     "friction": 0.3
+    },
+    "Ball": {
+     "age": 0
+    }
+   }
+  },
+  "Apple": {
+   "prefab": "Ball",
+   "components": {
+    "Name": {
+     "value": "Apple"
+    },
+    "MeshRenderer": {
+     "color": [
+      0.8,
+      0.1,
+      0.1,
+      1
+     ]
+    }
+   }
+  }
+ },
+ "instances": [
+  {
+   "prefab": "Tree",
+   "at": [
+    -21.85,
+    0,
+    -20.29
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.13,
+      1.13,
+      1.13
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -22.2,
+    0,
+    -13.15
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.98,
+      0.98,
+      0.98
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -22.22,
+    0,
+    -6.59
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.82,
+      0.82,
+      0.82
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -21.69,
+    0,
+    -0.6
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.85,
+      0.85,
+      0.85
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -21.71,
+    0,
+    7.06
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.86,
+      0.86,
+      0.86
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -21.99,
+    0,
+    13.38
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.27,
+      1.27,
+      1.27
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -16.69,
+    0,
+    -19.94
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.29,
+      1.29,
+      1.29
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -17.43,
+    0,
+    -12.7
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.94,
+      0.94,
+      0.94
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -17.3,
+    0,
+    -7.14
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.95,
+      0.95,
+      0.95
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -16.36,
+    0,
+    -0.45
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.09,
+      1.09,
+      1.09
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -16.61,
+    0,
+    6.42
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.07,
+      1.07,
+      1.07
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -17.41,
+    0,
+    12.58
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -11.75,
+    0,
+    -19.9
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.96,
+      0.96,
+      0.96
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -11.88,
+    0,
+    -13.27
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.95,
+      0.95,
+      0.95
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -11.59,
+    0,
+    -6.32
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.92,
+      0.92,
+      0.92
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -11.9,
+    0,
+    0.04
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.24,
+      1.24,
+      1.24
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -11.68,
+    0,
+    6.3
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.29,
+      1.29,
+      1.29
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -12.53,
+    0,
+    13.09
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.18,
+      1.18,
+      1.18
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -7.69,
+    0,
+    -19.82
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.82,
+      0.82,
+      0.82
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -6.96,
+    0,
+    -12.83
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.09,
+      1.09,
+      1.09
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -6.67,
+    0,
+    -6.86
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.15,
+      1.15,
+      1.15
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -7.07,
+    0,
+    0.11
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.03,
+      1.03,
+      1.03
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -6.72,
+    0,
+    7.22
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.04,
+      1.04,
+      1.04
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -6.97,
+    0,
+    12.58
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.15,
+      1.15,
+      1.15
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -2.19,
+    0,
+    -19.11
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.21,
+      1.21,
+      1.21
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -2.7,
+    0,
+    -13.36
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.13,
+      1.13,
+      1.13
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -3.07,
+    0,
+    -6.65
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.88,
+      0.88,
+      0.88
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -2.02,
+    0,
+    6.08
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.92,
+      0.92,
+      0.92
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    -2.55,
+    0,
+    13.72
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.84,
+      0.84,
+      0.84
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    2.33,
+    0,
+    -19.73
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.24,
+      1.24,
+      1.24
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    2.85,
+    0,
+    -12.69
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.94,
+      0.94,
+      0.94
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    2.28,
+    0,
+    -6.8
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.24,
+      1.24,
+      1.24
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    1.95,
+    0,
+    6.22
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.92,
+      0.92,
+      0.92
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    2.38,
+    0,
+    13.32
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.93,
+      0.93,
+      0.93
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    6.51,
+    0,
+    -19.91
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      0.98,
+      0.98,
+      0.98
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    7.29,
+    0,
+    -12.57
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.15,
+      1.15,
+      1.15
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    7.22,
+    0,
+    -6.44
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.14,
+      1.14,
+      1.14
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    6.58,
+    0,
+    0.56
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.19,
+      1.19,
+      1.19
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    7.72,
+    0,
+    7.02
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "Tree",
+   "at": [
+    7.06,
+    0,
+    12.64
+   ],
+   "overrides": {
+    "Transform": {
+     "scale": [
+      1.12,
+      1.12,
+      1.12
+     ]
+    }
+   }
+  }
+ ],
+ "systems": [
+  {
+   "name": "rain",
+   "doc": "Every 15 ticks drop a Ball from [-10..10, 9, -10..10] with a little sideways speed.",
+   "each": [
+    "Spawner"
+   ],
+   "do": [
+    {
+     "if": {
+      "eq": [
+       {
+        "mod": [
+         {
+          "tick": true
+         },
+         15
+        ]
+       },
+       0
+      ]
+     },
+     "then": [
+      {
+       "spawn_prefab": "Ball",
+       "at": [
+        {
+         "sub": [
+          {
+           "mul": [
+            {
+             "rand": 1
+            },
+            20
+           ]
+          },
+          10
+         ]
+        },
+        9,
+        {
+         "sub": [
+          {
+           "mul": [
+            {
+             "rand": 2
+            },
+            20
+           ]
+          },
+          10
+         ]
+        }
+       ],
+       "velocity": [
+        {
+         "sub": [
+          {
+           "mul": [
+            {
+             "rand": 3
+            },
+            2
+           ]
+          },
+          1
+         ]
+        },
+        0,
+        {
+         "sub": [
+          {
+           "mul": [
+            {
+             "rand": 4
+            },
+            2
+           ]
+          },
+          1
+         ]
+        }
+       ]
+      },
+      {
+       "res_add": "dropped",
+       "by": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "age",
+   "doc": "Balls get old and disappear after seven seconds.",
+   "each": [
+    "Ball"
+   ],
+   "do": [
+    {
+     "set": "Ball.age",
+     "to": {
+      "add": [
+       {
+        "get": "Ball.age"
+       },
+       {
+        "dt": true
+       }
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "get": "Ball.age"
+       },
+       7
+      ]
+     },
+     "then": [
+      {
+       "despawn": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

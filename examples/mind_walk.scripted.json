@@ -1,0 +1,10 @@
+[
+  "{\"thought\": \"The Goal is to the east, so I walk that way.\", \"actions\": [{\"tool\": \"set\", \"args\": {\"component\": \"Velocity\", \"value\": {\"lin\": [3, 0, 0]}}}]}",
+  "{\"thought\": \"Still heading east.\", \"actions\": []}",
+  "{\"thought\": \"Still heading east.\", \"actions\": []}",
+  "{\"thought\": \"Still heading east.\", \"actions\": []}",
+  "{\"thought\": \"The Goal is getting close, slow down a little.\", \"actions\": [{\"tool\": \"set\", \"args\": {\"component\": \"Velocity\", \"value\": {\"lin\": [2, 0, 0]}}}]}",
+  "{\"thought\": \"Nearly there.\", \"actions\": []}",
+  "{\"thought\": \"Right beside the Goal, creep the last bit.\", \"actions\": [{\"tool\": \"set\", \"args\": {\"component\": \"Velocity\", \"value\": {\"lin\": [1, 0, 0]}}}]}",
+  "{\"thought\": \"Reached the Goal, stop.\", \"actions\": [{\"tool\": \"set\", \"args\": {\"component\": \"Velocity\", \"value\": {\"lin\": [0, 0, 0]}}}]}"
+]

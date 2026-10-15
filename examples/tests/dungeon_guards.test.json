@@ -1,0 +1,68 @@
+{
+  "name": "Dungeon: a guard that sees the hero hunts it and bites (Sensor with line of sight, chase, contacts, HitPoints)",
+  "scene": "examples/dungeon.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "entity": 1100,
+        "field": "Enemy.alert",
+        "eq": 0,
+        "message": "the guards start calm"
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 1100,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              -18.5,
+              11.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "step": 20
+    },
+    {
+      "expect": {
+        "entity": 1100,
+        "field": "Enemy.alert",
+        "gt": 0,
+        "message": "the guard sees the hero across the room and is alerted"
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "expect": {
+        "resource": "hero.hp",
+        "lt": 100,
+        "message": "the guard caught the hero and bit it"
+      }
+    },
+    {
+      "expect": {
+        "resource": "hero.hp",
+        "gt": 0,
+        "message": "the hero survives one guard"
+      }
+    },
+    {
+      "expect": {
+        "entity": 1101,
+        "field": "Enemy.alert",
+        "eq": 0,
+        "message": "a guard behind walls never noticed anything"
+      }
+    }
+  ]
+}

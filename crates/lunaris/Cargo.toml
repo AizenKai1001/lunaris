@@ -1,0 +1,33 @@
+[package]
+name = "lunaris"
+description = "The lunaris command line: serve (MCP/JSON-RPC), run, schema, bench."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "lunaris"
+path = "src/main.rs"
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-ecs = { path = "../lunaris-ecs" }
+lunaris-sim = { path = "../lunaris-sim" }
+lunaris-api = { path = "../lunaris-api" }
+lunaris-render = { path = "../lunaris-render" }
+lunaris-mind = { path = "../lunaris-mind" }
+lunaris-editor = { path = "../lunaris-editor" }
+lunaris-gpu = { path = "../lunaris-gpu" }
+lunaris-net = { path = "../lunaris-net" }
+lunaris-audio = { path = "../lunaris-audio" }
+lunaris-pad = { path = "../lunaris-pad" }
+
+[target.'cfg(windows)'.dependencies]
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
+
+# Linux: a window on an X server (also on Wayland desktops, through XWayland), drawn by the GPU renderer
+[target.'cfg(target_os = "linux")'.dependencies]
+winit = { version = "0.30", default-features = false, features = ["rwh_06", "x11"] }
+
+[lints]
+workspace = true

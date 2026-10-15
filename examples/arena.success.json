@@ -1,0 +1,4 @@
+[
+  { "name": "Walker", "field": "Transform.pos[0]", "ge": 8.0, "message": "the walker is within a metre of the Goal (x = 9)" },
+  { "name": "Walker", "field": "Transform.pos[0]", "le": 9.0 }
+]

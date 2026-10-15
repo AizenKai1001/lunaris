@@ -1,0 +1,22 @@
+[package]
+name = "lunaris-api"
+description = "The one command and query API (JSON-RPC 2.0 and MCP over stdio) used by editors, AI agents, CLI and CI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-ecs = { path = "../lunaris-ecs" }
+lunaris-sim = { path = "../lunaris-sim" }
+lunaris-render = { path = "../lunaris-render" }
+lunaris-wasm = { path = "../lunaris-wasm" }
+lunaris-audio = { path = "../lunaris-audio" }
+lunaris-script = { path = "../lunaris-script" }
+lunaris-pad = { path = "../lunaris-pad" }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+png = "0.18"

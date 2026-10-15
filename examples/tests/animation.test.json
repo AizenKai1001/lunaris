@@ -1,0 +1,19 @@
+{
+  "name": "Animation: five skinned models play clips; the clocks run, freeze with speed 0, and the pose is part of the replayed state",
+  "scene": "examples/animation.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0, "message": "the model, its clips and the textures are all found" } },
+    { "expect": { "count": { "with": ["Animator"] }, "eq": 5 } },
+    { "expect": { "name": "Swayer sway x1.0", "field": "Animator.time", "approx": [0.0, 0.0001] } },
+    { "step": 60 },
+    { "expect": { "name": "Swayer sway x1.0", "field": "Animator.time", "approx": [1.0, 0.001], "message": "one second of simulation is one second into the clip" } },
+    { "expect": { "name": "Swayer sway x1.6", "field": "Animator.time", "approx": [2.0, 0.001], "message": "speed 1.6 from 0.4: 0.4 + 1.6" } },
+    { "expect": { "name": "Swayer nod x0.6", "field": "Animator.time", "approx": [1.5, 0.001], "message": "0.9 + 0.6" } },
+    { "call": { "tool": "set", "args": { "uid": 5, "component": "Animator", "value": { "speed": 0 } } } },
+    { "step": 60 },
+    { "expect": { "name": "Swayer sway x1.0", "field": "Animator.time", "approx": [1.0, 0.001], "message": "speed 0 freezes the clock" } },
+    { "expect": { "name": "Swayer nod x1.0", "field": "Animator.time", "approx": [2.0, 0.001], "message": "the others kept playing" } }
+  ]
+}

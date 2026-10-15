@@ -1,0 +1,610 @@
+{
+  "lunaris": 1,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Name": {
+          "value": "Environment"
+        },
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.02,
+            0.03,
+            0.09
+          ],
+          "sky_horizon": [
+            0.08,
+            0.1,
+            0.2
+          ],
+          "ground": [
+            0.03,
+            0.04,
+            0.05
+          ],
+          "ambient": 0.5,
+          "bloom": 0.5,
+          "bloom_threshold": 0.8,
+          "fog": 0.01,
+          "fog_color": [
+            0.05,
+            0.06,
+            0.12
+          ],
+          "exposure": 1.1
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Name": {
+          "value": "Moon"
+        },
+        "Transform": {
+          "rot": [
+            -0.55,
+            0.3,
+            0.1,
+            0.77
+          ]
+        },
+        "Light": {
+          "kind": 0,
+          "color": [
+            0.45,
+            0.55,
+            0.9
+          ],
+          "intensity": 0.8
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Name": {
+          "value": "Fire light"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.9,
+            0
+          ]
+        },
+        "Light": {
+          "kind": 1,
+          "color": [
+            1.0,
+            0.55,
+            0.2
+          ],
+          "intensity": 4.0,
+          "range": 9
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Name": {
+          "value": "Ground"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            40,
+            1,
+            40
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "plane",
+          "color": [
+            0.14,
+            0.18,
+            0.14,
+            1
+          ],
+          "roughness": 0.95
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2.6,
+            9.5
+          ],
+          "rot": [
+            -0.12,
+            0,
+            0,
+            0.99
+          ]
+        },
+        "Camera": {
+          "fov_y": 55,
+          "clear": [
+            0.02,
+            0.03,
+            0.08,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Name": {
+          "value": "Log 1"
+        },
+        "Transform": {
+          "pos": [
+            -0.35,
+            0.12,
+            0.0
+          ],
+          "rot": [
+            0,
+            0.09983341664682815,
+            0,
+            0.9950041652780258
+          ],
+          "scale": [
+            1.1,
+            0.18,
+            0.18
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.3,
+            0.18,
+            0.1,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Name": {
+          "value": "Log 2"
+        },
+        "Transform": {
+          "pos": [
+            0.35,
+            0.12,
+            0.0
+          ],
+          "rot": [
+            0,
+            -0.09983341664682815,
+            0,
+            0.9950041652780258
+          ],
+          "scale": [
+            1.1,
+            0.18,
+            0.18
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.3,
+            0.18,
+            0.1,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Name": {
+          "value": "Log 3"
+        },
+        "Transform": {
+          "pos": [
+            0.0,
+            0.12,
+            0.3
+          ],
+          "rot": [
+            0,
+            0.6816387600233341,
+            0,
+            0.7316888688738209
+          ],
+          "scale": [
+            1.1,
+            0.18,
+            0.18
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.3,
+            0.18,
+            0.1,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Name": {
+          "value": "Fire"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.2,
+            0
+          ]
+        },
+        "Particles": {
+          "count": 700,
+          "lifetime": 1.2,
+          "shape": 3,
+          "extent": [
+            0.3,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 14,
+          "speed_range": [
+            0.8,
+            1.8
+          ],
+          "gravity": [
+            0,
+            1.2,
+            0
+          ],
+          "turbulence": 0.18,
+          "turbulence_scale": 1.5,
+          "size": [
+            0.55,
+            0.12
+          ],
+          "color": [
+            1.0,
+            0.65,
+            0.18,
+            0.9
+          ],
+          "color_end": [
+            0.9,
+            0.12,
+            0.02,
+            0.0
+          ],
+          "additive": true,
+          "fade_in": 0.1,
+          "seed": 11
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Name": {
+          "value": "Smoke"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.0,
+            0
+          ]
+        },
+        "Particles": {
+          "count": 160,
+          "lifetime": 4.0,
+          "shape": 3,
+          "extent": [
+            0.15,
+            0,
+            0
+          ],
+          "cone": 20,
+          "speed_range": [
+            0.5,
+            1.0
+          ],
+          "gravity": [
+            0.3,
+            0.6,
+            0.0
+          ],
+          "drag": 0.25,
+          "turbulence": 0.5,
+          "turbulence_scale": 0.6,
+          "size": [
+            0.35,
+            1.5
+          ],
+          "size_jitter": 0.25,
+          "color": [
+            0.32,
+            0.32,
+            0.36,
+            0.5
+          ],
+          "color_end": [
+            0.16,
+            0.16,
+            0.2,
+            0.0
+          ],
+          "additive": false,
+          "fade_in": 0.2,
+          "spin": 0.4,
+          "seed": 5
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Name": {
+          "value": "Sparks"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.6,
+            0
+          ]
+        },
+        "Particles": {
+          "count": 120,
+          "lifetime": 1.6,
+          "shape": 0,
+          "cone": 55,
+          "speed_range": [
+            2.0,
+            5.0
+          ],
+          "gravity": [
+            0,
+            -5,
+            0
+          ],
+          "drag": 0.4,
+          "size": [
+            0.05,
+            0.02
+          ],
+          "stretch": 0.05,
+          "color": [
+            1.0,
+            0.85,
+            0.4,
+            1.0
+          ],
+          "color_end": [
+            1.0,
+            0.3,
+            0.05,
+            0.0
+          ],
+          "additive": true,
+          "fade_in": 0.0,
+          "seed": 21
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Name": {
+          "value": "Snow"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            7,
+            0
+          ]
+        },
+        "Particles": {
+          "count": 4000,
+          "lifetime": 9.0,
+          "shape": 2,
+          "extent": [
+            12,
+            0.2,
+            9
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "cone": 12,
+          "speed_range": [
+            0.5,
+            1.0
+          ],
+          "gravity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "turbulence": 0.6,
+          "turbulence_scale": 0.3,
+          "size": [
+            0.05,
+            0.05
+          ],
+          "size_jitter": 0.5,
+          "color": [
+            0.9,
+            0.95,
+            1.0,
+            0.9
+          ],
+          "color_end": [
+            0.9,
+            0.95,
+            1.0,
+            0.9
+          ],
+          "additive": false,
+          "fade_in": 0.02,
+          "seed": 3
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Name": {
+          "value": "Burst"
+        },
+        "Transform": {
+          "pos": [
+            -5.5,
+            1.5,
+            -1
+          ]
+        },
+        "Particles": {
+          "count": 500,
+          "lifetime": 2.0,
+          "looping": false,
+          "playing": false,
+          "time": 0.55,
+          "shape": 1,
+          "extent": [
+            0.2,
+            0,
+            0
+          ],
+          "cone": 180,
+          "speed_range": [
+            3.0,
+            7.0
+          ],
+          "gravity": [
+            0,
+            -4,
+            0
+          ],
+          "drag": 1.6,
+          "size": [
+            0.18,
+            0.04
+          ],
+          "color": [
+            1.0,
+            0.95,
+            0.5,
+            1.0
+          ],
+          "color_end": [
+            1.0,
+            0.25,
+            0.05,
+            0.0
+          ],
+          "additive": true,
+          "fade_in": 0.0,
+          "seed": 9
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Name": {
+          "value": "Magic ring"
+        },
+        "Transform": {
+          "pos": [
+            5.2,
+            1.1,
+            -0.5
+          ]
+        },
+        "Particles": {
+          "count": 300,
+          "lifetime": 2.5,
+          "shape": 4,
+          "extent": [
+            1.0,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 8,
+          "speed_range": [
+            0.2,
+            0.6
+          ],
+          "gravity": [
+            0,
+            0.4,
+            0
+          ],
+          "size": [
+            0.16,
+            0.02
+          ],
+          "color": [
+            0.5,
+            0.8,
+            1.0,
+            1.0
+          ],
+          "color_end": [
+            0.7,
+            0.3,
+            1.0,
+            0.0
+          ],
+          "additive": true,
+          "spin": 3.0,
+          "texture": "ring",
+          "seed": 17
+        }
+      }
+    }
+  ]
+}

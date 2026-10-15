@@ -1,0 +1,5583 @@
+{
+  "lunaris": 1,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Name": {
+          "value": "Environment"
+        },
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.3,
+            0.5,
+            0.85
+          ],
+          "sky_horizon": [
+            0.8,
+            0.88,
+            0.95
+          ],
+          "ambient": 0.9,
+          "ssao": 0.8,
+          "bloom": 0.15,
+          "fog": 0.003
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "rot": [
+            -0.52,
+            0.3,
+            0.12,
+            0.79
+          ]
+        },
+        "Light": {
+          "kind": 0,
+          "intensity": 3.0
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Name": {
+          "value": "Field"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            60,
+            1,
+            40
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "plane",
+          "texture": "grass",
+          "uv_scale": [
+            24,
+            16
+          ],
+          "color": [
+            0.8,
+            0.95,
+            0.8,
+            1
+          ],
+          "roughness": 0.95
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            15,
+            14
+          ],
+          "rot": [
+            -0.45,
+            0,
+            0,
+            0.89
+          ]
+        },
+        "Camera": {
+          "fov_y": 52
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Name": {
+          "value": "Post 0"
+        },
+        "Transform": {
+          "pos": [
+            -12,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Name": {
+          "value": "Post 0"
+        },
+        "Transform": {
+          "pos": [
+            -12,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Name": {
+          "value": "Post 1"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Name": {
+          "value": "Post 1"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Name": {
+          "value": "Post 2"
+        },
+        "Transform": {
+          "pos": [
+            -6,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Name": {
+          "value": "Post 2"
+        },
+        "Transform": {
+          "pos": [
+            -6,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Name": {
+          "value": "Post 3"
+        },
+        "Transform": {
+          "pos": [
+            -3,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Name": {
+          "value": "Post 3"
+        },
+        "Transform": {
+          "pos": [
+            -3,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Name": {
+          "value": "Post 4"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Name": {
+          "value": "Post 4"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 15,
+      "components": {
+        "Name": {
+          "value": "Post 5"
+        },
+        "Transform": {
+          "pos": [
+            3,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 16,
+      "components": {
+        "Name": {
+          "value": "Post 5"
+        },
+        "Transform": {
+          "pos": [
+            3,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 17,
+      "components": {
+        "Name": {
+          "value": "Post 6"
+        },
+        "Transform": {
+          "pos": [
+            6,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 18,
+      "components": {
+        "Name": {
+          "value": "Post 6"
+        },
+        "Transform": {
+          "pos": [
+            6,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 19,
+      "components": {
+        "Name": {
+          "value": "Post 7"
+        },
+        "Transform": {
+          "pos": [
+            9,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 20,
+      "components": {
+        "Name": {
+          "value": "Post 7"
+        },
+        "Transform": {
+          "pos": [
+            9,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "Name": {
+          "value": "Post 8"
+        },
+        "Transform": {
+          "pos": [
+            12,
+            0.4,
+            -7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "Name": {
+          "value": "Post 8"
+        },
+        "Transform": {
+          "pos": [
+            12,
+            0.4,
+            7.4
+          ],
+          "scale": [
+            0.15,
+            0.8,
+            0.15
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.45,
+            0.32,
+            0.2,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "Name": {
+          "value": "Rail 0"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.6,
+            -7.4
+          ],
+          "scale": [
+            24.4,
+            0.08,
+            0.08
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.55,
+            0.4,
+            0.26,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 24,
+      "components": {
+        "Name": {
+          "value": "Rail 1"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.6,
+            7.4
+          ],
+          "scale": [
+            24.4,
+            0.08,
+            0.08
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.55,
+            0.4,
+            0.26,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 25,
+      "components": {
+        "Name": {
+          "value": "End rail 0"
+        },
+        "Transform": {
+          "pos": [
+            -12.4,
+            0.6,
+            0
+          ],
+          "scale": [
+            0.08,
+            0.08,
+            14.8
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.55,
+            0.4,
+            0.26,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 26,
+      "components": {
+        "Name": {
+          "value": "End rail 1"
+        },
+        "Transform": {
+          "pos": [
+            12.4,
+            0.6,
+            0
+          ],
+          "scale": [
+            0.08,
+            0.08,
+            14.8
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.55,
+            0.4,
+            0.26,
+            1
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "uid": 27,
+      "components": {
+        "Name": {
+          "value": "Dog"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            0.35,
+            0
+          ],
+          "scale": [
+            0.55,
+            0.55,
+            0.8
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2,
+            0.15,
+            0.12,
+            1
+          ],
+          "roughness": 0.6
+        },
+        "Velocity": {},
+        "Steer": {
+          "wander": 1.0,
+          "max_speed": 5.5,
+          "max_accel": 14,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 3,
+          "face": true
+        }
+      }
+    },
+    {
+      "uid": 28,
+      "components": {
+        "Name": {
+          "value": "Sheep 1"
+        },
+        "Transform": {
+          "pos": [
+            4.6,
+            0.3,
+            0.0
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 29,
+      "components": {
+        "Name": {
+          "value": "Sheep 2"
+        },
+        "Transform": {
+          "pos": [
+            3.231131716698527,
+            0.3,
+            0.35217332729826867
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "Name": {
+          "value": "Sheep 3"
+        },
+        "Transform": {
+          "pos": [
+            4.107192035412818,
+            0.3,
+            -0.6107021999272613
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 31,
+      "components": {
+        "Name": {
+          "value": "Sheep 4"
+        },
+        "Transform": {
+          "pos": [
+            4.8316220287782095,
+            0.3,
+            0.5423510620113815
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 32,
+      "components": {
+        "Name": {
+          "value": "Sheep 5"
+        },
+        "Transform": {
+          "pos": [
+            2.537269183296395,
+            0.3,
+            -0.12936754971995532
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 33,
+      "components": {
+        "Name": {
+          "value": "Sheep 6"
+        },
+        "Transform": {
+          "pos": [
+            5.341527323541741,
+            0.3,
+            -0.4266860182219274
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 34,
+      "components": {
+        "Name": {
+          "value": "Sheep 7"
+        },
+        "Transform": {
+          "pos": [
+            3.562715577379466,
+            0.3,
+            0.8133425997172283
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 35,
+      "components": {
+        "Name": {
+          "value": "Sheep 8"
+        },
+        "Transform": {
+          "pos": [
+            3.1835817803682933,
+            0.3,
+            -0.7859787107852605
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 36,
+      "components": {
+        "Name": {
+          "value": "Sheep 9"
+        },
+        "Transform": {
+          "pos": [
+            5.739810257427788,
+            0.3,
+            0.3176861458377256
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 37,
+      "components": {
+        "Name": {
+          "value": "Sheep 10"
+        },
+        "Transform": {
+          "pos": [
+            2.2177185203953096,
+            0.3,
+            0.3678520994173405
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 38,
+      "components": {
+        "Name": {
+          "value": "Sheep 11"
+        },
+        "Transform": {
+          "pos": [
+            4.847687828631293,
+            0.3,
+            -0.9057352462489194
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 39,
+      "components": {
+        "Name": {
+          "value": "Sheep 12"
+        },
+        "Transform": {
+          "pos": [
+            4.61902349700364,
+            0.3,
+            0.9867634943444196
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 40,
+      "components": {
+        "Name": {
+          "value": "Sheep 13"
+        },
+        "Transform": {
+          "pos": [
+            2.1539623745027487,
+            0.3,
+            -0.5349048696884868
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 41,
+      "components": {
+        "Name": {
+          "value": "Sheep 14"
+        },
+        "Transform": {
+          "pos": [
+            6.145018457349547,
+            0.3,
+            -0.23579150313164562
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 42,
+      "components": {
+        "Name": {
+          "value": "Sheep 15"
+        },
+        "Transform": {
+          "pos": [
+            2.702225034749062,
+            0.3,
+            0.9229819806867031
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 43,
+      "components": {
+        "Name": {
+          "value": "Sheep 16"
+        },
+        "Transform": {
+          "pos": [
+            3.702535744612088,
+            0.3,
+            -1.1477245314865827
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 44,
+      "components": {
+        "Name": {
+          "value": "Sheep 17"
+        },
+        "Transform": {
+          "pos": [
+            5.812893177585462,
+            0.3,
+            0.7639484462804471
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 45,
+      "components": {
+        "Name": {
+          "value": "Sheep 18"
+        },
+        "Transform": {
+          "pos": [
+            1.576694858616754,
+            0.3,
+            0.05011037790123263
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 46,
+      "components": {
+        "Name": {
+          "value": "Sheep 19"
+        },
+        "Transform": {
+          "pos": [
+            5.756682653861772,
+            0.3,
+            -0.8740741637499858
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 47,
+      "components": {
+        "Name": {
+          "value": "Sheep 20"
+        },
+        "Transform": {
+          "pos": [
+            3.8831574427012527,
+            0.3,
+            1.2635335380545945
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 48,
+      "components": {
+        "Name": {
+          "value": "Sheep 21"
+        },
+        "Transform": {
+          "pos": [
+            2.3470260248071053,
+            0.3,
+            -0.9903983822333566
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 49,
+      "components": {
+        "Name": {
+          "value": "Sheep 22"
+        },
+        "Transform": {
+          "pos": [
+            6.605317772543726,
+            0.3,
+            0.175264512542918
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 50,
+      "components": {
+        "Name": {
+          "value": "Sheep 23"
+        },
+        "Transform": {
+          "pos": [
+            1.8029511838325334,
+            0.3,
+            0.7643329102951929
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 51,
+      "components": {
+        "Name": {
+          "value": "Sheep 24"
+        },
+        "Transform": {
+          "pos": [
+            4.597678751505262,
+            0.3,
+            -1.3284037657279162
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 52,
+      "components": {
+        "Name": {
+          "value": "Sheep 25"
+        },
+        "Transform": {
+          "pos": [
+            5.376642789896977,
+            0.3,
+            1.2011972608273018
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 53,
+      "components": {
+        "Name": {
+          "value": "Sheep 26"
+        },
+        "Transform": {
+          "pos": [
+            1.319504061983202,
+            0.3,
+            -0.4275671762474548
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 54,
+      "components": {
+        "Name": {
+          "value": "Sheep 27"
+        },
+        "Transform": {
+          "pos": [
+            6.593944429862175,
+            0.3,
+            -0.5992434601677582
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 55,
+      "components": {
+        "Name": {
+          "value": "Sheep 28"
+        },
+        "Transform": {
+          "pos": [
+            2.880271620554703,
+            0.3,
+            1.3377901597495443
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 56,
+      "components": {
+        "Name": {
+          "value": "Sheep 29"
+        },
+        "Transform": {
+          "pos": [
+            3.004036240367716,
+            0.3,
+            -1.3844885227633366
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 57,
+      "components": {
+        "Name": {
+          "value": "Sheep 30"
+        },
+        "Transform": {
+          "pos": [
+            6.641515522551478,
+            0.3,
+            0.6941420340238785
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 58,
+      "components": {
+        "Name": {
+          "value": "Sheep 31"
+        },
+        "Transform": {
+          "pos": [
+            1.0750456608351207,
+            0.3,
+            0.38551506796630464
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 59,
+      "components": {
+        "Name": {
+          "value": "Sheep 32"
+        },
+        "Transform": {
+          "pos": [
+            5.657624624966472,
+            0.3,
+            -1.2890137543354103
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 60,
+      "components": {
+        "Name": {
+          "value": "Sheep 33"
+        },
+        "Transform": {
+          "pos": [
+            4.525833226898208,
+            0.3,
+            1.5297691638977378
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 61,
+      "components": {
+        "Name": {
+          "value": "Sheep 34"
+        },
+        "Transform": {
+          "pos": [
+            1.514877854691218,
+            0.3,
+            -0.9622940662586136
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 62,
+      "components": {
+        "Name": {
+          "value": "Sheep 35"
+        },
+        "Transform": {
+          "pos": [
+            7.170607813641284,
+            0.3,
+            -0.1313516556112363
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 63,
+      "components": {
+        "Name": {
+          "value": "Sheep 36"
+        },
+        "Transform": {
+          "pos": [
+            1.8139538154869728,
+            0.3,
+            1.1815449932256223
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 64,
+      "components": {
+        "Name": {
+          "value": "Sheep 37"
+        },
+        "Transform": {
+          "pos": [
+            4.0158582683446875,
+            0.3,
+            -1.628137309686658
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 65,
+      "components": {
+        "Name": {
+          "value": "Sheep 38"
+        },
+        "Transform": {
+          "pos": [
+            6.212507523392346,
+            0.3,
+            1.2194624821302475
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 66,
+      "components": {
+        "Name": {
+          "value": "Sheep 39"
+        },
+        "Transform": {
+          "pos": [
+            0.6851011782099712,
+            0.3,
+            -0.1535974455768149
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 67,
+      "components": {
+        "Name": {
+          "value": "Sheep 40"
+        },
+        "Transform": {
+          "pos": [
+            6.680227835905503,
+            0.3,
+            -1.0171176080232058
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 68,
+      "components": {
+        "Name": {
+          "value": "Sheep 41"
+        },
+        "Transform": {
+          "pos": [
+            3.39148655600361,
+            0.3,
+            1.6725512988004025
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 69,
+      "components": {
+        "Name": {
+          "value": "Sheep 42"
+        },
+        "Transform": {
+          "pos": [
+            2.1705874768509306,
+            0.3,
+            -1.4535293728547887
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 70,
+      "components": {
+        "Name": {
+          "value": "Sheep 43"
+        },
+        "Transform": {
+          "pos": [
+            7.345782375654515,
+            0.3,
+            0.4584527653210458
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 71,
+      "components": {
+        "Name": {
+          "value": "Sheep 44"
+        },
+        "Transform": {
+          "pos": [
+            0.8833541237450593,
+            0.3,
+            0.7997250510928948
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 72,
+      "components": {
+        "Name": {
+          "value": "Sheep 45"
+        },
+        "Transform": {
+          "pos": [
+            5.229370638496924,
+            0.3,
+            -1.6580595256996487
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 73,
+      "components": {
+        "Name": {
+          "value": "Sheep 46"
+        },
+        "Transform": {
+          "pos": [
+            5.346019328257633,
+            0.3,
+            1.6531825477799686
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 74,
+      "components": {
+        "Name": {
+          "value": "Sheep 47"
+        },
+        "Transform": {
+          "pos": [
+            0.744413931328983,
+            0.3,
+            -0.7714204314956539
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 75,
+      "components": {
+        "Name": {
+          "value": "Sheep 48"
+        },
+        "Transform": {
+          "pos": [
+            7.473762813029193,
+            0.3,
+            -0.5355196373881984
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 76,
+      "components": {
+        "Name": {
+          "value": "Sheep 49"
+        },
+        "Transform": {
+          "pos": [
+            2.1457931665298178,
+            0.3,
+            1.581977607707138
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 77,
+      "components": {
+        "Name": {
+          "value": "Sheep 50"
+        },
+        "Transform": {
+          "pos": [
+            3.223338698344689,
+            0.3,
+            -1.8082889530485091
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 78,
+      "components": {
+        "Name": {
+          "value": "Sheep 51"
+        },
+        "Transform": {
+          "pos": [
+            7.041300016325355,
+            0.3,
+            1.080172256274323
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 79,
+      "components": {
+        "Name": {
+          "value": "Sheep 52"
+        },
+        "Transform": {
+          "pos": [
+            0.2672375778743903,
+            0.3,
+            0.23262570237439448
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 80,
+      "components": {
+        "Name": {
+          "value": "Sheep 53"
+        },
+        "Transform": {
+          "pos": [
+            6.4581425599886355,
+            0.3,
+            -1.443998319173677
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 81,
+      "components": {
+        "Name": {
+          "value": "Sheep 54"
+        },
+        "Transform": {
+          "pos": [
+            4.1393704913235965,
+            0.3,
+            1.9102503969185942
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 82,
+      "components": {
+        "Name": {
+          "value": "Sheep 55"
+        },
+        "Transform": {
+          "pos": [
+            1.2952777445076227,
+            0.3,
+            -1.3722649829407318
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 83,
+      "components": {
+        "Name": {
+          "value": "Sheep 56"
+        },
+        "Transform": {
+          "pos": [
+            7.878227335987676,
+            0.3,
+            0.09912362060782733
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 84,
+      "components": {
+        "Name": {
+          "value": "Sheep 57"
+        },
+        "Transform": {
+          "pos": [
+            0.9834963312993712,
+            0.3,
+            1.2462254241266497
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 85,
+      "components": {
+        "Name": {
+          "value": "Sheep 58"
+        },
+        "Transform": {
+          "pos": [
+            4.544717633303689,
+            0.3,
+            -1.9523209089292484
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 86,
+      "components": {
+        "Name": {
+          "value": "Sheep 59"
+        },
+        "Transform": {
+          "pos": [
+            6.252446440280716,
+            0.3,
+            1.6355779415959475
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 87,
+      "components": {
+        "Name": {
+          "value": "Sheep 60"
+        },
+        "Transform": {
+          "pos": [
+            0.10127706844176831,
+            0.3,
+            -0.44851569767484345
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 88,
+      "components": {
+        "Name": {
+          "value": "Sheep 61"
+        },
+        "Transform": {
+          "pos": [
+            7.505700872140478,
+            0.3,
+            -0.9931269006211172
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 89,
+      "components": {
+        "Name": {
+          "value": "Sheep 62"
+        },
+        "Transform": {
+          "pos": [
+            2.7479197701877487,
+            0.3,
+            1.9298697503944446
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 90,
+      "components": {
+        "Name": {
+          "value": "Sheep 63"
+        },
+        "Transform": {
+          "pos": [
+            2.304313330058764,
+            0.3,
+            -1.8587504527442502
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 91,
+      "components": {
+        "Name": {
+          "value": "Sheep 64"
+        },
+        "Transform": {
+          "pos": [
+            7.787259299071897,
+            0.3,
+            0.8033420092534035
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 92,
+      "components": {
+        "Name": {
+          "value": "Sheep 65"
+        },
+        "Transform": {
+          "pos": [
+            0.09590883947622686,
+            0.3,
+            0.691406787930672
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 93,
+      "components": {
+        "Name": {
+          "value": "Sheep 66"
+        },
+        "Transform": {
+          "pos": [
+            5.957618841410326,
+            0.3,
+            -1.84057768534591
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 94,
+      "components": {
+        "Name": {
+          "value": "Sheep 67"
+        },
+        "Transform": {
+          "pos": [
+            5.049941360280411,
+            0.3,
+            2.031601664106672
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 95,
+      "components": {
+        "Name": {
+          "value": "Sheep 68"
+        },
+        "Transform": {
+          "pos": [
+            0.45839022808015617,
+            0.3,
+            -1.150822792929576
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 96,
+      "components": {
+        "Name": {
+          "value": "Sheep 69"
+        },
+        "Transform": {
+          "pos": [
+            8.192787703384873,
+            0.3,
+            -0.34979825994449043
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 97,
+      "components": {
+        "Name": {
+          "value": "Sheep 70"
+        },
+        "Transform": {
+          "pos": [
+            1.3644611005178806,
+            0.3,
+            1.6845573372255678
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 98,
+      "components": {
+        "Name": {
+          "value": "Sheep 71"
+        },
+        "Transform": {
+          "pos": [
+            3.6654954836428373,
+            0.3,
+            -2.145516775227193
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 99,
+      "components": {
+        "Name": {
+          "value": "Sheep 72"
+        },
+        "Transform": {
+          "pos": [
+            7.164470797400442,
+            0.3,
+            1.4780581182875683
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 100,
+      "components": {
+        "Name": {
+          "value": "Sheep 73"
+        },
+        "Transform": {
+          "pos": [
+            -0.35638755178495085,
+            0.3,
+            -0.02121639279362162
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 101,
+      "components": {
+        "Name": {
+          "value": "Sheep 74"
+        },
+        "Transform": {
+          "pos": [
+            7.260266745996118,
+            0.3,
+            -1.4643915792816142
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 102,
+      "components": {
+        "Name": {
+          "value": "Sheep 75"
+        },
+        "Transform": {
+          "pos": [
+            3.571838628609535,
+            0.3,
+            2.193785081257058
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 103,
+      "components": {
+        "Name": {
+          "value": "Sheep 76"
+        },
+        "Transform": {
+          "pos": [
+            1.3365458401393444,
+            0.3,
+            -1.7724898745383828
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 104,
+      "components": {
+        "Name": {
+          "value": "Sheep 77"
+        },
+        "Transform": {
+          "pos": [
+            8.383589713747103,
+            0.3,
+            0.4097504125174583
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 105,
+      "components": {
+        "Name": {
+          "value": "Sheep 78"
+        },
+        "Transform": {
+          "pos": [
+            0.19262744145692157,
+            0.3,
+            1.1850870229043342
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 106,
+      "components": {
+        "Name": {
+          "value": "Sheep 79"
+        },
+        "Transform": {
+          "pos": [
+            5.213171362076002,
+            0.3,
+            -2.1718770626433384
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 107,
+      "components": {
+        "Name": {
+          "value": "Sheep 80"
+        },
+        "Transform": {
+          "pos": [
+            6.050908797338021,
+            0.3,
+            2.022358697003332
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 108,
+      "components": {
+        "Name": {
+          "value": "Sheep 81"
+        },
+        "Transform": {
+          "pos": [
+            -0.2676801094435053,
+            0.3,
+            -0.8029109622233751
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 109,
+      "components": {
+        "Name": {
+          "value": "Sheep 82"
+        },
+        "Transform": {
+          "pos": [
+            8.254467156214183,
+            0.3,
+            -0.8539427730927568
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 110,
+      "components": {
+        "Name": {
+          "value": "Sheep 83"
+        },
+        "Transform": {
+          "pos": [
+            2.0059408964106775,
+            0.3,
+            2.0776498844038547
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 111,
+      "components": {
+        "Name": {
+          "value": "Sheep 84"
+        },
+        "Transform": {
+          "pos": [
+            2.6564243827851852,
+            0.3,
+            -2.217139915440846
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 112,
+      "components": {
+        "Name": {
+          "value": "Sheep 85"
+        },
+        "Transform": {
+          "pos": [
+            8.00686451301187,
+            0.3,
+            1.1872383249674214
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 113,
+      "components": {
+        "Name": {
+          "value": "Sheep 86"
+        },
+        "Transform": {
+          "pos": [
+            -0.5820413035342176,
+            0.3,
+            0.48033766362229335
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 114,
+      "components": {
+        "Name": {
+          "value": "Sheep 87"
+        },
+        "Transform": {
+          "pos": [
+            6.74368532027839,
+            0.3,
+            -1.9114731211570548
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 115,
+      "components": {
+        "Name": {
+          "value": "Sheep 88"
+        },
+        "Transform": {
+          "pos": [
+            4.56208468910053,
+            0.3,
+            2.3479431896204197
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 116,
+      "components": {
+        "Name": {
+          "value": "Sheep 89"
+        },
+        "Transform": {
+          "pos": [
+            0.3955642308972509,
+            0.3,
+            -1.5491714051179875
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    },
+    {
+      "uid": 117,
+      "components": {
+        "Name": {
+          "value": "Sheep 90"
+        },
+        "Transform": {
+          "pos": [
+            8.77421781538684,
+            0.3,
+            -0.07544209425467678
+          ],
+          "scale": [
+            0.5,
+            0.42,
+            0.62
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.78,
+            0.78,
+            0.75,
+            1
+          ],
+          "roughness": 0.95
+        },
+        "Velocity": {},
+        "Steer": {
+          "group": "sheep",
+          "radius": 3.0,
+          "personal": 0.9,
+          "separation": 1.6,
+          "alignment": 1.0,
+          "cohesion": 0.8,
+          "max_speed": 3.0,
+          "max_accel": 9,
+          "flee": 27,
+          "flee_radius": 6.5,
+          "flee_weight": 3.0,
+          "wander": 0.25,
+          "bounds": [
+            -12,
+            -7,
+            12,
+            7
+          ],
+          "edge": 2.5,
+          "face": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[package]
+name = "lunaris-sim"
+description = "Deterministic fixed-step simulation: schedule, RNG, commands with undo, snapshots, replay, state hash."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-ecs = { path = "../lunaris-ecs" }
+
+[lints]
+workspace = true

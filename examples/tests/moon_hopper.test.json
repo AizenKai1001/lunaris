@@ -1,0 +1,29 @@
+{
+  "name": "Moon Hopper: the hero runs, lands, and jumps",
+  "scene": "examples/moon_hopper.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "count": { "with": ["Coin"] }, "eq": 12 } },
+    { "expect": { "resource": "score", "eq": 0 } },
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "approx": [-17, 0.001] } },
+
+    { "note": "hold D: the hero runs to the right and ends up standing on the ground" },
+    { "input": { "d": true } },
+    { "step": 90 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "gt": -16 } },
+    { "expect": { "name": "Hero", "field": "Hero.grounded", "eq": 1 } },
+
+    { "note": "hold Space as well: the hero leaves the ground" },
+    { "input": { "space": true } },
+    { "step": 20 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "gt": -3.0 } },
+    { "expect": { "name": "Hero", "field": "Hero.grounded", "eq": 0 } },
+    { "input": { "d": false, "space": false } },
+
+    { "note": "same seed, same inputs: the hash after the run is always this one" },
+    { "step": 120 },
+    { "expect": { "tick": true, "eq": 230 } }
+  ]
+}

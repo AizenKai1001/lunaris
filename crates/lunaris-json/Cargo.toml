@@ -1,0 +1,9 @@
+[package]
+name = "lunaris-json"
+description = "Strict RFC 8259 JSON value, parser and writer with line/column errors. No dependencies."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

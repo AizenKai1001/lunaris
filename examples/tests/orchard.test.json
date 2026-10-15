@@ -1,0 +1,23 @@
+{
+  "name": "Orchard: forty tree instances expand into trunk + crown entities, a graph system rains balls from a prefab, balls bounce on the trees and disappear when old",
+  "scene": "examples/orchard.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "expect": { "count": { "with": ["Name", "Transform"] }, "eq": 124 }, "message": "4 placed scene entities (sun, ground, camera, spawner) and 40 trees of 3 entities each" },
+    { "expect": { "exists": "Trunk", "eq": true } },
+    { "expect": { "resource": "dropped", "eq": 0 } },
+    { "step": 1 },
+    { "expect": { "resource": "dropped", "eq": 1, "message": "the spawner fires on tick 0" } },
+    { "expect": { "count": { "with": ["Ball"] }, "eq": 1 } },
+    { "step": 59 },
+    { "expect": { "resource": "dropped", "eq": 4 } },
+    { "expect": { "count": { "with": ["Ball"] }, "eq": 4, "message": "one ball every 15 ticks, none old enough to go yet" } },
+    { "step": 600 },
+    { "expect": { "resource": "dropped", "ge": 44 } },
+    { "expect": { "count": { "with": ["Ball"] }, "between": [20, 30], "message": "balls older than seven seconds are removed, so the number alive stays around 28" } },
+    { "expect": { "count": { "with": ["Ball", "Transform"], "without": ["RigidBody"] }, "eq": 0, "message": "every ball is a complete prefab copy" } },
+    { "expect": { "check": "errors", "eq": 0 } }
+  ]
+}

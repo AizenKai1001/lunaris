@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Drives the Lunaris engine from C# through its C interface (crates/lunaris-ffi). Build the library first
+       (cargo build with the release profile, package lunaris-ffi), then run this project in Release configuration. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\target\release\lunaris_ffi.dll" Link="lunaris_ffi.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\..\target\release\lunaris_ffi.dll')" />
+    <None Include="..\..\..\target\release\liblunaris_ffi.so" Link="liblunaris_ffi.so" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\..\target\release\liblunaris_ffi.so')" />
+  </ItemGroup>
+
+</Project>

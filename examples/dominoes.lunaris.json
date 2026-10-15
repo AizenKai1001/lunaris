@@ -1,0 +1,1573 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.18,
+      0.4,
+      0.82
+     ],
+     "sky_horizon": [
+      0.8,
+      0.86,
+      0.95
+     ],
+     "ground": [
+      0.3,
+      0.28,
+      0.25
+     ],
+     "clouds": 0.3,
+     "fog": 0.004,
+     "fog_color": [
+      0.8,
+      0.86,
+      0.95
+     ],
+     "bloom": 0.12
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.52,
+      0.3,
+      0.14,
+      0.78
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.93,
+      0.82
+     ],
+     "intensity": 2.6
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Floor"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.5,
+      0
+     ],
+     "scale": [
+      24,
+      1,
+      14
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "texture": "wood",
+     "uv_scale": [
+      10,
+      6
+     ],
+     "color": [
+      0.78,
+      0.74,
+      0.7,
+      1
+     ],
+     "roughness": 0.7
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "friction": 0.8,
+     "restitution": 0.05
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Ramp"
+    },
+    "Transform": {
+     "pos": [
+      -3.1509,
+      0.4728,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      -0.130526,
+      0.991445
+     ],
+     "scale": [
+      4.4,
+      0.2,
+      1.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.42,
+      0.3,
+      1
+     ],
+     "texture": "wood",
+     "uv_scale": [
+      4,
+      1
+     ],
+     "roughness": 0.6
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "friction": 0.9,
+     "restitution": 0
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Ball"
+    },
+    "Transform": {
+     "pos": [
+      -4.8595,
+      1.2443,
+      0
+     ],
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.02
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2.0,
+     "friction": 0.7,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.85,
+      0.15,
+      0.12,
+      1
+     ],
+     "metallic": 0.4,
+     "roughness": 0.25
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Domino 1"
+    },
+    "Transform": {
+     "pos": [
+      0.4,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.25,
+      0.55,
+      0.9,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Domino 2"
+    },
+    "Transform": {
+     "pos": [
+      0.7,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.287,
+      0.534,
+      0.859,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Domino 3"
+    },
+    "Transform": {
+     "pos": [
+      1.0,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.325,
+      0.519,
+      0.819,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Domino 4"
+    },
+    "Transform": {
+     "pos": [
+      1.3,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.362,
+      0.503,
+      0.778,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Domino 5"
+    },
+    "Transform": {
+     "pos": [
+      1.6,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.4,
+      0.488,
+      0.738,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Domino 6"
+    },
+    "Transform": {
+     "pos": [
+      1.9,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.438,
+      0.472,
+      0.697,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Domino 7"
+    },
+    "Transform": {
+     "pos": [
+      2.2,
+      0.31,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.475,
+      0.456,
+      0.656,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Domino 8"
+    },
+    "Transform": {
+     "pos": [
+      2.4975,
+      0.31,
+      -0.0389
+     ],
+     "rot": [
+      0,
+      0.064954,
+      0,
+      0.997888
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.512,
+      0.441,
+      0.616,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Domino 9"
+    },
+    "Transform": {
+     "pos": [
+      2.7874,
+      0.31,
+      -0.116
+     ],
+     "rot": [
+      0,
+      0.129634,
+      0,
+      0.991562
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.425,
+      0.575,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 15,
+   "components": {
+    "Name": {
+     "value": "Domino 10"
+    },
+    "Transform": {
+     "pos": [
+      3.0649,
+      0.31,
+      -0.2301
+     ],
+     "rot": [
+      0,
+      0.193767,
+      0,
+      0.981048
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.587,
+      0.409,
+      0.534,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 16,
+   "components": {
+    "Name": {
+     "value": "Domino 11"
+    },
+    "Transform": {
+     "pos": [
+      3.3252,
+      0.31,
+      -0.3791
+     ],
+     "rot": [
+      0,
+      0.257081,
+      0,
+      0.96639
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.625,
+      0.394,
+      0.494,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 17,
+   "components": {
+    "Name": {
+     "value": "Domino 12"
+    },
+    "Transform": {
+     "pos": [
+      3.564,
+      0.31,
+      -0.5607
+     ],
+     "rot": [
+      0,
+      0.319309,
+      0,
+      0.947651
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.662,
+      0.378,
+      0.453,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 18,
+   "components": {
+    "Name": {
+     "value": "Domino 13"
+    },
+    "Transform": {
+     "pos": [
+      3.7773,
+      0.31,
+      -0.7717
+     ],
+     "rot": [
+      0,
+      0.380188,
+      0,
+      0.924909
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.363,
+      0.412,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 19,
+   "components": {
+    "Name": {
+     "value": "Domino 14"
+    },
+    "Transform": {
+     "pos": [
+      3.9614,
+      0.31,
+      -1.0085
+     ],
+     "rot": [
+      0,
+      0.439462,
+      0,
+      0.898261
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.738,
+      0.347,
+      0.372,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Domino 15"
+    },
+    "Transform": {
+     "pos": [
+      4.1133,
+      0.31,
+      -1.2672
+     ],
+     "rot": [
+      0,
+      0.49688,
+      0,
+      0.867819
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.775,
+      0.331,
+      0.331,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Domino 16"
+    },
+    "Transform": {
+     "pos": [
+      4.2652,
+      0.31,
+      -1.526
+     ],
+     "rot": [
+      0,
+      0.49688,
+      0,
+      0.867819
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.812,
+      0.316,
+      0.291,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Domino 17"
+    },
+    "Transform": {
+     "pos": [
+      4.417,
+      0.31,
+      -1.7847
+     ],
+     "rot": [
+      0,
+      0.49688,
+      0,
+      0.867819
+     ],
+     "scale": [
+      0.1,
+      0.62,
+      0.32
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.5,
+     "restitution": 0.05
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.85,
+      0.3,
+      0.25,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 23,
+   "components": {
+    "Name": {
+     "value": "Hinge post"
+    },
+    "Transform": {
+     "pos": [
+      4.1636,
+      0.45,
+      -2.2813
+     ],
+     "rot": [
+      0,
+      0.49688,
+      0,
+      0.867819
+     ],
+     "scale": [
+      0.08,
+      0.9,
+      0.08
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.35,
+      0.3,
+      0.28,
+      1
+     ],
+     "roughness": 0.5
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 24,
+   "components": {
+    "Name": {
+     "value": "Door"
+    },
+    "Transform": {
+     "pos": [
+      4.5689,
+      0.38,
+      -2.0434
+     ],
+     "rot": [
+      0,
+      0.49688,
+      0,
+      0.867819
+     ],
+     "scale": [
+      0.05,
+      0.7,
+      0.8
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.15
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.25,
+     "friction": 0.4,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.5,
+      0.3,
+      1
+     ],
+     "texture": "wood",
+     "roughness": 0.55
+    },
+    "Joint": {
+     "kind": 4,
+     "target": 23,
+     "anchor": [
+      4.2239,
+      0.38,
+      -2.2459
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "limit": [
+      0.0,
+      1.5
+     ]
+    }
+   }
+  },
+  {
+   "uid": 25,
+   "components": {
+    "Name": {
+     "value": "Gantry beam"
+    },
+    "Transform": {
+     "pos": [
+      -1.6,
+      2.34,
+      -1.6
+     ],
+     "scale": [
+      1.0,
+      0.08,
+      0.08
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.3,
+      0.3,
+      0.34,
+      1
+     ],
+     "metallic": 0.6,
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 26,
+   "components": {
+    "Name": {
+     "value": "Gantry post"
+    },
+    "Transform": {
+     "pos": [
+      -2.1,
+      1.15,
+      -1.6
+     ],
+     "scale": [
+      0.08,
+      2.3,
+      0.08
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.3,
+      0.3,
+      0.34,
+      1
+     ],
+     "metallic": 0.6,
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 27,
+   "components": {
+    "Name": {
+     "value": "Chain 1"
+    },
+    "Transform": {
+     "pos": [
+      -1.4433,
+      2.1757,
+      -1.6
+     ],
+     "rot": [
+      0,
+      0,
+      0.434966,
+      0.900447
+     ],
+     "scale": [
+      0.12,
+      0.4,
+      0.12
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.1
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.4,
+     "friction": 0.3,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.65,
+      0.2,
+      1
+     ],
+     "metallic": 0.8,
+     "roughness": 0.3
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 0,
+     "anchor": [
+      -1.6,
+      2.3,
+      -1.6
+     ]
+    }
+   }
+  },
+  {
+   "uid": 28,
+   "components": {
+    "Name": {
+     "value": "Chain 2"
+    },
+    "Transform": {
+     "pos": [
+      -1.1908,
+      1.8758,
+      -1.6
+     ],
+     "rot": [
+      0,
+      0,
+      0.247404,
+      0.968912
+     ],
+     "scale": [
+      0.12,
+      0.4,
+      0.12
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.1
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.4,
+     "friction": 0.3,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.65,
+      0.2,
+      1
+     ],
+     "metallic": 0.8,
+     "roughness": 0.3
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 27,
+     "anchor": [
+      -1.2867,
+      2.0514,
+      -1.6
+     ]
+    }
+   }
+  },
+  {
+   "uid": 29,
+   "components": {
+    "Name": {
+     "value": "Chain 3"
+    },
+    "Transform": {
+     "pos": [
+      -1.0454,
+      1.5065,
+      -1.6
+     ],
+     "rot": [
+      0,
+      0,
+      0.124675,
+      0.992198
+     ],
+     "scale": [
+      0.12,
+      0.4,
+      0.12
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.1
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.4,
+     "friction": 0.3,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.65,
+      0.2,
+      1
+     ],
+     "metallic": 0.8,
+     "roughness": 0.3
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 28,
+     "anchor": [
+      -1.0949,
+      1.7003,
+      -1.6
+     ]
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Chain 4"
+    },
+    "Transform": {
+     "pos": [
+      -0.9959,
+      1.1128,
+      -1.6
+     ],
+     "rot": [
+      0,
+      0,
+      0.0,
+      1.0
+     ],
+     "scale": [
+      0.12,
+      0.4,
+      0.12
+     ]
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.1
+    },
+    "Collider": {
+     "shape": 2,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 0.4,
+     "friction": 0.3,
+     "restitution": 0.1
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.85,
+      0.65,
+      0.2,
+      1
+     ],
+     "metallic": 0.8,
+     "roughness": 0.3
+    },
+    "Joint": {
+     "kind": 3,
+     "target": 29,
+     "anchor": [
+      -0.9959,
+      1.3128,
+      -1.6
+     ]
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0.20851259536991124,
+      3.1,
+      7.4
+     ],
+     "rot": [
+      -0.17147,
+      0,
+      0,
+      0.98519
+     ]
+    },
+    "Camera": {
+     "fov_y": 55,
+     "clear": [
+      0.5,
+      0.65,
+      0.85,
+      1
+     ]
+    }
+   }
+  }
+ ]
+}

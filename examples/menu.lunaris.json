@@ -1,0 +1,555 @@
+{
+ "lunaris": 1,
+ "components": [
+  {
+   "name": "HpBar",
+   "fields": []
+  },
+  {
+   "name": "HealButton",
+   "fields": []
+  },
+  {
+   "name": "HurtButton",
+   "fields": []
+  },
+  {
+   "name": "ResetButton",
+   "fields": []
+  }
+ ],
+ "next_uid": 12,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      0.3,
+      0.1,
+      0.8
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.95,
+      0.85
+     ],
+     "intensity": 2.0
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.12,
+      0.2,
+      0.45
+     ],
+     "sky_horizon": [
+      0.6,
+      0.55,
+      0.75
+     ],
+     "ground": [
+      0.15,
+      0.15,
+      0.2
+     ],
+     "bloom": 0.3
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Backdrop floor"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.5,
+      0
+     ],
+     "scale": [
+      30,
+      1,
+      30
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "texture": "tiles",
+     "uv_scale": [
+      15,
+      15
+     ],
+     "color": [
+      0.7,
+      0.75,
+      0.9,
+      1
+     ],
+     "roughness": 0.6
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Crystal"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.4,
+      0
+     ],
+     "scale": [
+      1.4,
+      1.4,
+      1.4
+     ],
+     "rot": [
+      0.2,
+      0.5,
+      0.1,
+      0.84
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.5,
+      0.8,
+      1.0,
+      1
+     ],
+     "emissive": 0.5,
+     "roughness": 0.15
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      2.2,
+      6
+     ],
+     "rot": [
+      -0.12,
+      0,
+      0,
+      0.99
+     ]
+    },
+    "Camera": {
+     "fov_y": 55,
+     "clear": [
+      0.3,
+      0.4,
+      0.6,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Title"
+    },
+    "Ui": {
+     "pos": [
+      0.25,
+      0.05
+     ],
+     "size": [
+      0.5,
+      0.12
+     ],
+     "color": [
+      0.08,
+      0.1,
+      0.2,
+      0.85
+     ],
+     "border": 0.004,
+     "border_color": [
+      0.6,
+      0.75,
+      1.0,
+      1
+     ],
+     "text": "HEALTH DEMO",
+     "text_size": 0.05,
+     "layer": 1
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Health bar"
+    },
+    "Ui": {
+     "pos": [
+      0.1,
+      0.3
+     ],
+     "size": [
+      0.8,
+      0.09
+     ],
+     "color": [
+      0.2,
+      0.8,
+      0.3,
+      1
+     ],
+     "back_color": [
+      0.05,
+      0.05,
+      0.08,
+      0.8
+     ],
+     "fill": 0.5,
+     "border": 0.004,
+     "border_color": [
+      1,
+      1,
+      1,
+      0.9
+     ],
+     "text": "{hp} / 100",
+     "text_size": 0.045,
+     "layer": 1
+    },
+    "HpBar": {}
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Heal button"
+    },
+    "Ui": {
+     "pos": [
+      0.1,
+      0.55
+     ],
+     "size": [
+      0.2,
+      0.1
+     ],
+     "color": [
+      0.2,
+      0.3,
+      0.55,
+      0.95
+     ],
+     "border": 0.003,
+     "border_color": [
+      0.8,
+      0.9,
+      1,
+      1
+     ],
+     "text": "Heal",
+     "text_size": 0.045,
+     "button": true,
+     "layer": 2
+    },
+    "HealButton": {}
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Hurt button"
+    },
+    "Ui": {
+     "pos": [
+      0.4,
+      0.55
+     ],
+     "size": [
+      0.2,
+      0.1
+     ],
+     "color": [
+      0.2,
+      0.3,
+      0.55,
+      0.95
+     ],
+     "border": 0.003,
+     "border_color": [
+      0.8,
+      0.9,
+      1,
+      1
+     ],
+     "text": "Hurt",
+     "text_size": 0.045,
+     "button": true,
+     "layer": 2
+    },
+    "HurtButton": {}
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Reset button"
+    },
+    "Ui": {
+     "pos": [
+      0.7,
+      0.55
+     ],
+     "size": [
+      0.2,
+      0.1
+     ],
+     "color": [
+      0.2,
+      0.3,
+      0.55,
+      0.95
+     ],
+     "border": 0.003,
+     "border_color": [
+      0.8,
+      0.9,
+      1,
+      1
+     ],
+     "text": "Reset",
+     "text_size": 0.045,
+     "button": true,
+     "layer": 2
+    },
+    "ResetButton": {}
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Hint"
+    },
+    "Text": {
+     "value": "click the buttons",
+     "pos": [
+      0.5,
+      0.85
+     ],
+     "size": 0.035,
+     "color": [
+      0.9,
+      0.92,
+      1,
+      0.85
+     ],
+     "align": 1,
+     "shadow": true
+    }
+   }
+  }
+ ],
+ "resources": {
+  "hp": 50
+ },
+ "systems": [
+  {
+   "name": "healbutton",
+   "doc": "A click on the HealButton changes the health.",
+   "each": [
+    "HealButton",
+    "Ui"
+   ],
+   "do": [
+    {
+     "if": {
+      "get": "Ui.clicked"
+     },
+     "then": [
+      {
+       "res_set": "hp",
+       "to": {
+        "min": [
+         100,
+         {
+          "add": [
+           {
+            "res": "hp"
+           },
+           10
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hurtbutton",
+   "doc": "A click on the HurtButton changes the health.",
+   "each": [
+    "HurtButton",
+    "Ui"
+   ],
+   "do": [
+    {
+     "if": {
+      "get": "Ui.clicked"
+     },
+     "then": [
+      {
+       "res_set": "hp",
+       "to": {
+        "max": [
+         0,
+         {
+          "sub": [
+           {
+            "res": "hp"
+           },
+           15
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "resetbutton",
+   "doc": "A click on the ResetButton changes the health.",
+   "each": [
+    "ResetButton",
+    "Ui"
+   ],
+   "do": [
+    {
+     "if": {
+      "get": "Ui.clicked"
+     },
+     "then": [
+      {
+       "res_set": "hp",
+       "to": 100
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "bar",
+   "doc": "The bar shows the health: its fill, and a colour from red (empty) through yellow to green (full).",
+   "each": [
+    "HpBar",
+    "Ui"
+   ],
+   "do": [
+    {
+     "set": "Ui.fill",
+     "to": {
+      "div": [
+       {
+        "res": "hp"
+       },
+       100
+      ]
+     }
+    },
+    {
+     "set": "Ui.color[0]",
+     "to": {
+      "min": [
+       1,
+       {
+        "mul": [
+         2,
+         {
+          "sub": [
+           1,
+           {
+            "div": [
+             {
+              "res": "hp"
+             },
+             100
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "set": "Ui.color[1]",
+     "to": {
+      "mul": [
+       0.85,
+       {
+        "min": [
+         1,
+         {
+          "mul": [
+           2,
+           {
+            "div": [
+             {
+              "res": "hp"
+             },
+             100
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "set": "Ui.color[2]",
+     "to": 0.15
+    }
+   ]
+  }
+ ]
+}

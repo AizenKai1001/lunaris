@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lunaris-json",
+    "crates/lunaris-ecs",
+    "crates/lunaris-sim",
+    "crates/lunaris-api",
+    "crates/lunaris-render",
+    "crates/lunaris-mind",
+    "crates/lunaris-editor",
+    "crates/lunaris-ffi",
+    "crates/lunaris-gpu",
+    "crates/lunaris-wasm",
+    "crates/lunaris-net",
+    "crates/lunaris-audio",
+    "crates/lunaris-pad",
+    "crates/lunaris-script",
+    "crates/lunaris-studio",
+    "crates/lunaris",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Lunaris contributors"]
+rust-version = "1.80"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+
+[profile.dev]
+opt-level = 1
+
+[profile.test]
+opt-level = 2
+debug = 1
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = 1

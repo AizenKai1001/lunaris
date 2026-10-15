@@ -1,0 +1,14 @@
+[package]
+name = "swarm"
+version = "0.0.1"
+edition = "2021"
+description = "A Lunaris native plugin written in Rust: entities steer towards a target. It has no dependencies; the same C interface works from C, C++, Zig, Go ..."
+
+[lib]
+crate-type = ["cdylib"]
+
+# a workspace of its own, so the engine's workspace does not try to build it
+[workspace]
+
+[profile.release]
+opt-level = 3

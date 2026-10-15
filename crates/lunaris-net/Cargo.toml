@@ -1,0 +1,14 @@
+[package]
+name = "lunaris-net"
+description = "Deterministic multiplayer for Lunaris: lockstep or rollback (GGPO style), a relay host that does not run the game, lobby, spectators, rejoin by replay and a latency simulator, with state-hash desync detection. Standard library only."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-api = { path = "../lunaris-api" }
+lunaris-sim = { path = "../lunaris-sim" }
+
+[lints]
+workspace = true

@@ -1,0 +1,309 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.16,
+      0.38,
+      0.8
+     ],
+     "sky_horizon": [
+      0.8,
+      0.88,
+      0.95
+     ],
+     "ground": [
+      0.28,
+      0.3,
+      0.24
+     ],
+     "clouds": 0.3,
+     "fog": 0.006,
+     "fog_color": [
+      0.8,
+      0.88,
+      0.95
+     ],
+     "bloom": 0.2
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.45,
+      0.35,
+      0.1,
+      0.8
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.93,
+      0.8
+     ],
+     "intensity": 2.2
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      2.6,
+      9.5
+     ],
+     "rot": [
+      -0.09,
+      0,
+      0,
+      0.996
+     ]
+    },
+    "Camera": {
+     "fov_y": 50,
+     "clear": [
+      0.5,
+      0.65,
+      0.85,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Ground"
+    },
+    "Transform": {
+     "scale": [
+      300,
+      1,
+      300
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "plane",
+     "texture": "grass",
+     "uv_scale": [
+      120,
+      120
+     ],
+     "roughness": 0.95,
+     "color": [
+      0.8,
+      0.9,
+      0.8,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Swayer sway x1.0"
+    },
+    "Transform": {
+     "pos": [
+      -6,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/swayer.glb",
+     "color": [
+      1.0,
+      1.0,
+      1.0,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Animator": {
+     "clip": "sway",
+     "time": 0.0,
+     "speed": 1.0,
+     "playing": true,
+     "looping": true
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Swayer sway x1.6"
+    },
+    "Transform": {
+     "pos": [
+      -3,
+      0,
+      0
+     ],
+     "scale": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/swayer.glb",
+     "color": [
+      0.7,
+      0.95,
+      1.0,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Animator": {
+     "clip": "sway",
+     "time": 0.4,
+     "speed": 1.6,
+     "playing": true,
+     "looping": true
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Swayer nod x1.0"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.2,
+      1.2,
+      1.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/swayer.glb",
+     "color": [
+      1.0,
+      0.85,
+      0.85,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Animator": {
+     "clip": "nod",
+     "time": 0.0,
+     "speed": 1.0,
+     "playing": true,
+     "looping": true
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Swayer nod x0.6"
+    },
+    "Transform": {
+     "pos": [
+      3,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/swayer.glb",
+     "color": [
+      0.85,
+      1.0,
+      0.8,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Animator": {
+     "clip": "nod",
+     "time": 0.9,
+     "speed": 0.6,
+     "playing": true,
+     "looping": true
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Swayer sway x0.5"
+    },
+    "Transform": {
+     "pos": [
+      6,
+      0,
+      0
+     ],
+     "scale": [
+      1.4,
+      1.4,
+      1.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "examples/models/swayer.glb",
+     "color": [
+      1.0,
+      0.95,
+      0.7,
+      1
+     ],
+     "roughness": 0.55
+    },
+    "Animator": {
+     "clip": "sway",
+     "time": 1.2,
+     "speed": 0.5,
+     "playing": true,
+     "looping": true
+    }
+   }
+  }
+ ]
+}

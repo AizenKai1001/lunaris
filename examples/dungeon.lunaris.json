@@ -1,0 +1,4913 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Enemy",
+      "doc": "",
+      "fields": [
+        {
+          "name": "alert",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Coin",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Exit",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Wall",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "WinBanner",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "LoseBanner",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 1205,
+  "entities": [
+    {
+      "uid": 2,
+      "components": {
+        "Name": {
+          "value": "Physics"
+        },
+        "PhysicsSettings": {
+          "gravity": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Camera": {
+          "fov_y": 60,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": true,
+          "ortho_height": 13,
+          "active": true,
+          "clear": [
+            0.029999999329447746,
+            0.02500000037252903,
+            0.05000000074505806,
+            1
+          ]
+        },
+        "CameraRig": {
+          "target": 1000,
+          "mode": 0,
+          "offset": [
+            0,
+            0,
+            10
+          ],
+          "look_at": true,
+          "look_offset": [
+            0,
+            0,
+            0
+          ],
+          "follow_speed": 5,
+          "yaw": 0,
+          "pitch": 0.4000000059604645,
+          "distance": 8,
+          "shake": 0,
+          "shake_decay": 1.5,
+          "shake_amount": 0.4000000059604645
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            -20.5,
+            11.5,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "InputMap": {
+          "bindings": "move_x = d, a:-1, gamepad.lx, arrowright, arrowleft:-1\nmove_y = w, s:-1, gamepad.ly, arrowup, arrowdown:-1\ndeadzone = 0.15"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Name": {
+          "value": "Dungeon"
+        },
+        "Tilemap": {
+          "texture": "examples/dungeon_tiles.png",
+          "sheet": [
+            17,
+            1
+          ],
+          "size": [
+            48,
+            32
+          ],
+          "tile": 1,
+          "data": "16 12 12 12 12 12 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 12 12 12 12 12 16 16 16 12 12 12 12 16 16 16 16 16 16 16 16 16 16 16 16 16\n14 0 0 0 0 0 8 16 12 12 12 12 12 16 16 16 16 16 16 16 16 16 14 0 0 0 0 0 8 16 14 0 0 0 0 8 16 16 16 16 16 16 16 16 16 16 16 16\n14 0 0 0 0 0 4 10 0 0 0 0 0 4 12 12 12 12 12 12 12 12 10 0 0 0 0 0 4 12 10 0 0 0 0 8 16 16 16 16 16 16 16 12 12 12 12 16\n14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 16 16 16 16 16 16 14 0 0 0 0 8\n14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 7 13 0 0 0 0 0 7 15 13 0 0 0 0 8 16 16 16 16 16 16 14 0 0 0 0 8\n14 0 0 0 0 0 7 13 0 0 0 0 0 7 13 0 0 0 0 0 0 8 16 15 13 0 7 15 16 16 16 15 15 15 15 16 16 12 12 12 12 16 14 0 0 0 0 8\n14 0 0 0 0 0 8 14 0 0 0 0 0 4 10 0 0 0 0 0 0 4 12 12 10 0 4 12 12 12 12 12 12 12 12 12 10 0 0 0 0 4 10 0 0 0 0 8\n16 15 13 0 7 15 16 16 15 13 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8\n16 16 14 0 8 16 16 16 12 10 0 3 15 15 15 15 15 13 0 7 15 15 13 0 0 0 0 3 9 0 0 0 0 0 3 11 9 0 0 0 0 0 0 0 0 0 0 8\n16 12 10 0 4 12 16 14 0 0 0 0 8 16 12 12 12 10 0 4 12 16 14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8\n14 0 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 0 0 0 8 14 0 0 0 0 7 13 0 0 0 0 0 7 15 13 0 0 0 0 7 13 0 0 0 0 8\n14 0 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 0 0 0 8 16 15 15 15 15 16 16 15 13 0 7 15 16 16 16 15 15 15 15 16 16 15 13 0 7 16\n14 0 0 0 0 0 4 10 0 0 0 0 4 10 0 0 0 0 0 0 0 8 16 16 16 16 16 16 16 16 14 0 8 16 16 16 12 12 12 12 16 16 16 12 10 0 4 16\n14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 16 16 16 16 16 16 16 16 14 0 8 16 16 14 0 0 0 0 8 16 14 0 0 0 0 8\n14 0 0 0 0 0 7 13 0 0 0 0 7 13 0 0 0 0 0 0 0 8 16 16 16 16 16 16 16 16 14 0 8 16 16 14 0 0 0 0 4 12 10 0 0 0 0 8\n14 0 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 0 0 0 8 16 16 16 16 16 16 16 16 14 0 8 16 16 14 0 0 0 0 0 0 0 0 0 0 0 8\n14 0 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 0 0 0 8 16 12 12 12 12 12 16 16 10 0 4 12 16 14 0 0 0 0 7 15 13 0 0 0 0 8\n16 15 13 0 7 15 16 16 15 13 0 7 16 16 15 15 15 13 0 7 15 16 14 0 0 0 0 0 8 14 0 0 0 0 8 16 15 13 0 7 16 16 16 15 13 0 7 16\n16 12 10 0 4 12 16 16 16 14 0 4 12 12 12 16 16 10 0 4 12 16 14 0 0 0 0 0 4 10 0 0 0 0 4 12 12 10 0 4 16 16 16 12 10 0 4 16\n14 0 0 0 0 0 8 16 16 14 0 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 16 14 0 0 0 0 8\n14 0 0 0 0 0 4 12 12 10 0 0 0 0 0 4 10 0 0 0 0 8 14 0 0 0 0 0 7 13 0 0 0 0 7 13 0 0 0 0 8 16 14 0 0 0 0 8\n14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 14 0 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 8 16 14 0 0 0 0 8\n14 0 0 0 0 0 7 15 15 13 0 0 0 0 0 7 13 0 0 0 0 8 16 15 15 13 0 7 16 16 13 0 0 7 16 14 0 0 0 0 8 16 14 0 0 0 0 8\n14 0 0 0 0 0 8 16 16 14 0 0 0 0 0 8 14 0 0 0 0 8 16 16 12 10 0 4 16 16 14 0 0 8 16 16 15 15 15 15 16 16 16 15 13 0 7 16\n16 15 15 13 0 7 16 16 16 16 15 13 0 7 15 16 16 13 0 7 15 16 16 14 0 0 0 0 8 16 14 0 0 8 16 16 16 16 16 16 16 16 12 12 10 0 4 16\n16 16 16 14 0 8 16 16 16 16 16 14 0 8 16 16 16 14 0 8 16 16 16 14 0 0 0 0 8 16 10 0 0 4 16 16 12 12 12 12 16 14 0 0 0 0 0 8\n16 12 12 10 0 4 12 16 16 16 12 10 0 4 16 16 12 10 0 4 12 16 16 14 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 8 14 0 0 0 0 0 8\n14 0 0 0 0 0 0 4 12 10 0 0 0 0 4 10 0 0 0 0 0 4 12 10 0 0 0 0 4 10 0 0 0 0 4 10 0 0 0 0 4 10 0 0 0 0 0 8\n14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8\n14 0 0 0 0 0 0 7 15 13 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 7 13 0 0 0 0 7 15 15 15 15 15 15 16\n14 0 0 0 0 0 0 8 16 14 0 0 0 0 7 13 0 0 0 0 0 7 15 13 0 0 0 0 7 13 0 0 0 0 8 14 0 0 0 0 8 16 16 16 16 16 16 16\n16 15 15 15 15 15 15 16 16 16 15 15 15 15 16 16 15 15 15 15 15 16 16 16 15 15 15 15 16 16 15 15 15 15 16 16 15 15 15 15 16 16 16 16 16 16 16 16",
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            48,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            15.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            17,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -9.5,
+            14.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -17,
+            13.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            10,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -6,
+            13.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 15,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5.5,
+            14,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 16,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            13,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            17.5,
+            14,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 17,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -2,
+            11.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 18,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5.5,
+            11.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 19,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            8,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            15,
+            12,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 20,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            17,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            10.5,
+            10.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            6,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -23.5,
+            12,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -17,
+            10,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -10,
+            10,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 24,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -1,
+            10,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 25,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            11,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            7.5,
+            9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 26,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            18,
+            9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 27,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            6,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -17,
+            8,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 28,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            7,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -9.5,
+            7.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 29,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            4,
+            7.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            11.5,
+            7.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 31,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -22.5,
+            7.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 32,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -18,
+            6.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 33,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            6,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            6.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 34,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -3,
+            7,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 35,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -2,
+            5.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 36,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            4,
+            5.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 37,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            11.5,
+            5.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 38,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            18,
+            5.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 39,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            8,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23.5,
+            9,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 40,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -17,
+            4.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 41,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -11,
+            4.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 42,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            13,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            14.5,
+            4,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 43,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23,
+            4,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 44,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            17.5,
+            2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 45,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            7,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -23.5,
+            2.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 46,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -17,
+            0.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 47,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -11,
+            0.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 48,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            10,
+            6,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            2,
+            2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 49,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            4,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            10,
+            1,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 50,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            17.5,
+            -0.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 51,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            4,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23.5,
+            1,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 52,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -22.5,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 53,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            6,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -17,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 54,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            7,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -9.5,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 55,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -3,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 56,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 57,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            12,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 58,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            6,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            18,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 59,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23,
+            -2,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 60,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -16,
+            -4,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 61,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -8,
+            -4,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 62,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -2,
+            -4.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 63,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5,
+            -5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 64,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            11,
+            -5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 65,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            10.5,
+            -6.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 66,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            4,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            17.5,
+            -5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 67,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            4,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23.5,
+            -5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 68,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            5,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -23.5,
+            -5.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 69,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -16,
+            -7,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 70,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -8,
+            -7,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 71,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            5,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -0.5,
+            -7,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 72,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5,
+            -7,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 73,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            12,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            15,
+            -8,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 74,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23,
+            -8,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 75,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5.5,
+            -9,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 76,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            9,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            13.5,
+            -9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 77,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            4,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -22,
+            -9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 78,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            7,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -15.5,
+            -9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 79,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            5,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -8.5,
+            -9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 80,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            5,
+            3,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -2.5,
+            -9.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 81,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -15.5,
+            -11.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 82,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            -11.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 83,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -1.5,
+            -11.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 84,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5,
+            -11,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 85,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            11,
+            -11,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 86,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            17,
+            -11,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 87,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            4,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            23.5,
+            -11,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 88,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            4,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -23.5,
+            -13,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 89,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -15.5,
+            -14,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 90,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            -14.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 91,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            3,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            -1.5,
+            -14.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 92,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            5,
+            -14.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 93,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            2,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            11,
+            -14,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 94,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            8,
+            2,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            20,
+            -14,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 95,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            48,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Name": {
+          "value": "tile collider 10"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            -15.5,
+            -0.05000000074505806
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Wall": {}
+      }
+    },
+    {
+      "uid": 1000,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Hero": {},
+        "HitPoints": {
+          "value": 100,
+          "max": 100,
+          "regen": 2,
+          "regen_delay": 4,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Hero"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.3499999940395355,
+            0.6499999761581421,
+            1,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -20.5,
+            11.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1001,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0.11999999731779099,
+            0.10000000149011612,
+            0.009999999776482582
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Hero eye"
+        },
+        "Parent": {
+          "target": 1000
+        },
+        "Sprite": {
+          "size": [
+            0.2199999988079071,
+            0.2199999988079071
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -20.3799991607666,
+            11.600000381469727,
+            0.009999999776482582
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1010,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1.2000000476837158,
+            1.2000000476837158,
+            1.2000000476837158
+          ],
+          "trigger": true
+        },
+        "Exit": {},
+        "Name": {
+          "value": "Exit"
+        },
+        "Sprite": {
+          "size": [
+            1.399999976158142,
+            1.399999976158142
+          ],
+          "color": [
+            1,
+            0.8500000238418579,
+            0.30000001192092896,
+            1
+          ],
+          "texture": "ring",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            22.5,
+            -12.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1011,
+      "components": {
+        "Name": {
+          "value": "Exit glow"
+        },
+        "Sprite": {
+          "size": [
+            2.4000000953674316,
+            2.4000000953674316
+          ],
+          "color": [
+            1,
+            0.800000011920929,
+            0.30000001192092896,
+            0.3499999940395355
+          ],
+          "texture": "soft",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            22.5,
+            -12.5,
+            -0.009999999776482582
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1020,
+      "components": {
+        "Name": {
+          "value": "Score"
+        },
+        "Text": {
+          "value": "Coins {score}   Health {hero.hp}",
+          "pos": [
+            0.5,
+            0.029999999329447746
+          ],
+          "size": 0.04500000178813934,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    },
+    {
+      "uid": 1021,
+      "components": {
+        "Name": {
+          "value": "Hint"
+        },
+        "Text": {
+          "value": "WASD or a pad: walk   find the golden ring",
+          "pos": [
+            0.5,
+            0.9399999976158142
+          ],
+          "size": 0.029999999329447746,
+          "color": [
+            1,
+            1,
+            1,
+            0.75
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    },
+    {
+      "uid": 1022,
+      "components": {
+        "LoseBanner": {},
+        "Name": {
+          "value": "Lost"
+        },
+        "Ui": {
+          "pos": [
+            0.25,
+            0.4000000059604645
+          ],
+          "size": [
+            0.5,
+            0.18000000715255737
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0.699999988079071
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "YOU FELL   coins {score}",
+          "text_size": 0.05000000074505806,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 5,
+          "visible": false,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        }
+      }
+    },
+    {
+      "uid": 1023,
+      "components": {
+        "Name": {
+          "value": "Won"
+        },
+        "Ui": {
+          "pos": [
+            0.25,
+            0.4000000059604645
+          ],
+          "size": [
+            0.5,
+            0.18000000715255737
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0.699999988079071
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "YOU ESCAPED   coins {score}",
+          "text_size": 0.05000000074505806,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 5,
+          "visible": false,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "WinBanner": {}
+      }
+    },
+    {
+      "uid": 1100,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Enemy": {
+          "alert": 0
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30,
+          "regen": 0,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Guard 1"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sensor": {
+          "radius": 8,
+          "fov": 360,
+          "filter": "Hero",
+          "los": true,
+          "eye": 0,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.8999999761581421,
+            0.2199999988079071,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            9.5,
+            14.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1101,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Enemy": {
+          "alert": 0
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30,
+          "regen": 0,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Guard 2"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sensor": {
+          "radius": 8,
+          "fov": 360,
+          "filter": "Hero",
+          "los": true,
+          "eye": 0,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.8999999761581421,
+            0.2199999988079071,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -7.5,
+            -14.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1102,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Enemy": {
+          "alert": 0
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30,
+          "regen": 0,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Guard 3"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sensor": {
+          "radius": 8,
+          "fov": 360,
+          "filter": "Hero",
+          "los": true,
+          "eye": 0,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.8999999761581421,
+            0.2199999988079071,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -4.5,
+            3.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1103,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Enemy": {
+          "alert": 0
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30,
+          "regen": 0,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Guard 4"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sensor": {
+          "radius": 8,
+          "fov": 360,
+          "filter": "Hero",
+          "los": true,
+          "eye": 0,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.8999999761581421,
+            0.2199999988079071,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -22.5,
+            -5.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1104,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Enemy": {
+          "alert": 0
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30,
+          "regen": 0,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Guard 5"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sensor": {
+          "radius": 8,
+          "fov": 360,
+          "filter": "Hero",
+          "los": true,
+          "eye": 0,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.8999999761581421,
+            0.2199999988079071,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            21.5,
+            3.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1105,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ],
+          "trigger": false
+        },
+        "Enemy": {
+          "alert": 0
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30,
+          "regen": 0,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Guard 6"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0,
+          "friction": 0,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Sensor": {
+          "radius": 8,
+          "fov": 360,
+          "filter": "Hero",
+          "los": true,
+          "eye": 0,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Sprite": {
+          "size": [
+            0.800000011920929,
+            0.800000011920929
+          ],
+          "color": [
+            0.8999999761581421,
+            0.2199999988079071,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            7.5,
+            -7.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1200,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.6000000238418579,
+            0.6000000238418579,
+            0.6000000238418579
+          ],
+          "trigger": true
+        },
+        "Name": {
+          "value": "Coin 1"
+        },
+        "Sprite": {
+          "size": [
+            0.44999998807907104,
+            0.44999998807907104
+          ],
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            7.5,
+            3.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1201,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.6000000238418579,
+            0.6000000238418579,
+            0.6000000238418579
+          ],
+          "trigger": true
+        },
+        "Name": {
+          "value": "Coin 2"
+        },
+        "Sprite": {
+          "size": [
+            0.44999998807907104,
+            0.44999998807907104
+          ],
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -11.5,
+            -4.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1202,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.6000000238418579,
+            0.6000000238418579,
+            0.6000000238418579
+          ],
+          "trigger": true
+        },
+        "Name": {
+          "value": "Coin 3"
+        },
+        "Sprite": {
+          "size": [
+            0.44999998807907104,
+            0.44999998807907104
+          ],
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -9.5,
+            12.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1203,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.6000000238418579,
+            0.6000000238418579,
+            0.6000000238418579
+          ],
+          "trigger": true
+        },
+        "Name": {
+          "value": "Coin 4"
+        },
+        "Sprite": {
+          "size": [
+            0.44999998807907104,
+            0.44999998807907104
+          ],
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            -17.5,
+            -14.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 1204,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            0.6000000238418579,
+            0.6000000238418579,
+            0.6000000238418579
+          ],
+          "trigger": true
+        },
+        "Name": {
+          "value": "Coin 5"
+        },
+        "Sprite": {
+          "size": [
+            0.44999998807907104,
+            0.44999998807907104
+          ],
+          "color": [
+            1,
+            0.8500000238418579,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "circle",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            0.5,
+            11.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "resources": {
+    "hero.hp": 100,
+    "hero.x": -20.5,
+    "hero.y": 11.5,
+    "score": 0,
+    "won": 0
+  },
+  "systems": [
+    {
+      "name": "hero_walk",
+      "doc": "The keys (or the pad) become the hero's walk; it stands still when it has fallen or won.",
+      "each": [
+        "Hero",
+        "Velocity",
+        "HitPoints"
+      ],
+      "order": 10,
+      "do": [
+        {
+          "if": {
+            "or": [
+              {
+                "get": "HitPoints.dead"
+              },
+              {
+                "ne": [
+                  {
+                    "res": "won"
+                  },
+                  0
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "Velocity.lin[0]",
+              "to": 0
+            },
+            {
+              "set": "Velocity.lin[1]",
+              "to": 0
+            }
+          ],
+          "else": [
+            {
+              "set": "Velocity.lin[0]",
+              "to": {
+                "mul": [
+                  {
+                    "res": "action.move_x"
+                  },
+                  5
+                ]
+              }
+            },
+            {
+              "set": "Velocity.lin[1]",
+              "to": {
+                "mul": [
+                  {
+                    "res": "action.move_y"
+                  },
+                  5
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "hero_status",
+      "doc": "What the guards need to know about the hero, and the health in the HUD.",
+      "each": [
+        "Hero",
+        "Transform",
+        "HitPoints"
+      ],
+      "order": 11,
+      "do": [
+        {
+          "res_set": "hero.x",
+          "to": {
+            "get": "Transform.pos[0]"
+          }
+        },
+        {
+          "res_set": "hero.y",
+          "to": {
+            "get": "Transform.pos[1]"
+          }
+        },
+        {
+          "res_set": "hero.hp",
+          "to": {
+            "floor": {
+              "get": "HitPoints.value"
+            }
+          }
+        },
+        {
+          "if": {
+            "get": "HitPoints.dead"
+          },
+          "then": [
+            {
+              "res_set": "time.scale",
+              "to": 0.25
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "guard_ai",
+      "doc": "A guard that sees the hero is alerted for a few seconds; an alerted guard runs at the hero, otherwise it stands guard.",
+      "each": [
+        "Enemy",
+        "Sensor",
+        "Transform",
+        "Velocity"
+      ],
+      "order": 20,
+      "do": [
+        {
+          "if": {
+            "ne": [
+              {
+                "get": "Sensor.seen"
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "set": "Enemy.alert",
+              "to": 3
+            }
+          ]
+        },
+        {
+          "if": {
+            "gt": [
+              {
+                "get": "Enemy.alert"
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "let": "dx",
+              "be": {
+                "sub": [
+                  {
+                    "res": "hero.x"
+                  },
+                  {
+                    "get": "Transform.pos[0]"
+                  }
+                ]
+              }
+            },
+            {
+              "let": "dy",
+              "be": {
+                "sub": [
+                  {
+                    "res": "hero.y"
+                  },
+                  {
+                    "get": "Transform.pos[1]"
+                  }
+                ]
+              }
+            },
+            {
+              "let": "d",
+              "be": {
+                "max": [
+                  {
+                    "hypot": [
+                      {
+                        "var": "dx"
+                      },
+                      {
+                        "var": "dy"
+                      }
+                    ]
+                  },
+                  0.001
+                ]
+              }
+            },
+            {
+              "set": "Velocity.lin[0]",
+              "to": {
+                "mul": [
+                  {
+                    "div": [
+                      {
+                        "var": "dx"
+                      },
+                      {
+                        "var": "d"
+                      }
+                    ]
+                  },
+                  3
+                ]
+              }
+            },
+            {
+              "set": "Velocity.lin[1]",
+              "to": {
+                "mul": [
+                  {
+                    "div": [
+                      {
+                        "var": "dy"
+                      },
+                      {
+                        "var": "d"
+                      }
+                    ]
+                  },
+                  3
+                ]
+              }
+            },
+            {
+              "set": "Enemy.alert",
+              "to": {
+                "sub": [
+                  {
+                    "get": "Enemy.alert"
+                  },
+                  {
+                    "dt": true
+                  }
+                ]
+              }
+            }
+          ],
+          "else": [
+            {
+              "set": "Velocity.lin[0]",
+              "to": 0
+            },
+            {
+              "set": "Velocity.lin[1]",
+              "to": 0
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "guard_bites",
+      "doc": "A guard that touches the hero hurts it, once in a while (a moment of grace after each hit, and a shove away from the guard).",
+      "on_contact": {
+        "a": [
+          "Hero",
+          "HitPoints"
+        ],
+        "b": [
+          "Enemy"
+        ]
+      },
+      "order": 30,
+      "do": [
+        {
+          "if": {
+            "and": [
+              {
+                "le": [
+                  {
+                    "get": "a.HitPoints.invulnerable"
+                  },
+                  0
+                ]
+              },
+              {
+                "not": {
+                  "get": "a.HitPoints.dead"
+                }
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "a.HitPoints.value",
+              "to": {
+                "sub": [
+                  {
+                    "get": "a.HitPoints.value"
+                  },
+                  15
+                ]
+              }
+            },
+            {
+              "set": "a.HitPoints.invulnerable",
+              "to": 0.8
+            },
+            {
+              "emit": "hurt"
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "coin_pickup",
+      "on_contact": {
+        "a": [
+          "Hero"
+        ],
+        "b": [
+          "Coin"
+        ]
+      },
+      "order": 31,
+      "do": [
+        {
+          "res_add": "score",
+          "by": 1
+        },
+        {
+          "emit": "pickup"
+        },
+        {
+          "despawn": "b"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "reach_exit",
+      "on_contact": {
+        "a": [
+          "Hero"
+        ],
+        "b": [
+          "Exit"
+        ]
+      },
+      "order": 32,
+      "do": [
+        {
+          "res_set": "won",
+          "to": 1
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "win_banner",
+      "each": [
+        "WinBanner",
+        "Ui"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Ui.visible",
+          "to": {
+            "ne": [
+              {
+                "res": "won"
+              },
+              0
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "lose_banner",
+      "each": [
+        "LoseBanner",
+        "Ui"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Ui.visible",
+          "to": {
+            "le": [
+              {
+                "res": "hero.hp"
+              },
+              0
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

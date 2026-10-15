@@ -1,0 +1,1753 @@
+{
+ "lunaris": 1,
+ "next_uid": 45,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      0.3,
+      0.1,
+      0.8
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.95,
+      0.85
+     ],
+     "intensity": 1.0
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.25,
+      0.45,
+      0.85
+     ],
+     "sky_horizon": [
+      0.75,
+      0.82,
+      0.9
+     ],
+     "ground": [
+      0.3,
+      0.3,
+      0.3
+     ],
+     "bloom": 0.1,
+     "fog": 0.0,
+     "exposure": 0.8
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Bathroom floor"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      -0.1,
+      0.0
+     ],
+     "scale": [
+      4,
+      0.2,
+      4.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "tiles",
+     "uv_scale": [
+      2.0,
+      2.2
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Bathroom ceiling"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      3.1,
+      0.0
+     ],
+     "scale": [
+      4,
+      0.20000000000000018,
+      4.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Bathroom south wall"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      1.5,
+      -2.1
+     ],
+     "scale": [
+      4,
+      3,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Bathroom north wall"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      1.5,
+      2.1
+     ],
+     "scale": [
+      4,
+      3,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Bathroom west wall"
+    },
+    "Transform": {
+     "pos": [
+      -0.1,
+      1.5,
+      0.0
+     ],
+     "scale": [
+      0.2,
+      3,
+      4.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Bathroom door wall (south part)"
+    },
+    "Transform": {
+     "pos": [
+      4.1,
+      1.5,
+      -1.4000000000000001
+     ],
+     "scale": [
+      0.20000000000000018,
+      3,
+      1.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Bathroom door wall (north part)"
+    },
+    "Transform": {
+     "pos": [
+      4.1,
+      1.5,
+      1.4000000000000001
+     ],
+     "scale": [
+      0.20000000000000018,
+      3,
+      1.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Bathroom door wall (lintel)"
+    },
+    "Transform": {
+     "pos": [
+      4.1,
+      2.6,
+      0.0
+     ],
+     "scale": [
+      0.20000000000000018,
+      0.7999999999999998,
+      1.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.78,
+      0.84,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.04,
+     "transmission": 0.01
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Bathroom lamp"
+    },
+    "Transform": {
+     "pos": [
+      2,
+      2.6,
+      0
+     ]
+    },
+    "Light": {
+     "kind": 1,
+     "color": [
+      0.9,
+      0.95,
+      1.0
+     ],
+     "intensity": 2.0,
+     "range": 9
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Tap"
+    },
+    "Transform": {
+     "pos": [
+      2,
+      1.0,
+      1.5
+     ],
+     "scale": [
+      0.2,
+      0.25,
+      0.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.8,
+      0.82,
+      0.85,
+      1
+     ],
+     "metallic": 0.9,
+     "roughness": 0.25
+    },
+    "AudioSource": {
+     "file": "examples/sounds/drip.wav",
+     "volume": 0.9,
+     "near": 1.0,
+     "range": 25
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Living room floor"
+    },
+    "Transform": {
+     "pos": [
+      8.1,
+      -0.1,
+      0.0
+     ],
+     "scale": [
+      7.8,
+      0.2,
+      4.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.66,
+      0.5,
+      0.36,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "tiles",
+     "uv_scale": [
+      3.9,
+      2.2
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.4,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Living room ceiling"
+    },
+    "Transform": {
+     "pos": [
+      8.1,
+      3.1,
+      0.0
+     ],
+     "scale": [
+      7.8,
+      0.20000000000000018,
+      4.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.66,
+      0.5,
+      0.36,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.4,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 15,
+   "components": {
+    "Name": {
+     "value": "Living room north wall"
+    },
+    "Transform": {
+     "pos": [
+      8.1,
+      1.5,
+      2.1
+     ],
+     "scale": [
+      7.8,
+      3,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.66,
+      0.5,
+      0.36,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.4,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 16,
+   "components": {
+    "Name": {
+     "value": "Living room - hall wall (south part)"
+    },
+    "Transform": {
+     "pos": [
+      12.1,
+      4.5,
+      -4.5
+     ],
+     "scale": [
+      0.1999999999999993,
+      9,
+      7.3999999999999995
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.68,
+      0.64,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.15,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 17,
+   "components": {
+    "Name": {
+     "value": "Living room - hall wall (north part)"
+    },
+    "Transform": {
+     "pos": [
+      12.1,
+      4.5,
+      4.5
+     ],
+     "scale": [
+      0.1999999999999993,
+      9,
+      7.3999999999999995
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.68,
+      0.64,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.15,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 18,
+   "components": {
+    "Name": {
+     "value": "Living room - hall wall (lintel)"
+    },
+    "Transform": {
+     "pos": [
+      12.1,
+      5.7,
+      0.0
+     ],
+     "scale": [
+      0.1999999999999993,
+      6.6,
+      1.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.68,
+      0.64,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.15,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 19,
+   "components": {
+    "Name": {
+     "value": "Living room lamp"
+    },
+    "Transform": {
+     "pos": [
+      8,
+      2.7,
+      0
+     ]
+    },
+    "Light": {
+     "kind": 1,
+     "color": [
+      1.0,
+      0.82,
+      0.55
+     ],
+     "intensity": 2.0,
+     "range": 10
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Sofa"
+    },
+    "Transform": {
+     "pos": [
+      8,
+      0.4,
+      1.2
+     ],
+     "scale": [
+      2.2,
+      0.8,
+      0.8
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.25,
+      0.25,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Store floor"
+    },
+    "Transform": {
+     "pos": [
+      8.0,
+      -0.1,
+      -4.2
+     ],
+     "scale": [
+      4.3999999999999995,
+      0.2,
+      4.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.45,
+      0.4,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.2,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Store ceiling"
+    },
+    "Transform": {
+     "pos": [
+      8.0,
+      3.1,
+      -4.2
+     ],
+     "scale": [
+      4.3999999999999995,
+      0.20000000000000018,
+      4.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.45,
+      0.4,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.2,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 23,
+   "components": {
+    "Name": {
+     "value": "Store west wall"
+    },
+    "Transform": {
+     "pos": [
+      5.9,
+      1.5,
+      -4.2
+     ],
+     "scale": [
+      0.20000000000000018,
+      3,
+      4.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.45,
+      0.4,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.2,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 24,
+   "components": {
+    "Name": {
+     "value": "Store east wall"
+    },
+    "Transform": {
+     "pos": [
+      10.1,
+      1.5,
+      -4.2
+     ],
+     "scale": [
+      0.1999999999999993,
+      3,
+      4.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.45,
+      0.4,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.2,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 25,
+   "components": {
+    "Name": {
+     "value": "Store back wall"
+    },
+    "Transform": {
+     "pos": [
+      8.0,
+      1.5,
+      -6.1
+     ],
+     "scale": [
+      4.3999999999999995,
+      3,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.45,
+      0.4,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.2,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 26,
+   "components": {
+    "Name": {
+     "value": "Living room south wall (west of the door)"
+    },
+    "Transform": {
+     "pos": [
+      5.800000000000001,
+      1.5,
+      -2.1
+     ],
+     "scale": [
+      3.2,
+      3,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.66,
+      0.5,
+      0.36,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.3,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 27,
+   "components": {
+    "Name": {
+     "value": "Living room south wall (east of the door)"
+    },
+    "Transform": {
+     "pos": [
+      10.3,
+      1.5,
+      -2.1
+     ],
+     "scale": [
+      3.4000000000000004,
+      3,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.66,
+      0.5,
+      0.36,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.3,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 28,
+   "components": {
+    "Name": {
+     "value": "Living room south wall (above the door)"
+    },
+    "Transform": {
+     "pos": [
+      8.0,
+      2.6,
+      -2.1
+     ],
+     "scale": [
+      1.1999999999999993,
+      0.7999999999999998,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.66,
+      0.5,
+      0.36,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.3,
+     "transmission": 0.03
+    }
+   }
+  },
+  {
+   "uid": 29,
+   "components": {
+    "Name": {
+     "value": "Wooden door"
+    },
+    "Transform": {
+     "pos": [
+      8.0,
+      1.1,
+      -2.1
+     ],
+     "scale": [
+      1.1999999999999993,
+      2.2,
+      0.20000000000000018
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.45,
+      0.28,
+      0.14,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.1,
+     "transmission": 0.3
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Radio"
+    },
+    "Transform": {
+     "pos": [
+      8,
+      1.0,
+      -5.4
+     ],
+     "scale": [
+      0.5,
+      0.3,
+      0.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.15,
+      0.15,
+      0.17,
+      1
+     ],
+     "roughness": 0.4
+    },
+    "AudioSource": {
+     "file": "examples/sounds/radio.wav",
+     "volume": 1.0,
+     "near": 1.5,
+     "range": 30
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Hall floor"
+    },
+    "Transform": {
+     "pos": [
+      24.1,
+      -0.1,
+      0.0
+     ],
+     "scale": [
+      23.8,
+      0.2,
+      16.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "tiles",
+     "uv_scale": [
+      11.9,
+      8.2
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 32,
+   "components": {
+    "Name": {
+     "value": "Hall ceiling"
+    },
+    "Transform": {
+     "pos": [
+      24.1,
+      9.1,
+      0.0
+     ],
+     "scale": [
+      23.8,
+      0.1999999999999993,
+      16.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 33,
+   "components": {
+    "Name": {
+     "value": "Hall south wall"
+    },
+    "Transform": {
+     "pos": [
+      24.1,
+      4.5,
+      -8.1
+     ],
+     "scale": [
+      23.8,
+      9,
+      0.1999999999999993
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 34,
+   "components": {
+    "Name": {
+     "value": "Hall north wall"
+    },
+    "Transform": {
+     "pos": [
+      24.1,
+      4.5,
+      8.1
+     ],
+     "scale": [
+      23.8,
+      9,
+      0.1999999999999993
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 35,
+   "components": {
+    "Name": {
+     "value": "Hall end wall (south part)"
+    },
+    "Transform": {
+     "pos": [
+      36.1,
+      4.5,
+      -5.6
+     ],
+     "scale": [
+      0.20000000000000284,
+      9,
+      5.199999999999999
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 36,
+   "components": {
+    "Name": {
+     "value": "Hall end wall (north part)"
+    },
+    "Transform": {
+     "pos": [
+      36.1,
+      4.5,
+      5.6
+     ],
+     "scale": [
+      0.20000000000000284,
+      9,
+      5.199999999999999
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 37,
+   "components": {
+    "Name": {
+     "value": "Hall end wall (lintel)"
+    },
+    "Transform": {
+     "pos": [
+      36.1,
+      7.5,
+      0.0
+     ],
+     "scale": [
+      0.20000000000000284,
+      3.0,
+      6.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.48,
+      0.48,
+      0.52,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.08,
+     "transmission": 0.02
+    }
+   }
+  },
+  {
+   "uid": 38,
+   "components": {
+    "Name": {
+     "value": "Hall lamp 1"
+    },
+    "Transform": {
+     "pos": [
+      18,
+      8,
+      0
+     ]
+    },
+    "Light": {
+     "kind": 1,
+     "color": [
+      0.9,
+      0.9,
+      1.0
+     ],
+     "intensity": 6,
+     "range": 22
+    }
+   }
+  },
+  {
+   "uid": 39,
+   "components": {
+    "Name": {
+     "value": "Hall lamp 2"
+    },
+    "Transform": {
+     "pos": [
+      30,
+      8,
+      0
+     ]
+    },
+    "Light": {
+     "kind": 1,
+     "color": [
+      0.9,
+      0.9,
+      1.0
+     ],
+     "intensity": 6,
+     "range": 22
+    }
+   }
+  },
+  {
+   "uid": 40,
+   "components": {
+    "Name": {
+     "value": "Clapper (hall)"
+    },
+    "Transform": {
+     "pos": [
+      24,
+      1.2,
+      -4
+     ],
+     "scale": [
+      0.4,
+      1.8,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.9,
+      0.55,
+      0.2,
+      1
+     ],
+     "roughness": 0.6
+    },
+    "AudioSource": {
+     "file": "examples/sounds/clap.wav",
+     "volume": 1.0,
+     "near": 3.0,
+     "range": 70
+    }
+   }
+  },
+  {
+   "uid": 41,
+   "components": {
+    "Name": {
+     "value": "Courtyard ground"
+    },
+    "Transform": {
+     "pos": [
+      63.1,
+      -0.1,
+      0.0
+     ],
+     "scale": [
+      53.8,
+      0.2,
+      60
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.35,
+      0.5,
+      0.3,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "AcousticMaterial": {
+     "absorption": 0.3,
+     "transmission": 0.0
+    }
+   }
+  },
+  {
+   "uid": 42,
+   "components": {
+    "Name": {
+     "value": "Clapper (courtyard)"
+    },
+    "Transform": {
+     "pos": [
+      46,
+      1.2,
+      3
+     ],
+     "scale": [
+      0.4,
+      1.8,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.3,
+      0.6,
+      0.95,
+      1
+     ],
+     "roughness": 0.6
+    },
+    "AudioSource": {
+     "file": "examples/sounds/clap.wav",
+     "volume": 1.0,
+     "near": 3.0,
+     "range": 70
+    }
+   }
+  },
+  {
+   "uid": 43,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      1,
+      1.6,
+      0
+     ],
+     "rot": [
+      0,
+      -0.70710678,
+      0,
+      0.70710678
+     ]
+    },
+    "Camera": {
+     "fov_y": 70,
+     "far": 400,
+     "clear": [
+      0.5,
+      0.65,
+      0.9,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 44,
+   "components": {
+    "Name": {
+     "value": "Tour text"
+    },
+    "Text": {
+     "value": "walking tour: {x} metres  (bathroom, living room, hall, courtyard)",
+     "pos": [
+      0.5,
+      0.94
+     ],
+     "size": 0.032,
+     "color": [
+      1,
+      1,
+      1,
+      0.95
+     ],
+     "align": 1,
+     "shadow": true
+    }
+   }
+  }
+ ],
+ "resources": {
+  "x": 1
+ },
+ "systems": [
+  {
+   "name": "walk",
+   "doc": "The camera (and with it the listener) walks east at 3 m/s and stops in the courtyard.",
+   "each": [
+    "Camera",
+    "Transform"
+   ],
+   "do": [
+    {
+     "set": "Transform.pos[0]",
+     "to": {
+      "min": [
+       52,
+       {
+        "add": [
+         {
+          "get": "Transform.pos[0]"
+         },
+         {
+          "mul": [
+           3,
+           {
+            "dt": true
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "res_set": "x",
+     "to": {
+      "floor": {
+       "get": "Transform.pos[0]"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

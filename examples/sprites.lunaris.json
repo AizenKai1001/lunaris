@@ -1,0 +1,12 @@
+{
+  "lunaris": 1,
+  "entities": [
+    { "uid": 1, "components": { "Name": { "value": "Camera" }, "Transform": { "pos": [0, 0, 10] }, "Camera": { "ortho": true, "ortho_height": 6, "clear": [0.1, 0.12, 0.18, 1] } } },
+    { "uid": 2, "components": { "Name": { "value": "Backdrop" }, "Transform": { "pos": [0, 0, -1] }, "Sprite": { "size": [12, 6], "texture": "checker", "color": [0.5, 0.6, 0.9, 1] } } },
+    { "uid": 3, "components": { "Name": { "value": "Sun" }, "Transform": { "pos": [-3, 1.2, 0] }, "Sprite": { "size": [2, 2], "texture": "circle", "color": [1, 0.8, 0.2, 1] } } },
+    { "uid": 4, "components": { "Name": { "value": "Ring" }, "Transform": { "pos": [-0.6, 0.4, 1] }, "Sprite": { "size": [3, 3], "texture": "ring", "color": [0.2, 1, 0.6, 0.9] } } },
+    { "uid": 5, "components": { "Name": { "value": "Glass panel" }, "Transform": { "pos": [2.2, -0.5, 2] }, "Sprite": { "size": [3, 2], "color": [1, 1, 1, 0.45] } } },
+    { "uid": 6, "components": { "Name": { "value": "Fade bar" }, "Transform": { "pos": [0, -2.4, 2] }, "Sprite": { "size": [8, 0.6], "texture": "gradient", "color": [1, 0.4, 0.4, 1] } } },
+    { "uid": 7, "components": { "Name": { "value": "3D cube among sprites" }, "Transform": { "pos": [-3.2, -1.4, 0.5], "rot": [0.3, 0.4, 0.1, 0.85] }, "MeshRenderer": { "mesh": "cube", "color": [0.9, 0.3, 0.3, 1] } } }
+  ]
+}

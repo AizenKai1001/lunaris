@@ -1,0 +1,265 @@
+{
+  "name": "Driving: the car settles on the springs, accelerates through the first gate, brakes to a stop, turns, and jumps the ramp through the second gate (Vehicle, Terrain, trigger gates on their own collision layer)",
+  "scene": "examples/driving.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 90
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Vehicle.on_ground",
+        "eq": 4,
+        "message": "all four wheels stand on the meadow"
+      }
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Transform.pos[1]",
+        "approx": [
+          0.716,
+          0.02
+        ],
+        "message": "the springs hold the chassis at its ride height over the grass"
+      }
+    },
+    {
+      "expect": {
+        "resource": "car.kmh",
+        "eq": 0
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "step": 240
+    },
+    {
+      "expect": {
+        "resource": "car.kmh",
+        "ge": 60,
+        "message": "four seconds of full throttle: well over 60 km/h"
+      }
+    },
+    {
+      "expect": {
+        "resource": "gates",
+        "ge": 1,
+        "message": "the first gate (across the road at z = -8) was driven through"
+      }
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Transform.pos[0]",
+        "between": [
+          -2.0,
+          2.0
+        ],
+        "message": "driving straight"
+      }
+    },
+    {
+      "input": {
+        "w": false,
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "resource": "car.kmh",
+        "le": 2,
+        "max_ticks": 400
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 30
+    },
+    {
+      "expect": {
+        "resource": "car.kmh",
+        "le": 2,
+        "message": "stopped by the brakes"
+      }
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Vehicle.on_ground",
+        "eq": 4
+      }
+    },
+    {
+      "input": {
+        "w": true,
+        "d": true
+      }
+    },
+    {
+      "step": 90
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Vehicle.steering",
+        "ge": 12,
+        "message": "the front wheels are turned to the right"
+      }
+    },
+    {
+      "expect": {
+        "resource": "car.heading",
+        "between": [
+          0.5,
+          2.8
+        ],
+        "message": "and the car has turned right (its heading, in radians, grows to the right)"
+      }
+    },
+    {
+      "input": {
+        "w": false,
+        "d": false,
+        "s": true
+      }
+    },
+    {
+      "until": {
+        "resource": "car.kmh",
+        "le": 2,
+        "max_ticks": 400
+      }
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 10,
+          "component": "Transform",
+          "value": {
+            "pos": [
+              0,
+              0.8,
+              -44
+            ],
+            "rot": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 10,
+          "component": "Velocity",
+          "value": {
+            "lin": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "set",
+        "args": {
+          "uid": 10,
+          "component": "AngularVelocity",
+          "value": {
+            "w": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "w": true
+      }
+    },
+    {
+      "until": {
+        "name": "Car",
+        "field": "Vehicle.on_ground",
+        "eq": 0,
+        "max_ticks": 400
+      }
+    },
+    {
+      "expect": {
+        "resource": "gates",
+        "ge": 2,
+        "message": "the second gate, at z = -52, was driven through on the way to the ramp"
+      }
+    },
+    {
+      "until": {
+        "name": "Car",
+        "field": "Vehicle.on_ground",
+        "eq": 4,
+        "max_ticks": 300
+      }
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Transform.pos[1]",
+        "between": [
+          0.55,
+          1.0
+        ],
+        "message": "it jumped and landed on the meadow on all four wheels (the first time all four were down again, the springs still pressed in a little)"
+      }
+    },
+    {
+      "input": {
+        "w": false
+      }
+    },
+    {
+      "step": 120
+    },
+    {
+      "expect": {
+        "name": "Car",
+        "field": "Vehicle.on_ground",
+        "eq": 4,
+        "message": "and it is rolling out on four wheels"
+      }
+    }
+  ]
+}

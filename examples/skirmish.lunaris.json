@@ -1,0 +1,1926 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Enemy",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Bolt",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Muzzle",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HeroBar",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "GameOver",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Gate",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 35,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.20000000298023224,
+            0.41999998688697815,
+            0.8500000238418579
+          ],
+          "sky_horizon": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "ground": [
+            0.30000001192092896,
+            0.27000001072883606,
+            0.23999999463558197
+          ],
+          "ambient": 1,
+          "exposure": 1,
+          "clouds": 0.44999998807907104,
+          "fog": 0.004000000189989805,
+          "fog_color": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "shadows": true,
+          "shadow_distance": 80,
+          "ssao": 1,
+          "bloom": 0.3499999940395355,
+          "bloom_threshold": 1,
+          "vignette": 0.20000000298023224,
+          "saturation": 1,
+          "tonemap": 0,
+          "dof": 0,
+          "focus": 10,
+          "focus_range": 4
+        },
+        "Name": {
+          "value": "Environment"
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 3,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "TimeOfDay": {
+          "time": 17.200000762939453,
+          "day_seconds": 900,
+          "azimuth": 0.8999999761581421,
+          "sun_intensity": 3,
+          "night_intensity": 0,
+          "enabled": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.5,
+            0.30000001192092896,
+            0.10000000149011612,
+            0.800000011920929
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.550000011920929,
+            0.5799999833106995,
+            0.6000000238418579,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "stone",
+          "uv_scale": [
+            20,
+            20
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Ground"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            -0.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            44,
+            1,
+            44
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.699999988079071,
+            0.6499999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            12,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 1"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1,
+            -22.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            45,
+            2,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.699999988079071,
+            0.6499999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            12,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 2"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1,
+            22.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            45,
+            2,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.699999988079071,
+            0.6499999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            12,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 3"
+        },
+        "Transform": {
+          "pos": [
+            -22.5,
+            1,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            2,
+            45
+          ]
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.800000011920929,
+            0.699999988079071,
+            0.6499999761581421,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            12,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Wall 4"
+        },
+        "Transform": {
+          "pos": [
+            22.5,
+            1,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            2,
+            45
+          ]
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.699999988079071,
+            0.7200000286102295,
+            0.7799999713897705,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 1"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            1.5,
+            -8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.7999999523162842,
+            3,
+            1.7999999523162842
+          ]
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.699999988079071,
+            0.7200000286102295,
+            0.7799999713897705,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 2"
+        },
+        "Transform": {
+          "pos": [
+            10,
+            1.5,
+            -5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.7999999523162842,
+            3,
+            1.7999999523162842
+          ]
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.699999988079071,
+            0.7200000286102295,
+            0.7799999713897705,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 3"
+        },
+        "Transform": {
+          "pos": [
+            -4,
+            1.5,
+            9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.7999999523162842,
+            3,
+            1.7999999523162842
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.699999988079071,
+            0.7200000286102295,
+            0.7799999713897705,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Pillar 4"
+        },
+        "Transform": {
+          "pos": [
+            8,
+            1.5,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.7999999523162842,
+            3,
+            1.7999999523162842
+          ]
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Gate": {},
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.3499999940395355,
+            0.10000000149011612,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.800000011920929,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate 1"
+        },
+        "PrefabSpawner": {
+          "prefab": "Grunt",
+          "interval": 2.4000000953674316,
+          "count": 1,
+          "max_alive": 4,
+          "limit": 0,
+          "radius": 1.2000000476837158,
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "speed": 0,
+          "active": true,
+          "timer": 0,
+          "spawned": 0
+        },
+        "Transform": {
+          "pos": [
+            -18,
+            0,
+            -18
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Gate": {},
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.3499999940395355,
+            0.10000000149011612,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.800000011920929,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate 2"
+        },
+        "PrefabSpawner": {
+          "prefab": "Grunt",
+          "interval": 2.4000000953674316,
+          "count": 1,
+          "max_alive": 4,
+          "limit": 0,
+          "radius": 1.2000000476837158,
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "speed": 0,
+          "active": true,
+          "timer": 0,
+          "spawned": 0
+        },
+        "Transform": {
+          "pos": [
+            18,
+            0,
+            -18
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Gate": {},
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.3499999940395355,
+            0.10000000149011612,
+            0.44999998807907104,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.800000011920929,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Gate 3"
+        },
+        "PrefabSpawner": {
+          "prefab": "Grunt",
+          "interval": 2.4000000953674316,
+          "count": 1,
+          "max_alive": 4,
+          "limit": 0,
+          "radius": 1.2000000476837158,
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "speed": 0,
+          "active": true,
+          "timer": 0,
+          "spawned": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            18
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 20,
+      "components": {
+        "CharacterBody": {
+          "radius": 0.4000000059604645,
+          "height": 1.7999999523162842,
+          "walk": [
+            0,
+            0
+          ],
+          "jump": 0,
+          "gravity_scale": 1,
+          "step_height": 0.4000000059604645,
+          "max_slope": 50,
+          "fall": 0,
+          "grounded": false
+        },
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1.7999999523162842,
+            1.7999999523162842,
+            1.7999999523162842
+          ],
+          "trigger": true
+        },
+        "Hero": {},
+        "HitPoints": {
+          "value": 100,
+          "max": 100,
+          "regen": 4,
+          "regen_delay": 3,
+          "invulnerable": 0,
+          "remove_after": 0,
+          "hurt": 100,
+          "dead": false,
+          "last": 100
+        },
+        "Name": {
+          "value": "Hero"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0.8999999761581421,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.8999999761581421,
+            0.5
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.20000000298023224,
+            0.550000011920929,
+            0.949999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.4000000059604645,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hero body"
+        },
+        "Parent": {
+          "target": 20
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.8999999761581421,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.8999999761581421,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            1.899999976158142,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.550000011920929,
+            0.550000011920929,
+            0.550000011920929
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.8500000238418579,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.44999998807907104,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hero head"
+        },
+        "Parent": {
+          "target": 20
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.899999976158142,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.550000011920929,
+            0.550000011920929,
+            0.550000011920929
+          ]
+        }
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            1,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Muzzle": {},
+        "Name": {
+          "value": "Muzzle"
+        },
+        "Parent": {
+          "target": 20
+        },
+        "PrefabSpawner": {
+          "prefab": "Bolt",
+          "interval": 0.20000000298023224,
+          "count": 1,
+          "max_alive": 0,
+          "limit": 0,
+          "radius": 0,
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "speed": 18,
+          "active": false,
+          "timer": 0,
+          "spawned": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 24,
+      "components": {
+        "Camera": {
+          "fov_y": 50,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.5,
+            0.6499999761581421,
+            0.8500000238418579,
+            1
+          ]
+        },
+        "CameraRig": {
+          "target": 20,
+          "mode": 0,
+          "offset": [
+            0,
+            11,
+            9
+          ],
+          "look_at": true,
+          "look_offset": [
+            0,
+            0.5,
+            0
+          ],
+          "follow_speed": 4,
+          "yaw": 0,
+          "pitch": 0.4000000059604645,
+          "distance": 8,
+          "shake": 0,
+          "shake_decay": 1.5,
+          "shake_amount": 0.4000000059604645
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            11,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 25,
+      "components": {
+        "InputMap": {
+          "bindings": "move_x = d, a:-1\nmove_y = s, w:-1\nfire = space, mouse_left"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "Name": {
+          "value": "Health back"
+        },
+        "Ui": {
+          "pos": [
+            0.029999999329447746,
+            0.03999999910593033
+          ],
+          "size": [
+            0.30000001192092896,
+            0.03999999910593033
+          ],
+          "color": [
+            0.10000000149011612,
+            0.10000000149011612,
+            0.10000000149011612,
+            0.6000000238418579
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0.0020000000949949026,
+          "text": "",
+          "text_size": 0.03999999910593033,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 0,
+          "visible": true,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        }
+      }
+    },
+    {
+      "uid": 31,
+      "components": {
+        "HeroBar": {},
+        "Name": {
+          "value": "Health bar"
+        },
+        "Ui": {
+          "pos": [
+            0.03400000184774399,
+            0.04699999839067459
+          ],
+          "size": [
+            0.2919999957084656,
+            0.026000000536441803
+          ],
+          "color": [
+            0.8500000238418579,
+            0.20000000298023224,
+            0.20000000298023224,
+            1
+          ],
+          "back_color": [
+            0.20000000298023224,
+            0.05000000074505806,
+            0.05000000074505806,
+            0.800000011920929
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "",
+          "text_size": 0.03999999910593033,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 1,
+          "visible": true,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        }
+      }
+    },
+    {
+      "uid": 32,
+      "components": {
+        "Name": {
+          "value": "Score"
+        },
+        "Text": {
+          "value": "Score {score}   Health {hero.hp}",
+          "pos": [
+            0.5,
+            0.03999999910593033
+          ],
+          "size": 0.04500000178813934,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    },
+    {
+      "uid": 33,
+      "components": {
+        "GameOver": {},
+        "Name": {
+          "value": "Game over"
+        },
+        "Ui": {
+          "pos": [
+            0.25,
+            0.4000000059604645
+          ],
+          "size": [
+            0.5,
+            0.18000000715255737
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            0.699999988079071
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "GAME OVER   score {score}",
+          "text_size": 0.05000000074505806,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 5,
+          "visible": false,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        }
+      }
+    },
+    {
+      "uid": 34,
+      "components": {
+        "Name": {
+          "value": "Hint"
+        },
+        "Text": {
+          "value": "WASD walk   Space fire",
+          "pos": [
+            0.5,
+            0.9399999976158142
+          ],
+          "size": 0.029999999329447746,
+          "color": [
+            1,
+            1,
+            1,
+            0.800000011920929
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "resources": {
+    "aim.x": 0,
+    "aim.z": -1,
+    "hero.hp": 100,
+    "score": 0
+  },
+  "systems": [
+    {
+      "name": "hero_walk",
+      "doc": "The keys become the hero's walk, and the last way it walked is the way it aims.",
+      "each": [
+        "Hero",
+        "CharacterBody"
+      ],
+      "order": 10,
+      "do": [
+        {
+          "set": "CharacterBody.walk[0]",
+          "to": {
+            "mul": [
+              {
+                "res": "action.move_x"
+              },
+              6
+            ]
+          }
+        },
+        {
+          "set": "CharacterBody.walk[1]",
+          "to": {
+            "mul": [
+              {
+                "res": "action.move_y"
+              },
+              6
+            ]
+          }
+        },
+        {
+          "if": {
+            "or": [
+              {
+                "ne": [
+                  {
+                    "res": "action.move_x"
+                  },
+                  0
+                ]
+              },
+              {
+                "ne": [
+                  {
+                    "res": "action.move_y"
+                  },
+                  0
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "res_set": "aim.x",
+              "to": {
+                "res": "action.move_x"
+              }
+            },
+            {
+              "res_set": "aim.z",
+              "to": {
+                "res": "action.move_y"
+              }
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "hero_status",
+      "doc": "What the grunts need to know about the hero, and the hero's health bar.",
+      "each": [
+        "Hero",
+        "Transform",
+        "HitPoints"
+      ],
+      "order": 11,
+      "do": [
+        {
+          "res_set": "hero.x",
+          "to": {
+            "get": "Transform.pos[0]"
+          }
+        },
+        {
+          "res_set": "hero.z",
+          "to": {
+            "get": "Transform.pos[2]"
+          }
+        },
+        {
+          "res_set": "hero.hp",
+          "to": {
+            "floor": {
+              "get": "HitPoints.value"
+            }
+          }
+        },
+        {
+          "if": {
+            "get": "HitPoints.dead"
+          },
+          "then": [
+            {
+              "res_set": "time.scale",
+              "to": 0.25
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "muzzle",
+      "doc": "The muzzle turns the way the hero aims and fires while the key is held.",
+      "each": [
+        "Muzzle",
+        "LocalTransform",
+        "PrefabSpawner"
+      ],
+      "order": 12,
+      "do": [
+        {
+          "let": "yaw",
+          "be": {
+            "atan2": [
+              {
+                "neg": {
+                  "res": "aim.x"
+                }
+              },
+              {
+                "neg": {
+                  "res": "aim.z"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.rot[1]",
+          "to": {
+            "sin": {
+              "mul": [
+                {
+                  "var": "yaw"
+                },
+                0.5
+              ]
+            }
+          }
+        },
+        {
+          "set": "LocalTransform.rot[3]",
+          "to": {
+            "cos": {
+              "mul": [
+                {
+                  "var": "yaw"
+                },
+                0.5
+              ]
+            }
+          }
+        },
+        {
+          "set": "PrefabSpawner.active",
+          "to": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "action.fire"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "gt": [
+                  {
+                    "res": "hero.hp"
+                  },
+                  0
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "hunt",
+      "doc": "Grunts head for the hero: every 20 ticks each asks for a new path (staggered by uid so they do not all plan at once).",
+      "each": [
+        "Enemy",
+        "NavAgent"
+      ],
+      "order": 20,
+      "do": [
+        {
+          "if": {
+            "eq": [
+              {
+                "mod": [
+                  {
+                    "tick": true
+                  },
+                  20
+                ]
+              },
+              {
+                "mod": [
+                  {
+                    "uid": true
+                  },
+                  20
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "NavAgent.target[0]",
+              "to": {
+                "res": "hero.x"
+              }
+            },
+            {
+              "set": "NavAgent.target[1]",
+              "to": 0
+            },
+            {
+              "set": "NavAgent.target[2]",
+              "to": {
+                "res": "hero.z"
+              }
+            },
+            {
+              "set": "NavAgent.active",
+              "to": true
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "grunt_bites",
+      "doc": "A grunt that touches the hero bites, once in a while (the hero has a moment of grace after each bite).",
+      "on_contact": {
+        "a": [
+          "Hero",
+          "HitPoints"
+        ],
+        "b": [
+          "Enemy"
+        ]
+      },
+      "order": 30,
+      "do": [
+        {
+          "if": {
+            "and": [
+              {
+                "le": [
+                  {
+                    "get": "a.HitPoints.invulnerable"
+                  },
+                  0
+                ]
+              },
+              {
+                "not": {
+                  "get": "a.HitPoints.dead"
+                }
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "a.HitPoints.value",
+              "to": {
+                "sub": [
+                  {
+                    "get": "a.HitPoints.value"
+                  },
+                  12
+                ]
+              }
+            },
+            {
+              "set": "a.HitPoints.invulnerable",
+              "to": 0.7
+            },
+            {
+              "emit": "hurt"
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "bolt_hits",
+      "doc": "A bolt that reaches a grunt hurts it and is used up.",
+      "on_contact": {
+        "a": [
+          "Bolt"
+        ],
+        "b": [
+          "Enemy",
+          "HitPoints"
+        ]
+      },
+      "order": 31,
+      "do": [
+        {
+          "set": "b.HitPoints.value",
+          "to": {
+            "sub": [
+              {
+                "get": "b.HitPoints.value"
+              },
+              15
+            ]
+          }
+        },
+        {
+          "emit": "hit"
+        },
+        {
+          "despawn": "a"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "grunt_dies",
+      "doc": "A dead grunt scores and goes.",
+      "each": [
+        "Enemy",
+        "HitPoints"
+      ],
+      "order": 40,
+      "do": [
+        {
+          "if": {
+            "get": "HitPoints.dead"
+          },
+          "then": [
+            {
+              "res_add": "score",
+              "by": 1
+            },
+            {
+              "emit": "pop"
+            },
+            {
+              "despawn": true
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "hud_bar",
+      "each": [
+        "HeroBar",
+        "Ui"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Ui.fill",
+          "to": {
+            "div": [
+              {
+                "res": "hero.hp"
+              },
+              100
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "hud_game_over",
+      "each": [
+        "GameOver",
+        "Ui"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Ui.visible",
+          "to": {
+            "le": [
+              {
+                "res": "hero.hp"
+              },
+              0
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    }
+  ],
+  "prefabs": {
+    "Bolt": {
+      "components": {
+        "Name": {
+          "value": "Bolt"
+        },
+        "Transform": {
+          "scale": [
+            0.3,
+            0.3,
+            0.3
+          ]
+        },
+        "Velocity": {},
+        "Bolt": {},
+        "Lifetime": {
+          "seconds": 1.1
+        },
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.85,
+            0.3,
+            1
+          ],
+          "emissive": 3
+        }
+      }
+    },
+    "Grunt": {
+      "components": {
+        "Name": {
+          "value": "Grunt"
+        },
+        "Transform": {},
+        "Enemy": {},
+        "CharacterBody": {
+          "radius": 0.4
+        },
+        "NavAgent": {
+          "speed": 3.2,
+          "radius": 0.4,
+          "arrive": 0.2
+        },
+        "NavAvoid": {
+          "strength": 1.2
+        },
+        "HitPoints": {
+          "value": 30,
+          "max": 30
+        },
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1.8,
+            1.8,
+            1.8
+          ],
+          "trigger": true
+        }
+      },
+      "children": [
+        {
+          "name": "Body",
+          "components": {
+            "LocalTransform": {
+              "pos": [
+                0,
+                0.3,
+                0
+              ],
+              "scale": [
+                0.45,
+                0.45,
+                0.45
+              ]
+            },
+            "MeshRenderer": {
+              "mesh": "sphere",
+              "color": [
+                0.85,
+                0.2,
+                0.18,
+                1
+              ],
+              "roughness": 0.5
+            }
+          }
+        },
+        {
+          "name": "Eye",
+          "components": {
+            "LocalTransform": {
+              "pos": [
+                0,
+                0.36,
+                -0.2
+              ],
+              "scale": [
+                0.16,
+                0.16,
+                0.16
+              ]
+            },
+            "MeshRenderer": {
+              "mesh": "sphere",
+              "color": [
+                1,
+                0.95,
+                0.7,
+                1
+              ],
+              "emissive": 2
+            }
+          }
+        }
+      ]
+    }
+  }
+}

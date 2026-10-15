@@ -1,0 +1,29 @@
+{
+  "hud": {
+    "coins": "Coins"
+  },
+  "hint": {
+    "talk": "Press E to talk"
+  },
+  "quest": {
+    "fetch": "Quest: bring water from the well",
+    "back": "Quest: take the water back to the elder"
+  },
+  "name": {
+    "elder": "Elder Maren"
+  },
+  "choice": {
+    "help": "I will help",
+    "later": "Maybe later",
+    "give": "Here is your water"
+  },
+  "elder": {
+    "hello": "Welcome, traveller.",
+    "need": "Our bucket was left at the well. Could you fetch some water for me?",
+    "accept": "Thank you! The well is to the east.",
+    "reminder": "The well is to the east. Please hurry.",
+    "water": "You have the water!",
+    "thanks": "Wonderful. Take these coins for your trouble.",
+    "after": "Thank you again, friend."
+  }
+}

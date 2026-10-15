@@ -1,0 +1,22 @@
+{
+  "name": "Coin Chase (the tutorial game): ten coins, the camera rides on the hero, touching a coin scores",
+  "scene": "examples/coin_chase.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "count": { "with": ["Coin"] }, "eq": 10 } },
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "expect": { "name": "Camera", "field": "Transform.pos[1]", "approx": [11.5, 0.001], "message": "the camera hangs 11 above the hero, whose centre is at 0.5" } },
+
+    { "input": { "d": true } },
+    { "step": 60 },
+    { "expect": { "resource": "score", "ge": 1, "message": "the hero ran through the first coin" } },
+    { "expect": { "count": { "with": ["Coin"] }, "le": 9, "message": "and the coin is gone" } },
+    { "expect": { "name": "Camera", "field": "Transform.pos[0]", "gt": 2, "message": "the camera followed the hero" } },
+    { "expect": { "events": "coin", "ge": 1 } },
+
+    { "input": { "d": false, "s": true } },
+    { "step": 60 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[2]", "gt": 3, "message": "S moves the hero towards the viewer (+z)" } }
+  ]
+}

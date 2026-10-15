@@ -1,0 +1,343 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Burster",
+      "doc": "Fires the emitter's burst every `every` ticks.",
+      "fields": [
+        {
+          "name": "every",
+          "type": "u32",
+          "default": 120
+        },
+        {
+          "name": "power",
+          "type": "u32",
+          "default": 120
+        }
+      ]
+    }
+  ],
+  "next_uid": 6,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Camera": {
+          "fov_y": 60,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": true,
+          "ortho_height": 14,
+          "active": true,
+          "clear": [
+            0.029999999329447746,
+            0.029999999329447746,
+            0.07999999821186066,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Name": {
+          "value": "Ground"
+        },
+        "Sprite": {
+          "size": [
+            1,
+            1
+          ],
+          "color": [
+            0.11999999731779099,
+            0.14000000059604645,
+            0.20000000298023224,
+            1
+          ],
+          "texture": "",
+          "visible": true,
+          "sheet": [
+            1,
+            1
+          ],
+          "frame": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            -6.199999809265137,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            40,
+            1.2000000476837158,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Emitter": {
+          "active": true,
+          "rate": 140,
+          "burst": 0,
+          "life": 1.7000000476837158,
+          "life_var": 0.15000000596046448,
+          "speed": 8,
+          "speed_var": 0.11999999731779099,
+          "dir": [
+            0,
+            1,
+            0
+          ],
+          "spread": 0.05000000074505806,
+          "gravity": [
+            0,
+            -9.5,
+            0
+          ],
+          "size0": 0.30000001192092896,
+          "size1": 0.07999999821186066,
+          "color0": [
+            0.699999988079071,
+            0.8799999952316284,
+            1,
+            1
+          ],
+          "color1": [
+            0.20000000298023224,
+            0.44999998807907104,
+            1,
+            0
+          ],
+          "texture": "circle",
+          "mesh": "",
+          "max": 400,
+          "carry": 0
+        },
+        "Name": {
+          "value": "Fountain"
+        },
+        "Transform": {
+          "pos": [
+            -6,
+            -5.599999904632568,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Emitter": {
+          "active": true,
+          "rate": 110,
+          "burst": 0,
+          "life": 1.100000023841858,
+          "life_var": 0.30000001192092896,
+          "speed": 2.5999999046325684,
+          "speed_var": 0.30000001192092896,
+          "dir": [
+            0,
+            1,
+            0
+          ],
+          "spread": 0.10000000149011612,
+          "gravity": [
+            0,
+            1.399999976158142,
+            0
+          ],
+          "size0": 0.550000011920929,
+          "size1": 0.05000000074505806,
+          "color0": [
+            1,
+            0.8799999952316284,
+            0.30000001192092896,
+            1
+          ],
+          "color1": [
+            0.8999999761581421,
+            0.11999999731779099,
+            0.019999999552965164,
+            0
+          ],
+          "texture": "circle",
+          "mesh": "",
+          "max": 400,
+          "carry": 0
+        },
+        "Name": {
+          "value": "Campfire"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            -5.599999904632568,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Burster": {
+          "every": 120,
+          "power": 140
+        },
+        "Emitter": {
+          "active": true,
+          "rate": 0,
+          "burst": 0,
+          "life": 1.7999999523162842,
+          "life_var": 0.25,
+          "speed": 5.5,
+          "speed_var": 0.44999998807907104,
+          "dir": [
+            0,
+            1,
+            0
+          ],
+          "spread": 1,
+          "gravity": [
+            0,
+            -3,
+            0
+          ],
+          "size0": 0.25999999046325684,
+          "size1": 0,
+          "color0": [
+            1,
+            0.9200000166893005,
+            0.44999998807907104,
+            1
+          ],
+          "color1": [
+            1,
+            0.25,
+            0.10000000149011612,
+            0
+          ],
+          "texture": "circle",
+          "mesh": "",
+          "max": 600,
+          "carry": 0
+        },
+        "Name": {
+          "value": "Fireworks"
+        },
+        "Transform": {
+          "pos": [
+            6,
+            1.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "systems": [
+    {
+      "name": "launch",
+      "each": [
+        "Burster",
+        "Emitter"
+      ],
+      "doc": "Every `every` ticks, tell the emitter to throw a burst.",
+      "do": [
+        {
+          "if": {
+            "eq": [
+              {
+                "mod": [
+                  {
+                    "tick": true
+                  },
+                  {
+                    "get": "Burster.every"
+                  }
+                ]
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "set": "Emitter.burst",
+              "to": {
+                "get": "Burster.power"
+              }
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,3560 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Npc",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Bucket",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HintText",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "QuestFetch",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "QuestBack",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Celebration",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 116,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.20000000298023224,
+            0.41999998688697815,
+            0.8500000238418579
+          ],
+          "sky_horizon": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "ground": [
+            0.30000001192092896,
+            0.27000001072883606,
+            0.23999999463558197
+          ],
+          "ambient": 1,
+          "exposure": 1,
+          "clouds": 0.4000000059604645,
+          "fog": 0.003000000026077032,
+          "fog_color": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "shadows": true,
+          "shadow_distance": 80,
+          "ssao": 1,
+          "bloom": 0.30000001192092896,
+          "bloom_threshold": 1,
+          "vignette": 0.20000000298023224,
+          "saturation": 1,
+          "tonemap": 0,
+          "dof": 0,
+          "focus": 10,
+          "focus_range": 4
+        },
+        "Name": {
+          "value": "Environment"
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 2.799999952316284,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "TimeOfDay": {
+          "time": 16.5,
+          "day_seconds": 1200,
+          "azimuth": 0.8999999761581421,
+          "sun_intensity": 3,
+          "night_intensity": 0,
+          "enabled": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.5,
+            0.30000001192092896,
+            0.10000000149011612,
+            0.800000011920929
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.699999988079071,
+            0.8500000238418579,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.949999988079071,
+          "texture": "grass",
+          "uv_scale": [
+            30,
+            30
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Ground"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            -0.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            60,
+            1,
+            60
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.7799999713897705,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            2,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "House 1"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            1.5,
+            -2
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            5,
+            3,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.550000011920929,
+            0.2199999988079071,
+            0.18000000715255737,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.800000011920929,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Roof 1"
+        },
+        "Transform": {
+          "pos": [
+            -9,
+            3.299999952316284,
+            -2
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            5.599999904632568,
+            0.699999988079071,
+            4.599999904632568
+          ]
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.7799999713897705,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            2,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "House 2"
+        },
+        "Transform": {
+          "pos": [
+            9,
+            1.5,
+            -9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            4,
+            3,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.550000011920929,
+            0.2199999988079071,
+            0.18000000715255737,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.800000011920929,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Roof 2"
+        },
+        "Transform": {
+          "pos": [
+            9,
+            3.299999952316284,
+            -9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            4.599999904632568,
+            0.699999988079071,
+            5.599999904632568
+          ]
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.7799999713897705,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            2,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "House 3"
+        },
+        "Transform": {
+          "pos": [
+            -8,
+            1.5,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            6,
+            3,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.550000011920929,
+            0.2199999988079071,
+            0.18000000715255737,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.800000011920929,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Roof 3"
+        },
+        "Transform": {
+          "pos": [
+            -8,
+            3.299999952316284,
+            10
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            6.599999904632568,
+            0.699999988079071,
+            4.599999904632568
+          ]
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.8999999761581421,
+            0.7799999713897705,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "bricks",
+          "uv_scale": [
+            2,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "House 4"
+        },
+        "Transform": {
+          "pos": [
+            12,
+            1.5,
+            8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            4,
+            3,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.550000011920929,
+            0.2199999988079071,
+            0.18000000715255737,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.800000011920929,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Roof 4"
+        },
+        "Transform": {
+          "pos": [
+            12,
+            3.299999952316284,
+            8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            4.599999904632568,
+            0.699999988079071,
+            4.599999904632568
+          ]
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.699999988079071,
+            0.699999988079071,
+            0.7200000286102295,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "stone",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Well"
+        },
+        "Transform": {
+          "pos": [
+            8,
+            0.5,
+            -2.5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.600000023841858,
+            1,
+            1.600000023841858
+          ]
+        }
+      }
+    },
+    {
+      "uid": 20,
+      "components": {
+        "CharacterBody": {
+          "radius": 0.4000000059604645,
+          "height": 1.7999999523162842,
+          "walk": [
+            0,
+            0
+          ],
+          "jump": 0,
+          "gravity_scale": 1,
+          "step_height": 0.4000000059604645,
+          "max_slope": 50,
+          "fall": 0,
+          "grounded": false
+        },
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1.7999999523162842,
+            1.7999999523162842,
+            1.7999999523162842
+          ],
+          "trigger": true
+        },
+        "Hero": {},
+        "Name": {
+          "value": "Hero"
+        },
+        "Sensor": {
+          "radius": 3.5,
+          "fov": 360,
+          "filter": "Npc",
+          "los": false,
+          "eye": 1,
+          "seen": 0,
+          "distance": 0,
+          "count": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 21,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0.8999999761581421,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.8999999761581421,
+            0.5
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.20000000298023224,
+            0.550000011920929,
+            0.949999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.4000000059604645,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hero body"
+        },
+        "Parent": {
+          "target": 20
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.8999999761581421,
+            9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.8999999761581421,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 22,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            1.899999976158142,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.550000011920929,
+            0.550000011920929,
+            0.550000011920929
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.8500000238418579,
+            0.699999988079071,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.44999998807907104,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hero head"
+        },
+        "Parent": {
+          "target": 20
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.899999976158142,
+            9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.550000011920929,
+            0.550000011920929,
+            0.550000011920929
+          ]
+        }
+      }
+    },
+    {
+      "uid": 23,
+      "components": {
+        "Camera": {
+          "fov_y": 50,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.5,
+            0.6499999761581421,
+            0.8500000238418579,
+            1
+          ]
+        },
+        "CameraRig": {
+          "target": 20,
+          "mode": 0,
+          "offset": [
+            0,
+            8,
+            8
+          ],
+          "look_at": true,
+          "look_offset": [
+            0,
+            0.800000011920929,
+            0
+          ],
+          "follow_speed": 4,
+          "yaw": 0,
+          "pitch": 0.4000000059604645,
+          "distance": 8,
+          "shake": 0,
+          "shake_decay": 1.5,
+          "shake_amount": 0.4000000059604645
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            8,
+            17
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 24,
+      "components": {
+        "InputMap": {
+          "bindings": "move_x = d, a:-1\nmove_y = s, w:-1\ninteract = e\ndialogue_next = space, enter\ndialogue_choice_1 = 1\ndialogue_choice_2 = 2\ndialogue_choice_3 = 3"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 25,
+      "components": {
+        "Bucket": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1.600000023841858,
+            1.600000023841858,
+            1.600000023841858
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.6000000238418579,
+            0.44999998807907104,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Bucket"
+        },
+        "Transform": {
+          "pos": [
+            7,
+            0.4000000059604645,
+            -1
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.44999998807907104,
+            0.5,
+            0.44999998807907104
+          ]
+        }
+      }
+    },
+    {
+      "uid": 26,
+      "components": {
+        "MusicPlayer": {
+          "playlist": "examples/sounds/radio.wav volume=0.3",
+          "crossfade": 1,
+          "volume": 1,
+          "shuffle": false,
+          "repeat": true,
+          "playing": true,
+          "skip": 0
+        },
+        "Name": {
+          "value": "Music"
+        }
+      }
+    },
+    {
+      "uid": 30,
+      "components": {
+        "Dialogue": {
+          "script": "# the elder's talk\n== start\nif $quest == 1 -> reminder\nif $quest == 2 -> water_back\nif $quest == 3 -> after\nElder: {#elder.hello}\nElder: {#elder.need}\n* [{#choice.help}] -> accept\n* [{#choice.later}] -> end\n\n== accept\nres quest = 1\nElder: {#elder.accept}\n-> end\n\n== reminder\nElder: {#elder.reminder}\n-> end\n\n== water_back\nElder: {#elder.water}\n* [{#choice.give}] -> thanks\n* [{#choice.later}] -> end\n\n== thanks\nres quest = 3\nres coins += 10\nevent quest_done\nElder: {#elder.thanks}\n-> end\n\n== after\nElder: {#elder.after}\n-> end\n",
+          "active": false,
+          "start": "",
+          "text_ui": 60,
+          "speaker_ui": 61,
+          "choice_1": 62,
+          "choice_2": 63,
+          "choice_3": 64,
+          "choice_4": 0,
+          "speed": 40,
+          "advance": 0,
+          "choose": 0,
+          "node": "",
+          "item": 0,
+          "speaker": "",
+          "text": "",
+          "elapsed": 0,
+          "seen_advance": 0
+        },
+        "Name": {
+          "value": "Elder"
+        },
+        "Npc": {},
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            -4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 31,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            0.8999999761581421,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.6000000238418579,
+            0.8999999761581421,
+            0.6000000238418579
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.550000011920929,
+            0.30000001192092896,
+            0.6000000238418579,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.5,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Elder body"
+        },
+        "Parent": {
+          "target": 30
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.8999999761581421,
+            -4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.6000000238418579,
+            0.8999999761581421,
+            0.6000000238418579
+          ]
+        }
+      }
+    },
+    {
+      "uid": 32,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            1.9500000476837158,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.550000011920929,
+            0.550000011920929,
+            0.550000011920929
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.949999988079071,
+            0.800000011920929,
+            0.6800000071525574,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.44999998807907104,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Elder head"
+        },
+        "Parent": {
+          "target": 30
+        },
+        "Transform": {
+          "pos": [
+            0,
+            1.9500000476837158,
+            -4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.550000011920929,
+            0.550000011920929,
+            0.550000011920929
+          ]
+        }
+      }
+    },
+    {
+      "uid": 33,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            2.1500000953674316,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.6000000238418579,
+            0.30000001192092896,
+            0.6000000238418579
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.8500000238418579,
+            0.8500000238418579,
+            0.8799999952316284,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Elder hair"
+        },
+        "Parent": {
+          "target": 30
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2.1500000953674316,
+            -4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.6000000238418579,
+            0.30000001192092896,
+            0.6000000238418579
+          ]
+        }
+      }
+    },
+    {
+      "uid": 34,
+      "components": {
+        "Celebration": {},
+        "Name": {
+          "value": "Celebration"
+        },
+        "Particles": {
+          "count": 400,
+          "lifetime": 1.7999999523162842,
+          "looping": false,
+          "prewarm": true,
+          "playing": false,
+          "time": 99,
+          "speed": 1,
+          "spread_time": 0,
+          "shape": 1,
+          "extent": [
+            0.20000000298023224,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 180,
+          "speed_range": [
+            2,
+            5
+          ],
+          "gravity": [
+            0,
+            -3,
+            0
+          ],
+          "drag": 1.2000000476837158,
+          "turbulence": 0,
+          "turbulence_scale": 1,
+          "size": [
+            0.1599999964237213,
+            0.03999999910593033
+          ],
+          "size_jitter": 0.30000001192092896,
+          "color": [
+            1,
+            0.8999999761581421,
+            0.4000000059604645,
+            1
+          ],
+          "color_end": [
+            1,
+            0.4000000059604645,
+            0.10000000149011612,
+            0
+          ],
+          "fade_in": 0,
+          "spin": 0,
+          "stretch": 0,
+          "texture": "",
+          "sheet": [
+            1,
+            1
+          ],
+          "additive": true,
+          "seed": 9,
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2,
+            -4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 35,
+      "components": {
+        "EventWatch": {
+          "names": "quest_done"
+        },
+        "Name": {
+          "value": "Watch"
+        }
+      }
+    },
+    {
+      "uid": 36,
+      "components": {
+        "Name": {
+          "value": "Elder name"
+        },
+        "Text": {
+          "value": "{#name.elder}",
+          "pos": [
+            0,
+            0
+          ],
+          "size": 0.03999999910593033,
+          "color": [
+            1,
+            0.949999988079071,
+            0.6000000238418579,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        },
+        "UiAnchor": {
+          "entity": 30,
+          "world": [
+            0,
+            2.700000047683716,
+            0
+          ],
+          "offset": [
+            0,
+            -0.029999999329447746
+          ]
+        }
+      }
+    },
+    {
+      "uid": 40,
+      "components": {
+        "Light": {
+          "kind": 1,
+          "color": [
+            1,
+            0.6000000238418579,
+            0.25
+          ],
+          "intensity": 3,
+          "range": 8,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Campfire light"
+        },
+        "Transform": {
+          "pos": [
+            -4,
+            0.8999999761581421,
+            5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 41,
+      "components": {
+        "Name": {
+          "value": "Fire"
+        },
+        "Particles": {
+          "count": 500,
+          "lifetime": 1.100000023841858,
+          "looping": true,
+          "prewarm": true,
+          "playing": true,
+          "time": 0,
+          "speed": 1,
+          "spread_time": 0,
+          "shape": 3,
+          "extent": [
+            0.25,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 14,
+          "speed_range": [
+            0.800000011920929,
+            1.600000023841858
+          ],
+          "gravity": [
+            0,
+            1.2000000476837158,
+            0
+          ],
+          "drag": 0,
+          "turbulence": 0.15000000596046448,
+          "turbulence_scale": 1,
+          "size": [
+            0.5,
+            0.10000000149011612
+          ],
+          "size_jitter": 0.30000001192092896,
+          "color": [
+            1,
+            0.6499999761581421,
+            0.18000000715255737,
+            0.8999999761581421
+          ],
+          "color_end": [
+            0.8999999761581421,
+            0.11999999731779099,
+            0.019999999552965164,
+            0
+          ],
+          "fade_in": 0.05000000074505806,
+          "spin": 0,
+          "stretch": 0,
+          "texture": "",
+          "sheet": [
+            1,
+            1
+          ],
+          "additive": true,
+          "seed": 11,
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            -4,
+            0.20000000298023224,
+            5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 42,
+      "components": {
+        "Name": {
+          "value": "Smoke"
+        },
+        "Particles": {
+          "count": 120,
+          "lifetime": 3.5,
+          "looping": true,
+          "prewarm": true,
+          "playing": true,
+          "time": 0,
+          "speed": 1,
+          "spread_time": 0,
+          "shape": 3,
+          "extent": [
+            0.15000000596046448,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 18,
+          "speed_range": [
+            0.5,
+            0.8999999761581421
+          ],
+          "gravity": [
+            0.30000001192092896,
+            0.5,
+            0
+          ],
+          "drag": 0.25,
+          "turbulence": 0.4000000059604645,
+          "turbulence_scale": 1,
+          "size": [
+            0.30000001192092896,
+            1.2000000476837158
+          ],
+          "size_jitter": 0.30000001192092896,
+          "color": [
+            0.3499999940395355,
+            0.3499999940395355,
+            0.3799999952316284,
+            0.44999998807907104
+          ],
+          "color_end": [
+            0.20000000298023224,
+            0.20000000298023224,
+            0.2199999988079071,
+            0
+          ],
+          "fade_in": 0.20000000298023224,
+          "spin": 0,
+          "stretch": 0,
+          "texture": "",
+          "sheet": [
+            1,
+            1
+          ],
+          "additive": false,
+          "seed": 5,
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            -4,
+            1,
+            5
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 43,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.30000001192092896,
+            0.18000000715255737,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Log 1"
+        },
+        "Transform": {
+          "pos": [
+            -4.300000190734863,
+            0.11999999731779099,
+            5
+          ],
+          "rot": [
+            0,
+            0.20000000298023224,
+            0,
+            0.8999999761581421
+          ],
+          "scale": [
+            0.8999999761581421,
+            0.20000000298023224,
+            0.20000000298023224
+          ]
+        }
+      }
+    },
+    {
+      "uid": 44,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "cube",
+          "color": [
+            0.30000001192092896,
+            0.18000000715255737,
+            0.10000000149011612,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Log 2"
+        },
+        "Transform": {
+          "pos": [
+            -3.700000047683716,
+            0.11999999731779099,
+            5
+          ],
+          "rot": [
+            0,
+            -0.20000000298023224,
+            0,
+            0.8999999761581421
+          ],
+          "scale": [
+            0.8999999761581421,
+            0.20000000298023224,
+            0.20000000298023224
+          ]
+        }
+      }
+    },
+    {
+      "uid": 60,
+      "components": {
+        "Name": {
+          "value": "Dialogue text"
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0.7400000095367432,
+          "line_spacing": 0.30000001192092896
+        },
+        "Ui": {
+          "pos": [
+            0.07999999821186066,
+            0.699999988079071
+          ],
+          "size": [
+            0.8399999737739563,
+            0.2199999988079071
+          ],
+          "color": [
+            0.11999999731779099,
+            0.1599999964237213,
+            0.30000001192092896,
+            0.9399999976158142
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            0.800000011920929,
+            0.8500000238418579,
+            1,
+            0.8999999761581421
+          ],
+          "border": 0.004000000189989805,
+          "text": "",
+          "text_size": 0.03999999910593033,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 3,
+          "visible": false,
+          "button": true,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.03500000014901161,
+          "color2": [
+            0.03999999910593033,
+            0.05000000074505806,
+            0.11999999731779099,
+            0.9399999976158142
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.5
+          ],
+          "shadow_offset": [
+            0.006000000052154064,
+            0.009999999776482582
+          ]
+        }
+      }
+    },
+    {
+      "uid": 61,
+      "components": {
+        "Name": {
+          "value": "Dialogue speaker"
+        },
+        "Text": {
+          "value": "",
+          "pos": [
+            0.10000000149011612,
+            0.6449999809265137
+          ],
+          "size": 0.04500000178813934,
+          "color": [
+            1,
+            0.8999999761581421,
+            0.4000000059604645,
+            1
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 62,
+      "components": {
+        "Name": {
+          "value": "Choice 1"
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        },
+        "Ui": {
+          "pos": [
+            0.5,
+            0.3799999952316284
+          ],
+          "size": [
+            0.41999998688697815,
+            0.07000000029802322
+          ],
+          "color": [
+            0.20000000298023224,
+            0.550000011920929,
+            0.3499999940395355,
+            0.949999988079071
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "",
+          "text_size": 0.03200000151991844,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 4,
+          "visible": false,
+          "button": true,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.029999999329447746,
+          "color2": [
+            0.07999999821186066,
+            0.30000001192092896,
+            0.18000000715255737,
+            0.949999988079071
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.44999998807907104
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.00800000037997961
+          ]
+        }
+      }
+    },
+    {
+      "uid": 63,
+      "components": {
+        "Name": {
+          "value": "Choice 2"
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        },
+        "Ui": {
+          "pos": [
+            0.5,
+            0.4650000035762787
+          ],
+          "size": [
+            0.41999998688697815,
+            0.07000000029802322
+          ],
+          "color": [
+            0.20000000298023224,
+            0.550000011920929,
+            0.3499999940395355,
+            0.949999988079071
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "",
+          "text_size": 0.03200000151991844,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 4,
+          "visible": false,
+          "button": true,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.029999999329447746,
+          "color2": [
+            0.07999999821186066,
+            0.30000001192092896,
+            0.18000000715255737,
+            0.949999988079071
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.44999998807907104
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.00800000037997961
+          ]
+        }
+      }
+    },
+    {
+      "uid": 64,
+      "components": {
+        "Name": {
+          "value": "Choice 3"
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        },
+        "Ui": {
+          "pos": [
+            0.5,
+            0.550000011920929
+          ],
+          "size": [
+            0.41999998688697815,
+            0.07000000029802322
+          ],
+          "color": [
+            0.20000000298023224,
+            0.550000011920929,
+            0.3499999940395355,
+            0.949999988079071
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "",
+          "text_size": 0.03200000151991844,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 4,
+          "visible": false,
+          "button": true,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.029999999329447746,
+          "color2": [
+            0.07999999821186066,
+            0.30000001192092896,
+            0.18000000715255737,
+            0.949999988079071
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.44999998807907104
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.00800000037997961
+          ]
+        }
+      }
+    },
+    {
+      "uid": 70,
+      "components": {
+        "Name": {
+          "value": "Coins"
+        },
+        "Text": {
+          "value": "{#hud.coins} {coins}",
+          "pos": [
+            0.029999999329447746,
+            0.03999999910593033
+          ],
+          "size": 0.05000000074505806,
+          "color": [
+            1,
+            0.8999999761581421,
+            0.4000000059604645,
+            1
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 71,
+      "components": {
+        "HintText": {},
+        "Name": {
+          "value": "Hint"
+        },
+        "Text": {
+          "value": "{#hint.talk}",
+          "pos": [
+            0.5,
+            0.8799999952316284
+          ],
+          "size": 0.04500000178813934,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 72,
+      "components": {
+        "Name": {
+          "value": "Quest fetch"
+        },
+        "QuestFetch": {},
+        "Text": {
+          "value": "{#quest.fetch}",
+          "pos": [
+            0.029999999329447746,
+            0.10999999940395355
+          ],
+          "size": 0.03500000014901161,
+          "color": [
+            0.800000011920929,
+            1,
+            0.800000011920929,
+            1
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 73,
+      "components": {
+        "Name": {
+          "value": "Quest back"
+        },
+        "QuestBack": {},
+        "Text": {
+          "value": "{#quest.back}",
+          "pos": [
+            0.029999999329447746,
+            0.10999999940395355
+          ],
+          "size": 0.03500000014901161,
+          "color": [
+            0.800000011920929,
+            1,
+            0.800000011920929,
+            1
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": false
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 74,
+      "components": {
+        "Camera": {
+          "fov_y": 60,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": true,
+          "ortho_height": 40,
+          "active": false,
+          "clear": [
+            0.15000000596046448,
+            0.4000000059604645,
+            0.20000000298023224,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Map camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            60,
+            0
+          ],
+          "rot": [
+            -0.7071068286895752,
+            0,
+            0,
+            0.7071068286895752
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 75,
+      "components": {
+        "CameraView": {
+          "camera": 74,
+          "width": 128,
+          "height": 128,
+          "every": 6,
+          "active": true
+        },
+        "Name": {
+          "value": "Minimap"
+        },
+        "Ui": {
+          "pos": [
+            0.800000011920929,
+            0.029999999329447746
+          ],
+          "size": [
+            0.17000000178813934,
+            0.30000001192092896
+          ],
+          "color": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            0.8999999761581421
+          ],
+          "border": 0.004000000189989805,
+          "text": "",
+          "text_size": 0.03999999910593033,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 2,
+          "visible": true,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.029999999329447746,
+          "color2": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.006000000052154064
+          ]
+        }
+      }
+    },
+    {
+      "uid": 76,
+      "components": {
+        "Localization": {
+          "language": "village_en"
+        },
+        "Name": {
+          "value": "Localization"
+        }
+      }
+    },
+    {
+      "uid": 100,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 1"
+        },
+        "Transform": {
+          "pos": [
+            -14,
+            1.2000000476837158,
+            4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 101,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 1"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            -14,
+            3.200000047683716,
+            4
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 102,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 2"
+        },
+        "Transform": {
+          "pos": [
+            -3,
+            1.2000000476837158,
+            14
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 103,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 2"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            -3,
+            3.200000047683716,
+            14
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 104,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 3"
+        },
+        "Transform": {
+          "pos": [
+            4,
+            1.2000000476837158,
+            16
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 105,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 3"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            4,
+            3.200000047683716,
+            16
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 106,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 4"
+        },
+        "Transform": {
+          "pos": [
+            16,
+            1.2000000476837158,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 107,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 4"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            16,
+            3.200000047683716,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 108,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 5"
+        },
+        "Transform": {
+          "pos": [
+            -16,
+            1.2000000476837158,
+            -9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 109,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 5"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            -16,
+            3.200000047683716,
+            -9
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 110,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 6"
+        },
+        "Transform": {
+          "pos": [
+            5,
+            1.2000000476837158,
+            -14
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 111,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 6"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            5,
+            3.200000047683716,
+            -14
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 112,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 7"
+        },
+        "Transform": {
+          "pos": [
+            -2,
+            1.2000000476837158,
+            -12
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 113,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 7"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            -2,
+            3.200000047683716,
+            -12
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    },
+    {
+      "uid": 114,
+      "components": {
+        "Collider": {
+          "shape": 1,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "MeshRenderer": {
+          "mesh": "cylinder",
+          "color": [
+            0.4000000059604645,
+            0.27000001072883606,
+            0.1599999964237213,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Trunk 8"
+        },
+        "Transform": {
+          "pos": [
+            14,
+            1.2000000476837158,
+            14
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            2.4000000953674316,
+            0.5
+          ]
+        }
+      }
+    },
+    {
+      "uid": 115,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.2199999988079071,
+            0.550000011920929,
+            0.25,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Crown 8"
+        },
+        "Sway": {
+          "amount": 0.15000000596046448,
+          "extent": 3,
+          "speed": 1.2000000476837158,
+          "offset": 0,
+          "phase": 0
+        },
+        "Transform": {
+          "pos": [
+            14,
+            3.200000047683716,
+            14
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2.200000047683716,
+            2.200000047683716,
+            2.200000047683716
+          ]
+        }
+      }
+    }
+  ],
+  "resources": {
+    "coins": 0,
+    "near": 0,
+    "quest": 0,
+    "talking": 0
+  },
+  "systems": [
+    {
+      "name": "hero_walk",
+      "doc": "Walking: the keys move the hero, except while the elder is talking.",
+      "each": [
+        "Hero",
+        "CharacterBody"
+      ],
+      "order": 10,
+      "do": [
+        {
+          "set": "CharacterBody.walk[0]",
+          "to": {
+            "mul": [
+              {
+                "res": "action.move_x"
+              },
+              5,
+              {
+                "sub": [
+                  1,
+                  {
+                    "res": "talking"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "set": "CharacterBody.walk[1]",
+          "to": {
+            "mul": [
+              {
+                "res": "action.move_y"
+              },
+              5,
+              {
+                "sub": [
+                  1,
+                  {
+                    "res": "talking"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "senses",
+      "doc": "Does the hero's sensor see the elder?",
+      "each": [
+        "Hero",
+        "Sensor"
+      ],
+      "order": 11,
+      "do": [
+        {
+          "if": {
+            "gt": [
+              {
+                "get": "Sensor.count"
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "res_set": "near",
+              "to": 1
+            }
+          ],
+          "else": [
+            {
+              "res_set": "near",
+              "to": 0
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "is_talking",
+      "each": [
+        "Npc",
+        "Dialogue"
+      ],
+      "order": 12,
+      "do": [
+        {
+          "if": {
+            "get": "Dialogue.active"
+          },
+          "then": [
+            {
+              "res_set": "talking",
+              "to": 1
+            }
+          ],
+          "else": [
+            {
+              "res_set": "talking",
+              "to": 0
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "interact",
+      "doc": "E starts the elder's talk when the hero is close.",
+      "each": [
+        "Npc",
+        "Dialogue"
+      ],
+      "order": 14,
+      "do": [
+        {
+          "if": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "action.interact.pressed"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "gt": [
+                  {
+                    "res": "near"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "lt": [
+                  {
+                    "res": "talking"
+                  },
+                  0.5
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "Dialogue.active",
+              "to": true
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "bucket_pickup",
+      "doc": "The bucket by the well: picking it up completes the first half of the quest.",
+      "on_contact": {
+        "a": [
+          "Hero"
+        ],
+        "b": [
+          "Bucket"
+        ]
+      },
+      "order": 30,
+      "do": [
+        {
+          "if": {
+            "eq": [
+              {
+                "res": "quest"
+              },
+              1
+            ]
+          },
+          "then": [
+            {
+              "res_set": "quest",
+              "to": 2
+            },
+            {
+              "emit": "pickup"
+            },
+            {
+              "despawn": "b"
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "hint",
+      "each": [
+        "HintText",
+        "Text"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Text.visible",
+          "to": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "near"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "lt": [
+                  {
+                    "res": "talking"
+                  },
+                  0.5
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "quest_fetch_text",
+      "each": [
+        "QuestFetch",
+        "Text"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Text.visible",
+          "to": {
+            "eq": [
+              {
+                "res": "quest"
+              },
+              1
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "quest_back_text",
+      "each": [
+        "QuestBack",
+        "Text"
+      ],
+      "order": 50,
+      "do": [
+        {
+          "set": "Text.visible",
+          "to": {
+            "eq": [
+              {
+                "res": "quest"
+              },
+              2
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "celebrate",
+      "doc": "When the quest is done the elder's celebration goes off again (an `EventWatch` turns the event into the resource).",
+      "each": [
+        "Celebration",
+        "Particles"
+      ],
+      "order": 60,
+      "do": [
+        {
+          "if": {
+            "gt": [
+              {
+                "res": "event.quest_done"
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "set": "Particles.time",
+              "to": 0
+            },
+            {
+              "set": "Particles.playing",
+              "to": true
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

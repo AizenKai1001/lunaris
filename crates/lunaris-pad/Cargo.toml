@@ -1,0 +1,9 @@
+[package]
+name = "lunaris-pad"
+description = "Game controllers for Lunaris, standard library only: XInput on Windows (Xbox-style pads, with rumble), the joystick interface on Linux. They become the `gamepad.*` names an InputMap can bind."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

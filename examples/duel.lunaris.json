@@ -1,0 +1,2182 @@
+{
+ "lunaris": 1,
+ "components": [
+  {
+   "name": "P1",
+   "fields": []
+  },
+  {
+   "name": "P2",
+   "fields": []
+  },
+  {
+   "name": "Orb",
+   "fields": []
+  },
+  {
+   "name": "P1Banner",
+   "fields": []
+  },
+  {
+   "name": "P2Banner",
+   "fields": []
+  }
+ ],
+ "next_uid": 50,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.1,
+      0.22,
+      0.55
+     ],
+     "sky_horizon": [
+      0.7,
+      0.62,
+      0.78
+     ],
+     "ground": [
+      0.2,
+      0.2,
+      0.25
+     ],
+     "clouds": 0.2,
+     "fog": 0.003,
+     "fog_color": [
+      0.7,
+      0.62,
+      0.78
+     ],
+     "bloom": 0.35
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.55,
+      0.3,
+      0.1,
+      0.77
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.9,
+      0.78
+     ],
+     "intensity": 2.0
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Floor"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.5,
+      0
+     ],
+     "scale": [
+      34,
+      1,
+      34
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "texture": "tiles",
+     "uv_scale": [
+      17,
+      17
+     ],
+     "color": [
+      0.75,
+      0.78,
+      0.9,
+      1
+     ],
+     "roughness": 0.6
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 4,
+   "components": {
+    "Name": {
+     "value": "Wall 1"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1,
+      -17
+     ],
+     "scale": [
+      34,
+      2,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.5,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "bricks",
+     "uv_scale": [
+      8,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Wall 2"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1,
+      17
+     ],
+     "scale": [
+      34,
+      2,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.5,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "bricks",
+     "uv_scale": [
+      8,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Wall 3"
+    },
+    "Transform": {
+     "pos": [
+      -17,
+      1,
+      0
+     ],
+     "scale": [
+      1,
+      2,
+      34
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.5,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "bricks",
+     "uv_scale": [
+      8,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Wall 4"
+    },
+    "Transform": {
+     "pos": [
+      17,
+      1,
+      0
+     ],
+     "scale": [
+      1,
+      2,
+      34
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.5,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "bricks",
+     "uv_scale": [
+      8,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Pillar 1"
+    },
+    "Transform": {
+     "pos": [
+      -6,
+      1.5,
+      -6
+     ],
+     "scale": [
+      2.4,
+      3,
+      2.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.55,
+      0.8,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "stone",
+     "uv_scale": [
+      1,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Pillar 2"
+    },
+    "Transform": {
+     "pos": [
+      6,
+      1.5,
+      -6
+     ],
+     "scale": [
+      2.4,
+      3,
+      2.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.55,
+      0.8,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "stone",
+     "uv_scale": [
+      1,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Pillar 3"
+    },
+    "Transform": {
+     "pos": [
+      -6,
+      1.5,
+      6
+     ],
+     "scale": [
+      2.4,
+      3,
+      2.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.55,
+      0.8,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "stone",
+     "uv_scale": [
+      1,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Pillar 4"
+    },
+    "Transform": {
+     "pos": [
+      6,
+      1.5,
+      6
+     ],
+     "scale": [
+      2.4,
+      3,
+      2.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.55,
+      0.8,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "stone",
+     "uv_scale": [
+      1,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Pillar 5"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.5,
+      0
+     ],
+     "scale": [
+      2.4,
+      3,
+      2.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.55,
+      0.8,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "stone",
+     "uv_scale": [
+      1,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Ramp block"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0.4,
+      -11
+     ],
+     "scale": [
+      6,
+      0.8,
+      3
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.8,
+      0.7,
+      0.45,
+      1
+     ],
+     "roughness": 0.8,
+     "texture": "wood",
+     "uv_scale": [
+      2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Orb 1"
+    },
+    "Transform": {
+     "pos": [
+      8.0,
+      0.7,
+      0.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 15,
+   "components": {
+    "Name": {
+     "value": "Orb 2"
+    },
+    "Transform": {
+     "pos": [
+      6.928,
+      0.7,
+      4.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 16,
+   "components": {
+    "Name": {
+     "value": "Orb 3"
+    },
+    "Transform": {
+     "pos": [
+      4.0,
+      0.7,
+      6.928
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 17,
+   "components": {
+    "Name": {
+     "value": "Orb 4"
+    },
+    "Transform": {
+     "pos": [
+      0.0,
+      0.7,
+      8.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 18,
+   "components": {
+    "Name": {
+     "value": "Orb 5"
+    },
+    "Transform": {
+     "pos": [
+      -4.0,
+      0.7,
+      6.928
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 19,
+   "components": {
+    "Name": {
+     "value": "Orb 6"
+    },
+    "Transform": {
+     "pos": [
+      -6.928,
+      0.7,
+      4.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Orb 7"
+    },
+    "Transform": {
+     "pos": [
+      -8.0,
+      0.7,
+      0.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Orb 8"
+    },
+    "Transform": {
+     "pos": [
+      -6.928,
+      0.7,
+      -4.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Orb 9"
+    },
+    "Transform": {
+     "pos": [
+      -4.0,
+      0.7,
+      -6.928
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 23,
+   "components": {
+    "Name": {
+     "value": "Orb 10"
+    },
+    "Transform": {
+     "pos": [
+      -0.0,
+      0.7,
+      -8.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 24,
+   "components": {
+    "Name": {
+     "value": "Orb 11"
+    },
+    "Transform": {
+     "pos": [
+      4.0,
+      0.7,
+      -6.928
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 25,
+   "components": {
+    "Name": {
+     "value": "Orb 12"
+    },
+    "Transform": {
+     "pos": [
+      6.928,
+      0.7,
+      -4.0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 26,
+   "components": {
+    "Name": {
+     "value": "Orb 13"
+    },
+    "Transform": {
+     "pos": [
+      12.563,
+      0.7,
+      3.342
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 27,
+   "components": {
+    "Name": {
+     "value": "Orb 14"
+    },
+    "Transform": {
+     "pos": [
+      9.209,
+      0.7,
+      9.176
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 28,
+   "components": {
+    "Name": {
+     "value": "Orb 15"
+    },
+    "Transform": {
+     "pos": [
+      3.387,
+      0.7,
+      12.551
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 29,
+   "components": {
+    "Name": {
+     "value": "Orb 16"
+    },
+    "Transform": {
+     "pos": [
+      -3.342,
+      0.7,
+      12.563
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Orb 17"
+    },
+    "Transform": {
+     "pos": [
+      -9.176,
+      0.7,
+      9.209
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Orb 18"
+    },
+    "Transform": {
+     "pos": [
+      -12.551,
+      0.7,
+      3.387
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 32,
+   "components": {
+    "Name": {
+     "value": "Orb 19"
+    },
+    "Transform": {
+     "pos": [
+      -12.563,
+      0.7,
+      -3.342
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 33,
+   "components": {
+    "Name": {
+     "value": "Orb 20"
+    },
+    "Transform": {
+     "pos": [
+      -9.209,
+      0.7,
+      -9.176
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 34,
+   "components": {
+    "Name": {
+     "value": "Orb 21"
+    },
+    "Transform": {
+     "pos": [
+      -3.387,
+      0.7,
+      -12.551
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 35,
+   "components": {
+    "Name": {
+     "value": "Orb 22"
+    },
+    "Transform": {
+     "pos": [
+      3.342,
+      0.7,
+      -12.563
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 36,
+   "components": {
+    "Name": {
+     "value": "Orb 23"
+    },
+    "Transform": {
+     "pos": [
+      9.176,
+      0.7,
+      -9.209
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 37,
+   "components": {
+    "Name": {
+     "value": "Orb 24"
+    },
+    "Transform": {
+     "pos": [
+      12.551,
+      0.7,
+      -3.387
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.82,
+      0.25,
+      1
+     ],
+     "emissive": 2.5,
+     "roughness": 0.2,
+     "cast_shadow": false
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "trigger": true
+    },
+    "Orb": {}
+   }
+  },
+  {
+   "uid": 38,
+   "components": {
+    "Name": {
+     "value": "Orange"
+    },
+    "Transform": {
+     "pos": [
+      -11,
+      0,
+      0
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.4,
+     "height": 1.8,
+     "step_height": 0.5
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1.6,
+      1.6,
+      1.6
+     ],
+     "trigger": true
+    },
+    "P1": {}
+   }
+  },
+  {
+   "uid": 39,
+   "components": {
+    "Name": {
+     "value": "Orange body"
+    },
+    "Transform": {
+     "pos": [
+      -11,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.8,
+      1.8,
+      0.8
+     ]
+    },
+    "Parent": {
+     "target": 38
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.8,
+      1.8,
+      0.8
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.98,
+      0.5,
+      0.2,
+      1
+     ],
+     "roughness": 0.45
+    }
+   }
+  },
+  {
+   "uid": 40,
+   "components": {
+    "Name": {
+     "value": "Orange head"
+    },
+    "Transform": {
+     "pos": [
+      -11,
+      2.0,
+      0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Parent": {
+     "target": 38
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      2.0,
+      0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.9,
+      0.78,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 41,
+   "components": {
+    "Name": {
+     "value": "Blue"
+    },
+    "Transform": {
+     "pos": [
+      11,
+      0,
+      0
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.4,
+     "height": 1.8,
+     "step_height": 0.5
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      1.6,
+      1.6,
+      1.6
+     ],
+     "trigger": true
+    },
+    "P2": {}
+   }
+  },
+  {
+   "uid": 42,
+   "components": {
+    "Name": {
+     "value": "Blue body"
+    },
+    "Transform": {
+     "pos": [
+      11,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.8,
+      1.8,
+      0.8
+     ]
+    },
+    "Parent": {
+     "target": 41
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.9,
+      0
+     ],
+     "scale": [
+      0.8,
+      1.8,
+      0.8
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cylinder",
+     "color": [
+      0.25,
+      0.5,
+      0.98,
+      1
+     ],
+     "roughness": 0.45
+    }
+   }
+  },
+  {
+   "uid": 43,
+   "components": {
+    "Name": {
+     "value": "Blue head"
+    },
+    "Transform": {
+     "pos": [
+      11,
+      2.0,
+      0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "Parent": {
+     "target": 41
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      2.0,
+      0
+     ],
+     "scale": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.9,
+      0.78,
+      1
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "uid": 44,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      30,
+      17
+     ],
+     "rot": [
+      -0.43,
+      0,
+      0,
+      0.9
+     ]
+    },
+    "Camera": {
+     "fov_y": 55,
+     "clear": [
+      0.1,
+      0.12,
+      0.2,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 45,
+   "components": {
+    "Name": {
+     "value": "Orange score"
+    },
+    "Text": {
+     "value": "Orange {score1} / 12",
+     "pos": [
+      0.02,
+      0.03
+     ],
+     "size": 0.06,
+     "color": [
+      1.0,
+      0.65,
+      0.35,
+      1
+     ],
+     "align": 0,
+     "shadow": true
+    }
+   }
+  },
+  {
+   "uid": 46,
+   "components": {
+    "Name": {
+     "value": "Blue score"
+    },
+    "Text": {
+     "value": "Blue {score2} / 12",
+     "pos": [
+      0.98,
+      0.03
+     ],
+     "size": 0.06,
+     "color": [
+      0.45,
+      0.65,
+      1.0,
+      1
+     ],
+     "align": 2,
+     "shadow": true
+    }
+   }
+  },
+  {
+   "uid": 47,
+   "components": {
+    "Name": {
+     "value": "Hint"
+    },
+    "Text": {
+     "value": "WASD move, Space jump: first to 12 orbs wins",
+     "pos": [
+      0.5,
+      0.93
+     ],
+     "size": 0.04,
+     "color": [
+      0.9,
+      0.92,
+      1,
+      0.85
+     ],
+     "align": 1,
+     "shadow": true
+    }
+   }
+  },
+  {
+   "uid": 48,
+   "components": {
+    "Name": {
+     "value": "Orange wins"
+    },
+    "Text": {
+     "value": "ORANGE WINS",
+     "pos": [
+      0.5,
+      0.4
+     ],
+     "size": 0.16,
+     "color": [
+      1.0,
+      0.65,
+      0.35,
+      1
+     ],
+     "align": 1,
+     "shadow": true,
+     "visible": false
+    },
+    "P1Banner": {}
+   }
+  },
+  {
+   "uid": 49,
+   "components": {
+    "Name": {
+     "value": "Blue wins"
+    },
+    "Text": {
+     "value": "BLUE WINS",
+     "pos": [
+      0.5,
+      0.4
+     ],
+     "size": 0.16,
+     "color": [
+      0.45,
+      0.65,
+      1.0,
+      1
+     ],
+     "align": 1,
+     "shadow": true,
+     "visible": false
+    },
+    "P2Banner": {}
+   }
+  }
+ ],
+ "resources": {
+  "score1": 0,
+  "score2": 0
+ },
+ "systems": [
+  {
+   "name": "p1_walk",
+   "doc": "The first player's keys (input.<key>) move the orange hero.",
+   "each": [
+    "P1",
+    "CharacterBody"
+   ],
+   "do": [
+    {
+     "set": "CharacterBody.walk[0]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.d"
+         },
+         {
+          "res": "input.a"
+         }
+        ]
+       },
+       6
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[1]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.s"
+         },
+         {
+          "res": "input.w"
+         }
+        ]
+       },
+       6
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "input.space"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "CharacterBody.jump",
+       "to": 7
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "p2_walk",
+   "doc": "The second player's keys (input.p2.<key>) move the blue hero.",
+   "each": [
+    "P2",
+    "CharacterBody"
+   ],
+   "do": [
+    {
+     "set": "CharacterBody.walk[0]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.p2.d"
+         },
+         {
+          "res": "input.p2.a"
+         }
+        ]
+       },
+       6
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[1]",
+     "to": {
+      "mul": [
+       {
+        "sub": [
+         {
+          "res": "input.p2.s"
+         },
+         {
+          "res": "input.p2.w"
+         }
+        ]
+       },
+       6
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "input.p2.space"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "CharacterBody.jump",
+       "to": 7
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "p1_pick",
+   "doc": "Touching an orb scores for orange and removes it.",
+   "on_contact": {
+    "a": [
+     "P1"
+    ],
+    "b": [
+     "Orb"
+    ]
+   },
+   "do": [
+    {
+     "res_add": "score1",
+     "by": 1
+    },
+    {
+     "emit": "coin"
+    },
+    {
+     "despawn": "b"
+    }
+   ]
+  },
+  {
+   "name": "p2_pick",
+   "doc": "Touching an orb scores for blue and removes it.",
+   "on_contact": {
+    "a": [
+     "P2"
+    ],
+    "b": [
+     "Orb"
+    ]
+   },
+   "do": [
+    {
+     "res_add": "score2",
+     "by": 1
+    },
+    {
+     "emit": "coin"
+    },
+    {
+     "despawn": "b"
+    }
+   ]
+  },
+  {
+   "name": "p1_banner",
+   "order": 140,
+   "each": [
+    "P1Banner",
+    "Text"
+   ],
+   "do": [
+    {
+     "set": "Text.visible",
+     "to": {
+      "ge": [
+       {
+        "res": "score1"
+       },
+       12
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "p2_banner",
+   "order": 140,
+   "each": [
+    "P2Banner",
+    "Text"
+   ],
+   "do": [
+    {
+     "set": "Text.visible",
+     "to": {
+      "ge": [
+       {
+        "res": "score2"
+       },
+       12
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,167 @@
+{
+  "name": "Dungeon: walk the shortest way (67 cells, 6 straight stretches) through a generated level to the exit (generate_map, autotile, tilemap_colliders, contacts)",
+  "scene": "examples/dungeon.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 30
+    },
+    {
+      "expect": {
+        "resource": "hero.hp",
+        "eq": 100,
+        "message": "nobody has found the hero yet"
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 1100
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 1101
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 1102
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 1103
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 1104
+        }
+      }
+    },
+    {
+      "call": {
+        "tool": "despawn",
+        "args": {
+          "uid": 1105
+        }
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 204
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 36
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 300
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 216
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "input": {
+        "d": true
+      }
+    },
+    {
+      "step": 12
+    },
+    {
+      "input": {
+        "d": false
+      }
+    },
+    {
+      "input": {
+        "s": true
+      }
+    },
+    {
+      "step": 36
+    },
+    {
+      "input": {
+        "s": false
+      }
+    },
+    {
+      "step": 10
+    },
+    {
+      "expect": {
+        "resource": "won",
+        "eq": 1,
+        "message": "the hero walked the 67 cells from the start to the golden ring and won"
+      }
+    },
+    {
+      "expect": {
+        "resource": "hero.hp",
+        "gt": 0,
+        "message": "and is still on its feet"
+      }
+    }
+  ]
+}

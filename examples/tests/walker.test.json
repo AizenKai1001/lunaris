@@ -1,0 +1,42 @@
+{
+  "name": "Walker: the character controller stands, is stopped by a wall, climbs stairs onto a platform, walks off its edge and falls, is stopped by the platform's side and jumps up onto it",
+  "scene": "examples/walker.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "step": 30 },
+    { "expect": { "name": "Hero", "field": "CharacterBody.grounded", "eq": true, "message": "standing on the ground" } },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "approx": [0, 0.01], "message": "with its feet on the grass" } },
+
+    { "input": { "a": true } },
+    { "step": 120 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "approx": [-5.15, 0.05], "message": "the wall's face is at -5.5 and the hero is 0.35 wide" } },
+    { "expect": { "name": "Hero", "field": "CharacterBody.grounded", "eq": true } },
+
+    { "input": { "a": false, "d": true } },
+    { "step": 240 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "approx": [1.2, 0.02], "message": "walked up the five steps (0.24 each) without jumping and stands on the platform" } },
+    { "expect": { "name": "Hero", "field": "CharacterBody.grounded", "eq": true } },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "between": [14.5, 15.2] } },
+
+    { "step": 90 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "approx": [0, 0.02], "message": "walked off the edge and fell back to the ground" } },
+    { "expect": { "name": "Hero", "field": "CharacterBody.grounded", "eq": true } },
+    { "expect": { "name": "Hero", "field": "CharacterBody.fall", "eq": 0 } },
+
+    { "input": { "d": false, "a": true } },
+    { "step": 120 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "approx": [18.85, 0.06], "message": "the platform's side (1.2 high, more than a step) stops the hero at 18.5 + 0.35" } },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "approx": [0, 0.02] } },
+
+    { "input": { "space": true } },
+    { "step": 30 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[0]", "lt": 18.0, "message": "jumped, cleared the platform's edge and carried on to the left" } },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "ge": 1.15, "message": "above the platform" } },
+    { "input": { "space": false, "a": false } },
+    { "step": 120 },
+    { "expect": { "name": "Hero", "field": "Transform.pos[1]", "approx": [1.2, 0.02], "message": "and landed on it" } },
+    { "expect": { "name": "Hero", "field": "CharacterBody.grounded", "eq": true } }
+  ]
+}

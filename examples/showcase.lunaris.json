@@ -1,0 +1,12 @@
+{
+  "lunaris": 1,
+  "entities": [
+    { "uid": 1, "components": { "Name": { "value": "Floor" }, "Transform": { "pos": [0, 0, 0], "scale": [12, 1, 12] }, "MeshRenderer": { "mesh": "plane", "color": [0.35, 0.55, 0.38, 1], "shininess": 8 } } },
+    { "uid": 2, "components": { "Name": { "value": "Red cube" }, "Transform": { "pos": [-1.6, 0.5, 0], "rot": [0, 0.3826834, 0, 0.9238795] }, "MeshRenderer": { "mesh": "cube", "color": [0.9, 0.25, 0.2, 1] } } },
+    { "uid": 3, "components": { "Name": { "value": "Blue sphere" }, "Transform": { "pos": [0, 0.7, 0.4], "scale": [1.4, 1.4, 1.4] }, "MeshRenderer": { "mesh": "sphere", "color": [0.2, 0.5, 0.95, 1], "shininess": 64 } } },
+    { "uid": 4, "components": { "Name": { "value": "Gold cylinder" }, "Transform": { "pos": [1.7, 0.75, -0.3], "scale": [0.9, 1.5, 0.9] }, "MeshRenderer": { "mesh": "cylinder", "color": [0.95, 0.8, 0.25, 1], "shininess": 48 } } },
+    { "uid": 5, "components": { "Name": { "value": "Lamp" }, "Transform": { "pos": [-2, 3, 3] }, "Light": { "kind": 1, "color": [1, 0.95, 0.85], "intensity": 1.6, "range": 12 } } },
+    { "uid": 7, "components": { "Name": { "value": "Camera" }, "Transform": { "pos": [3.5, 2.6, 6], "rot": [-0.15983, 0.25738, 0.04321, 0.95202] }, "Camera": { "fov_y": 60 } } },
+    { "uid": 6, "components": { "Name": { "value": "Sun" }, "Transform": { "rot": [-0.4, 0.2, 0, 0.8918] }, "Light": { "kind": 0, "color": [0.55, 0.6, 0.8], "intensity": 0.6 } } }
+  ]
+}

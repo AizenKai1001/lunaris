@@ -1,0 +1,94 @@
+{
+  "name": "Ropes: a heavy ball on a rod swings into a tower of blocks, a chain of rods hangs and swings, a ball on a spring settles where the pull balances the weight",
+  "scene": "examples/ropes.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    {
+      "expect": {
+        "check": "errors",
+        "eq": 0
+      }
+    },
+    {
+      "step": 600
+    },
+    {
+      "expect": {
+        "name": "Wrecking ball",
+        "field": "Transform.pos[1]",
+        "ge": 2.8,
+        "message": "the rod keeps the ball 8 m from its hook: never lower than 3 m"
+      }
+    },
+    {
+      "expect": {
+        "name": "Wrecking ball",
+        "field": "Transform.pos[1]",
+        "le": 7.4,
+        "message": "and never higher than where it was let go (a little slack for the correction)"
+      }
+    },
+    {
+      "expect": {
+        "name": "Block 7",
+        "field": "Transform.pos[0]",
+        "gt": 3.0,
+        "message": "the ball knocked the top of the tower more than 5 m to the right"
+      }
+    },
+    {
+      "expect": {
+        "name": "Block 8",
+        "field": "Transform.pos[0]",
+        "gt": 3.0
+      }
+    },
+    {
+      "expect": {
+        "name": "Block 1",
+        "field": "Transform.pos[0]",
+        "approx": [
+          -2.2,
+          0.15
+        ],
+        "message": "while the bottom of the tower stayed where it was"
+      }
+    },
+    {
+      "expect": {
+        "name": "Chain 5",
+        "field": "Transform.pos[1]",
+        "between": [
+          3.0,
+          10.5
+        ],
+        "message": "the end of the chain swings below the hook"
+      }
+    },
+    {
+      "step": 1500
+    },
+    {
+      "expect": {
+        "name": "Spring ball",
+        "field": "Transform.pos[1]",
+        "approx": [
+          6.837,
+          0.01
+        ],
+        "message": "settled where 60 N/m balance 9.8 N: 3.16 m below the hook"
+      }
+    },
+    {
+      "expect": {
+        "name": "Spring ball",
+        "field": "Transform.pos[0]",
+        "approx": [
+          10,
+          0.01
+        ]
+      }
+    }
+  ]
+}

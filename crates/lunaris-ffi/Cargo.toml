@@ -1,0 +1,16 @@
+[package]
+name = "lunaris-ffi"
+description = "The Lunaris engine as a C-callable library (a DLL / shared object): embed it in any language that can call C."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-api = { path = "../lunaris-api" }
+
+[lints]
+workspace = true

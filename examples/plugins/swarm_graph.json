@@ -1,0 +1,21 @@
+{
+  "name": "seek_graph",
+  "doc": "The same behaviour as the native plugin examples/plugins/swarm, written as a graph system: accelerate towards (target.x, target.z), and disappear on arrival.",
+  "each": ["Transform", "Velocity"],
+  "do": [
+    { "if": { "lt": [
+        { "add": [
+          { "mul": [ { "sub": [ { "res": "target.x" }, { "get": "Transform.pos[0]" } ] }, { "sub": [ { "res": "target.x" }, { "get": "Transform.pos[0]" } ] } ] },
+          { "mul": [ { "sub": [ { "res": "target.z" }, { "get": "Transform.pos[2]" } ] }, { "sub": [ { "res": "target.z" }, { "get": "Transform.pos[2]" } ] } ] } ] },
+        0.01 ] },
+      "then": [ { "despawn": true } ] },
+    { "set": "Velocity.lin[0]", "to": { "add": [
+        { "get": "Velocity.lin[0]" },
+        { "mul": [ { "sub": [ { "mul": [ { "sub": [ { "res": "target.x" }, { "get": "Transform.pos[0]" } ] }, { "res": "seek.k" } ] }, { "mul": [ { "get": "Velocity.lin[0]" }, 0.5 ] } ] }, { "dt": true } ] },
+        { "mul": [ { "sub": [ { "rand": 3 }, 0.5 ] }, 0.02 ] } ] } },
+    { "set": "Velocity.lin[2]", "to": { "add": [
+        { "get": "Velocity.lin[2]" },
+        { "mul": [ { "sub": [ { "mul": [ { "sub": [ { "res": "target.z" }, { "get": "Transform.pos[2]" } ] }, { "res": "seek.k" } ] }, { "mul": [ { "get": "Velocity.lin[2]" }, 0.5 ] } ] }, { "dt": true } ] },
+        { "mul": [ { "sub": [ { "rand": 4 }, 0.5 ] }, 0.02 ] } ] } }
+  ]
+}

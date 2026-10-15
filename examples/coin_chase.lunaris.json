@@ -1,0 +1,1088 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "The thing the player moves.",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "f32",
+          "default": 6
+        }
+      ]
+    },
+    {
+      "name": "Coin",
+      "doc": "Something to collect.",
+      "fields": []
+    }
+  ],
+  "next_uid": 17,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "MeshRenderer": {
+          "mesh": "plane",
+          "color": [
+            0.25,
+            0.4000000059604645,
+            0.30000001192092896,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Floor"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            40,
+            1,
+            40
+          ]
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 1.100000023841858,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.5,
+            0.20000000298023224,
+            0,
+            0.8399999737739563
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": false
+        },
+        "Hero": {
+          "speed": 6
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            0.30000001192092896,
+            0.550000011920929,
+            1,
+            1
+          ],
+          "shininess": 80,
+          "visible": true,
+          "emissive": 0,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Hero"
+        },
+        "RigidBody": {
+          "mass": 1,
+          "restitution": 0.30000001192092896,
+          "friction": 0.5,
+          "gravity_scale": 0,
+          "drag": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0.5,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 4,
+      "components": {
+        "Camera": {
+          "fov_y": 55,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.05000000074505806,
+            0.05000000074505806,
+            0.07999999821186066,
+            1
+          ]
+        },
+        "LocalTransform": {
+          "pos": [
+            0,
+            11,
+            9
+          ],
+          "rot": [
+            -0.42260000109672546,
+            0,
+            0,
+            0.9063000082969666
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Parent": {
+          "target": 3
+        },
+        "Transform": {
+          "pos": [
+            0,
+            11.5,
+            9
+          ],
+          "rot": [
+            -0.4226062595844269,
+            0,
+            0,
+            0.906313419342041
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 1"
+        },
+        "Transform": {
+          "pos": [
+            4,
+            0.6000000238418579,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 2"
+        },
+        "Transform": {
+          "pos": [
+            3.240000009536743,
+            0.6000000238418579,
+            2.3499999046325684
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 3"
+        },
+        "Transform": {
+          "pos": [
+            1.2400000095367432,
+            0.6000000238418579,
+            3.799999952316284
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 4"
+        },
+        "Transform": {
+          "pos": [
+            -1.2400000095367432,
+            0.6000000238418579,
+            3.799999952316284
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 5"
+        },
+        "Transform": {
+          "pos": [
+            -3.240000009536743,
+            0.6000000238418579,
+            2.3499999046325684
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 10,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 6"
+        },
+        "Transform": {
+          "pos": [
+            -4,
+            0.6000000238418579,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 11,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 7"
+        },
+        "Transform": {
+          "pos": [
+            -3.240000009536743,
+            0.6000000238418579,
+            -2.3499999046325684
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 12,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 8"
+        },
+        "Transform": {
+          "pos": [
+            -1.2400000095367432,
+            0.6000000238418579,
+            -3.799999952316284
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 13,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 9"
+        },
+        "Transform": {
+          "pos": [
+            1.2400000095367432,
+            0.6000000238418579,
+            -3.799999952316284
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Coin": {},
+        "Collider": {
+          "shape": 0,
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "trigger": true
+        },
+        "MeshRenderer": {
+          "mesh": "sphere",
+          "color": [
+            1,
+            0.800000011920929,
+            0.20000000298023224,
+            1
+          ],
+          "shininess": 32,
+          "visible": true,
+          "emissive": 0.4000000059604645,
+          "metallic": 0,
+          "roughness": -1,
+          "texture": "",
+          "uv_scale": [
+            1,
+            1
+          ],
+          "cast_shadow": true,
+          "bump": 0.029999999329447746
+        },
+        "Name": {
+          "value": "Coin 10"
+        },
+        "Transform": {
+          "pos": [
+            3.240000009536743,
+            0.6000000238418579,
+            -2.3499999046325684
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "Velocity": {
+          "lin": [
+            0,
+            0,
+            0
+          ],
+          "ang": [
+            0,
+            3,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uid": 15,
+      "components": {
+        "Name": {
+          "value": "Sfx coin"
+        },
+        "Sound": {
+          "name": "coin",
+          "wave": 1,
+          "freq": 880,
+          "freq_end": 1320,
+          "duration": 0.11999999731779099,
+          "volume": 0.20000000298023224
+        }
+      }
+    },
+    {
+      "uid": 16,
+      "components": {
+        "Name": {
+          "value": "Score"
+        },
+        "Text": {
+          "value": "Coins {score} / 10",
+          "pos": [
+            0.019999999552965164,
+            0.029999999329447746
+          ],
+          "size": 0.05999999865889549,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "resources": {
+    "score": 0
+  },
+  "systems": [
+    {
+      "name": "hero_move",
+      "each": [
+        "Hero",
+        "Velocity"
+      ],
+      "doc": "Keys become velocity.",
+      "do": [
+        {
+          "set": "Velocity.lin[0]",
+          "to": {
+            "mul": [
+              {
+                "get": "Hero.speed"
+              },
+              {
+                "sub": [
+                  {
+                    "max": [
+                      {
+                        "res": "input.d"
+                      },
+                      {
+                        "res": "input.arrowright"
+                      }
+                    ]
+                  },
+                  {
+                    "max": [
+                      {
+                        "res": "input.a"
+                      },
+                      {
+                        "res": "input.arrowleft"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "set": "Velocity.lin[2]",
+          "to": {
+            "mul": [
+              {
+                "get": "Hero.speed"
+              },
+              {
+                "sub": [
+                  {
+                    "max": [
+                      {
+                        "res": "input.s"
+                      },
+                      {
+                        "res": "input.arrowdown"
+                      }
+                    ]
+                  },
+                  {
+                    "max": [
+                      {
+                        "res": "input.w"
+                      },
+                      {
+                        "res": "input.arrowup"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "coin_pickup",
+      "on_contact": {
+        "a": [
+          "Hero"
+        ],
+        "b": [
+          "Coin"
+        ]
+      },
+      "doc": "Touching a coin scores and removes it.",
+      "do": [
+        {
+          "res_add": "score",
+          "by": 1
+        },
+        {
+          "emit": "coin"
+        },
+        {
+          "despawn": "b"
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[package]
+name = "lunaris-ecs"
+description = "Archetype ECS with type-erased plain-data columns and runtime component schemas."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+
+[lints]
+workspace = true

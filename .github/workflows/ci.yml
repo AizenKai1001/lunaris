@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # the editor crate is a Windows application and is checked in its own job; the GPU tests skip themselves when the runner has no graphics adapter
+      - run: cargo test --workspace --exclude lunaris-studio --no-fail-fast
+
+  golden:
+    name: the same hashes on every machine (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p lunaris
+      # every example scene's state hash and reference-picture hash must be the recorded one: a platform that differs is a bug
+      - run: python tools/xplat_hashes.py target/debug/lunaris --check
+        if: runner.os == 'Linux'
+      - run: python tools/xplat_hashes.py target/debug/lunaris.exe --check
+        if: runner.os == 'Windows'
+
+  studio:
+    name: editor builds (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p lunaris-studio

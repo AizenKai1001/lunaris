@@ -1,0 +1,52 @@
+{
+  "name": "Menu: buttons react to the mouse (hover, press, a click is press and release over the same button), change the health, and the bar follows",
+  "scene": "examples/menu.lunaris.json",
+  "seed": 1,
+  "replay_check": true,
+  "steps": [
+    { "expect": { "check": "errors", "eq": 0 } },
+    { "step": 2 },
+    { "expect": { "name": "Health bar", "field": "Ui.fill", "approx": [0.5, 0.001], "message": "the bar shows the starting health of 50" } },
+
+    { "input": { "mouse_x": 0.5, "mouse_y": 0.6 } },
+    { "step": 2 },
+    { "expect": { "name": "Hurt button", "field": "Ui.hover", "eq": true, "message": "the pointer is over the Hurt button" } },
+    { "expect": { "name": "Heal button", "field": "Ui.hover", "eq": false } },
+    { "input": { "mouse_left": true } },
+    { "step": 2 },
+    { "expect": { "name": "Hurt button", "field": "Ui.pressed", "eq": true } },
+    { "expect": { "resource": "hp", "eq": 50, "message": "pressing is not clicking" } },
+    { "input": { "mouse_left": false } },
+    { "step": 1 },
+    { "expect": { "resource": "hp", "eq": 35, "message": "releasing over the button clicks it: 50 - 15" } },
+    { "step": 3 },
+    { "expect": { "name": "Hurt button", "field": "Ui.clicked", "eq": false, "message": "a click lasts one tick" } },
+    { "expect": { "resource": "hp", "eq": 35 } },
+    { "expect": { "name": "Health bar", "field": "Ui.fill", "approx": [0.35, 0.001] } },
+
+    { "input": { "mouse_x": 0.2, "mouse_y": 0.6, "mouse_left": true } },
+    { "step": 2 },
+    { "input": { "mouse_left": false } },
+    { "step": 2 },
+    { "input": { "mouse_left": true } },
+    { "step": 2 },
+    { "input": { "mouse_left": false } },
+    { "step": 2 },
+    { "expect": { "resource": "hp", "eq": 55, "message": "two clicks on Heal: 35 + 10 + 10" } },
+
+    { "input": { "mouse_x": 0.2, "mouse_y": 0.6, "mouse_left": true } },
+    { "step": 2 },
+    { "input": { "mouse_x": 0.5, "mouse_y": 0.9 } },
+    { "step": 1 },
+    { "input": { "mouse_left": false } },
+    { "step": 2 },
+    { "expect": { "resource": "hp", "eq": 55, "message": "pressed on Heal, dragged away and released elsewhere: no click" } },
+
+    { "input": { "mouse_x": 0.8, "mouse_y": 0.6, "mouse_left": true } },
+    { "step": 2 },
+    { "input": { "mouse_left": false } },
+    { "step": 2 },
+    { "expect": { "resource": "hp", "eq": 100, "message": "Reset" } },
+    { "expect": { "name": "Health bar", "field": "Ui.fill", "approx": [1, 0.001] } }
+  ]
+}

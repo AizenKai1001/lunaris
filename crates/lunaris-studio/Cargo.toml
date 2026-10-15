@@ -1,0 +1,24 @@
+[package]
+name = "lunaris-studio"
+description = "The Lunaris Editor: a native desktop application (egui on wgpu) with a scene viewport drawn by the engine's own GPU renderer, hierarchy, inspector, project browser, console and system graphs. Every action is the same tool call an AI agent or the CLI would make."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "lunaris-editor"
+path = "src/main.rs"
+
+[dependencies]
+lunaris-script = { path = "../lunaris-script" }
+lunaris-json = { path = "../lunaris-json" }
+lunaris-ecs = { path = "../lunaris-ecs" }
+lunaris-sim = { path = "../lunaris-sim" }
+lunaris-api = { path = "../lunaris-api" }
+lunaris-render = { path = "../lunaris-render" }
+lunaris-gpu = { path = "../lunaris-gpu" }
+lunaris-audio = { path = "../lunaris-audio" }
+eframe = { version = "=0.36.2", default-features = false, features = ["default_fonts", "glow"] }
+
+[lints]
+workspace = true

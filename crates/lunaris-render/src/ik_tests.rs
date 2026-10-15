@@ -1,0 +1,117 @@
+//! Inverse kinematics: reaching with a chain of joints, looking at a point, and the entity-level `Ik` goals in the picture.
+use super::*;
+use crate::math::*;
+use crate::rig::{IkGoal, IkKind, PoseLayer};
+use lunaris_json::{parse, Json};
+use lunaris_sim::{Command, Sim};
+
+fn repo_root() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
+}
+
+/// The column model: four joints one above the other, 0.8 apart (base, lower, middle, top).
+fn column() -> (std::sync::Arc<crate::mesh::Mesh>, TextureCache) {
+    let mut c = TextureCache::new(Some(repo_root()));
+    (c.model("examples/models/swayer.glb").expect("the model loads"), c)
+}
+
+fn rest_layers() -> Vec<PoseLayer> {
+    vec![PoseLayer { clip: None, time: 0.0, looping: false, weight: 1.0, root: None }]
+}
+
+/// Where joint `j` (resting at `rest`) is after posing with `m`.
+fn at(m: &[M4], j: usize, rest: V3) -> V3 {
+    m[j].transform_point(rest)
+}
+
+const REST: [V3; 4] = [[0.0, 0.0, 0.0], [0.0, 0.8, 0.0], [0.0, 1.6, 0.0], [0.0, 2.4, 0.0]];
+
+#[test]
+fn a_chain_of_two_bones_reaches_its_target_keeping_its_bone_lengths() {
+    let (model, _c) = column();
+    let rig = model.rig.as_ref().unwrap();
+    let top = rig.joint_index("top").unwrap();
+    let goal = |target: V3, weight: f32, pole: Option<V3>| IkGoal { joint: top, kind: IkKind::Reach, target, pole, weight };
+    // the tip (joint `top`) is asked to go to (1, 1.5, 0): reachable (1.2 from the lower joint, whose bones are 0.8 + 0.8)
+    let m = rig.skin_matrices_ik(&rest_layers(), &[goal([1.0, 1.5, 0.0], 1.0, None)]);
+    let (pa, pb, pc) = (at(&m, 1, REST[1]), at(&m, 2, REST[2]), at(&m, 3, REST[3]));
+    let near = |a: V3, b: V3, e: f32| (0..3).all(|k| (a[k] - b[k]).abs() < e);
+    assert!(near(pc, [1.0, 1.5, 0.0], 2e-3), "the tip arrives: {pc:?}");
+    assert!((length(sub(pb, pa)) - 0.8).abs() < 2e-3 && (length(sub(pc, pb)) - 0.8).abs() < 2e-3, "bones keep their length: {} {}", length(sub(pb, pa)), length(sub(pc, pb)));
+    assert!(near(pa, REST[1], 1e-4), "the root of the chain stays put");
+    assert!(near(at(&m, 0, REST[0]), REST[0], 1e-6), "joints below the chain do not move");
+    // the same goal again gives the same pose, exactly
+    let again = rig.skin_matrices_ik(&rest_layers(), &[goal([1.0, 1.5, 0.0], 1.0, None)]);
+    assert_eq!(m.iter().map(|x| x.0).collect::<Vec<_>>(), again.iter().map(|x| x.0).collect::<Vec<_>>());
+    // too far: the chain stretches out towards the target and stops at its full length
+    let far = rig.skin_matrices_ik(&rest_layers(), &[goal([10.0, 0.8, 0.0], 1.0, None)]);
+    let (fa, fc) = (at(&far, 1, REST[1]), at(&far, 3, REST[3]));
+    assert!((length(sub(fc, fa)) - 1.6).abs() < 3e-3, "straight, 1.6 long: {}", length(sub(fc, fa)));
+    assert!(fc[0] > 1.5 && (fc[1] - 0.8).abs() < 0.05, "pointing at the target: {fc:?}");
+    // half weight: halfway between the animation (straight up) and the goal
+    let half = rig.skin_matrices_ik(&rest_layers(), &[goal([1.0, 1.5, 0.0], 0.5, None)]);
+    let hc = at(&half, 3, REST[3]);
+    assert!(hc[0] > 0.15 && hc[0] < 0.9, "somewhere between: {hc:?}");
+    // weight 0 and bad targets change nothing
+    for bad in [goal([1.0, 1.5, 0.0], 0.0, None), goal([f32::NAN, 0.0, 0.0], 1.0, None)] {
+        let m0 = rig.skin_matrices_ik(&rest_layers(), &[bad]);
+        assert!(near(at(&m0, 3, REST[3]), REST[3], 1e-5));
+    }
+    // the pole decides which way the middle joint bows out: towards +z or towards -z
+    let bow = |pole: V3| at(&rig.skin_matrices_ik(&rest_layers(), &[goal([0.0, 2.0, 0.0], 1.0, Some(pole))]), 2, REST[2]);
+    assert!(bow([0.0, 1.5, 5.0])[2] > 0.1 && bow([0.0, 1.5, -5.0])[2] < -0.1, "{:?} {:?}", bow([0.0, 1.5, 5.0]), bow([0.0, 1.5, -5.0]));
+}
+
+#[test]
+fn a_joint_looks_at_a_point_but_not_further_round_than_it_may() {
+    let (model, _c) = column();
+    let rig = model.rig.as_ref().unwrap();
+    let top = rig.joint_index("top").unwrap();
+    // the axis along the bone is +y; asked to face +x (90 degrees from where it points), with room to turn and then with a limit of 30
+    let facing = |max_angle: f32| {
+        let g = IkGoal { joint: top, kind: IkKind::Look { axis: [0.0, 1.0, 0.0], max_angle }, target: [5.0, 2.4, 0.0], pole: None, weight: 1.0 };
+        let m = rig.skin_matrices_ik(&rest_layers(), &[g]);
+        normalize(sub(at(&m, 3, [0.0, 3.4, 0.0]), at(&m, 3, REST[3])))
+    };
+    let free = facing(180.0);
+    assert!(free[0] > 0.999, "faces +x: {free:?}");
+    let limited = facing(30.0);
+    assert!((limited[1] - 0.866).abs() < 5e-3 && (limited[0] - 0.5).abs() < 5e-3, "30 degrees from up, towards +x: {limited:?}");
+}
+
+#[test]
+fn an_ik_goal_entity_bends_the_model_in_the_picture_and_follows_the_goal() {
+    let mut s = Sim::new(1);
+    let spawn = |s: &mut Sim, uid: u64, comps: &str| {
+        let Json::Obj(components) = parse(comps).unwrap() else { panic!() };
+        s.apply(&Command::Spawn { uid: Some(uid), components }).unwrap();
+    };
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,1.5,6]},"Camera":{}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[0,0,0]},"MeshRenderer":{"mesh":"examples/models/swayer.glb"},"Animator":{"clip":"","playing":false}}"#);
+    spawn(&mut s, 3, r#"{"Transform":{"pos":[1.0,1.5,0]},"Ik":{"skin":2,"joint":"top"}}"#);
+    let tip_x = |s: &mut Sim| {
+        let mut tex = TextureCache::new(Some(repo_root()));
+        let scene = render::gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 64, ..RenderOptions::default() }).unwrap();
+        assert!(scene.warnings.is_empty(), "{:?}", scene.warnings);
+        let m = scene.meshes[0].mesh.get();
+        let top: Vec<f32> = m.pos.iter().filter(|p| p[1] > 1.0).map(|p| p[0]).collect();
+        top.iter().sum::<f32>() / top.len().max(1) as f32
+    };
+    let bent = tip_x(&mut s);
+    assert!(bent > 0.4, "the upper part leans towards the goal at x = 1: {bent}");
+    // move the goal to the other side and the model follows; switch it off and it stands straight again
+    s.apply(&Command::Set { uid: 3, component: "Transform".into(), value: parse(r#"{"pos":[-1.0,1.5,0]}"#).unwrap() }).unwrap();
+    assert!(tip_x(&mut s) < -0.4);
+    s.apply(&Command::Set { uid: 3, component: "Ik".into(), value: parse(r#"{"active":false}"#).unwrap() }).unwrap();
+    // without the goal the model is exactly what the animation alone makes of it
+    let (model, _c) = column();
+    let plain = model.rig.as_ref().unwrap().pose(&model, Some(0), 0.0, true);
+    let upper: Vec<f32> = plain.pos.iter().filter(|p| p[1] > 1.0).map(|p| p[0]).collect();
+    let expected = upper.iter().sum::<f32>() / upper.len() as f32;
+    assert!((tip_x(&mut s) - expected).abs() < 1e-5, "{} vs {expected}", tip_x(&mut s));
+    // a joint that does not exist is a warning, not a crash
+    s.apply(&Command::Set { uid: 3, component: "Ik".into(), value: parse(r#"{"active":true,"joint":"elbow"}"#).unwrap() }).unwrap();
+    let mut tex = TextureCache::new(Some(repo_root()));
+    let scene = render::gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 64, ..RenderOptions::default() }).unwrap();
+    assert!(scene.warnings.iter().any(|w| w.contains("no joint called `elbow`")), "{:?}", scene.warnings);
+}
