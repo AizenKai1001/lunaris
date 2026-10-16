@@ -16,6 +16,14 @@
 @group(1) @binding(0) var tex: texture_2d<f32>;
 @group(1) @binding(1) var tex_samp: sampler;
 @group(1) @binding(2) var height_tex: texture_2d<f32>;
+// `PbrMaps`: a tangent-space normal map (DirectX convention) and occlusion / roughness / metallic in r / g / b; plain numbers, not colours
+@group(1) @binding(3) var normal_tex: texture_2d<f32>;
+@group(1) @binding(4) var arm_tex: texture_2d<f32>;
+
+// What the maps of the mesh being shaded say, handed from `lit_mesh` to `lit_tail` (a negative roughness means "no map": the object's own numbers count).
+var<private> g_ao: f32 = 1.0;
+var<private> g_rough: f32 = -1.0;
+var<private> g_metal: f32 = 0.0;
 
 const AMBIENT: f32 = 0.16;
 
@@ -244,6 +252,19 @@ fn bump_normal(n: vec3<f32>, dpx: vec3<f32>, dpy: vec3<f32>, dhx: f32, dhy: f32)
     return normalize(abs(det) * n - grad);
 }
 
+// A tangent-space normal map without tangents (Schuler's cotangent frame): the frame comes from how the position and the picture's coordinates change over the screen. `uv` runs down the picture,
+// which is the way the green channel of a DirectX normal map points, so the map is read as it is.
+fn map_normal(n: vec3<f32>, dpx: vec3<f32>, dpy: vec3<f32>, duvx: vec2<f32>, duvy: vec2<f32>, nm: vec3<f32>) -> vec3<f32> {
+    let r1 = cross(dpy, n);
+    let r2 = cross(n, dpx);
+    // the formula assumes a screen whose y runs up; here it runs down, which turns both axes round: the sign of the determinant (as in `bump_normal`) puts that right, and a mirrored mesh as well
+    let sg = select(-1.0, 1.0, dot(dpx, r1) >= 0.0);
+    let t = (r1 * duvx.x + r2 * duvy.x) * sg;
+    let b = (r1 * duvx.y + r2 * duvy.y) * sg;
+    let inv = inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+    return normalize(t * (inv * nm.x) + b * (inv * nm.y) + n * nm.z);
+}
+
 fn d_ggx(nh: f32, a: f32) -> f32 {
     let a2 = a * a;
     let d = nh * nh * (a2 - 1.0) + 1.0;
@@ -375,6 +396,20 @@ fn lit_mesh(in: MeshOut) -> Lit {
     if (!classic && o.uvrect.x > 0.0) {
         n = bump_normal(n, dpx, dpy, dhx, dhy);
     }
+    // the maps are always sampled (derivatives need uniform control flow); whether they count is decided afterwards
+    let nmap = textureSample(normal_tex, tex_samp, tuv).xyz * 2.0 - vec3<f32>(1.0);
+    let armv = textureSample(arm_tex, tex_samp, tuv);
+    let duvx = dpdx(tuv);
+    let duvy = dpdy(tuv);
+    let maps = u32(o.pbr.z + 0.5);
+    if (!classic && (maps & 1u) != 0u) {
+        n = map_normal(n, dpx, dpy, duvx, duvy, vec3<f32>(nmap.xy * o.pbr.x, nmap.z));
+    }
+    if (!classic && (maps & 2u) != 0u) {
+        g_ao = mix(1.0, armv.r, o.pbr.y);
+        g_rough = clamp(armv.g * o.pbr.w, 0.045, 1.0);
+        g_metal = armv.b;
+    }
     if (o.misc.z > 0.5 && in.tw > 0.001) {
         if (in.tw > 0.999 && t.a < 0.5) {
             discard;
@@ -397,18 +432,20 @@ fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool
     }
     let v = normalize(frame.eye.xyz - in.world);
     let uv = in.clip.xy * frame.p1.zw;
-    let ao = textureSampleLevel(ao_tex, lin_samp, uv, 0.0).r;
+    let ao = textureSampleLevel(ao_tex, lin_samp, uv, 0.0).r * g_ao;
+    let metal = select(o.mat.z, g_metal, g_rough >= 0.0);
+    let rough = select(o.mat.w, g_rough, g_rough >= 0.0);
     var shadow = 1.0;
     if (i32(frame.p4.x) >= 0) {
         shadow = shadow_factor(in.world, n);
     }
-    let pbr = shade_pbr(base, o.mat.z, o.mat.w, in.world, n, v, ao, shadow);
+    let pbr = shade_pbr(base, metal, rough, in.world, n, v, ao, shadow);
     let fog = fog_amount(in.world);
     // glass is more mirror-like at grazing angles
     let nv = clamp(dot(n, v), 0.0, 1.0);
     let alpha = o.color.a + (1.0 - o.color.a) * pow(1.0 - nv, 5.0);
     if (frame.p18.x > 0.5) {
-        let change = shade_probe_change(base, o.mat.z, o.mat.w, in.world, n, v, ao);
+        let change = shade_probe_change(base, metal, rough, in.world, n, v, ao);
         return Lit(pbr.diffuse + change.diffuse + base * o.mat.y, pbr.spec + change.spec, fog, alpha);
     }
     return Lit(pbr.diffuse + base * o.mat.y, pbr.spec, fog, alpha);
@@ -544,6 +581,20 @@ fn fs_gbuf(in: MeshOut) -> GbufOut {
     if (o.uvrect.x > 0.0) {
         n = bump_normal(n, dpx, dpy, dhx, dhy);
     }
+    let nmap = textureSample(normal_tex, tex_samp, tuv).xyz * 2.0 - vec3<f32>(1.0);
+    let armv = textureSample(arm_tex, tex_samp, tuv);
+    let duvx = dpdx(tuv);
+    let duvy = dpdy(tuv);
+    let maps = u32(o.pbr.z + 0.5);
+    var rough = o.mat.w;
+    var metal = o.mat.z;
+    if ((maps & 1u) != 0u) {
+        n = map_normal(n, dpx, dpy, duvx, duvy, vec3<f32>(nmap.xy * o.pbr.x, nmap.z));
+    }
+    if ((maps & 2u) != 0u) {
+        rough = armv.g * o.pbr.w;
+        metal = armv.b;
+    }
     if (o.misc.z > 0.5 && in.tw > 0.001) {
         if (in.tw > 0.999 && t.a < 0.5) {
             discard;
@@ -551,8 +602,8 @@ fn fs_gbuf(in: MeshOut) -> GbufOut {
         base = base * (vec3<f32>(1.0) + in.tw * (t.rgb - vec3<f32>(1.0)));
     }
     var out: GbufOut;
-    out.a = vec4<f32>(n, clamp(o.mat.w, 0.045, 1.0));
-    out.b = vec4<f32>(mix(vec3<f32>(0.04), base, o.mat.z), 1.0);
+    out.a = vec4<f32>(n, clamp(rough, 0.045, 1.0));
+    out.b = vec4<f32>(mix(vec3<f32>(0.04), base, metal), 1.0);
     return out;
 }
 

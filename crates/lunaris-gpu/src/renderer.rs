@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use lunaris_ecs::World;
 use lunaris_render::math::{length, sub, V3};
 use lunaris_render::mesh::Mesh;
-use lunaris_render::render::{gather_scene, ExplicitCamera, MeshRef, RenderOptions, Scene, SceneParticles, SceneProbe, View};
+use lunaris_render::render::{gather_scene, ExplicitCamera, MeshPbr, MeshRef, RenderOptions, Scene, SceneParticles, SceneProbe, View};
 use lunaris_render::terrain_layers::{Splat, SplatLayers};
 use lunaris_render::Frame;
 use lunaris_render::texture::Texture;
@@ -92,6 +92,8 @@ struct ObjectData {
     misc: [f32; 4],
     uvrect: [f32; 4],
     ids: [u32; 4],
+    /// `PbrMaps`: x the normal map's strength, y the occlusion strength, z which maps there are (1 normal, 2 arm, 3 both), w the roughness scale; all 0 for an object without them. Matches `Object.pbr` in `common.wgsl`.
+    pbr: [f32; 4],
 }
 
 /// What the shader of a painted terrain (`TerrainLayers`) needs besides its textures: each layer's repeat, relief depth and tint. Matches `SplatU` in `scene.wgsl`.
@@ -173,6 +175,9 @@ struct GpuMesh {
     center: V3,
     radius: f32,
 }
+
+/// A texture bind group's key: the colour texture, the quality, the sampler, and the addresses of the normal and occlusion-roughness-metallic maps (0 for none).
+type TexKey = (usize, bool, SamplerKind, usize, usize);
 
 struct GpuTex {
     view: wgpu::TextureView,
@@ -294,7 +299,7 @@ struct SurfaceState {
 #[derive(Clone)]
 struct Batch {
     mesh: MeshId,
-    tex: (usize, bool, SamplerKind),
+    tex: TexKey,
     first: u32,
     count: u32,
     cast: bool,
@@ -321,7 +326,11 @@ pub struct GpuRenderer {
     dyn_meshes: HashMap<u64, GpuMesh>,
     textures: HashMap<(usize, bool), GpuTex>,
     splat_textures: HashMap<usize, GpuSplat>,
-    tex_bgs: HashMap<(usize, bool, SamplerKind), wgpu::BindGroup>,
+    tex_bgs: HashMap<TexKey, wgpu::BindGroup>,
+    /// Normal and occlusion-roughness-metallic maps: numbers in a plain 8-bit texture (no sRGB), by the address of the picture.
+    data_textures: HashMap<usize, GpuTex>,
+    flat_normal: wgpu::TextureView,
+    arm_default: wgpu::TextureView,
     /// Bind groups of interface pictures: (texture address, filtered), the texture in its display-colour form.
     ui_bgs: HashMap<(usize, bool), wgpu::BindGroup>,
     white: [wgpu::TextureView; 2],
@@ -444,6 +453,16 @@ impl GpuRenderer {
             gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[128], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(1), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
             t.create_view(&wgpu::TextureViewDescriptor::default())
         };
+        let flat_normal = {
+            let t = make_tex("flat-normal", 1, 1, 1, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
+            gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[128, 128, 255, 255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
+            t.create_view(&wgpu::TextureViewDescriptor::default())
+        };
+        let arm_default = {
+            let t = make_tex("arm-default", 1, 1, 1, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
+            gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[255, 200, 0, 255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
+            t.create_view(&wgpu::TextureViewDescriptor::default())
+        };
         let ao_white = {
             let t = make_tex("ao-white", 1, 1, 1, wgpu::TextureFormat::R8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
             gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(1), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
@@ -492,6 +511,9 @@ impl GpuRenderer {
             textures: HashMap::new(),
             splat_textures: HashMap::new(),
             tex_bgs: HashMap::new(),
+            data_textures: HashMap::new(),
+            flat_normal,
+            arm_default,
             ui_bgs: HashMap::new(),
             white,
             white_height,
@@ -661,7 +683,7 @@ impl GpuRenderer {
     /// One particle cloud as an object of the list (its quads are in world space already) and the batch that draws it.
     fn cloud_batch(&mut self, p: &SceneParticles, high: bool, frame: u64, objects: &mut Vec<ObjectData>) -> Batch {
         let id = self.ensure_mesh(&p.mesh, frame);
-        let tkey = self.texture_group(p.tex.as_ref(), high, SamplerKind::LinearClamp, frame);
+        let tkey = self.texture_group(p.tex.as_ref(), None, high, SamplerKind::LinearClamp, frame);
         let data = ObjectData {
             model: lunaris_render::math::M4::identity().0,
             n0: [1.0, 0.0, 0.0, 0.0],
@@ -672,6 +694,7 @@ impl GpuRenderer {
             misc: [1.0, 1.0, 1.0, 0.0],
             uvrect: [0.0, 0.0, 1.0, 1.0],
             ids: [0, 0, 0, 0],
+            pbr: [0.0; 4],
         };
         let batch = Batch { mesh: id, tex: tkey, first: objects.len() as u32, count: 1, cast: false, splat: None };
         objects.push(data);
@@ -827,7 +850,7 @@ impl GpuRenderer {
     }
 
     /// The bind group (texture + sampler) for drawing with `tex` (None = plain white).
-    fn texture_group(&mut self, tex: Option<&Arc<Texture>>, high: bool, kind: SamplerKind, frame: u64) -> (usize, bool, SamplerKind) {
+    fn texture_group(&mut self, tex: Option<&Arc<Texture>>, maps: Option<&MeshPbr>, high: bool, kind: SamplerKind, frame: u64) -> TexKey {
         let ptr = match tex {
             Some(t) => {
                 self.ensure_texture(t, high, frame);
@@ -835,10 +858,23 @@ impl GpuRenderer {
             }
             None => 0,
         };
-        let key = (ptr, high, kind);
+        let data_ptr = |this: &mut Self, t: &Option<Arc<Texture>>| match t {
+            Some(t) if high => {
+                this.ensure_data_texture(t, frame);
+                Arc::as_ptr(t) as usize
+            }
+            _ => 0,
+        };
+        let (np, ap) = match maps {
+            Some(m) => (data_ptr(self, &m.normal), data_ptr(self, &m.arm)),
+            None => (0, 0),
+        };
+        let key = (ptr, high, kind, np, ap);
         if !self.tex_bgs.contains_key(&key) {
             let view = if ptr == 0 { &self.white[high as usize] } else { &self.textures[&(ptr, high)].view };
             let height = if ptr == 0 { &self.white_height } else { self.textures[&(ptr, high)].height.as_ref().unwrap_or(&self.white_height) };
+            let normal = if np == 0 { &self.flat_normal } else { &self.data_textures[&np].view };
+            let arm = if ap == 0 { &self.arm_default } else { &self.data_textures[&ap].view };
             let sampler = match kind {
                 SamplerKind::NearestRepeat => &self.samplers.nearest_repeat,
                 SamplerKind::NearestClamp => &self.samplers.nearest_clamp,
@@ -848,11 +884,47 @@ impl GpuRenderer {
             let bg = self.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("texture"),
                 layout: &self.layouts.tex1,
-                entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(view) }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(height) }],
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(view) },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(sampler) },
+                    wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(height) },
+                    wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(normal) },
+                    wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(arm) },
+                ],
             });
             self.tex_bgs.insert(key, bg);
         }
         key
+    }
+
+    /// Upload a normal or occlusion-roughness-metallic map: the picture's own bytes in a plain 8-bit texture (the loader squares colours, so the bytes come back by the root), with mips.
+    fn ensure_data_texture(&mut self, tex: &Arc<Texture>, frame: u64) {
+        let key = Arc::as_ptr(tex) as usize;
+        if let Some(t) = self.data_textures.get_mut(&key) {
+            t.last_used = frame;
+            return;
+        }
+        let (w, h) = (tex.width.max(1), tex.height.max(1));
+        let to8 = |v: f32| (v.clamp(0.0, 1.0).sqrt() * 255.0 + 0.5) as u8;
+        let mut bytes = Vec::with_capacity((w * h * 4) as usize);
+        for t in &tex.texels {
+            bytes.extend_from_slice(&[to8(t[0]), to8(t[1]), to8(t[2]), 255]);
+        }
+        let levels = mip_chain(w, h, bytes, false);
+        let t = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("data-map"),
+            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            mip_level_count: levels.len() as u32,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        for (i, (lw, lh, data)) in levels.iter().enumerate() {
+            self.gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: i as u32, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, data, wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(lw * 4), rows_per_image: Some(*lh) }, wgpu::Extent3d { width: *lw, height: *lh, depth_or_array_layers: 1 });
+        }
+        self.data_textures.insert(key, GpuTex { view: t.create_view(&wgpu::TextureViewDescriptor::default()), height: None, _keep: Some(tex.clone()), last_used: frame });
     }
 
     /// Forget meshes and textures nothing has used for a while (tile maps that were edited, models that left the scene).
@@ -862,6 +934,11 @@ impl GpuRenderer {
         self.tile_meshes.retain(|_, g| !dead(g.last_used));
         self.dyn_meshes.retain(|_, g| !dead(g.last_used));
         self.splat_textures.retain(|_, g| !dead(g.last_used));
+        let gone_data: Vec<usize> = self.data_textures.iter().filter(|(_, t)| dead(t.last_used)).map(|(k, _)| *k).collect();
+        for k in gone_data {
+            self.data_textures.remove(&k);
+            self.tex_bgs.retain(|bk, _| bk.3 != k && bk.4 != k);
+        }
         let gone: Vec<(usize, bool)> = self.textures.iter().filter(|(_, t)| dead(t.last_used)).map(|(k, _)| *k).collect();
         for k in gone {
             self.textures.remove(&k);
@@ -1054,7 +1131,7 @@ impl GpuRenderer {
         // ---- the object list: meshes sorted into instanced runs, then the sprite and tile layers in drawing order
         struct MeshItem {
             id: MeshId,
-            tex: (usize, bool, SamplerKind),
+            tex: TexKey,
             cast: bool,
             /// Glows (a lamp's bulb): it must not shadow the light that sits inside it.
             glows: bool,
@@ -1079,7 +1156,7 @@ impl GpuRenderer {
             };
             let tex = m.tex.clone().or(model_tex);
             let splat = m.splat.as_ref().map(|sp| self.splat_group(sp, high, frame_no, &mut splat_bgs));
-            let tkey = self.texture_group(tex.as_ref(), high, if high { SamplerKind::Aniso } else { SamplerKind::NearestRepeat }, frame_no);
+            let tkey = self.texture_group(tex.as_ref(), m.pbr.as_ref(), high, if high { SamplerKind::Aniso } else { SamplerKind::NearestRepeat }, frame_no);
             let color = if high { display_to_linear(gamma2_to_display(m.color)) } else { m.color };
             let nm = m.model.normal_matrix();
             let scale = {
@@ -1100,13 +1177,17 @@ impl GpuRenderer {
                     _ => [if high && tex.as_ref().is_some_and(|t| t.heights.is_some()) { m.bump } else { 0.0 }, 0.0, 1.0, 1.0],
                 },
                 ids: [slots.len() as u32, if !high { 0 } else if m.water.is_some() { 1 } else if m.sway.is_some() { 2 } else { 0 }, 0, 0],
+                pbr: match &m.pbr {
+                    Some(p) if high && (p.normal.is_some() || p.arm.is_some()) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32, p.roughness_scale],
+                    _ => [0.0; 4],
+                },
             };
             let see_through = high && m.alpha < 0.999;
             let depth = -scene.view.transform_point(m.model.transform_point(center))[2];
             items.push(MeshItem { id, tex: tkey, cast: m.cast_shadow && !see_through, glows: m.emissive > 0.0, clear: see_through, depth, data, sphere: (m.model.transform_point(center), radius * scale), splat });
         }
         let mut order: Vec<usize> = (0..items.len()).filter(|&i| !items[i].clear).collect();
-        order.sort_by_key(|&i| (items[i].id, items[i].tex.0, items[i].tex.2 as u8, items[i].cast, items[i].splat));
+        order.sort_by_key(|&i| (items[i].id, items[i].tex.0, items[i].tex.2 as u8, items[i].tex.3, items[i].tex.4, items[i].cast, items[i].splat));
         let mut objects: Vec<ObjectData> = Vec::with_capacity(items.len() + scene.layers.len());
         let mut mesh_batches: Vec<Batch> = Vec::new();
         for &i in &order {
@@ -1143,7 +1224,7 @@ impl GpuRenderer {
             }
             slots.push(l.uid);
             let id = if l.mesh_key != 0 { self.ensure_tile_mesh(&l.mesh, l.mesh_key, frame_no) } else { self.ensure_mesh(&l.mesh, frame_no) };
-            let tkey = self.texture_group(l.tex.as_ref(), high, SamplerKind::NearestClamp, frame_no);
+            let tkey = self.texture_group(l.tex.as_ref(), None, high, SamplerKind::NearestClamp, frame_no);
             let color = if high { display_to_linear(gamma2_to_display([l.color[0], l.color[1], l.color[2]])) } else { [l.color[0], l.color[1], l.color[2]] };
             let nm = l.model.normal_matrix();
             let data = ObjectData {
@@ -1156,6 +1237,7 @@ impl GpuRenderer {
                 misc: [1.0, 1.0, if l.tex.is_some() { 1.0 } else { 0.0 }, 0.0],
                 uvrect: l.uv,
                 ids: [slots.len() as u32, 0, 0, 0],
+                pbr: [0.0; 4],
             };
             let same = matches!(layer_steps.last(), Some((PipeId::Sprite, b)) if b.mesh == id && b.tex == tkey);
             if same {

@@ -1935,3 +1935,18 @@ component! {
         pub scale: [f32; 3] = [1.0, 1.0, 1.0],
     }
 }
+
+component! {
+    /// Surface detail from pictures for a `MeshRenderer` (put it beside one; the GPU renderer's high-quality mode draws it, the reference picture and the classic mode ignore it). `normal` is a tangent-space normal map
+    /// (a PNG or JPEG of the workspace, DirectX convention: green points down the picture, which is what Poly Haven's `nor_dx` and Unreal's maps are) and `arm` a map with ambient occlusion in red, roughness in green and
+    /// metallic in blue (the usual packed form). Both hold numbers, not colours: they are read as they are, never turned from sRGB. They repeat `MeshRenderer.uv_scale` times like the colour texture. `normal_strength`
+    /// scales the bumps (1 as authored, 0 flat), `ao_strength` how much the occlusion map darkens the ambient light (0 to 1), `roughness_scale` multiplies the map's roughness. A name left empty is not used: the mesh's own
+    /// roughness and metallic count and the surface's own normal stays. New in the engine's standard set; a world without it is what it was.
+    pub struct PbrMaps {
+        pub normal: Sym = Sym(0),
+        pub arm: Sym = Sym(0),
+        pub normal_strength: f32 = 1.0,
+        pub ao_strength: f32 = 1.0,
+        pub roughness_scale: f32 = 1.0,
+    }
+}

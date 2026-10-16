@@ -686,6 +686,18 @@ pub struct SceneMesh {
     pub uv_scale: [f32; 2],
     /// A painted terrain (`TerrainLayers`): the splat map and its layers replace `tex`. Both renderers blend them per pixel; `None` for everything else.
     pub splat: Option<Arc<SplatLayers>>,
+    /// Normal and occlusion-roughness-metallic maps (`PbrMaps`): only the GPU renderer's high-quality mode draws them.
+    pub pbr: Option<MeshPbr>,
+}
+
+/// The pictures of a `PbrMaps` component, loaded as data (not as colours).
+#[derive(Clone)]
+pub struct MeshPbr {
+    pub normal: Option<Arc<Texture>>,
+    pub arm: Option<Arc<Texture>>,
+    pub normal_strength: f32,
+    pub ao_strength: f32,
+    pub roughness_scale: f32,
 }
 
 /// A sprite or a tile map: a flat textured mesh, alpha blended, drawn after the 3D meshes, far to near.
@@ -1031,6 +1043,10 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         if (l.weight_b > 0.0 && l.weight_b.is_finite()) || (l.weight_c > 0.0 && l.weight_c.is_finite()) {
             anim_layers_raw.insert(uid, *l);
         }
+    })?;
+    let mut pbr_raw: std::collections::BTreeMap<u64, lunaris_sim::components::PbrMaps> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&lunaris_sim::components::PbrMaps,), _>(|_, uid, (p,)| {
+        pbr_raw.insert(uid, *p);
     })?;
     let mut sways_raw: std::collections::BTreeMap<u64, lunaris_sim::components::Sway> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&lunaris_sim::components::Sway,), _>(|_, uid, (w,)| {
@@ -1441,6 +1457,15 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex,
             uv_scale,
             splat: None,
+            pbr: pbr_raw.get(uid).and_then(|p| {
+                let name_n = world.strings().get(p.normal.0).to_string();
+                let name_a = world.strings().get(p.arm.0).to_string();
+                if name_n.is_empty() && name_a.is_empty() {
+                    return None;
+                }
+                let fin = |v: f32, hi: f32| if v.is_finite() { v.clamp(0.0, hi) } else { 1.0 };
+                Some(MeshPbr { normal: (!name_n.is_empty()).then(|| textures.get(&name_n)), arm: (!name_a.is_empty()).then(|| textures.get(&name_a)), normal_strength: fin(p.normal_strength, 4.0), ao_strength: fin(p.ao_strength, 1.0), roughness_scale: fin(p.roughness_scale, 4.0) })
+            }),
         });
     }
     }
@@ -1472,6 +1497,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex: None,
             uv_scale: [1.0, 1.0],
             splat: None,
+            pbr: None,
         });
     }
     // water that follows a heightmap: the surface of the picture, see-through and rolling with waves in the GPU renderer's high qualities like a `Water` sheet
@@ -1502,6 +1528,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex: None,
             uv_scale: [1.0, 1.0],
             splat: None,
+            pbr: None,
         });
     }
     // terrain: the mesh of each heightmap, drawn like any model (the ground lies flat: the entity's rotation and scale are not used)
@@ -1539,6 +1566,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex,
             uv_scale: if g.uv_scale[0].is_finite() && g.uv_scale[1].is_finite() { g.uv_scale } else { [1.0, 1.0] },
             splat,
+            pbr: None,
         });
     }
     for (uid, j, from) in &cords {
@@ -1570,6 +1598,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex: None,
             uv_scale: [1.0, 1.0],
             splat: None,
+            pbr: None,
         });
     }
     let mut scene_layers: Vec<SceneLayer> = Vec::with_capacity(layers.len());

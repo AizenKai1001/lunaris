@@ -164,7 +164,7 @@ def main():
     # invisible walls far out at sea
     half = size / 2 + 260
     for i, (px, pz, sx, sz) in enumerate([(0, -half, 2 * half, 4), (0, half, 2 * half, 4), (-half, 0, 4, 2 * half), (half, 0, 4, 2 * half)]):
-        W.spawn(170 + i, f"Rough sea {i + 1}", Transform={"pos": [px, sea_y + 20, pz], "scale": [sx, 80, sz]}, Collider={"shape": 1, "size": [sx, 80, sz]})
+        W.spawn(170 + i, f"Rough sea {i + 1}", Transform={"pos": [px, sea_y + 20, pz], "scale": [sx, 80, sz]}, Collider={"shape": 1, "size": [1, 1, 1]})
     W.call("step", {"ticks": 1})  # the terrains are read at the first step
     th = W.th
     sx, sz = meta["start"]["x"], meta["start"]["z"]
@@ -261,16 +261,16 @@ def main():
     W.lookout(u, tower_x, tower_z)
     for name, a in meta["altars"].items():
         gy = th(a["x"], a["z"])
-        W.spawn(u(), f"{name.capitalize()} altar", Prop={}, Transform={"pos": [a["x"], gy + 0.6, a["z"]], "scale": [2.4, 1.2, 1.2]}, MeshRenderer={"mesh": "cube", "color": [0.46, 0.46, 0.5, 1], "roughness": 0.9}, Collider={"shape": 1, "size": [2.4, 1.2, 1.2]})
+        W.spawn(u(), f"{name.capitalize()} altar", Prop={}, Transform={"pos": [a["x"], gy + 0.6, a["z"]], "scale": [2.4, 1.2, 1.2]}, MeshRenderer={"mesh": "cube", "color": [0.46, 0.46, 0.5, 1], "roughness": 0.9}, Collider={"shape": 1, "size": [1, 1, 1]})
         W.spawn(u(), f"{name.capitalize()} altar light", Transform={"pos": [a["x"], gy + 2.2, a["z"]]}, Light={"kind": 1, "color": [0.55, 0.8, 1.0], "intensity": 3.0, "range": 18})
         for k in range(6):
             ang = k * math.pi / 3
             px, pz = a["x"] + math.cos(ang) * 7.0, a["z"] + math.sin(ang) * 7.0
-            W.spawn(u(), "Standing stone", Prop={}, Transform={"pos": [px, th(px, pz) + 1.7, pz], "scale": [1.1, 3.6, 0.9], "rot": W.quat_y(math.degrees(ang))}, MeshRenderer={"mesh": "cube", "color": [0.42, 0.42, 0.45, 1], "roughness": 0.95}, Collider={"shape": 1, "size": [1.1, 3.6, 0.9]})
+            W.spawn(u(), "Standing stone", Prop={}, Transform={"pos": [px, th(px, pz) + 1.7, pz], "scale": [1.1, 3.6, 0.9], "rot": W.quat_y(math.degrees(ang))}, MeshRenderer={"mesh": "cube", "color": [0.42, 0.42, 0.45, 1], "roughness": 0.95}, Collider={"shape": 1, "size": [1, 1, 1]})
     for k, c in enumerate(meta["camps"]):
         gy = th(c["x"], c["z"])
         W.spawn(u(), "Camp fire", Transform={"pos": [c["x"], gy + 0.6, c["z"]]}, Light={"kind": 1, "color": [1.0, 0.62, 0.28], "intensity": 3.0, "range": 20})
-        W.spawn(u(), "Camp crate", Prop={}, Transform={"pos": [c["x"] + 2.2, gy + 0.55, c["z"] + 1.0], "scale": [1.1, 1.1, 1.1]}, MeshRenderer={"mesh": "cube", "color": [0.55, 0.4, 0.22, 1], "roughness": 0.85}, Collider={"shape": 1, "size": [1.1, 1.1, 1.1]})
+        W.spawn(u(), "Camp crate", Prop={}, Transform={"pos": [c["x"] + 2.2, gy + 0.55, c["z"] + 1.0], "scale": [1.1, 1.1, 1.1]}, MeshRenderer={"mesh": "cube", "color": [0.55, 0.4, 0.22, 1], "roughness": 0.85}, Collider={"shape": 1, "size": [1, 1, 1]})
     res = W.call("define_script", {"source": S.ALL.replace("@SEA@", f"{sea_y:.3f}")})
     print("define_script:", json.dumps(res)[:200])
     W.call("check")

@@ -140,7 +140,7 @@ def dress_world():
     spawn(22, "Open sea", Transform={"pos": [0, SEA - 0.06, 0]}, Water={"size": [2600, 2600], "color": [0.04, 0.28, 0.4, 1.0], "wave_height": 0.3, "wave_length": 14, "speed": 0.9})
     # invisible walls far out at sea
     for i, (px, pz, sx, sz) in enumerate([(0, -156, 320, 4), (0, 156, 320, 4), (-156, 0, 4, 320), (156, 0, 4, 320)]):
-        spawn(34 + i, f"Rough sea {i + 1}", Transform={"pos": [px, 20, pz], "scale": [sx, 60, sz]}, Collider={"shape": 1, "size": [sx, 60, sz]})
+        spawn(34 + i, f"Rough sea {i + 1}", Transform={"pos": [px, 20, pz], "scale": [sx, 60, sz]}, Collider={"shape": 1, "size": [1, 1, 1]})
 
 
 def lookout(u, x, z):
@@ -149,10 +149,10 @@ def lookout(u, x, z):
     wood, dark = [0.46, 0.32, 0.2, 1], [0.34, 0.23, 0.14, 1]
     H = 5.0
     for sx, sz in ((-1.7, -1.7), (1.7, -1.7), (-1.7, 1.7), (1.7, 1.7)):
-        spawn(u(), "Post", Prop={}, Transform={"pos": [x + sx, g + H / 2 - 0.4, z + sz], "scale": [0.34, H + 0.8, 0.34]}, MeshRenderer={"mesh": "cube", "color": wood, "roughness": 0.9}, Collider={"shape": 1, "size": [0.34, H + 0.8, 0.34]})
-    spawn(u(), "Deck", Prop={}, Transform={"pos": [x, g + H + 0.1, z], "scale": [4.2, 0.24, 4.2]}, MeshRenderer={"mesh": "cube", "color": dark, "roughness": 0.9}, Collider={"shape": 1, "size": [4.2, 0.24, 4.2]})
+        spawn(u(), "Post", Prop={}, Transform={"pos": [x + sx, g + H / 2 - 0.4, z + sz], "scale": [0.34, H + 0.8, 0.34]}, MeshRenderer={"mesh": "cube", "color": wood, "roughness": 0.9}, Collider={"shape": 1, "size": [1, 1, 1]})
+    spawn(u(), "Deck", Prop={}, Transform={"pos": [x, g + H + 0.1, z], "scale": [4.2, 0.24, 4.2]}, MeshRenderer={"mesh": "cube", "color": dark, "roughness": 0.9}, Collider={"shape": 1, "size": [1, 1, 1]})
     for k, (px, pz, sx, sz) in enumerate(((0, -2.0, 4.2, 0.14), (0, 2.0, 4.2, 0.14), (-2.0, 0, 0.14, 4.2))):
-        spawn(u(), f"Rail {k + 1}", Prop={}, Transform={"pos": [x + px, g + H + 0.8, z + pz], "scale": [sx, 0.9, sz]}, MeshRenderer={"mesh": "cube", "color": wood, "roughness": 0.9}, Collider={"shape": 1, "size": [sx, 0.9, sz]})
+        spawn(u(), f"Rail {k + 1}", Prop={}, Transform={"pos": [x + px, g + H + 0.8, z + pz], "scale": [sx, 0.9, sz]}, MeshRenderer={"mesh": "cube", "color": wood, "roughness": 0.9}, Collider={"shape": 1, "size": [1, 1, 1]})
     # the ladder on the east face, 3.2 m beyond the posts' middle: its front is +x (turned 90 degrees about y)
     lx = x + 1.95
     spawn(u(), "Ladder", Prop={}, Transform={"pos": [lx, g, z], "rot": quat_y(90)}, Climbable={"height": H + 0.2, "width": 0.9, "reach": 0.9})
@@ -161,7 +161,7 @@ def lookout(u, x, z):
     for r in range(int((H + 0.2) / 0.4)):
         spawn(u(), "Rung", Prop={}, Transform={"pos": [lx + 0.06, g + 0.35 + r * 0.4, z], "scale": [0.06, 0.06, 0.8]}, MeshRenderer={"mesh": "cube", "color": wood, "roughness": 0.9})
     # a crate to jump up onto: a ledge a little too high to step over
-    spawn(u(), "Crate", Prop={}, Transform={"pos": [x - 4.5, th(x - 4.5, z + 3.5) + 0.65, z + 3.5], "scale": [1.3, 1.3, 1.3]}, MeshRenderer={"mesh": "cube", "color": [0.55, 0.4, 0.22, 1], "roughness": 0.85}, Collider={"shape": 1, "size": [1.3, 1.3, 1.3]})
+    spawn(u(), "Crate", Prop={}, Transform={"pos": [x - 4.5, th(x - 4.5, z + 3.5) + 0.65, z + 3.5], "scale": [1.3, 1.3, 1.3]}, MeshRenderer={"mesh": "cube", "color": [0.55, 0.4, 0.22, 1], "roughness": 0.85}, Collider={"shape": 1, "size": [1, 1, 1]})
     return g
 
 

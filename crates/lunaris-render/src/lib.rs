@@ -31,6 +31,8 @@ mod ui_tests;
 #[cfg(test)]
 mod ik_tests;
 #[cfg(test)]
+mod pbr_tests;
+#[cfg(test)]
 mod meshcol_tests;
 #[cfg(test)]
 mod particle_tests;

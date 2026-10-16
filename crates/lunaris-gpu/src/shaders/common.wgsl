@@ -125,4 +125,6 @@ struct Object {
     uvrect: vec4<f32>,
     // x: what the entity-id pass writes (the entity's slot, 0 is "nothing")
     ids: vec4<u32>,
+    // `PbrMaps`: normal strength, occlusion strength, which maps (1 normal, 2 arm, 3 both; 0 none), roughness scale
+    pbr: vec4<f32>,
 };

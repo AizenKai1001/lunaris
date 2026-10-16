@@ -153,6 +153,10 @@ and there is none when the sun is behind the camera or the camera is orthographi
 A test on the real GPU (`a_lens_flare_appears_with_the_sun_in_view_and_vanishes_when_a_cube_covers_it`) puts the sun 30 degrees up ahead of the camera and checks that 14,303 pixels of 129,600 get brighter and none darker, that the ghosts and the halo are most of it, that a stronger `intensity` is brighter and `0` changes nothing, that the same picture comes out twice, that a cube between the camera and the sun leaves 0 pixels brighter, that the sun behind the camera draws no flare and that `classic`, `low` and `medium` ignore it.
 `check` warns about a second `LensFlare`, an `intensity` of 0, more than 8 `ghosts`, a scene with no 3D meshes and a scene with no directional light.
 
+## Real surfaces: `PbrMaps`
+
+A mesh with a `PbrMaps` beside its `MeshRenderer` gets the detail of a photographed material (high quality only; the reference picture and classic mode ignore it). `normal` is a tangent-space normal map (a PNG or JPEG of the workspace, **DirectX** convention: green points down the picture, what Poly Haven's `nor_dx` and Unreal's maps are) and `arm` a map with ambient occlusion in red, roughness in green and metallic in blue. Both hold numbers, not colours: they are never converted from sRGB, and they repeat `MeshRenderer.uv_scale` times with the colour texture. `normal_strength` scales the bumps (1 as authored), `ao_strength` (0 to 1) how much the occlusion map darkens the ambient light, `roughness_scale` multiplies the map's roughness; a name left empty is not used. No tangents are needed in the model: the frame comes from the screen-space change of position and picture coordinates. `examples/hollowlight/` uses it with the CC0 sets `tools/fetch_polyhaven.py` downloads.
+
 ## Reflection probes: `ReflectionProbe`
 
 ```
