@@ -125,6 +125,14 @@ fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
 
 // ------------------------------------------------------------------------------------------------ shadows
 
+// sixteen points of a disc of radius 1 (a Poisson-like spread), for filtering the sun's shadows; and the pixel being shaded, for turning the pattern
+var<private> g_pix: vec2<f32> = vec2<f32>(0.0);
+var<private> POISSON16: array<vec2<f32>, 16> = array<vec2<f32>, 16>(
+    vec2<f32>(-0.94201624, -0.39906216), vec2<f32>(0.94558609, -0.76890725), vec2<f32>(-0.09418410, -0.92938870), vec2<f32>(0.34495938, 0.29387760),
+    vec2<f32>(-0.91588581, 0.45771432), vec2<f32>(-0.81544232, -0.87912464), vec2<f32>(-0.38277543, 0.27676845), vec2<f32>(0.97484398, 0.75648379),
+    vec2<f32>(0.44323325, -0.97511554), vec2<f32>(0.53742981, -0.47373420), vec2<f32>(-0.26496911, -0.41893023), vec2<f32>(0.79197514, 0.19090188),
+    vec2<f32>(-0.24188840, 0.99706507), vec2<f32>(-0.81409955, 0.91437590), vec2<f32>(0.19984126, 0.78641367), vec2<f32>(0.14383161, -0.14100790));
+
 // Light reaching `world` according to one cascade (1 outside its map).
 fn cascade_light(c: i32, world: vec3<f32>, n: vec3<f32>) -> f32 {
     var texel = frame.cascade_texel.x;
@@ -140,13 +148,50 @@ fn cascade_light(c: i32, world: vec3<f32>, n: vec3<f32>) -> f32 {
     }
     let ts = 1.0 / frame.cascade_info.w;
     let depth = lp.z - 0.0004;
-    var sum = 0.0;
-    for (var dy = -1; dy <= 1; dy = dy + 1) {
-        for (var dx = -1; dx <= 1; dx = dx + 1) {
-            sum = sum + textureSampleCompareLevel(shadow_map, shadow_samp, uv + vec2<f32>(f32(dx), f32(dy)) * ts, c, depth);
+    let soft = frame.cascade_depth.w;
+    if (soft <= 0.0) {
+        var sum = 0.0;
+        for (var dy = -1; dy <= 1; dy = dy + 1) {
+            for (var dx = -1; dx <= 1; dx = dx + 1) {
+                sum = sum + textureSampleCompareLevel(shadow_map, shadow_samp, uv + vec2<f32>(f32(dx), f32(dy)) * ts, c, depth);
+            }
+        }
+        return sum / 9.0;
+    }
+    // contact-hardening shadows (PCSS): look for what blocks the light within a window that is as wide as the biggest penumbra worth having, find how far above this point the blockers are, and filter as widely as
+    // the penumbra at that height; the sample pattern is turned by a different angle at every pixel (noise that the eye takes for softness)
+    let depth_m = frame.cascade_depth[c];
+    let tex_m = texel * 1.0;
+    let size_i = vec2<i32>(textureDimensions(shadow_map));
+    let ang0 = interleaved_noise(g_pix) * 6.2831853;
+    let ca = cos(ang0);
+    let sa = sin(ang0);
+    let search_texels = clamp(soft * min(depth_m, 14.0) * 0.5 / tex_m, 1.5, 28.0);
+    var blockers = 0.0;
+    var blocker_sum = 0.0;
+    for (var i = 0; i < 16; i = i + 1) {
+        let o = POISSON16[i];
+        let r = vec2<f32>(o.x * ca - o.y * sa, o.x * sa + o.y * ca) * search_texels;
+        let q = clamp(vec2<i32>(uv * vec2<f32>(size_i) + r), vec2<i32>(0), size_i - vec2<i32>(1));
+        let d = textureLoad(shadow_map, q, c, 0);
+        if (d < depth) {
+            blockers = blockers + 1.0;
+            blocker_sum = blocker_sum + d;
         }
     }
-    return sum / 9.0;
+    if (blockers < 0.5) {
+        return 1.0;
+    }
+    let avg = blocker_sum / blockers;
+    let pen_m = max((depth - avg) * depth_m * soft, tex_m);
+    let filter_texels = clamp(pen_m / tex_m, 1.2, 28.0);
+    var lit = 0.0;
+    for (var i = 0; i < 16; i = i + 1) {
+        let o = POISSON16[i];
+        let r = vec2<f32>(o.x * ca - o.y * sa, o.x * sa + o.y * ca) * filter_texels * ts;
+        lit = lit + textureSampleCompareLevel(shadow_map, shadow_samp, uv + r, c, depth);
+    }
+    return lit / 16.0;
 }
 
 // Light reaching `world` from the point light `k` (index into the shadowed lights) standing at `light_pos`.
@@ -470,14 +515,18 @@ fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool
     }
     let v = normalize(frame.eye.xyz - in.world);
     let uv = in.clip.xy * frame.p1.zw;
-    let ao = textureSampleLevel(ao_tex, lin_samp, uv, 0.0).r * g_ao;
+    let aot = textureSampleLevel(ao_tex, lin_samp, uv, 0.0);
+    let ao = aot.a * g_ao;
     let metal = select(o.mat.z, g_metal, g_rough >= 0.0);
     let rough = select(o.mat.w, g_rough, g_rough >= 0.0);
     var shadow = 1.0;
     if (i32(frame.p4.x) >= 0) {
+        g_pix = in.clip.xy;
         shadow = shadow_factor(in.world, n);
     }
-    let pbr = shade_pbr(base, metal, rough, in.world, n, v, ao, shadow);
+    var pbr = shade_pbr(base, metal, rough, in.world, n, v, ao, shadow);
+    // light that bounced off the other surfaces in view (`GlobalIllumination`), in the colour of this one
+    pbr.diffuse = pbr.diffuse + base * (1.0 - metal) * aot.rgb;
     let fog = fog_amount(in.world);
     // glass is more mirror-like at grazing angles
     let nv = clamp(dot(n, v), 0.0, 1.0);

@@ -7,7 +7,9 @@ use wgpu::*;
 pub const HDR: TextureFormat = TextureFormat::Rgba16Float;
 pub const DEPTH: TextureFormat = TextureFormat::Depth32Float;
 pub const AO_RAW: TextureFormat = TextureFormat::Rg16Float;
-pub const AO: TextureFormat = TextureFormat::R8Unorm;
+/// What the blur makes: the bounced light in rgb and the ambient occlusion in a.
+pub const AO: TextureFormat = TextureFormat::Rgba16Float;
+pub const GI_RAW: TextureFormat = TextureFormat::Rgba16Float;
 pub const IDS: TextureFormat = TextureFormat::R32Uint;
 /// The surface pictures of the screen-space reflections: where each pixel points and how rough it is, how much it reflects head on.
 pub const GBUF_A: TextureFormat = TextureFormat::Rgba16Float;
@@ -44,6 +46,8 @@ pub enum PipeId {
     DepthShadow,
     Resolve,
     Ssao,
+    /// Bounced light from the last picture (`GlobalIllumination`).
+    Gi,
     SsaoBlur,
     BloomFirst,
     BloomDown,
@@ -88,6 +92,7 @@ pub struct Layouts {
     pub text0: BindGroupLayout,
     pub resolve: BindGroupLayout,
     pub ssao: BindGroupLayout,
+    pub gi0: BindGroupLayout,
     pub blur: BindGroupLayout,
     pub bloom_first: BindGroupLayout,
     pub bloom_chain: BindGroupLayout,
@@ -184,7 +189,8 @@ impl Layouts {
             text0: make("text0", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering())]),
             resolve: make("resolve", &[entry(2, tex_float())]),
             ssao: make("ssao", &[entry(0, uniform()), entry(1, tex_depth())]),
-            blur: make("ssao-blur", &[entry(0, uniform()), entry(6, tex_float())]),
+            gi0: make("gi0", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float())]),
+            blur: make("ssao-blur", &[entry(0, uniform()), entry(1, tex_depth()), entry(5, sampler_filtering()), entry(6, tex_float()), entry(14, tex_float()), entry(15, tex_float())]),
             bloom_first: make("bloom-first", &[entry(0, uniform()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(8, storage_ro())]),
             bloom_chain: make("bloom-chain", &[entry(4, tex_float()), entry(5, sampler_filtering())]),
             composite: make("composite", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(7, tex_float()), entry(8, storage_ro())]),
@@ -476,10 +482,11 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 cache: None,
             })
         }
-        PipeId::Resolve | PipeId::Ssao | PipeId::SsaoBlur | PipeId::BloomFirst | PipeId::BloomDown | PipeId::BloomUp | PipeId::Composite | PipeId::Ssr | PipeId::ProbeResolve | PipeId::ProbeMip => {
+        PipeId::Resolve | PipeId::Ssao | PipeId::Gi | PipeId::SsaoBlur | PipeId::BloomFirst | PipeId::BloomDown | PipeId::BloomUp | PipeId::Composite | PipeId::Ssr | PipeId::ProbeResolve | PipeId::ProbeMip => {
             let (module, bgl, fs, format, blend): (&ShaderModule, &BindGroupLayout, &str, TextureFormat, Option<BlendState>) = match key.id {
                 PipeId::Resolve => (&sh.post, &ly.resolve, "fs_resolve", key.format.expect("format"), None),
                 PipeId::Ssao => (&sh.post, &ly.ssao, "fs_ssao", AO_RAW, None),
+                PipeId::Gi => (&sh.post, &ly.gi0, "fs_gi", GI_RAW, None),
                 PipeId::SsaoBlur => (&sh.post, &ly.blur, "fs_ssao_blur", AO, None),
                 PipeId::BloomFirst => (&sh.post, &ly.bloom_first, "fs_bloom_first", HDR, None),
                 PipeId::BloomDown => (&sh.post, &ly.bloom_chain, "fs_bloom_down", HDR, None),

@@ -105,6 +105,8 @@ pub struct Cascade {
     pub texel: f32,
     /// View distance at which this cascade ends.
     pub far: f32,
+    /// How many metres the light's depth range of this cascade spans (the depth in the map is 0 to 1 over it).
+    pub depth: f32,
 }
 
 pub const CASCADES: usize = 3;
@@ -133,7 +135,7 @@ pub fn fit_cascades(cam: &Cam, aspect: f32, to_light: V3, distance: f32, size: u
     }
     far_of[CASCADES - 1] = end;
     let tan_half = (cam.fov_y.clamp(1.0, 170.0).to_radians() * 0.5).tan();
-    let mut out = [Cascade { view_proj: M4::identity(), texel: 1.0, far: end }; CASCADES];
+    let mut out = [Cascade { view_proj: M4::identity(), texel: 1.0, far: end, depth: 1.0 }; CASCADES];
     let mut slice_near = start;
     for i in 0..CASCADES {
         let slice_far = far_of[i];
@@ -183,7 +185,7 @@ pub fn fit_cascades(cam: &Cam, aspect: f32, to_light: V3, distance: f32, size: u
         p[5] = 1.0 / radius;
         p[10] = -1.0 / depth;
         p[15] = 1.0;
-        out[i] = Cascade { view_proj: M4(p).mul(&view), texel, far: slice_far };
+        out[i] = Cascade { view_proj: M4(p).mul(&view), texel, far: slice_far, depth };
         slice_near = slice_far;
     }
     out

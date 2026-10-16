@@ -19,6 +19,10 @@
 // the faces of the reflection probes (see sky.wgsl) and how to sample them
 @group(0) @binding(12) var probe_tex: texture_2d_array<f32>;
 @group(0) @binding(13) var probe_samp: sampler;
+// the bounced light the blur combines with the occlusion (rgb)
+@group(0) @binding(14) var gi_in: texture_2d<f32>;
+// the bounced light of the last pictures (the blur blends the new light with it)
+@group(0) @binding(15) var gi_hist: texture_2d<f32>;
 // the state of the eye adaptation (see exposure.wgsl): x is the exposure it has settled on
 @group(0) @binding(8) var<storage, read> ae_state: array<vec4<f32>>;
 
@@ -135,24 +139,148 @@ fn fs_ssao(in: FullOut) -> @location(0) vec4<f32> {
     return vec4<f32>(ao, dist, 0.0, 1.0);
 }
 
-// A 4 x 4 blur that does not smear across depth edges. Output: r = occlusion.
+// The surface normal at a pixel from its neighbours, taking the side with the smaller depth jump on each axis, turned to face the eye.
+fn surface_normal(px: vec2<i32>, p: vec3<f32>, d0: f32) -> vec3<f32> {
+    let pl = world_at(px + vec2<i32>(-1, 0));
+    let pr = world_at(px + vec2<i32>(1, 0));
+    let pu = world_at(px + vec2<i32>(0, -1));
+    let pd = world_at(px + vec2<i32>(0, 1));
+    var dx = pr - p;
+    if (abs(depth_at(px + vec2<i32>(-1, 0)) - d0) < abs(depth_at(px + vec2<i32>(1, 0)) - d0)) {
+        dx = p - pl;
+    }
+    var dy = pd - p;
+    if (abs(depth_at(px + vec2<i32>(0, -1)) - d0) < abs(depth_at(px + vec2<i32>(0, 1)) - d0)) {
+        dy = p - pu;
+    }
+    var n = normalize(cross(dx, dy));
+    if (dot(n, frame.eye.xyz - p) < 0.0) {
+        n = -n;
+    }
+    return n;
+}
+
+// ------------------------------------------------------------------------------------------------ bounced light
+
+fn pcg3(v_in: vec3<u32>) -> vec3<u32> {
+    var v = v_in * 1664525u + vec3<u32>(1013904223u);
+    v.x = v.x + v.y * v.z;
+    v.y = v.y + v.z * v.x;
+    v.z = v.z + v.x * v.y;
+    v = v ^ (v >> vec3<u32>(16u));
+    v.x = v.x + v.y * v.z;
+    v.y = v.y + v.z * v.x;
+    v.z = v.z + v.x * v.y;
+    return v;
+}
+
+// For every pixel: rays about the surface, cosine-weighted, marched through the depth of the picture; where one meets a surface, the light that surface sent out in the last picture (found where the surface was
+// in that picture) comes back along it. Output: rgb = the bounced light as the average over the rays (rays that find nothing add nothing: the sky is the shader's own), a = the distance from the camera.
+@fragment
+fn fs_gi(in: FullOut) -> @location(0) vec4<f32> {
+    let px = vec2<i32>(in.pos.xy);
+    let d0 = depth_at(px);
+    if (d0 <= 0.0) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0e6);
+    }
+    let p = world_at(px);
+    let n = surface_normal(px, p, d0);
+    let dist = length(frame.eye.xyz - p);
+    let radius = frame.p23.y;
+    let thick = frame.p23.w;
+    let dirs = max(i32(frame.p23.z), 2);
+    let bias = 0.03 + dist * 0.003;
+    let helper = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.y) > 0.95);
+    let t = normalize(cross(helper, n));
+    let b = cross(n, t);
+    // white noise, not the structured pattern of the other passes: the blur turns it into grain, a pattern would stay a pattern
+    let h = pcg3(vec3<u32>(vec3<i32>(px.x, px.y, i32(frame.p8.w * 997.0))));
+    let rnd = f32(h.x >> 8u) / 16777216.0;
+    let rnd2 = f32(h.y >> 8u) / 16777216.0;
+    let size = frame.p1.xy;
+    var acc = vec3<f32>(0.0);
+    for (var i = 0; i < dirs; i = i + 1) {
+        let u = (f32(i) + rnd) / f32(dirs);
+        let ang = (f32(i) + rnd2) * 2.399963;
+        let r = sqrt(u);
+        let wdir = t * (r * cos(ang)) + b * (r * sin(ang)) + n * sqrt(max(1.0 - u, 0.0));
+        for (var s = 1; s <= 6; s = s + 1) {
+            let f = (f32(s) - 0.5 + (rnd2 - 0.5) * 0.6) / 6.0;
+            let tt = radius * f * f;
+            let sp = p + wdir * max(tt, bias * 2.0);
+            let clip = frame.view_proj * vec4<f32>(sp, 1.0);
+            if (clip.w <= 0.0) {
+                break;
+            }
+            let ndc = clip.xy / clip.w;
+            let suv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+            if (suv.x < 0.0 || suv.x >= 1.0 || suv.y < 0.0 || suv.y >= 1.0) {
+                break;
+            }
+            let spx = vec2<i32>(suv * size);
+            if (depth_at(spx) <= 0.0) {
+                continue;
+            }
+            let hit = world_at(spx);
+            let diff = length(sp - frame.eye.xyz) - length(hit - frame.eye.xyz);
+            if (diff > bias && diff < thick + tt * 0.3) {
+                // where the hit surface was in the last picture
+                let pc = frame.prev_view_proj * vec4<f32>(hit, 1.0);
+                if (pc.w > 0.0) {
+                    let pn = pc.xy / pc.w;
+                    let puv = vec2<f32>(pn.x * 0.5 + 0.5, 0.5 - pn.y * 0.5);
+                    if (puv.x >= 0.0 && puv.x < 1.0 && puv.y >= 0.0 && puv.y < 1.0) {
+                        let l = textureLoad(hdr_tex, vec2<i32>(puv * size), 0).rgb * frame.p24.y;
+                        acc = acc + min(l, vec3<f32>(8.0)) * (1.0 - 0.55 * f);
+                    }
+                }
+                break;
+            }
+        }
+    }
+    return vec4<f32>(acc / f32(dirs) * frame.p23.x, dist);
+}
+
+// A blur that does not smear across depth edges. Output: rgb = the bounced light, a = occlusion.
 @fragment
 fn fs_ssao_blur(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.pos.xy);
     let size = vec2<i32>(frame.p1.xy);
     let center = textureLoad(ao_in, px, 0);
     var sum = 0.0;
+    var gsum = vec3<f32>(0.0);
     var wsum = 0.0;
-    for (var y = -2; y < 2; y = y + 1) {
-        for (var x = -2; x < 2; x = x + 1) {
+    var gwsum = 0.0;
+    let wide = frame.p23.x > 0.0;
+    let lo = select(-2, -3, wide);
+    let hi = select(2, 3, wide);
+    for (var y = lo; y < hi; y = y + 1) {
+        for (var x = lo; x < hi; x = x + 1) {
             let q = clamp(px + vec2<i32>(x, y), vec2<i32>(0), size - vec2<i32>(1));
             let s = textureLoad(ao_in, q, 0);
             let w = exp(-abs(s.g - center.g) * 6.0 / max(center.g, 1.0) * 10.0);
             sum = sum + s.r * w;
             wsum = wsum + w;
+            if (wide) {
+                gsum = gsum + textureLoad(gi_in, q, 0).rgb * w;
+                gwsum = gwsum + w;
+            }
         }
     }
-    return vec4<f32>(sum / max(wsum, 1.0e-4), 0.0, 0.0, 1.0);
+    var gi = gsum / max(gwsum, 1.0e-4);
+    if (wide && frame.p24.x < 0.999 && depth_at(px) > 0.0) {
+        // where this surface was in the last picture, and what the history held there
+        let pc = frame.prev_view_proj * vec4<f32>(world_at(px), 1.0);
+        if (pc.w > 0.0) {
+            let pn = pc.xy / pc.w;
+            let puv = vec2<f32>(pn.x * 0.5 + 0.5, 0.5 - pn.y * 0.5);
+            if (puv.x >= 0.0 && puv.x < 1.0 && puv.y >= 0.0 && puv.y < 1.0) {
+                let old = textureSampleLevel(gi_hist, post_samp, puv, 0.0).rgb;
+                gi = mix(old, gi, frame.p24.x);
+            }
+        }
+    }
+    return vec4<f32>(gi, sum / max(wsum, 1.0e-4));
 }
 
 // ------------------------------------------------------------------------------------------------ screen-space reflections

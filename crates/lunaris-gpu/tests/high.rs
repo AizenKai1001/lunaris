@@ -629,3 +629,115 @@ fn a_lens_flare_appears_with_the_sun_in_view_and_vanishes_when_a_cube_covers_it(
         assert_eq!(a.rgba, b.rgba, "{quality:?} has no lens flare");
     }
 }
+
+#[test]
+fn bounced_light_tints_the_floor_next_to_a_red_wall_and_lifts_the_shade() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // a white floor, a red wall on the left, a lamp, a block with a shaded side; no sun, a dark sky
+    let room = |gi: &str| -> Vec<String> {
+        let mut v: Vec<String> = [
+            r#"{"uid":1,"components":{"Camera":{"fov_y":60,"clear":[0.02,0.02,0.03,1]},"Transform":{"pos":[0,3.5,8],"rot":[-0.25,0,0,0.968]}}}"#,
+            r#"{"uid":3,"components":{"Transform":{"scale":[16,1,16]},"MeshRenderer":{"mesh":"plane","color":[0.8,0.8,0.8,1],"roughness":0.9}}}"#,
+            r#"{"uid":4,"components":{"Transform":{"pos":[-4.5,2,0],"scale":[0.4,4,12]},"MeshRenderer":{"mesh":"cube","color":[0.85,0.08,0.06,1],"roughness":0.9}}}"#,
+            r#"{"uid":5,"components":{"Transform":{"pos":[2.5,1,-1],"scale":[1.6,2,1.6]},"MeshRenderer":{"mesh":"cube","color":[0.8,0.8,0.8,1],"roughness":0.9}}}"#,
+            r#"{"uid":6,"components":{"Transform":{"pos":[-1.5,3,0]},"Light":{"kind":1,"intensity":1.4,"range":14,"color":[1,1,1]}}}"#,
+            r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":0.02,"bloom":0,"ssao":0,"shadows":true,"tonemap":1,"exposure":1.0}}}"#,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        if !gi.is_empty() {
+            v.push(format!(r#"{{"uid":10,"components":{{"GlobalIllumination":{gi}}}}}"#));
+        }
+        v
+    };
+    let q = Quality::high();
+    let off = draw_owned(&mut gpu, &room(""), &q, 480, 270);
+    let on = draw_owned(&mut gpu, &room(r#"{"intensity":1.0,"radius":6,"directions":12}"#), &q, 480, 270);
+    // the floor pixels next to the wall, and far from it, by the ids of the picture
+    let floor_mean = |f: &Frame, x0: u32, x1: u32| -> [f32; 3] {
+        let (mut n, mut s) = (0.0f32, [0.0f32; 3]);
+        for y in 0..270 {
+            for x in x0..x1 {
+                if f.ids[(y * f.width + x) as usize] == 3 {
+                    let c = px(f, x, y);
+                    n += 1.0;
+                    for k in 0..3 {
+                        s[k] += c[k] as f32;
+                    }
+                }
+            }
+        }
+        assert!(n > 200.0, "only {n} floor pixels in columns {x0} to {x1}");
+        [s[0] / n, s[1] / n, s[2] / n]
+    };
+    let (near_off, near_on) = (floor_mean(&off, 90, 200), floor_mean(&on, 90, 200));
+    let (far_off, far_on) = (floor_mean(&off, 330, 440), floor_mean(&on, 330, 440));
+    let red_gain_near = (near_on[0] - near_off[0]) - (near_on[1] - near_off[1]);
+    let red_gain_far = (far_on[0] - far_off[0]) - (far_on[1] - far_off[1]);
+    eprintln!("floor near the wall: {near_off:?} -> {near_on:?}; far: {far_off:?} -> {far_on:?}");
+    assert!(red_gain_near > red_gain_far + 1.0, "the red wall should tint the floor beside it more than the floor far from it: {red_gain_near} vs {red_gain_far}");
+    assert!(red_gain_near > 1.0, "the floor beside a red wall turns red: {red_gain_near}");
+    // the shaded side of the block is lighter with bounced light
+    let shade = |f: &Frame| -> f32 {
+        let (mut n, mut s) = (0.0f32, 0.0f32);
+        for (i, id) in f.ids.iter().enumerate() {
+            if *id == 5 {
+                n += 1.0;
+                s += lum(px(f, i as u32 % f.width, i as u32 / f.width));
+            }
+        }
+        s / n.max(1.0)
+    };
+    assert!(shade(&on) > shade(&off) + 1.0, "{} vs {}", shade(&on), shade(&off));
+    // a still made twice is the same picture
+    let again = draw_owned(&mut gpu, &room(r#"{"intensity":1.0,"radius":6,"directions":12}"#), &q, 480, 270);
+    assert_eq!(on.rgba, again.rgba, "bounced light settles to the same picture every time");
+    // off means off: with the component disabled it is the picture without it
+    let disabled = draw_owned(&mut gpu, &room(r#"{"intensity":1.0,"enabled":false}"#), &q, 480, 270);
+    assert_eq!(off.rgba, disabled.rgba);
+    // the lower qualities do not draw it
+    let (a, b) = (draw_owned(&mut gpu, &room(""), &Quality::low(), 240, 135), draw_owned(&mut gpu, &room(r#"{"intensity":1.0}"#), &Quality::low(), 240, 135));
+    assert_eq!(a.rgba, b.rgba);
+}
+
+#[test]
+fn the_penumbra_of_a_sun_shadow_widens_with_the_height_of_what_casts_it() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let scene = |soft: &str| -> Vec<String> {
+        let mut v: Vec<String> = [
+            CAMERA_3D.to_string(),
+            SUN.to_string(),
+            FLOOR.to_string(),
+            r#"{"uid":4,"components":{"Transform":{"pos":[0,6,0],"scale":[3,0.3,3]},"MeshRenderer":{"mesh":"cube","color":[0.9,0.2,0.2,1]}}}"#.to_string(),
+            r#"{"uid":9,"components":{"Environment":{"sky":true,"shadows":true,"ssao":0,"bloom":0,"shadow_distance":60}}}"#.to_string(),
+        ]
+        .to_vec();
+        if !soft.is_empty() {
+            v.push(format!(r#"{{"uid":10,"components":{{"Shadows":{soft}}}}}"#));
+        }
+        v
+    };
+    // the steepest step of the floor's brightness along a row: a hard edge has a big one, a soft edge spreads it
+    let steepest = |f: &Frame| -> f32 {
+        let mut best = 0.0f32;
+        for y in 135..270 {
+            for x in 1..f.width {
+                if f.ids[(y * f.width + x) as usize] == 3 && f.ids[(y * f.width + x - 1) as usize] == 3 {
+                    best = best.max((lum(px(f, x, y)) - lum(px(f, x - 1, y))).abs());
+                }
+            }
+        }
+        best
+    };
+    let q = Quality::high();
+    let hard = draw_owned(&mut gpu, &scene(""), &q, 640, 360);
+    let soft = draw_owned(&mut gpu, &scene(r#"{"softness":0.12}"#), &q, 640, 360);
+    let (a, b) = (steepest(&hard), steepest(&soft));
+    eprintln!("steepest step: plain filter {a}, contact-hardening {b}");
+    assert!(a > 15.0, "the shadow edge is there: {a}");
+    assert!(b < a * 0.85, "a shadow from six metres up has a wide penumbra: {b} vs {a}");
+    // softness 0 is the plain filter
+    let zero = draw_owned(&mut gpu, &scene(r#"{"softness":0}"#), &q, 640, 360);
+    assert_eq!(hard.rgba, zero.rgba);
+}

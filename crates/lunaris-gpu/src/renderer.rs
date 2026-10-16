@@ -123,6 +123,8 @@ struct FrameU {
     cascade_vp: [[f32; 16]; 3],
     cascade_info: [f32; 4],
     cascade_texel: [f32; 4],
+    /// metres of light-space depth of each cascade, and (w) the softness of the sun's shadows (0 = the plain filter)
+    cascade_depth: [f32; 4],
     eye: [f32; 4],
     sun_dir: [f32; 4],
     sun_color: [f32; 4],
@@ -156,6 +158,10 @@ struct FrameU {
     /// volumetric light: density, anisotropy, steps, farthest; then colour and intensity
     p21: [f32; 4],
     p22: [f32; 4],
+    /// bounced light: intensity, radius, directions, thickness
+    p23: [f32; 4],
+    /// the share of the new bounced light in what is shown (the rest is the last pictures')
+    p24: [f32; 4],
     probes: [[f32; 4]; 8],
     prev_view_proj: [f32; 16],
     psh: [PointShadowU; 2],
@@ -264,12 +270,15 @@ struct Targets {
     hdr_ms: Option<wgpu::TextureView>,
     depth: wgpu::TextureView,
     pre_depth: Option<wgpu::TextureView>,
-    ao: Option<wgpu::TextureView>,
+    /// The bounced light and the occlusion, twice: one is made while the other, the last picture's, is the history it is blended with.
+    ao: Option<[wgpu::TextureView; 2]>,
     ao_raw: Option<wgpu::TextureView>,
+    gi_raw: Option<wgpu::TextureView>,
     bloom: Option<Bloom>,
     bg_resolve: wgpu::BindGroup,
     bg_ssao: Option<wgpu::BindGroup>,
-    bg_blur: Option<wgpu::BindGroup>,
+    bg_gi: Option<wgpu::BindGroup>,
+    bg_blur: Option<[wgpu::BindGroup; 2]>,
 }
 
 /// What a reflection probe was captured of: where it stood and how big its box was (when either changes it is captured again).
@@ -384,6 +393,9 @@ pub struct GpuRenderer {
     /// The view-projection of the previous picture, for motion blur.
     prev_vp: Option<[f32; 16]>,
     fx_frame: u32,
+    /// Which of the two `ao` textures the last picture with bounced light made, and how many pictures the bounce has been blended over.
+    gi_flip: usize,
+    gi_age: u32,
     out_image: Option<(u32, u32, wgpu::Texture)>,
     readback: Option<(u64, wgpu::Buffer)>,
     id_targets: Option<IdTargets>,
@@ -496,8 +508,8 @@ impl GpuRenderer {
             t.create_view(&wgpu::TextureViewDescriptor::default())
         };
         let ao_white = {
-            let t = make_tex("ao-white", 1, 1, 1, wgpu::TextureFormat::R8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
-            gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(1), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
+            let t = make_tex("ao-white", 1, 1, 1, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
+            gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[0, 0, 0, 255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
             t.create_view(&wgpu::TextureViewDescriptor::default())
         };
         let probe_dummy = make_tex("probe-dummy", 1, 1, 1, HDR, wgpu::TextureUsages::TEXTURE_BINDING).create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
@@ -572,6 +584,8 @@ impl GpuRenderer {
             probe_dummy,
             prev_vp: None,
             fx_frame: 0,
+            gi_flip: 0,
+            gi_age: 0,
             out_image: None,
             readback: None,
             id_targets: None,
@@ -1052,6 +1066,7 @@ impl GpuRenderer {
             return;
         }
         self.targets = None;
+        self.gi_age = 0;
         let rt = wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING;
         let view = |t: &wgpu::Texture| t.create_view(&wgpu::TextureViewDescriptor::default());
         let high = mode == Mode::High;
@@ -1061,14 +1076,17 @@ impl GpuRenderer {
         let hdr_ms = if samples > 1 { Some(view(&self.texture("hdr-ms", w, h, 1, 1, samples, HDR, rt))) } else { None };
         let depth = view(&self.texture("depth", w, h, 1, 1, samples, DEPTH, wgpu::TextureUsages::RENDER_ATTACHMENT));
         let bg_resolve = self.group("resolve", &self.layouts.resolve, &[wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&hdr) }]);
-        let mut t = Targets { w, h, mode, msaa, hdr, hdr_ms, depth, pre_depth: None, ao: None, ao_raw: None, bloom: None, bg_resolve, bg_ssao: None, bg_blur: None };
+        let mut t = Targets { w, h, mode, msaa, hdr, hdr_ms, depth, pre_depth: None, ao: None, ao_raw: None, gi_raw: None, bloom: None, bg_resolve, bg_ssao: None, bg_gi: None, bg_blur: None };
         if high {
             let pre = view(&self.texture("pre-depth", w, h, 1, 1, 1, DEPTH, rt));
             let ao_raw = view(&self.texture("ao-raw", w, h, 1, 1, 1, AO_RAW, rt));
-            let ao = view(&self.texture("ao", w, h, 1, 1, 1, AO, rt));
+            let ao = [view(&self.texture("ao", w, h, 1, 1, 1, AO, rt)), view(&self.texture("ao-history", w, h, 1, 1, 1, AO, rt))];
+            let gi_raw = view(&self.texture("gi-raw", w, h, 1, 1, 1, GI_RAW, rt));
             let frame = self.frame_buf.as_entire_binding();
             t.bg_ssao = Some(self.group("ssao", &self.layouts.ssao, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&pre) }]));
-            t.bg_blur = Some(self.group("ssao-blur", &self.layouts.blur, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(&ao_raw) }]));
+            t.bg_gi = Some(self.group("gi", &self.layouts.gi0, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&pre) }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&t.hdr) }]));
+            let blur_bg = |hist: &wgpu::TextureView| self.group("ssao-blur", &self.layouts.blur, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&pre) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }, wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(&ao_raw) }, wgpu::BindGroupEntry { binding: 14, resource: wgpu::BindingResource::TextureView(&gi_raw) }, wgpu::BindGroupEntry { binding: 15, resource: wgpu::BindingResource::TextureView(hist) }]);
+            t.bg_blur = Some([blur_bg(&ao[1]), blur_bg(&ao[0])]);
             // bloom: half size, a chain of single-mip views
             let (bw, bh) = ((w / 2).max(1), (h / 2).max(1));
             let levels = ((bw.min(bh) as f32).log2().floor() as usize).clamp(1, 6);
@@ -1081,6 +1099,7 @@ impl GpuRenderer {
             t.bloom = Some(Bloom { levels, first, down, up, views });
             t.pre_depth = Some(pre);
             t.ao_raw = Some(ao_raw);
+            t.gi_raw = Some(gi_raw);
             t.ao = Some(ao);
         }
         self.targets = Some(t);
@@ -1473,7 +1492,22 @@ impl GpuRenderer {
         // the lens flare looks at the depth where the sun is, to see whether something covers it
         let flare_on = high && q.dof && have_meshes && sun.is_some() && env.lens_flare.is_some();
         let vol_on = high && env.volumetrics[0] > 0.0 && have_meshes;
-        let need_depth = ssao_on || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
+        let gi_on = high && q.ssao && env.gi[0] > 0.0 && have_meshes && !probe_out;
+        let ao_pass = ssao_on || gi_on;
+        // the two ao textures take turns; the bounce is blended with the last pictures' (the first picture after the targets were made is all new)
+        let gi_alpha = if gi_on { (1.0 / (self.gi_age as f32 + 1.0)).max(0.12) } else { 1.0 };
+        // the first picture of a run has no last picture to read the light from (what the targets hold is from some other run): it reads black
+        let gi_seen = if self.gi_age == 0 { 0.0 } else { 1.0 };
+        if ao_pass {
+            self.gi_flip ^= 1;
+        }
+        if gi_on {
+            self.gi_age = (self.gi_age + 1).min(1000);
+        } else {
+            self.gi_age = 0;
+        }
+        let gi_idx = self.gi_flip;
+        let need_depth = ao_pass || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
         let bloom_on = high && q.bloom && env.bloom > 0.0;
         // eye adaptation needs something to measure: a flat 2D scene keeps its authored colours
         let ae_on = high && have_meshes && env.auto_exposure.is_some() && !probe_out;
@@ -1501,6 +1535,7 @@ impl GpuRenderer {
             }
             fu.cascade_info = [c[0].far, c[1].far, c[2].far, q.shadow_size.clamp(256, 8192) as f32];
             fu.cascade_texel = [c[0].texel, c[1].texel, c[2].texel, 0.0];
+            fu.cascade_depth = [c[0].depth, c[1].depth, c[2].depth, env.shadow_soft];
         }
         self.gpu.queue.write_buffer(&self.pass_bufs[0], 0, bytes_of_floats(&vp.0));
         let psize = q.point_shadow_size.clamp(128, 4096);
@@ -1550,6 +1585,8 @@ impl GpuRenderer {
         fu.p20 = if high { [env.lens[4], env.lens[5], 0.0, 0.0] } else { [1.0, 0.0, 0.0, 0.0] };
         fu.p21 = if vol_on { [env.volumetrics[0], env.volumetrics[1], env.volumetrics[2], env.volumetrics[3]] } else { [0.0, 0.6, 24.0, 120.0] };
         fu.p22 = if vol_on { [env.volumetrics[4], env.volumetrics[5], env.volumetrics[6], env.volumetrics[7]] } else { [1.0, 1.0, 1.0, 0.0] };
+        fu.p23 = if gi_on { env.gi } else { [0.0, 6.0, 10.0, 0.6] };
+        fu.p24 = [gi_alpha, gi_seen, 0.0, 0.0];
         fu.p7 = [if shafts_on { env.shafts } else { 0.0 }, if high { env.grain } else { 0.0 }, if high { env.contrast } else { 1.0 }, if blur_on { env.motion_blur } else { 0.0 }];
         fu.p8 = [if high { env.tint[0] } else { 1.0 }, if high { env.tint[1] } else { 1.0 }, if high { env.tint[2] } else { 1.0 }, (self.fx_frame % 4096) as f32];
         // colour grading and the fade (the high qualities only; the identity otherwise)
@@ -1682,9 +1719,12 @@ impl GpuRenderer {
                 self.need(PipeId::SsrGbuf, 1, None)?;
                 self.need(PipeId::Ssr, 1, None)?;
             }
-            if ssao_on {
+            if ao_pass {
                 self.need(PipeId::Ssao, 1, None)?;
                 self.need(PipeId::SsaoBlur, 1, None)?;
+            }
+            if gi_on {
+                self.need(PipeId::Gi, 1, None)?;
             }
             if bloom_on {
                 self.need(PipeId::BloomFirst, 1, None)?;
@@ -1702,8 +1742,8 @@ impl GpuRenderer {
         }
 
         // ---- bind groups that depend on this frame's buffers
-        let ao_view = match (&self.targets, ssao_on) {
-            (Some(t), true) => t.ao.as_ref().unwrap_or(&self.ao_white),
+        let ao_view = match (&self.targets, ao_pass) {
+            (Some(t), true) => t.ao.as_ref().map(|a| &a[gi_idx]).unwrap_or(&self.ao_white),
             _ => &self.ao_white,
         };
         let shadow_view = match (&self.shadow, shadows_on) {
@@ -1851,11 +1891,24 @@ impl GpuRenderer {
             draw_batches(&mut pass, &mesh_batches, false, true);
             draw_batches(&mut pass, &clear_batches, false, true);
         }
-        if ssao_on {
+        if ao_pass {
             let pre = t.pre_depth.as_ref().expect("high targets");
             let _ = pre;
             fullscreen(&mut enc, "ssao", t.ao_raw.as_ref().expect("high targets"), wgpu::LoadOp::Clear(wgpu::Color::WHITE), self.pipe(PipeId::Ssao, 1, None), t.bg_ssao.as_ref().expect("high targets"));
-            fullscreen(&mut enc, "ssao-blur", t.ao.as_ref().expect("high targets"), wgpu::LoadOp::Clear(wgpu::Color::WHITE), self.pipe(PipeId::SsaoBlur, 1, None), t.bg_blur.as_ref().expect("high targets"));
+            if gi_on {
+                fullscreen(&mut enc, "gi", t.gi_raw.as_ref().expect("high targets"), wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Gi, 1, None), t.bg_gi.as_ref().expect("high targets"));
+            } else {
+                // no bounce: the blur reads black
+                let _clear = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("gi-clear"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: t.gi_raw.as_ref().expect("high targets"), depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store } })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+            }
+            fullscreen(&mut enc, "ssao-blur", &t.ao.as_ref().expect("high targets")[gi_idx], wgpu::LoadOp::Clear(wgpu::Color::WHITE), self.pipe(PipeId::SsaoBlur, 1, None), &t.bg_blur.as_ref().expect("high targets")[gi_idx]);
         }
 
         // the main pass: sky or flat colour, meshes, then sprites and tile maps far to near, then (classic) the text
@@ -2279,6 +2332,15 @@ impl GpuRenderer {
         }
         let (w, h) = (opts.width, opts.height);
         let adapt = self.adapt_dt;
+        // bounced light is read from the last picture and blended over the last ones: a still lets it settle (seven pictures, a running average)
+        if quality.mode == Mode::High && quality.ssao && scene.env.gi[0] > 0.0 {
+            // the same pictures in the same order every time: a still made twice is the same picture
+            self.gi_age = 0;
+            self.fx_frame = 0;
+            for _ in 0..7 {
+                self.draw(&scene, w, h, Out::Image, quality, false, adapt)?;
+            }
+        }
         self.draw(&scene, w, h, Out::Image, quality, want_ids, adapt)?;
         let bpr = (w * 4).div_ceil(256) * 256;
         let buf = &self.readback.as_ref().expect("the picture was copied").1;

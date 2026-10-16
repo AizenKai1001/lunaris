@@ -32,6 +32,8 @@ struct Frame {
     cascade_info: vec4<f32>,
     // world size of one shadow texel for each cascade
     cascade_texel: vec4<f32>,
+    // metres of light-space depth of each cascade, and (w) the softness of the sun's shadows
+    cascade_depth: vec4<f32>,
     // xyz: camera position; w: near plane
     eye: vec4<f32>,
     // xyz: unit vector towards the sun
@@ -85,6 +87,10 @@ struct Frame {
     // volumetric light: density, anisotropy, steps, farthest; then colour and intensity
     p21: vec4<f32>,
     p22: vec4<f32>,
+    // bounced light: intensity, radius, directions, thickness
+    p23: vec4<f32>,
+    // the share of the new bounced light in what is shown
+    p24: vec4<f32>,
     // each probe: its centre (xyz), then half the size of its box (xyz)
     probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)

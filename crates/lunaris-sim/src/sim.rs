@@ -868,6 +868,8 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::Lens>().expect("standard component");
     world.register_native::<crate::components::GrassField>().expect("standard component");
     world.register_native::<crate::components::Volumetrics>().expect("standard component");
+    world.register_native::<crate::components::GlobalIllumination>().expect("standard component");
+    world.register_native::<crate::components::Shadows>().expect("standard component");
 }
 
 impl RecordedRead {

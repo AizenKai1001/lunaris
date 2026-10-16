@@ -2012,3 +2012,29 @@ component! {
         pub max_distance: f32 = 120.0,
     }
 }
+
+component! {
+    /// Light that bounces (the GPU renderer's high qualities; the first `GlobalIllumination` counts; the reference picture and classic mode ignore it): a lit wall lights the floor in its own colour, a bright lamp lights the room
+    /// it hangs in, a shaded corner is not black. It is worked out on the screen from what the last picture showed: for every pixel, `directions` rays (cosine-weighted about the surface) are marched through the picture's depth
+    /// for up to `radius` metres, and where one meets a surface the light that surface sent out last time comes back along it. Every picture's bounce is in the next one's, so the second bounce comes by itself and the
+    /// light settles in a few pictures (a still picture made by `render` is drawn three times to let it settle). `intensity` scales the bounce (1 = as bright as the surfaces it comes from, which are never brighter than 8 times
+    /// white), `thickness` is how far behind a surface's face a ray still counts as touching it. It only knows what is on the screen: a lit wall behind you does not light the floor in front of you, and what the picture
+    /// does not show is lit by the sky and the probes as before.
+    pub struct GlobalIllumination {
+        pub intensity: f32 = 1.0,
+        pub radius: f32 = 6.0,
+        pub directions: f32 = 10.0,
+        pub thickness: f32 = 0.6,
+        pub enabled: bool = true,
+    }
+}
+
+component! {
+    /// How the sun's shadows are drawn (the GPU renderer's high qualities; the first `Shadows` counts; the reference picture and classic mode ignore it): `softness` is the sun's apparent size as a share of the distance
+    /// (tan of its angular diameter: 0.0093 is the real sun, 0.03 a look that shows well), and it is what makes a shadow sharp where it starts and softer the further it falls from what casts it (contact-hardening
+    /// shadows: a search for the casters finds how far away they are, and the filter is as wide as the penumbra there). 0 keeps the plain filter. A new component; a world without it keeps the plain filter.
+    pub struct Shadows {
+        pub softness: f32 = 0.03,
+        pub enabled: bool = true,
+    }
+}
