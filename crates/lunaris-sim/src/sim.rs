@@ -423,6 +423,7 @@ impl Sim {
         let dt = self.dt * self.world.resource("time.scale").filter(|s| s.is_finite()).unwrap_or(1.0).clamp(0.0, 8.0) as f32;
         // bodies that float are pushed up by the water before the physics step moves them (a world without a `Buoyant` pays for one query)
         stage!("buoyancy", crate::water::Water::buoyancy(&mut self.world, &self.heightfields, dt));
+        stage!("floaters", crate::floaters::step(&mut self.world, &self.heightfields, dt, &mut self.scripts.events));
         let mut ctx = SimCtx { tick: self.tick, threads: self.threads, gravity: [0.0, -9.8, 0.0], contacts: Vec::new(), dt, seed: self.seed, rng: self.rng.clone(), terrains: self.heightfields.clone(), meshes: self.meshes.clone() };
         for s in &self.systems {
             match prof.as_mut() {
@@ -855,6 +856,8 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::WaterBody>().expect("standard component");
     world.register_native::<crate::components::InWater>().expect("standard component");
     world.register_native::<crate::components::Buoyant>().expect("standard component");
+    world.register_native::<crate::components::Floater>().expect("standard component");
+    world.register_native::<crate::components::WaterFlow>().expect("standard component");
     world.register_native::<crate::components::AutoExposure>().expect("standard component");
     world.register_native::<crate::components::Ssr>().expect("standard component");
     world.register_native::<crate::components::LensFlare>().expect("standard component");

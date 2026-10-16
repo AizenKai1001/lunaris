@@ -889,3 +889,19 @@ fn deep_water_shows_the_bottom_where_it_is_shallow_and_hides_it_where_it_is_deep
     let (a, b) = (draw_owned(&mut gpu, &scene(""), &Quality::classic(), 240, 135), draw_owned(&mut gpu, &scene(r#"{"clarity":2.5}"#), &Quality::classic(), 240, 135));
     assert_eq!(a.rgba, b.rgba);
 }
+
+#[test]
+fn ambient_occlusion_leaves_open_ground_alone_and_darkens_a_crease_gradually() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let env = |ssao: f32| format!(r#"{{"uid":9,"components":{{"Environment":{{"sky":true,"clouds":0,"ssao":{ssao},"bloom":0,"shadows":false,"vignette":0}}}}}}"#);
+    let wall = r#"{"uid":4,"components":{"Transform":{"pos":[0,2,-3],"scale":[30,4,0.5]},"MeshRenderer":{"mesh":"cube","color":[0.8,0.8,0.8,1]}}}"#;
+    let on = draw(&mut gpu, &[CAMERA_3D, FLOOR, wall, &env(1.0)], &Quality::high(), 480, 270);
+    let off = draw(&mut gpu, &[CAMERA_3D, FLOOR, wall, &env(0.0)], &Quality::high(), 480, 270);
+    // the open floor near the camera (bottom of the picture, middle): the same with and without
+    let near_on: f32 = (200..280).map(|x| lum(px(&on, x, 255))).sum::<f32>() / 80.0;
+    let near_off: f32 = (200..280).map(|x| lum(px(&off, x, 255))).sum::<f32>() / 80.0;
+    assert!((near_on - near_off).abs() < near_off * 0.06, "open floor changed: {near_off} -> {near_on}");
+    // somewhere along a column through the foot of the wall the floor is clearly darker with the occlusion than without
+    let dip = (40..230).map(|y| lum(px(&off, 240, y)) - lum(px(&on, 240, y))).fold(0.0f32, f32::max);
+    assert!(dip > 6.0, "the floor under the wall is only {dip} darker");
+}

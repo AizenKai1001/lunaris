@@ -2,7 +2,7 @@
 //! and a floating body needs what floating needs.
 use super::Problems;
 use lunaris_ecs::Result;
-use lunaris_sim::components::{Buoyant, Collider, RigidBody, Transform, Velocity, WaterBody};
+use lunaris_sim::components::{AngularVelocity, Buoyant, Collider, Floater, RigidBody, Transform, Velocity, Water, WaterBody};
 use lunaris_sim::Sim;
 
 /// The most samples `check` looks at to find out whether a picture has any water (a map of 64 million samples is looked at every few rows and columns).
@@ -52,6 +52,28 @@ pub(super) fn run(sim: &mut Sim, problems: &mut Problems) -> Result<()> {
         }
         if bodies.is_empty() {
             problems.add("warning", Some(*uid), "a Buoyant body floats on a WaterBody and there is none in the world".into(), "add an entity with Transform and WaterBody");
+        }
+    }
+    // bodies that ride the waves (`Floater`)
+    let mut riders: Vec<(u64, Floater)> = Vec::new();
+    sim.world.for_each_uid::<(&Floater,), _>(|_, uid, (f,)| riders.push((uid, *f)))?;
+    riders.sort_by_key(|f| f.0);
+    if !riders.is_empty() {
+        let mut sheets = 0usize;
+        sim.world.for_each::<(&Water,), _>(|_, _| sheets += 1)?;
+        for (uid, f) in &riders {
+            let Some(e) = sim.world.entity(*uid) else { continue };
+            if !(sim.world.get::<Collider>(e).is_some() && sim.world.get::<RigidBody>(e).is_some_and(|r| r.mass > 0.0) && sim.world.get::<Velocity>(e).is_some() && sim.world.get::<Transform>(e).is_some()) {
+                problems.add("warning", Some(*uid), "a Floater needs a Collider, a RigidBody (mass above 0), a Velocity and a Transform, so this one does not float".into(), "give it what a falling ball has, then Floater {density}");
+            } else if sim.world.get::<AngularVelocity>(e).is_none() && f.columns > 1 {
+                problems.add("info", Some(*uid), "a Floater without an AngularVelocity lifts but never tips: it will not roll with the waves or right itself".into(), "add AngularVelocity {} beside it for a boat, a raft or a log");
+            }
+            if !(f.density.is_finite() && f.density > 0.0) {
+                problems.add("warning", Some(*uid), format!("Floater.density {} is not above 0 (it counts as 1)", f.density), "kilograms per cubic metre: 500 wood, 920 ice, 1000 neutral, 2500 stone");
+            }
+            if bodies.is_empty() && sheets == 0 {
+                problems.add("warning", Some(*uid), "a Floater floats on a Water sheet or a WaterBody and there is none in the world".into(), "add an entity with Transform and Water");
+            }
         }
     }
     Ok(())

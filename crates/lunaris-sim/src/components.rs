@@ -1762,6 +1762,33 @@ component! {
     }
 }
 
+component! {
+    /// A body that rides the water properly (docs/TERRAIN.md, "Floaters and waves"; beside a `Collider`, a `RigidBody` and a `Velocity`, and an `AngularVelocity` if it should tip): a boat, a raft, a log, a crate, a ball.
+    /// Where `Buoyant` pushes a body up from its middle on a flat surface, a `Floater` is lifted by `columns` x `columns` columns of its own volume, each by the water at its own place: it **rolls and pitches with the
+    /// waves** of a `Water` sheet or a `WaterBody` (the same ripples that are drawn, `waves` 0 to 1 says how much they count), **rights itself** when it is tipped (the lift of the low side is bigger), is **carried by a
+    /// `WaterFlow`** (`current` 0 to 1) and slowed by the water it moves through (`drag`, `angular_drag`: per second at full depth). `density` is in kilograms per cubic metre (500 wood, 920 ice, 1000 neutral, 2500 stone).
+    /// The engine writes `submerged` (0 to 1, the share of the body under the surface) and `splash` (the speed in metres per second at which the body hit the water on this tick, otherwise 0) every tick, and the event
+    /// `splash` (on the body, at the point on the surface above it) when that is faster than 1 m/s. A body is looked at only when it is near the water: a thousand crates in a desert cost a rectangle test each.
+    pub struct Floater {
+        pub density: f32 = 500.0,
+        pub columns: u32 = 3,
+        pub drag: f32 = 1.2,
+        pub angular_drag: f32 = 3.0,
+        pub waves: f32 = 1.0,
+        pub current: f32 = 1.0,
+        pub submerged: f32 = 0.0,
+        pub splash: f32 = 0.0,
+    }
+}
+
+component! {
+    /// A current in the water of this entity (beside a `Water` sheet or a `WaterBody`): the water moves at `velocity` (metres per second in x and z). `Floater` bodies on it are carried along (and a body held still feels
+    /// the push as drag); nothing else is moved by it. A river that follows a heightmap flows one way over all of it: put one `WaterFlow` on each stretch you want to run its own way.
+    pub struct WaterFlow {
+        pub velocity: [f32; 2] = [0.0, 0.0],
+    }
+}
+
 // ------------------------------------------------------------------------------------------------ lighting effects of the GPU renderer
 // Eye adaptation, screen-space reflections, lens flare and reflection probes (docs/GPU.md). Each is its own component beside the `Environment`, never a field of an
 // existing one, and only the GPU renderer's high qualities draw them (the reference renderer and `classic` ignore them). Kept together at the end of the file.

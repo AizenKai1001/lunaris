@@ -169,6 +169,29 @@ at the surface, a cube of 250 with a quarter of it under. `Buoyant.submerged` (0
 * Limits: one surface level per place (the highest of overlapping bodies wins), no currents (a river is drawn flowing nowhere: push things along with your own system), and the waves do not move a floating body.
 * The example above has a lake at 4 m and a river 110 m long whose surface falls from 17 m to the lake's level; its `wade` graph system (`"each": ["CharacterBody", "InWater"]`) slows the hero by the depth of the water, and its playtest follows `InWater` appearing as the hero wades in and going as it climbs out.
 
+## Floaters and waves: boats, rafts, logs, crates
+
+`Buoyant` lifts a body from its middle on the flat surface of a picture. **`Floater`** is the water physics for things that should *ride* the water: a body beside a `Collider` (sphere, box or capsule), a `RigidBody` and a `Velocity` (and an `AngularVelocity`, so it can tip) on a `Water` sheet or a `WaterBody`.
+
+```
+{"Transform": {"pos": [0, 1, 0]}, "Velocity": {}, "AngularVelocity": {},
+ "Collider": {"shape": 1, "size": [3, 0.4, 1.2]}, "RigidBody": {"mass": 40},
+ "Floater": {"density": 500, "columns": 3}}
+```
+
+What it does, every tick, before the physics step:
+
+* **Waves move it.** The body is cut into `columns` x `columns` upright columns of its own volume (1 to 6; 3 by default, a ball is one). Each is lifted by the share of it under the surface *at its own place*, with the waves of the water (the same four ripples the GPU renderer draws: `wave_height`, `wave_length`, `speed` and the engine's `phase`; `Floater.waves` from 0 to 1 says how much they count). The lifts' sum is the buoyancy; their moments about the body's middle roll a plank with a swell and pitch a boat over a crest.
+* **It rights itself.** A tipped body has more of its low side under, so the lift of that side is larger and turns it back; `angular_drag` (per second at full depth) damps the rocking. A wide plank is stable, a tall narrow box tips over and floats on its side, as in the real world.
+* **Currents.** Put a **`WaterFlow {velocity: [x, z]}`** on the water's entity (metres per second): bodies on it are carried at that speed, and `Floater.current` (0 to 1) says how much. A body held still feels the push as drag.
+* **Drag.** The water slows a body (in proportion to how much of it is under) by `drag` per second, plus a part that grows with its speed through the water, so something that dives in fast stops without a bounce.
+* **Splash.** `Floater.splash` is the speed (m/s) at which the body hit the water on this tick (0 on every other tick), and the event `splash` (`on_event`, with the point on the surface above the body) is made when that is faster than 1 m/s: particles, a sound. `Floater.submerged` is the share (0 to 1) of the body under the surface: foam, wet-looking materials, engine sounds.
+* A body is lifted by gravity times `1000 / density`, with the body's `gravity_scale`; a density of 500 floats half under, 250 a quarter, 1000 awash, above 1000 sinks slowly.
+
+**Cost.** A world without a `Floater` pays for one empty query. With some, the water surfaces are prepared once a tick; a body outside every surface's rectangle or above its highest wave is dropped after a few comparisons and writes nothing; one deep under a flat surface takes one comparison; only bodies at the surface sample their columns (one lookup and, with waves, four cheap sines each; the sine is a polynomial, so every machine finds the same bits). On a Linux test machine: 2000 crates away from the water 0.04 ms a tick, 2000 planks of 9 columns in a rough sea about 1 ms a tick (`cargo test --release -p lunaris-sim floaters_cost -- --ignored --nocapture`). Nothing is allocated per body, and the result is deterministic.
+
+`check` finds a `Floater` that lacks a `Collider`, `RigidBody`, `Velocity` or `Transform`, one without an `AngularVelocity` (it lifts but never tips), a density of 0 or less, and a world with no water for it. Limits: a body is lifted by the highest water under each column (overlapping waters do not add up); the wave motion lifts and tilts bodies but does not carry them round (no orbital drift); characters swim in `WaterBody`s only (`InWater`), not in `Water` sheets.
+
 ## Making a heightmap without a terrain program
 
 ```

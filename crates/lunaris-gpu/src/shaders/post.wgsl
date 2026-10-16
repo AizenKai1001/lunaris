@@ -67,9 +67,24 @@ fn depth_at(px: vec2<i32>) -> f32 {
     return textureLoad(depth_tex, clamp(px, vec2<i32>(0), size - vec2<i32>(1)), 0);
 }
 
-const AO_SAMPLES: i32 = 16;
+const AO_SLICES: i32 = 3;
+const AO_STEPS: i32 = 8;
 
-// Output: r = occlusion (1 = open), g = distance from the camera (for the depth-aware blur).
+// The world point under a (fractional) pixel at a given depth.
+fn unproject(pixf: vec2<f32>, d: f32) -> vec3<f32> {
+    let uv = pixf * frame.p1.zw;
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let w = frame.inv_view_proj * vec4<f32>(ndc, d, 1.0);
+    return w.xyz / w.w;
+}
+
+fn fast_acos(x: f32) -> f32 {
+    return acos(clamp(x, -1.0, 1.0));
+}
+
+// Ground-truth ambient occlusion (horizon based): for a few slices through the point, each along a direction on the screen, find the highest horizon the depth of the picture makes on either side
+// and add up how much of the cosine-weighted half circle of the surface lies above both. Flat ground sees all of its half circle, so it stays unshaded; a crease or a wall's foot loses the part below the horizon.
+// Output: r = visibility (1 = open), g = distance from the camera (for the depth-aware blur).
 @fragment
 fn fs_ssao(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.pos.xy);
@@ -78,66 +93,73 @@ fn fs_ssao(in: FullOut) -> @location(0) vec4<f32> {
         return vec4<f32>(1.0, 1.0e6, 0.0, 1.0); // the sky
     }
     let p = world_at(px);
-    // the surface normal from the neighbours, taking the side with the smaller depth jump on each axis
-    let pl = world_at(px + vec2<i32>(-1, 0));
-    let pr = world_at(px + vec2<i32>(1, 0));
-    let pu = world_at(px + vec2<i32>(0, -1));
-    let pd = world_at(px + vec2<i32>(0, 1));
-    var dx = pr - p;
-    if (abs(depth_at(px + vec2<i32>(-1, 0)) - d0) < abs(depth_at(px + vec2<i32>(1, 0)) - d0)) {
-        dx = p - pl;
-    }
-    var dy = pd - p;
-    if (abs(depth_at(px + vec2<i32>(0, -1)) - d0) < abs(depth_at(px + vec2<i32>(0, 1)) - d0)) {
-        dy = p - pu;
-    }
-    var n = normalize(cross(dx, dy));
+    let n = surface_normal(px, p, d0);
     let to_eye = frame.eye.xyz - p;
-    if (dot(n, to_eye) < 0.0) {
-        n = -n;
-    }
     let dist = length(to_eye);
-    let radius = clamp(0.45 + dist * 0.02, 0.45, 3.0);
-    let bias = 0.02 + dist * 0.002;
-    let helper = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.y) > 0.95);
-    let t = normalize(cross(helper, n));
-    let b = cross(n, t);
-    let rnd = interleaved_noise(in.pos.xy);
-    var occ = 0.0;
-    let size = frame.p1.xy;
-    for (var i = 0; i < AO_SAMPLES; i = i + 1) {
-        let fi = f32(i);
-        let u = (fi + 0.5) / f32(AO_SAMPLES);
-        let ang = (fi + rnd) * 2.399963;
-        let r = sqrt(u);
-        let local = vec3<f32>(r * cos(ang), r * sin(ang), sqrt(max(1.0 - u, 0.0)));
-        let s = mix(0.12, 1.0, u * u);
-        let sp = p + (t * local.x + b * local.y + n * local.z) * (radius * s);
-        let clip = frame.view_proj * vec4<f32>(sp, 1.0);
-        if (clip.w <= 0.0) {
-            continue;
+    let v = to_eye / dist;
+    let radius = clamp(0.5 + dist * 0.025, 0.5, 4.0);
+    let pixc = vec2<f32>(px) + vec2<f32>(0.5);
+    // how many pixels the radius covers here
+    let wpp = max(length(unproject(pixc + vec2<f32>(1.0, 0.0), d0) - p), 1.0e-5);
+    let radius_px = clamp(radius / wpp, 4.0, 220.0);
+    let falloff_range = 0.4 * radius;
+    let falloff_from = radius - falloff_range;
+    let fmul = -1.0 / falloff_range;
+    let fadd = falloff_from / falloff_range + 1.0;
+    let h = pcg3(vec3<u32>(vec3<i32>(px.x, px.y, i32(frame.p8.w * 997.0))));
+    let noise_dir = f32(h.x & 0xffffu) / 65535.0;
+    let noise_step = f32(h.y & 0xffffu) / 65535.0;
+    let size = vec2<i32>(frame.p1.xy);
+    var visibility = 0.0;
+    for (var s = 0; s < AO_SLICES; s = s + 1) {
+        let phi = (f32(s) + noise_dir) / f32(AO_SLICES) * PI;
+        let dir = vec2<f32>(cos(phi), sin(phi)); // in pixels: x right, y down
+        let dir_w = unproject(pixc + dir * 2.0, d0) - p;
+        let ortho = normalize(dir_w - v * dot(dir_w, v));
+        let axis = cross(ortho, v);
+        let proj_n = n - axis * dot(n, axis);
+        let proj_len = max(length(proj_n), 1.0e-4);
+        let cos_n = clamp(dot(proj_n, v) / proj_len, -1.0, 1.0);
+        let ang_n = select(-1.0, 1.0, dot(ortho, proj_n) >= 0.0) * fast_acos(cos_n);
+        let low0 = cos(ang_n + 0.5 * PI);
+        let low1 = cos(ang_n - 0.5 * PI);
+        var hc0 = low0;
+        var hc1 = low1;
+        for (var k = 0; k < AO_STEPS; k = k + 1) {
+            let t = (f32(k) + noise_step) / f32(AO_STEPS);
+            let off = max(t * t * radius_px, 1.5 + f32(k));
+            let o = dir * off;
+            let q0 = vec2<i32>(floor(pixc + o));
+            let q1 = vec2<i32>(floor(pixc - o));
+            if (q0.x >= 0 && q0.y >= 0 && q0.x < size.x && q0.y < size.y) {
+                let sd = depth_at(q0);
+                if (sd > 0.0) {
+                    let dv = world_at(q0) - p;
+                    let dl = max(length(dv), 1.0e-4);
+                    let shc = dot(dv / dl, v);
+                    hc0 = max(hc0, mix(low0, shc, clamp(dl * fmul + fadd, 0.0, 1.0)));
+                }
+            }
+            if (q1.x >= 0 && q1.y >= 0 && q1.x < size.x && q1.y < size.y) {
+                let sd = depth_at(q1);
+                if (sd > 0.0) {
+                    let dv = world_at(q1) - p;
+                    let dl = max(length(dv), 1.0e-4);
+                    let shc = dot(dv / dl, v);
+                    hc1 = max(hc1, mix(low1, shc, clamp(dl * fmul + fadd, 0.0, 1.0)));
+                }
+            }
         }
-        let ndc = clip.xy / clip.w;
-        let suv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
-        if (suv.x < 0.0 || suv.x >= 1.0 || suv.y < 0.0 || suv.y >= 1.0) {
-            continue;
-        }
-        let spx = vec2<i32>(suv * size);
-        let scene_pos = world_at(spx);
-        let sd = depth_at(spx);
-        if (sd <= 0.0) {
-            continue;
-        }
-        let scene_dist = length(scene_pos - frame.eye.xyz);
-        let sample_dist = length(sp - frame.eye.xyz);
-        let diff = sample_dist - scene_dist;
-        if (diff > bias) {
-            // ignore occluders that are far in front of the point (they are a different object)
-            let range = smoothstep(0.0, 1.0, radius / max(abs(dist - scene_dist), 1.0e-4));
-            occ = occ + range;
-        }
+        var h0 = -fast_acos(hc1);
+        var h1 = fast_acos(hc0);
+        h0 = ang_n + clamp(h0 - ang_n, -0.5 * PI, 0.5 * PI);
+        h1 = ang_n + clamp(h1 - ang_n, -0.5 * PI, 0.5 * PI);
+        let iarc0 = (cos_n + 2.0 * h0 * sin(ang_n) - cos(2.0 * h0 - ang_n)) * 0.25;
+        let iarc1 = (cos_n + 2.0 * h1 * sin(ang_n) - cos(2.0 * h1 - ang_n)) * 0.25;
+        visibility = visibility + proj_len * (iarc0 + iarc1);
     }
-    let ao = clamp(1.0 - (occ / f32(AO_SAMPLES)) * 1.7 * frame.p0.z, 0.0, 1.0);
+    visibility = clamp(visibility / f32(AO_SLICES), 0.0, 1.0);
+    let ao = clamp(1.0 - (1.0 - visibility) * 1.5 * frame.p0.z, 0.0, 1.0);
     return vec4<f32>(ao, dist, 0.0, 1.0);
 }
 
