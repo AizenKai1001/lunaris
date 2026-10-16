@@ -12,6 +12,8 @@
 // the faces of the reflection probes (see sky.wgsl) and how to sample them
 @group(0) @binding(7) var probe_tex: texture_2d_array<f32>;
 @group(0) @binding(8) var probe_samp: sampler;
+// the depth of the opaque things of this picture (the depth prepass), for water to see how deep it is
+@group(0) @binding(9) var opaque_depth: texture_depth_2d;
 
 @group(1) @binding(0) var tex: texture_2d<f32>;
 @group(1) @binding(1) var tex_samp: sampler;
@@ -110,6 +112,7 @@ fn vs_sky(@builtin(vertex_index) i: u32) -> SkyOut {
 
 @fragment
 fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
+    g_pix = in.clip.xy;
     // the view direction of this pixel: unproject a point on the far plane
     let pa = frame.inv_view_proj * vec4<f32>(in.ndc, 1.0, 1.0);
     let pb = frame.inv_view_proj * vec4<f32>(in.ndc, 0.0001, 1.0);
@@ -126,7 +129,6 @@ fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
 // ------------------------------------------------------------------------------------------------ shadows
 
 // sixteen points of a disc of radius 1 (a Poisson-like spread), for filtering the sun's shadows; and the pixel being shaded, for turning the pattern
-var<private> g_pix: vec2<f32> = vec2<f32>(0.0);
 var<private> POISSON16: array<vec2<f32>, 16> = array<vec2<f32>, 16>(
     vec2<f32>(-0.94201624, -0.39906216), vec2<f32>(0.94558609, -0.76890725), vec2<f32>(-0.09418410, -0.92938870), vec2<f32>(0.34495938, 0.29387760),
     vec2<f32>(-0.91588581, 0.45771432), vec2<f32>(-0.81544232, -0.87912464), vec2<f32>(-0.38277543, 0.27676845), vec2<f32>(0.97484398, 0.75648379),
@@ -501,7 +503,41 @@ fn lit_mesh(in: MeshOut) -> Lit {
         let lin = select(t.rgb, t.rgb * t.rgb, classic);
         base = base * (vec3<f32>(1.0) + in.tw * (lin - vec3<f32>(1.0)));
     }
+    if (!classic && o.ids.y == 1u && o.pbr.w > 0.5 && frame.p28.x > 0.5) {
+        return lit_water(in, o, base, n);
+    }
     return lit_tail(in, o, base, n, classic);
+}
+
+// Deep water that knows how deep it is: the distance from this piece of the surface along the view ray to the opaque thing behind it (the prepass' depth) says how much of the bottom shows. The shallows' colour
+// (carried in the spare numbers of the normal matrix) fades to the water's own colour with the depth, the water is the clearer the shallower it is, and foam gathers where the water meets what it touches.
+fn lit_water(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>) -> Lit {
+    let px = vec2<i32>(in.clip.xy);
+    let d = textureLoad(opaque_depth, px, 0);
+    var thick = 1.0e4;
+    if (d > 0.0) {
+        let uv = (vec2<f32>(px) + 0.5) * frame.p1.zw;
+        let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+        let w4 = frame.inv_view_proj * vec4<f32>(ndc, d, 1.0);
+        thick = max(length(w4.xyz / w4.w - frame.eye.xyz) - length(in.world - frame.eye.xyz), 0.0);
+    }
+    let clarity = o.pbr.x;
+    let absorb = 1.0 - exp(-thick / clarity);
+    let shallow = vec3<f32>(o.n0.w, o.n1.w, o.n2.w);
+    var col = mix(shallow, base, absorb);
+    // foam: a band where the water is thin, broken up by a noise that drifts with the waves
+    let drift = o.uvrect.w * 0.25;
+    let nz = 0.5 * value_noise(in.world.xz * 1.3 + vec2<f32>(drift, -drift)) + 0.5 * value_noise(in.world.xz * 3.1 - vec2<f32>(drift * 1.7, drift));
+    let band = 1.0 - smoothstep(0.0, max(o.pbr.y, 0.01), thick);
+    let foam = clamp(band * smoothstep(0.25, 0.75, nz + band * 0.5) * o.pbr.z, 0.0, 1.0);
+    col = mix(col, vec3<f32>(0.85, 0.88, 0.9), foam);
+    var l = lit_tail(in, o, col, n, false);
+    // see-through where it is thin, opaque where it is deep; foam is solid; the sky's glint at grazing angles is lit_tail's
+    let v = normalize(frame.eye.xyz - in.world);
+    let fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
+    let a = clamp(0.06 + absorb * 0.94, 0.0, 1.0);
+    l.alpha = clamp(max(a + (1.0 - a) * fres, foam), 0.0, 1.0);
+    return l;
 }
 
 // The shading every mesh pixel ends with once its colour and normal are known: the classic lighting, or the physically based one with shadows, ambient occlusion, sky and fog.

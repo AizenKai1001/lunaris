@@ -871,6 +871,7 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::GlobalIllumination>().expect("standard component");
     world.register_native::<crate::components::Shadows>().expect("standard component");
     world.register_native::<crate::components::Atmosphere>().expect("standard component");
+    world.register_native::<crate::components::WaterLook>().expect("standard component");
 }
 
 impl RecordedRead {

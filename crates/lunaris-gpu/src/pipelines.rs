@@ -182,7 +182,7 @@ impl Layouts {
     pub fn new(device: &Device) -> Layouts {
         let make = |label: &str, entries: &[BindGroupLayoutEntry]| device.create_bind_group_layout(&BindGroupLayoutDescriptor { label: Some(label), entries });
         Layouts {
-            scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering())]),
+            scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering()), entry(9, tex_depth())]),
             tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float()), entry(3, tex_float()), entry(4, tex_float()), entry(5, tex_float())]),
             tex1_small: make("tex1-small", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float())]),
             grass2: make("grass2", &[entry(12, uniform()), entry(13, tex_unfiltered())]),

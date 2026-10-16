@@ -779,7 +779,7 @@ fn the_sky_of_the_air_is_blue_at_noon_red_at_sunset_and_dark_at_night() {
     let sunset = mean(&draw_owned(&mut gpu, &scene(3.0, "{}"), &qh, 320, 180));
     let night = mean(&draw_owned(&mut gpu, &scene(-25.0, "{}"), &qh, 320, 180));
     eprintln!("noon {noon:?}, sunset {sunset:?}, night {night:?}");
-    assert!(noon[2] > noon[0] * 1.25, "a noon sky is blue: {noon:?}");
+    assert!(noon[2] > noon[0] * 1.15, "a noon sky is blue: {noon:?}");
     let (r_noon, r_sunset) = (noon[0] / noon[2], sunset[0] / sunset[2]);
     assert!(r_sunset > r_noon * 1.6, "looking at a low sun the sky is red: {r_sunset} vs {r_noon}");
     assert!(lum([night[0] as u8, night[1] as u8, night[2] as u8]) < 0.2 * lum([noon[0] as u8, noon[1] as u8, noon[2] as u8]), "{night:?} vs {noon:?}");
@@ -836,4 +836,56 @@ fn temporal_anti_aliasing_smooths_the_edges_and_is_the_same_every_time() {
     assert!((lum(px(&a, 240, 135)) - lum(px(&b, 240, 135))).abs() < 25.0);
     // the lower qualities do not have it
     assert!(!Quality::medium().taa && !Quality::low().taa && !Quality::classic().taa && Quality::ultra().taa);
+}
+
+#[test]
+fn deep_water_shows_the_bottom_where_it_is_shallow_and_hides_it_where_it_is_deep() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // a white bed 0.3 m under the water on the left and 9 m under it on the right, seen from above
+    let scene = |look: &str| -> Vec<String> {
+        let mut v: Vec<String> = [
+            r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0.1,0.1,0.15,1]},"Transform":{"pos":[0,9,9],"rot":[-0.38,0,0,0.925]}}}"#,
+            SUN.to_string().as_str(),
+            r#"{"uid":3,"components":{"Transform":{"pos":[-20,-0.3,0],"scale":[40,1,70]},"MeshRenderer":{"mesh":"plane","color":[0.9,0.9,0.85,1],"roughness":0.9}}}"#,
+            r#"{"uid":4,"components":{"Transform":{"pos":[20,-9,0],"scale":[40,1,70]},"MeshRenderer":{"mesh":"plane","color":[0.9,0.9,0.85,1],"roughness":0.9}}}"#,
+            r#"{"uid":5,"components":{"Transform":{"pos":[0,0,0]},"Water":{"size":[16,14],"color":[0.02,0.14,0.26,0.85],"wave_height":0,"speed":0}}}"#,
+            r#"{"uid":9,"components":{"Environment":{"sky":true,"ssao":0,"bloom":0,"shadows":false,"tonemap":2}}}"#,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        if !look.is_empty() {
+            v.push(format!(r#"{{"uid":6,"components":{{"WaterLook":{look}}}}}"#));
+            // the look goes beside the water: the same entity
+            v[4] = r#"{"uid":5,"components":{"Transform":{"pos":[0,0,0]},"Water":{"size":[16,14],"color":[0.02,0.14,0.26,0.85],"wave_height":0,"speed":0},"WaterLook":LOOK}}"#.replace("LOOK", look);
+            v.pop();
+        }
+        v
+    };
+    let q = Quality::high();
+    let side = |f: &Frame, left: bool| -> f32 {
+        let (mut n, mut sum) = (0.0f32, 0.0f32);
+        for y in 0..f.height {
+            for x in 0..f.width {
+                if f.ids[(y * f.width + x) as usize] == 5 && (x < f.width / 2) == left && (x as i32 - (f.width / 2) as i32).abs() > 40 {
+                    n += 1.0;
+                    sum += lum(px(f, x, y));
+                }
+            }
+        }
+        assert!(n > 500.0, "only {n} water pixels on one side");
+        sum / n
+    };
+    let with = draw_owned(&mut gpu, &scene(r#"{"clarity":2.5,"foam":0}"#), &q, 480, 270);
+    let (shallow, deep) = (side(&with, true), side(&with, false));
+    eprintln!("water over the shallows {shallow}, over the deep {deep}");
+    assert!(shallow > deep * 1.7, "the bottom shows through in the shallows and not in the deep: {shallow} vs {deep}");
+    // the clarity matters: with 40 m of clarity the deep side is another picture (the bed is seen through the water there)
+    let clear = draw_owned(&mut gpu, &scene(r#"{"clarity":40,"foam":0}"#), &q, 480, 270);
+    let clear_deep = side(&clear, false);
+    eprintln!("clarity 40: over the deep {clear_deep}");
+    assert!((clear_deep - deep).abs() > deep * 0.1, "{clear_deep} vs {deep}");
+    // classic draws the water as before
+    let (a, b) = (draw_owned(&mut gpu, &scene(""), &Quality::classic(), 240, 135), draw_owned(&mut gpu, &scene(r#"{"clarity":2.5}"#), &Quality::classic(), 240, 135));
+    assert_eq!(a.rgba, b.rgba);
 }

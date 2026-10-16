@@ -77,6 +77,10 @@ fn cloud_layer(dir: vec3<f32>) -> vec4<f32> {
 }
 
 // ---- the sky of the air (`Atmosphere`): Nishita's single scattering, summed along the view ray in 16 steps with 6 towards the sun at each. The same sums as `lunaris_render::atmosphere` (kilometres).
+// the pixel being shaded (set by the sky pass; zero elsewhere): it moves the sample points of the atmosphere a different fraction of a step at every pixel, so that the steps show as noise (which the
+// temporal anti-aliasing averages away) and not as rings round the sun
+var<private> g_pix: vec2<f32> = vec2<f32>(0.0);
+
 const R_EARTH: f32 = 6360.0;
 const R_TOP: f32 = 6420.0;
 
@@ -105,12 +109,13 @@ fn atmosphere_sky(dir: vec3<f32>) -> vec3<f32> {
         return vec3<f32>(0.0);
     }
     let ds = t_max / 16.0;
+    let jit = interleaved_noise(g_pix);
     var od_r = 0.0;
     var od_m = 0.0;
     var sum_r = vec3<f32>(0.0);
     var sum_m = vec3<f32>(0.0);
     for (var i = 0; i < 16; i = i + 1) {
-        let p = o + d * ((f32(i) + 0.5) * ds);
+        let p = o + d * ((f32(i) + jit) * ds);
         let h = length(p) - R_EARTH;
         let hr = exp(-h / 8.0) * ds * ray;
         let hm = exp(-h / 1.2) * ds * turb;

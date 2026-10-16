@@ -2055,3 +2055,16 @@ component! {
         pub enabled: bool = true,
     }
 }
+
+component! {
+    /// How deep water looks (put it beside a `Water` or a `WaterBody`; the GPU renderer's high qualities with the depth prepass: ambient occlusion, bounced light, anti-aliasing or this; the reference picture and classic mode draw the
+    /// water as before): the water's `color` is what it is in the deep, and where the bottom or the shore is near it is `shallow`, because the picture knows how far the water is from what is behind it. `clarity` is how many
+    /// metres of water it takes to hide what is under it (about two thirds hidden at that depth); the thinner the water the more of the bottom shows through, in the colour of the shallows. `foam` (0 to 1) is how much white
+    /// the waves leave where the water meets the shore, a rock or a post, in a band `foam_width` metres wide, broken up by a noise that moves with the waves. A new component.
+    pub struct WaterLook {
+        pub clarity: f32 = 3.0,
+        pub shallow: [f32; 3] = [0.22, 0.62, 0.58],
+        pub foam: f32 = 0.7,
+        pub foam_width: f32 = 0.7,
+    }
+}

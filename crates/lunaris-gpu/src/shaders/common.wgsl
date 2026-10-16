@@ -96,6 +96,8 @@ struct Frame {
     p26: vec4<f32>,
     // temporal anti-aliasing: the share of the new picture, and (y) 1 when it is on
     p27: vec4<f32>,
+    // water that looks at the depth of what is behind it: x is 1 when the picture has that depth
+    p28: vec4<f32>,
     // each probe: its centre (xyz), then half the size of its box (xyz)
     probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)

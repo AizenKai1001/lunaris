@@ -810,7 +810,8 @@ fn resolve_sample(c: vec4<f32>, bloom: vec3<f32>, ae: f32, ssr: vec3<f32>) -> ve
     var fg: vec3<f32>;
     if (frame.p16.w > 0.5) {
         // the reflections found on the screen are scene light too: they are exposed with it
-        fg = tonemap((c.rgb / a + ssr) * (frame.p0.y * ae) + glow);
+        // the reflection layer swaps the sky's reflection for what was seen, so it can be negative: a colour with a negative channel tone maps to a wrong hue (rainbow stripes where the reflection is noisy), so it is held at zero
+        fg = tonemap(max((c.rgb / a + ssr) * (frame.p0.y * ae), vec3<f32>(0.0)) + glow);
     } else if (frame.p15.x > 0.5) {
         fg = tonemap(c.rgb / a * (frame.p0.y * ae) + glow);
     } else {
@@ -1154,6 +1155,15 @@ fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
 
 // ---- temporal anti-aliasing: the picture of this time (`hdr_tex`, the composite's, already in display colours) is blended with the history, which is looked up where the surface was in the last picture (the matrices
 // without the sub-pixel shift, so a still camera finds the same pixel) and kept inside the range of colours the neighbours of this pixel have (so what changed is not smeared); then grain and dither, which belong after it.
+// The neighbourhood of a pixel is judged in luma and chroma (YCoCg), not in red, green and blue separately: a history clamped channel by channel next to a strong edge changes colour, clamped in luma and chroma it only changes brightness.
+fn to_ycocg(c: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(0.25 * c.r + 0.5 * c.g + 0.25 * c.b, 0.5 * c.r - 0.5 * c.b, -0.25 * c.r + 0.5 * c.g - 0.25 * c.b);
+}
+
+fn from_ycocg(c: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(c.x + c.y - c.z, c.x + c.z, c.x - c.y - c.z);
+}
+
 struct TaaOut {
     @location(0) display: vec4<f32>,
     @location(1) history: vec4<f32>,
@@ -1164,16 +1174,17 @@ fn fs_taa(in: FullOut) -> TaaOut {
     let px = vec2<i32>(in.pos.xy);
     let size = vec2<i32>(frame.p1.xy);
     let cur = textureLoad(hdr_tex, px, 0).rgb;
-    var lo = cur;
-    var hi = cur;
-    var mean = cur;
-    var m2 = cur * cur;
+    let cur_y = to_ycocg(cur);
+    var lo = cur_y;
+    var hi = cur_y;
+    var mean = cur_y;
+    var m2 = cur_y * cur_y;
     for (var y = -1; y <= 1; y = y + 1) {
         for (var x = -1; x <= 1; x = x + 1) {
             if (x == 0 && y == 0) {
                 continue;
             }
-            let c = textureLoad(hdr_tex, clamp(px + vec2<i32>(x, y), vec2<i32>(0), size - vec2<i32>(1)), 0).rgb;
+            let c = to_ycocg(textureLoad(hdr_tex, clamp(px + vec2<i32>(x, y), vec2<i32>(0), size - vec2<i32>(1)), 0).rgb);
             lo = min(lo, c);
             hi = max(hi, c);
             mean = mean + c;
@@ -1203,7 +1214,7 @@ fn fs_taa(in: FullOut) -> TaaOut {
             let huv = uv + (puv - cuv);
             if (huv.x >= 0.0 && huv.x < 1.0 && huv.y >= 0.0 && huv.y < 1.0) {
                 let hist = textureSampleLevel(taa_hist, post_samp, huv, 0.0).rgb;
-                let clamped = clamp(hist, box_lo, box_hi);
+                let clamped = from_ycocg(clamp(to_ycocg(hist), box_lo, box_hi));
                 // the more the history had to be pulled in, the less it can be trusted
                 let off = length(hist - clamped) / max(length(hist), 0.05);
                 result = mix(clamped, cur, clamp(alpha + off * 0.5, 0.0, 1.0));

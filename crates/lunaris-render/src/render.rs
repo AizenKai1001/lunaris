@@ -662,6 +662,8 @@ impl MeshRef {
 pub struct SceneMesh {
     /// Water (GPU high qualities): wave height, wave length, phase.
     pub water: Option<[f32; 3]>,
+    /// `WaterLook`: clarity, foam width, foam strength, then the colour of the shallows (rgb, linear).
+    pub water_look: Option<[f32; 6]>,
     /// Leaves in the wind (GPU high qualities): amount, extent, phase.
     pub sway: Option<[f32; 3]>,
     pub uid: u64,
@@ -1538,6 +1540,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let uv_scale = if m.uv_scale[0].is_finite() && m.uv_scale[1].is_finite() { m.uv_scale } else { [1.0, 1.0] };
         scene_meshes.push(SceneMesh {
             water: None,
+            water_look: None,
             sway: sways_raw.get(uid).map(|w| [w.amount.clamp(-5.0, 5.0), if w.extent.is_finite() { w.extent.max(0.1) } else { 3.0 }, w.phase + w.offset]),
             uid: *uid,
             mesh,
@@ -1566,6 +1569,18 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         });
     }
     }
+    // the look of the water, by entity: deep colour is the water's own, the shallows' colour and the foam are the `WaterLook`'s
+    let mut looks: std::collections::BTreeMap<u64, lunaris_sim::components::WaterLook> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&lunaris_sim::components::WaterLook,), _>(|_, uid, (l,)| {
+        looks.insert(uid, *l);
+    })?;
+    let look_of = |uid: u64| -> Option<[f32; 6]> {
+        looks.get(&uid).map(|l| {
+            let f = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+            let sh = display_to_linear([f(l.shallow[0], 0.0, 4.0, 0.2), f(l.shallow[1], 0.0, 4.0, 0.6), f(l.shallow[2], 0.0, 4.0, 0.55), 1.0]);
+            [f(l.clarity, 0.05, 500.0, 3.0), f(l.foam_width, 0.0, 20.0, 0.7), f(l.foam, 0.0, 1.0, 0.7), sh[0], sh[1], sh[2]]
+        })
+    };
     // water: a flat grid scaled to the sheet, see-through, with the wave numbers for the GPU renderer
     let mut waters: Vec<(u64, Water, Transform)> = Vec::new();
     world.for_each_uid::<(&Water, &Transform), _>(|_, uid, (w, t)| waters.push((uid, *w, *t)))?;
@@ -1579,6 +1594,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let c = display_to_linear(w.color);
         scene_meshes.push(SceneMesh {
             water: if w.wave_height > 0.0 && w.wave_height.is_finite() { Some([w.wave_height.min(10.0), w.wave_length.max(0.2), w.phase]) } else { None },
+            water_look: look_of(*uid),
             sway: None,
             uid: *uid,
             mesh: MeshRef::Shared(mesh),
@@ -1610,6 +1626,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let c = display_to_linear(w.color);
         scene_meshes.push(SceneMesh {
             water: if w.wave_height > 0.0 && w.wave_height.is_finite() { Some([w.wave_height.min(10.0), w.wave_length.max(0.2), w.phase]) } else { None },
+            water_look: look_of(*uid),
             sway: None,
             uid: *uid,
             mesh: MeshRef::Shared(mesh),
@@ -1648,6 +1665,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let tex = if tex_name.is_empty() || splat.is_some() { None } else { Some(textures.get(&tex_name)) };
         scene_meshes.push(SceneMesh {
             water: None,
+            water_look: None,
             sway: None,
             uid: *uid,
             mesh: MeshRef::Shared(mesh),
@@ -1680,6 +1698,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let c = display_to_linear(j.color);
         scene_meshes.push(SceneMesh {
             water: None,
+            water_look: None,
             sway: None,
             uid: *uid,
             mesh: MeshRef::Builtin(builtin("cylinder").expect("built-in")),

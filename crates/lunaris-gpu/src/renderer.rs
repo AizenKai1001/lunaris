@@ -169,6 +169,8 @@ struct FrameU {
     p26: [f32; 4],
     /// temporal anti-aliasing: the share of the new picture, and (y) 1 when it is on
     p27: [f32; 4],
+    /// water that looks at the depth of what is behind it: x is 1 when the picture has that depth
+    p28: [f32; 4],
     probes: [[f32; 4]; 8],
     prev_view_proj: [f32; 16],
     /// the view-projection of this picture and of the last one, without the sub-pixel shift (temporal anti-aliasing)
@@ -396,6 +398,8 @@ pub struct GpuRenderer {
     shadow: Option<ShadowMap>,
     point_shadow: Option<ShadowMap>,
     shadow_dummy: wgpu::TextureView,
+    /// A stand-in for the depth of the opaque things when a picture has none (the water only looks at it when there is one).
+    depth_dummy: wgpu::TextureView,
     ao_white: wgpu::TextureView,
     targets: Option<Targets>,
     ssr_targets: Option<SsrTargets>,
@@ -533,6 +537,7 @@ impl GpuRenderer {
         };
         let probe_dummy = make_tex("probe-dummy", 1, 1, 1, HDR, wgpu::TextureUsages::TEXTURE_BINDING).create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
         let ssr_dummy = make_tex("ssr-dummy", 1, 1, 1, HDR, wgpu::TextureUsages::TEXTURE_BINDING).create_view(&wgpu::TextureViewDescriptor::default());
+        let depth_dummy = make_tex("depth-dummy", 1, 1, 1, DEPTH, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT).create_view(&wgpu::TextureViewDescriptor::default());
         let shadow_dummy = make_tex("shadow-dummy", 1, 1, 1, DEPTH, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT).create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::D2Array), ..Default::default() });
 
         // the font: one texel per font pixel, 95 glyphs of 5 x 8 side by side; 255 where the pixel is lit
@@ -595,6 +600,7 @@ impl GpuRenderer {
             shadow: None,
             point_shadow: None,
             shadow_dummy,
+            depth_dummy,
             ao_white,
             targets: None,
             ssr_targets: None,
@@ -1287,6 +1293,8 @@ impl GpuRenderer {
                 let c = |i: usize| (m.model.0[i * 4].powi(2) + m.model.0[i * 4 + 1].powi(2) + m.model.0[i * 4 + 2].powi(2)).sqrt();
                 c(0).max(c(1)).max(c(2))
             };
+            // water that is flat (no waves) is still water when it has a look: the surface shader needs the same path
+            let waterish = m.water.or(m.water_look.map(|_| [0.0, 8.0, 0.0]));
             let data = ObjectData {
                 model: m.model.0,
                 n0: [nm[0][0], nm[1][0], nm[2][0], 0.0],
@@ -1295,18 +1303,25 @@ impl GpuRenderer {
                 color: [color[0], color[1], color[2], if high { m.alpha } else { 1.0 }],
                 mat: [m.shininess as f32, m.emissive, m.metallic, m.roughness],
                 misc: [m.uv_scale[0], m.uv_scale[1], if tex.is_some() { 1.0 } else { 0.0 }, if use_vcol { 1.0 } else { 0.0 }],
-                uvrect: match (m.water, m.sway) {
+                uvrect: match (waterish, m.sway) {
                     (Some(wv), _) if high => [0.0, wv[0], wv[1], wv[2]],
                     (None, Some(sw)) if high => [0.0, sw[0], sw[1], sw[2]],
                     _ => [if high && tex.as_ref().is_some_and(|t| t.heights.is_some()) { m.bump } else { 0.0 }, if high { m.pbr.as_ref().filter(|p| p.disp.is_some()).map_or(0.0, |p| p.height_scale) } else { 0.0 }, 1.0, 1.0],
                 },
-                ids: [slots.len() as u32, if !high { 0 } else if m.water.is_some() { 1 } else if m.sway.is_some() { 2 } else { 0 }, 0, 0],
-                pbr: match &m.pbr {
-                    Some(p) if high && (p.normal.is_some() || p.arm.is_some() || p.disp.is_some()) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32 + 4.0 * p.disp.is_some() as u32 as f32, p.roughness_scale],
+                ids: [slots.len() as u32, if !high { 0 } else if waterish.is_some() { 1 } else if m.sway.is_some() { 2 } else { 0 }, 0, 0],
+                pbr: match (&m.water_look, &m.pbr) {
+                    (Some(wl), _) if high => [wl[0], wl[1], wl[2], 1.0],
+                    (_, Some(p)) if high && (p.normal.is_some() || p.arm.is_some() || p.disp.is_some()) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32 + 4.0 * p.disp.is_some() as u32 as f32, p.roughness_scale],
                     _ => [0.0; 4],
                 },
             };
-            let see_through = high && m.alpha < 0.999;
+            let mut data = data;
+            if let (Some(wl), true) = (&m.water_look, high) {
+                data.n0[3] = wl[3];
+                data.n1[3] = wl[4];
+                data.n2[3] = wl[5];
+            }
+            let see_through = high && (m.alpha < 0.999 || m.water_look.is_some());
             let depth = -scene.view.transform_point(m.model.transform_point(center))[2];
             items.push(MeshItem { id, tex: tkey, cast: m.cast_shadow && !see_through, glows: m.emissive > 0.0, clear: see_through, depth, data, sphere: (m.model.transform_point(center), radius * scale), splat });
         }
@@ -1538,7 +1553,8 @@ impl GpuRenderer {
         }
         let gi_idx = self.gi_flip;
         let taa_wants = high && q.taa && !probe_out && have_meshes;
-        let need_depth = taa_wants || ao_pass || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
+        let water_deep = high && !probe_out && scene.meshes.iter().any(|m| m.water_look.is_some());
+        let need_depth = water_deep || taa_wants || ao_pass || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
         let bloom_on = high && q.bloom && env.bloom > 0.0;
         // eye adaptation needs something to measure: a flat 2D scene keeps its authored colours
         let ae_on = high && have_meshes && env.auto_exposure.is_some() && !probe_out;
@@ -1683,6 +1699,7 @@ impl GpuRenderer {
         fu.unj_prev_vp = self.prev_unj_vp.unwrap_or(vp_unj.0);
         let taa_alpha = if taa_on { (1.0 / (self.taa_age as f32 + 1.0)).max(0.1) } else { 1.0 };
         fu.p27 = [taa_alpha, if taa_on { 1.0 } else { 0.0 }, 0.0, 0.0];
+        fu.p28 = [if water_deep { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0];
         if !probe_out {
             self.prev_unj_vp = Some(vp_unj.0);
         }
@@ -1830,6 +1847,10 @@ impl GpuRenderer {
             (Some(s), true) => &s.array_view,
             _ => &self.probe_dummy,
         };
+        let opaque_depth = match (&self.targets, water_deep) {
+            (Some(t), true) => t.pre_depth.as_ref().unwrap_or(&self.depth_dummy),
+            _ => &self.depth_dummy,
+        };
         let scene_bg = self.group(
             "scene",
             &self.layouts.scene0,
@@ -1843,6 +1864,7 @@ impl GpuRenderer {
                 wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(point_view) },
                 wgpu::BindGroupEntry { binding: 7, resource: wgpu::BindingResource::TextureView(probe_view) },
                 wgpu::BindGroupEntry { binding: 8, resource: wgpu::BindingResource::Sampler(&self.samplers.probe) },
+                wgpu::BindGroupEntry { binding: 9, resource: wgpu::BindingResource::TextureView(opaque_depth) },
             ],
         );
         let depth_bgs: Vec<wgpu::BindGroup> = (0..16).map(|i| self.group("depth", &self.layouts.depth0, &[wgpu::BindGroupEntry { binding: 0, resource: self.pass_bufs[i].as_entire_binding() }, wgpu::BindGroupEntry { binding: 1, resource: self.objects.as_entire_binding() }])).collect();
