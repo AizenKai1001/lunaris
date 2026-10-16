@@ -7,7 +7,7 @@
 //! URIs) and relative files inside the workspace; PNG textures; the first skin (joints, inverse bind matrices, `JOINTS_0` and
 //! `WEIGHTS_0`) and every animation of translation, rotation and scale (linear, step and cubic spline) of its joints, kept in a
 //! `Rig` (see `rig.rs`; the mesh itself is skinned to the rest pose). Not supported (reported as warnings, the rest still loads):
-//! more than one skin, morph targets, animation of anything but joints, sparse accessors, JPEG textures, texture transforms, alpha
+//! more than one skin, morph targets, animation of anything but joints, sparse accessors, texture transforms, alpha
 //! blending.
 use crate::math::*;
 use crate::mesh::Mesh;
@@ -613,9 +613,7 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
             } else {
                 load_uri(image.get("uri").and_then(|u| u.as_str()).ok_or("the image has neither a bufferView nor a uri")?, dir)?
             };
-            if !data.starts_with(b"\x89PNG") {
-                return Err("only PNG textures are supported (this one is another format, for example JPEG)".to_string());
-            }
+            // a PNG or a JPEG (told apart by their first bytes)
             Texture::from_image_bytes(&data)
         })();
         match loaded {

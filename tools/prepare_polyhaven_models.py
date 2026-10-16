@@ -1,6 +1,6 @@
-"""Make the Poly Haven glTF models in examples/gfx_lab/models/<id>/ usable by Lunaris's importer, which reads PNG textures only and shows one texture per model: a model with one textured material gets that
-picture converted to PNG; a model with several (a tree: bark, trunks, twigs) gets each material's plain colour set to the average colour of its picture (as linear light), the picture left out. Writes
-<id>/<id>_lunaris.gltf beside the original. Needs ffmpeg on the PATH.
+"""Make the Poly Haven glTF models in examples/gfx_lab/models/<id>/ fit Lunaris's importer, which reads PNG and JPEG textures but shows one texture per model: a model with one textured material keeps its
+picture; a model with several (a tree: bark, trunks, twigs) gets each material's plain colour set to the average colour of its picture (as linear light) and the picture left out. Every material is made
+non-metallic and rough. Writes <id>/<id>_lunaris.gltf beside the original. Needs ffmpeg on the PATH (for the average colours).
     python -I tools/prepare_polyhaven_models.py [id ...]"""
 import json
 import os
@@ -44,10 +44,7 @@ def prepare(mid):
             continue
         pic = picture(pbr["baseColorTexture"]["index"])
         if len(textured) == 1:
-            png = os.path.splitext(pic)[0] + ".png"
-            to_png(pic, png)
-            images[textures[pbr["baseColorTexture"]["index"]]["source"]]["uri"] = os.path.relpath(png, folder).replace(os.sep, "/")
-            images[textures[pbr["baseColorTexture"]["index"]]["source"]].pop("mimeType", None)
+            continue
         else:
             rgb = average_colour(pic)
             # the twig pictures are atlases with the needles stretched across them: their average is brown, the needles are a dark conifer green
