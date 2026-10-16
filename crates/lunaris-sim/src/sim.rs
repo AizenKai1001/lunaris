@@ -865,6 +865,7 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::Probe>().expect("standard component");
     world.register_native::<crate::components::BoneAttach>().expect("standard component");
     world.register_native::<crate::components::PbrMaps>().expect("standard component");
+    world.register_native::<crate::components::Lens>().expect("standard component");
 }
 
 impl RecordedRead {

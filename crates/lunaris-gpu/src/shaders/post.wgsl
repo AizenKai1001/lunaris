@@ -748,17 +748,17 @@ fn velocity_px(px: vec2<i32>) -> vec2<f32> {
     return v;
 }
 
-@fragment
-fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
-    let px = vec2<i32>(in.pos.xy);
+fn composite_core(pos: vec2<f32>) -> vec3<f32> {
+    let uv = pos / frame.p1.xy;
+    let px = vec2<i32>(pos);
     let ae = ae_factor();
-    var rays = shafts_at(in.uv, in.pos.xy);
+    var rays = shafts_at(uv, pos);
     if (frame.p17.w > 0.5) {
-        rays = rays + flare_at(in.uv);
+        rays = rays + flare_at(uv);
     }
-    var bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays;
+    var bloom = textureSampleLevel(bloom_tex, post_samp, uv, 0.0).rgb * frame.p3.x + rays;
     if (frame.p15.x > 0.5) {
-        bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays * ae;
+        bloom = textureSampleLevel(bloom_tex, post_samp, uv, 0.0).rgb * frame.p3.x + rays * ae;
     }
     var c = textureLoad(hdr_tex, px, 0);
     if (frame.p7.w > 0.0) {
@@ -786,21 +786,22 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
             c = acc / 16.0;
         }
     }
-    return finish(resolve_sample(c, bloom, ae, ssr_at(px)), in.uv, in.pos.xy);
+    return resolve_sample(c, bloom, ae, ssr_at(px));
 }
 
+
 // With multisampling: tone map every sample before averaging, so that bright edges stay anti-aliased.
-@fragment
-fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
-    let px = vec2<i32>(in.pos.xy);
+fn composite_core_ms(pos: vec2<f32>) -> vec3<f32> {
+    let uv = pos / frame.p1.xy;
+    let px = vec2<i32>(pos);
     let ae = ae_factor();
-    var rays = shafts_at(in.uv, in.pos.xy);
+    var rays = shafts_at(uv, pos);
     if (frame.p17.w > 0.5) {
-        rays = rays + flare_at(in.uv);
+        rays = rays + flare_at(uv);
     }
-    var bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays;
+    var bloom = textureSampleLevel(bloom_tex, post_samp, uv, 0.0).rgb * frame.p3.x + rays;
     if (frame.p15.x > 0.5) {
-        bloom = textureSampleLevel(bloom_tex, post_samp, in.uv, 0.0).rgb * frame.p3.x + rays * ae;
+        bloom = textureSampleLevel(bloom_tex, post_samp, uv, 0.0).rgb * frame.p3.x + rays * ae;
     }
     let n = i32(frame.p4.z);
     if (frame.p7.w > 0.0) {
@@ -813,7 +814,7 @@ fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
                 let q = clamp(px + vec2<i32>(round(v * t)), vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1));
                 acc = acc + resolve_sample(textureLoad(hdr_ms, q, k % n), bloom, ae, ssr_at(q));
             }
-            return finish(acc / 8.0, in.uv, in.pos.xy);
+            return acc / 8.0;
         }
     }
     if (frame.p6.x > 0.0) {
@@ -827,12 +828,112 @@ fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
                 let q = clamp(px + vec2<i32>(i32(round(cos(a) * rad)), i32(round(sin(a) * rad))), vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1));
                 acc = acc + resolve_sample(textureLoad(hdr_ms, q, k % n), bloom, ae, ssr_at(q));
             }
-            return finish(acc / 16.0, in.uv, in.pos.xy);
+            return acc / 16.0;
         }
     }
     var acc = vec3<f32>(0.0);
     for (var i = 0; i < n; i = i + 1) {
         acc = acc + resolve_sample(textureLoad(hdr_ms, px, i), bloom, ae, ssr_at(px));
     }
-    return finish(acc / f32(n), in.uv, in.pos.xy);
+    return acc / f32(n);
+}
+
+
+// ---- the lens (`Lens`): where the picture a pixel shows comes from, the colour fringes, the soft sensor, the blocks, the scan lines
+fn lens_on() -> bool {
+    return frame.p19.x != 0.0 || frame.p19.y != 1.0 || frame.p19.z > 0.0 || frame.p19.w > 0.0 || frame.p20.x > 1.5 || frame.p20.y > 0.0;
+}
+
+// output pixel -> the pixel of the picture it shows (`extra` bends the red and the blue a little differently from the green)
+fn lens_src(pos: vec2<f32>, extra: f32) -> vec2<f32> {
+    let dims = frame.p1.xy;
+    let asp = dims.x / dims.y;
+    var u = (pos / dims - vec2<f32>(0.5)) * 2.0;
+    u.x = u.x * asp;
+    u = u * frame.p19.y;
+    let s = 1.0 + (frame.p19.x + extra) * dot(u, u);
+    var v = u * s;
+    v.x = v.x / asp;
+    return (v * 0.5 + vec2<f32>(0.5)) * dims;
+}
+
+fn lens_inside(q: vec2<f32>) -> bool {
+    return q.x >= 0.0 && q.y >= 0.0 && q.x < frame.p1.x && q.y < frame.p1.y;
+}
+
+fn lens_plain(pos_in: vec2<f32>) -> vec3<f32> {
+    var p = pos_in;
+    if (frame.p20.x > 1.5) {
+        p = (floor(p / frame.p20.x) + vec2<f32>(0.5)) * frame.p20.x;
+    }
+    let c = frame.p19.z;
+    let qg = lens_src(p, 0.0);
+    if (!lens_inside(qg)) {
+        return vec3<f32>(0.0);
+    }
+    var col = composite_core(qg);
+    if (c > 0.0) {
+        let qr = lens_src(p, c * 6.0);
+        let qb = lens_src(p, 0.0 - c * 6.0);
+        col.r = composite_core(clamp(qr, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).r;
+        col.b = composite_core(clamp(qb, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).b;
+    }
+    if (frame.p19.w > 0.0) {
+        let o = frame.p19.w;
+        let lo = vec2<f32>(0.0);
+        let hi = frame.p1.xy - vec2<f32>(1.0);
+        let around = (composite_core(clamp(qg + vec2<f32>(o, 0.0), lo, hi)) + composite_core(clamp(qg - vec2<f32>(o, 0.0), lo, hi)) + composite_core(clamp(qg + vec2<f32>(0.0, o), lo, hi)) + composite_core(clamp(qg - vec2<f32>(0.0, o), lo, hi))) * 0.25;
+        col = mix(col, around, 0.6);
+    }
+    if (frame.p20.y > 0.0) {
+        col = col * (1.0 - frame.p20.y * 0.4 * (0.5 + 0.5 * cos(pos_in.y * 3.14159265)));
+    }
+    return col;
+}
+
+fn lens_ms(pos_in: vec2<f32>) -> vec3<f32> {
+    var p = pos_in;
+    if (frame.p20.x > 1.5) {
+        p = (floor(p / frame.p20.x) + vec2<f32>(0.5)) * frame.p20.x;
+    }
+    let c = frame.p19.z;
+    let qg = lens_src(p, 0.0);
+    if (!lens_inside(qg)) {
+        return vec3<f32>(0.0);
+    }
+    var col = composite_core_ms(qg);
+    if (c > 0.0) {
+        let qr = lens_src(p, c * 6.0);
+        let qb = lens_src(p, 0.0 - c * 6.0);
+        col.r = composite_core_ms(clamp(qr, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).r;
+        col.b = composite_core_ms(clamp(qb, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).b;
+    }
+    if (frame.p19.w > 0.0) {
+        let o = frame.p19.w;
+        let lo = vec2<f32>(0.0);
+        let hi = frame.p1.xy - vec2<f32>(1.0);
+        let around = (composite_core_ms(clamp(qg + vec2<f32>(o, 0.0), lo, hi)) + composite_core_ms(clamp(qg - vec2<f32>(o, 0.0), lo, hi)) + composite_core_ms(clamp(qg + vec2<f32>(0.0, o), lo, hi)) + composite_core_ms(clamp(qg - vec2<f32>(0.0, o), lo, hi))) * 0.25;
+        col = mix(col, around, 0.6);
+    }
+    if (frame.p20.y > 0.0) {
+        col = col * (1.0 - frame.p20.y * 0.4 * (0.5 + 0.5 * cos(pos_in.y * 3.14159265)));
+    }
+    return col;
+}
+
+@fragment
+fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
+    if (lens_on()) {
+        return finish(lens_plain(in.pos.xy), in.uv, in.pos.xy);
+    }
+    return finish(composite_core(in.pos.xy), in.uv, in.pos.xy);
+}
+
+
+@fragment
+fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
+    if (lens_on()) {
+        return finish(lens_ms(in.pos.xy), in.uv, in.pos.xy);
+    }
+    return finish(composite_core_ms(in.pos.xy), in.uv, in.pos.xy);
 }

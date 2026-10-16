@@ -877,6 +877,8 @@ pub struct EnvData {
     pub grain: f32,
     pub contrast: f32,
     pub tint: V3,
+    /// `Lens`: distortion, zoom, chromatic fringe, soften, block size, scan lines (identity by default).
+    pub lens: [f32; 6],
     /// `ColorGrade`: lift rgb + temperature, gamma rgb + tint shift, gain rgb, and the fade colour + amount (all identity by default).
     pub grade_a: [f32; 4],
     pub grade_b: [f32; 4],
@@ -900,7 +902,7 @@ impl EnvData {
         let c = [clear[0], clear[1], clear[2]];
         let mix = |a: V3, b: V3, t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
         let sky = mix(c, [0.52, 0.55, 0.62], 0.7);
-        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
+        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
     }
 
     fn from_component(e: &Environment) -> EnvData {
@@ -933,6 +935,7 @@ impl EnvData {
             grain: 0.0,
             contrast: 1.0,
             tint: [1.0; 3],
+            lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0],
             grade_a: [0.0; 4],
             grade_b: [1.0, 1.0, 1.0, 0.0],
             grade_c: [1.0, 1.0, 1.0, 0.0],
@@ -1122,6 +1125,14 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             env.grain = nz(f.grain, 0.0, 1.0);
             env.contrast = nz(f.contrast, 0.0, 4.0);
             env.tint = [nz(f.tint[0], 0.0, 4.0), nz(f.tint[1], 0.0, 4.0), nz(f.tint[2], 0.0, 4.0)];
+        }
+    }
+    {
+        let mut lenses: Vec<(u64, lunaris_sim::components::Lens)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::Lens,), _>(|_, uid, (l,)| lenses.push((uid, *l)))?;
+        if let Some((_, l)) = lenses.into_iter().min_by_key(|x| x.0) {
+            let nz = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+            env.lens = [nz(l.distortion, -2.0, 2.0, 0.0), nz(l.zoom, 0.2, 4.0, 1.0), nz(l.chromatic, 0.0, 0.2, 0.0), nz(l.soften, 0.0, 4.0, 0.0), nz(l.block, 1.0, 16.0, 1.0), nz(l.scan, 0.0, 1.0, 0.0)];
         }
     }
     {

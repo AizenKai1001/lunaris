@@ -1950,3 +1950,18 @@ component! {
         pub roughness_scale: f32 = 1.0,
     }
 }
+
+component! {
+    /// A camera lens for the GPU renderer's high qualities (the first `Lens` counts; the reference picture and classic mode ignore it): what makes a picture look like it came out of a body camera or a phone. `distortion` bends the
+    /// picture round its middle (above 0 barrel, a fisheye, below 0 pincushion), `zoom` is how much of the picture the lens frames (1 as it is; below 1 crops in, so a strong fisheye has no black corners), `chromatic` is the colour
+    /// fringe that grows towards the edges (0.02 is a cheap lens), `soften` blurs like a small sensor (0 to 4 pixels), `block` is the size of the blocks of a compressed picture in pixels (1 = off, 2 or 3 = a low bit rate),
+    /// `scan` (0 to 1) darkens every other line. A new component; a world without it is what it was.
+    pub struct Lens {
+        pub distortion: f32 = 0.0,
+        pub zoom: f32 = 1.0,
+        pub chromatic: f32 = 0.0,
+        pub soften: f32 = 0.0,
+        pub block: f32 = 1.0,
+        pub scan: f32 = 0.0,
+    }
+}

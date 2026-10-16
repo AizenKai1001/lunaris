@@ -77,6 +77,8 @@ pub struct Shaders {
 pub struct Layouts {
     pub scene0: BindGroupLayout,
     pub tex1: BindGroupLayout,
+    /// `tex1` without the normal and arm maps: a painted terrain's pipeline has its own nine textures and the card allows 16 per stage.
+    pub tex1_small: BindGroupLayout,
     pub splat2: BindGroupLayout,
     pub depth0: BindGroupLayout,
     pub text0: BindGroupLayout,
@@ -166,6 +168,7 @@ impl Layouts {
         Layouts {
             scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering())]),
             tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float()), entry(3, tex_float()), entry(4, tex_float())]),
+            tex1_small: make("tex1-small", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float())]),
             // a painted terrain: its numbers, the splat map and its sampler, the layers' sampler, four colour textures and four relief maps
             splat2: make("splat2", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering()), entry(3, sampler_filtering()), entry(4, tex_float()), entry(5, tex_float()), entry(6, tex_float()), entry(7, tex_float()), entry(8, tex_float()), entry(9, tex_float()), entry(10, tex_float()), entry(11, tex_float())]),
             depth0: make("depth0", &[entry(0, uniform()), entry(1, storage_ro())]),
@@ -275,7 +278,7 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
             })
         }
         PipeId::MeshSplat => {
-            let pl = layout("mesh-splat", &[&ly.scene0, &ly.tex1, &ly.splat2]);
+            let pl = layout("mesh-splat", &[&ly.scene0, &ly.tex1_small, &ly.splat2]);
             device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: Some("mesh-splat"),
                 layout: Some(&pl),

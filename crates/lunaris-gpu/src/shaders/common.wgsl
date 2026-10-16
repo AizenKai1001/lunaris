@@ -79,6 +79,9 @@ struct Frame {
     p17: vec4<f32>,
     // reflection probes: how many are baked, how many mip levels their faces have
     p18: vec4<f32>,
+    // the lens: distortion, zoom, chromatic fringe, soften; then block size, scan lines
+    p19: vec4<f32>,
+    p20: vec4<f32>,
     // each probe: its centre (xyz), then half the size of its box (xyz)
     probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)

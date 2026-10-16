@@ -150,6 +150,9 @@ struct FrameU {
     p16: [f32; 4],
     p17: [f32; 4],
     p18: [f32; 4],
+    /// the lens: distortion, zoom, chromatic fringe, soften; then block size, scan lines
+    p19: [f32; 4],
+    p20: [f32; 4],
     probes: [[f32; 4]; 8],
     prev_view_proj: [f32; 16],
     psh: [PointShadowU; 2],
@@ -329,6 +332,8 @@ pub struct GpuRenderer {
     tex_bgs: HashMap<TexKey, wgpu::BindGroup>,
     /// Normal and occlusion-roughness-metallic maps: numbers in a plain 8-bit texture (no sRGB), by the address of the picture.
     data_textures: HashMap<usize, GpuTex>,
+    /// Group 1 of a painted terrain's draws (it has no colour texture of its own): white, a sampler, a flat relief; made on first use.
+    splat_tex_bg: Option<wgpu::BindGroup>,
     flat_normal: wgpu::TextureView,
     arm_default: wgpu::TextureView,
     /// Bind groups of interface pictures: (texture address, filtered), the texture in its display-colour form.
@@ -512,6 +517,7 @@ impl GpuRenderer {
             splat_textures: HashMap::new(),
             tex_bgs: HashMap::new(),
             data_textures: HashMap::new(),
+            splat_tex_bg: None,
             flat_normal,
             arm_default,
             ui_bgs: HashMap::new(),
@@ -1403,6 +1409,8 @@ impl GpuRenderer {
         // depth of field: strength, focus distance, the depth that stays sharp around it
         fu.p6 = [if dof_on { env.dof } else { 0.0 }, env.focus, env.focus_range, 0.0];
         self.fx_frame = self.fx_frame.wrapping_add(1);
+        fu.p19 = if high { [env.lens[0], env.lens[1], env.lens[2], env.lens[3]] } else { [0.0, 1.0, 0.0, 0.0] };
+        fu.p20 = if high { [env.lens[4], env.lens[5], 0.0, 0.0] } else { [1.0, 0.0, 0.0, 0.0] };
         fu.p7 = [if shafts_on { env.shafts } else { 0.0 }, if high { env.grain } else { 0.0 }, if high { env.contrast } else { 1.0 }, if blur_on { env.motion_blur } else { 0.0 }];
         fu.p8 = [if high { env.tint[0] } else { 1.0 }, if high { env.tint[1] } else { 1.0 }, if high { env.tint[2] } else { 1.0 }, (self.fx_frame % 4096) as f32];
         // colour grading and the fade (the high qualities only; the identity otherwise)
@@ -1487,6 +1495,14 @@ impl GpuRenderer {
         }
         if have_clear {
             self.need(PipeId::MeshBlend, samples, None)?;
+        }
+        if !splat_bgs.is_empty() && self.splat_tex_bg.is_none() {
+            let bg = self.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("splat-texture"),
+                layout: &self.layouts.tex1_small,
+                entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&self.white[1]) }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.samplers.aniso) }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&self.white_height) }],
+            });
+            self.splat_tex_bg = Some(bg);
         }
         if !splat_bgs.is_empty() {
             self.need(PipeId::MeshSplat, samples, None)?;
@@ -1727,8 +1743,9 @@ impl GpuRenderer {
                 draw_batches(&mut pass, &plain, false, true);
                 pass.set_pipeline(self.pipe(PipeId::MeshSplat, samples, None));
                 for b in mesh_batches.iter().filter(|b| b.splat.is_some()) {
+                    pass.set_bind_group(1, self.splat_tex_bg.as_ref().expect("made above"), &[]);
                     pass.set_bind_group(2, &splat_bgs[b.splat.expect("filtered")], &[]);
-                    draw_batches(&mut pass, std::slice::from_ref(b), false, true);
+                    draw_batches(&mut pass, std::slice::from_ref(b), false, false);
                 }
                 pass.set_pipeline(self.pipe(PipeId::Mesh, samples, None));
             }
