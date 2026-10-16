@@ -9,6 +9,11 @@ env:
   CARGO_TERM_COLOR: never
   RUST_BACKTRACE: 1
 
+# a newer push replaces the run of an older one (a slow software-graphics run need not finish for a commit that is already out of date)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: tests (${{ matrix.os }})
@@ -21,8 +26,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # the editor crate is a Windows application and is checked in its own job; the GPU tests skip themselves when the runner has no graphics adapter
-      - run: cargo test --workspace --exclude lunaris-studio --no-fail-fast
+      # the editor crate is a Windows application and is checked in its own job; the GPU tests skip themselves when the runner has no graphics adapter.
+      # They are separate steps (with their own time limits) so that the run says which part is slow on a machine that draws with the CPU
+      - run: cargo test --workspace --exclude lunaris-studio --exclude lunaris-gpu --no-fail-fast
+      - name: graphics, unit tests
+        if: always()
+        run: cargo test -p lunaris-gpu --lib
+        timeout-minutes: 15
+      - name: graphics, the picture next to the reference renderer's
+        if: always()
+        run: cargo test -p lunaris-gpu --test compare
+        timeout-minutes: 30
+      - name: graphics, the high-quality effects
+        if: always()
+        run: cargo test -p lunaris-gpu --test high
+        timeout-minutes: 45
 
   golden:
     name: the same hashes on every machine (${{ matrix.os }})
