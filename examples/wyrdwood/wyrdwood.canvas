@@ -13,7 +13,7 @@
   {
    "id": "status",
    "type": "text",
-   "text": "## Where it stands (2026-10-15)\n- Plan written and committed.\n- **Character motion done**: swim, wade, roll, ladders, ledge pull-up (`CharacterMotion`, `Climbable`) and the three Caldera traps fixed (characters report contacts, a `Steer` walks a character, a `Probe` gives scripts the ground and a ray). 12 new tests; every old test, the 51 golden scenes and the 51 playtests unchanged.\n- Next: foot IK, then destruction, then the M1 island.\n- **This board is the editor's Canvas tab** (`lunaris-editor --canvas examples/wyrdwood/wyrdwood.canvas`): it reads Obsidian's canvas files and follows the file when it is saved, so the plan stays on screen while the work goes on.",
+   "text": "## Where it stands (2026-10-15)\n- Plan written and committed.\n- **Character motion done**: swim, wade, roll, ladders, ledge pull-up (`CharacterMotion`, `Climbable`) and the three Caldera traps fixed (characters report contacts, a `Steer` walks a character, a `Probe` gives scripts the ground and a ray). 12 new tests; every old test, the 51 golden scenes and the 51 playtests unchanged.\n- **World generation** from a seed: Gaea landform + Tellus detail and tiles, biomes, start, altars, camps (`tools/gen_wyrdwood.py`). **The sky**: a 25-minute day, a moonlit night, six kinds of weather.\n- Next: vegetation streaming, rain, crafting and inventory, building, combat (M1 to M3).\n- **This board is the editor's Canvas tab** (`lunaris-editor --canvas examples/wyrdwood/wyrdwood.canvas`): it reads Obsidian's canvas files and follows the file when it is saved, so the plan stays on screen while the work goes on.",
    "x": 400,
    "y": -90,
    "width": 560,
@@ -397,6 +397,136 @@
    "y": 2270,
    "width": 3900,
    "height": 160,
+   "color": "2"
+  },
+  {
+   "id": "g_parity",
+   "type": "group",
+   "label": "As close to the reference game as possible: feel, structure and systems, never its names, models, sounds, lore or code (the user's order, 2026-10-15)",
+   "x": -1480,
+   "y": 2520,
+   "width": 4040,
+   "height": 760,
+   "color": "2"
+  },
+  {
+   "id": "v1",
+   "type": "text",
+   "text": "**Camera and controls**\nthird person behind the shoulder, mouse look, scroll zoom, a first-person toggle; walk, run, jump, sneak, roll with grace frames. **M1**",
+   "x": -1450,
+   "y": 2600,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v2",
+   "type": "text",
+   "text": "**Survival**\nhealth + stamina, three foods at a time (no hunger bar), rested bonus at a fire and a bed, wet and cold. **M2-M3**",
+   "x": -450,
+   "y": 2600,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v3",
+   "type": "text",
+   "text": "**Gathering**\na felled tree falls over and leaves a stump; boulders break into stones; pick up flint, berries, mushrooms. **M1**",
+   "x": 550,
+   "y": 2600,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v4",
+   "type": "text",
+   "text": "**Building**\nhammer menu, snapping pieces, workbench must be near and under a roof, stations grow with what is built beside them. **M2**",
+   "x": 1550,
+   "y": 2600,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v5",
+   "type": "text",
+   "text": "**Structural integrity**\nblue / green / yellow / red by support, unsupported pieces fall, rain rots open timber, a fire needs smoke to leave. **M2**",
+   "x": -1450,
+   "y": 2820,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v6",
+   "type": "text",
+   "text": "**Combat**\nweapon types, bow with a draw, shield block and parry, backstab, stagger; durability and repair. **M3**",
+   "x": -450,
+   "y": 2820,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v7",
+   "type": "text",
+   "text": "**Creatures**\nskittish deer, boars you can tame, wolf packs, night monsters; flee, aggro, sleep, drops. **M3**",
+   "x": 550,
+   "y": 2820,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v8",
+   "type": "text",
+   "text": "**Bosses and biomes**\nfive altars with offerings, a power each; rings of biomes gated by gear and metal. **M3-M7**",
+   "x": 1550,
+   "y": 2820,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v9",
+   "type": "text",
+   "text": "**World and weather**\nhalf-hour day, mist, rain, storms, snow; map that fills as you walk, pins; portals; tombstone run. **M1-M5**",
+   "x": -1450,
+   "y": 3040,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v10",
+   "type": "text",
+   "text": "**Sailing**\nraft, boat, ship: oars, sails, wind, sea monsters. **M6**",
+   "x": -450,
+   "y": 3040,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v11",
+   "type": "text",
+   "text": "**Skills**\nrunning, swimming, axes, bows rise with use. **M3**",
+   "x": 550,
+   "y": 3040,
+   "width": 960,
+   "height": 190,
+   "color": "2"
+  },
+  {
+   "id": "v12",
+   "type": "text",
+   "text": "**The look**\nlow-detail models and textures under beautiful light: fog, bloom, shafts, shadows, one grade per hour. **every milestone**",
+   "x": 1550,
+   "y": 3040,
+   "width": 960,
+   "height": 190,
    "color": "2"
   }
  ],

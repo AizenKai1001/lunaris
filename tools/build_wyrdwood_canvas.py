@@ -42,7 +42,7 @@ text("core", -320, -90, 640, 250,
      "# Wyrdwood\nAn **original** 3D survival and building game for 1 to 10 players, built on **Lunaris** to find what the engine lacks (like Caldera did).\n\nSeeded archipelago, five Wardens, bases that must stand, stamina fights, boats, weather.\n\nPlan file: `examples/wyrdwood/PLAN.md`" + (" · notes: [[Wyrdwood - Overview]] · engine: [[Lunaris - Project Hub]]" if LINKS else ""), "6")
 
 text("status", 400, -90, 560, 250,
-     "## Where it stands (2026-10-15)\n- Plan written and committed.\n- **Character motion done**: swim, wade, roll, ladders, ledge pull-up (`CharacterMotion`, `Climbable`) and the three Caldera traps fixed (characters report contacts, a `Steer` walks a character, a `Probe` gives scripts the ground and a ray). 12 new tests; every old test, the 51 golden scenes and the 51 playtests unchanged.\n- Next: foot IK, then destruction, then the M1 island.\n- **This board is the editor's Canvas tab** (`lunaris-editor --canvas examples/wyrdwood/wyrdwood.canvas`): it reads Obsidian's canvas files and follows the file when it is saved, so the plan stays on screen while the work goes on.", "4")
+     "## Where it stands (2026-10-15)\n- Plan written and committed.\n- **Character motion done**: swim, wade, roll, ladders, ledge pull-up (`CharacterMotion`, `Climbable`) and the three Caldera traps fixed (characters report contacts, a `Steer` walks a character, a `Probe` gives scripts the ground and a ray). 12 new tests; every old test, the 51 golden scenes and the 51 playtests unchanged.\n- **World generation** from a seed: Gaea landform + Tellus detail and tiles, biomes, start, altars, camps (`tools/gen_wyrdwood.py`). **The sky**: a 25-minute day, a moonlit night, six kinds of weather.\n- Next: vegetation streaming, rain, crafting and inventory, building, combat (M1 to M3).\n- **This board is the editor's Canvas tab** (`lunaris-editor --canvas examples/wyrdwood/wyrdwood.canvas`): it reads Obsidian's canvas files and follows the file when it is saved, so the plan stays on screen while the work goes on.", "4")
 
 # ------------------------------------------------------------------ pillars
 group("g_pillars", -1480, -420, 1000, 640, "The five pillars", "5")
@@ -154,6 +154,25 @@ for w, m, label in [("w1", "m1", "needs"), ("w2", "m1", "needs"), ("w4", "m2", "
 
 text("rules", -1450, 2270, 3900, 160,
      "**What I will not claim**: that the Wardens, regions or two kilometres exist before they are played and photographed; that combat or building feels good because it works (every playtest note goes in `docs/DOGFOOD_WYRDWOOD.md`, bad parts included); that multiplayer works until two real windows on two machines finish a session with the same state hash.", "2")
+
+# ------------------------------------------------------------------ as close to the reference game as possible
+group("g_parity", -1480, 2520, 4040, 760, "As close to the reference game as possible: feel, structure and systems, never its names, models, sounds, lore or code (the user's order, 2026-10-15)", "2")
+parity = [
+    ("v1", "**Camera and controls**\nthird person behind the shoulder, mouse look, scroll zoom, a first-person toggle; walk, run, jump, sneak, roll with grace frames. **M1**"),
+    ("v2", "**Survival**\nhealth + stamina, three foods at a time (no hunger bar), rested bonus at a fire and a bed, wet and cold. **M2-M3**"),
+    ("v3", "**Gathering**\na felled tree falls over and leaves a stump; boulders break into stones; pick up flint, berries, mushrooms. **M1**"),
+    ("v4", "**Building**\nhammer menu, snapping pieces, workbench must be near and under a roof, stations grow with what is built beside them. **M2**"),
+    ("v5", "**Structural integrity**\nblue / green / yellow / red by support, unsupported pieces fall, rain rots open timber, a fire needs smoke to leave. **M2**"),
+    ("v6", "**Combat**\nweapon types, bow with a draw, shield block and parry, backstab, stagger; durability and repair. **M3**"),
+    ("v7", "**Creatures**\nskittish deer, boars you can tame, wolf packs, night monsters; flee, aggro, sleep, drops. **M3**"),
+    ("v8", "**Bosses and biomes**\nfive altars with offerings, a power each; rings of biomes gated by gear and metal. **M3-M7**"),
+    ("v9", "**World and weather**\nhalf-hour day, mist, rain, storms, snow; map that fills as you walk, pins; portals; tombstone run. **M1-M5**"),
+    ("v10", "**Sailing**\nraft, boat, ship: oars, sails, wind, sea monsters. **M6**"),
+    ("v11", "**Skills**\nrunning, swimming, axes, bows rise with use. **M3**"),
+    ("v12", "**The look**\nlow-detail models and textures under beautiful light: fog, bloom, shafts, shadows, one grade per hour. **every milestone**"),
+]
+for i, (id, body) in enumerate(parity):
+    text(id, -1450 + (i % 4) * 1000, 2600 + (i // 4) * 220, 960, 190, body, "2")
 
 edge("core", "sys_part", "what it needs", fa="bottom", tb="top")
 

@@ -96,6 +96,34 @@ Roughly: M1 to M3 are the game's first hour and are the first target; M4 to M5 a
 6. **Morph targets and retargeting**, when equipment on bodies is wanted (M3 to M7).
 7. The `high.rs` parallel hang, whenever it blocks.
 
+## As close to the reference game as possible
+
+The user's order (2026-10-15): "get it as close to valheim as possible". That means **feel, structure and systems**: the same kind of loop, the same kinds of rules, the same look of light and fog, the same pace. It does not mean its names, models, sounds, maps, lore or code: those stay our own, and the design is rebuilt from how the game plays, not from its files. This table is the checklist; "ours" is what to build, "when" the milestone that needs it.
+
+| Feature of the reference game | Ours | When |
+|---|---|---|
+| Third-person camera behind the shoulder, mouse look, scroll to zoom, a first-person toggle | `CameraRig` orbit with `CameraCollide`; a first-person view on a key | M1 |
+| Walk, run, jump, crouch to sneak, a roll with grace frames, swimming that costs stamina | `CharacterMotion` (done), stamina in the hero system, a sneak stance (slower, quieter, harder to see) | M1 |
+| Stamina and health, no hunger bar: three foods at a time that set the maximum of both and tick away; resting at a fire gives a "rested" bonus; a wet and a cold status | food slots, buffs with timers, comfort from the things around a bed and a fire, `Wet` and `Cold` statuses | M2 to M3 |
+| Chop a tree with an axe: it falls over and breaks into logs, a stump stays; mine boulders with a pick; pick up stones, flint, berries, mushrooms off the ground | felled trees with a falling arc and a stump, boulders that break into stones, picked-up things on the ground | M1 |
+| Tools and weapons wear out and are repaired at a workbench | durability on items, repair at stations | M2 |
+| A hammer opens the build menu; pieces snap together; a workbench must be near (and under a roof) to craft; stations grow by what is built beside them | a build menu, snap points on every piece, a station query (`nearby`), station levels from nearby pieces | M2 |
+| **Structural integrity**: pieces are blue, green, yellow or red by how well they are held; a piece with no support falls; the ground and strong beams carry weight | support values per material, propagated from the ground, a colour overlay in the build mode, collapse when unsupported | M2 |
+| Rain wets and rots unprotected timber; a fire needs a way for the smoke out; shelter counts | exposure test (a ray up through the roof), smoke, shelter state | M2 |
+| Weather and a day of about half an hour: mist in the morning, rain, storms, snow in the mountains; wind that matters at sea | `TimeOfDay`, weather states with fog, rain particles, wind direction as a resource | M1 to M4 |
+| Creatures: skittish deer, aggressive boars that can be tamed, packs of wolves, night monsters, camps; they flee, aggro, sleep, drop things | `Steer`, `Sensor`, `BehaviorTree` creature rules with spawners by region and hour; taming | M3 |
+| Melee with weapon types, a bow with a draw time, shield block and parry, backstab on the unaware, staggering big enemies | a combat system on `HitPoints` with block windows, a parry window, stagger, ranged arrows as bodies | M3 |
+| Five bosses called from altars with offerings, each giving a power you carry | five Wardens with an altar, an offering rule and a power | M3 to M7 |
+| Biomes in rings around the start, each needing better gear; ore and metals gate the tools | regions and the tool tiers of the plan | M4 to M7 |
+| A map that fills in as you explore, pins you place, a minimap | a map texture revealed by where you walked, pins, `CameraView` minimap | M4 |
+| Portals between bases, dying and running back to your tombstone for your things | portals, a tombstone with the inventory | M5 |
+| Sailing: a raft, a boat and a ship with oars, sails and wind; sea monsters | a boat controller with `Buoyant` hulls, wind, oars, sea creatures | M6 |
+| Skills that rise as you use them (running, swimming, axes, bows) | per-skill levels from use, each giving a small bonus | M3 |
+| Up to ten players on a host or a dedicated server, joining and leaving at will | snapshot join over `lunaris-net`, a dedicated server run | M5 |
+| The look: low-detail models and textures with beautiful light, fog, bloom, shafts and shadows | flat-shaded low-poly models, the GPU high quality with `HeightFog`, `PostFx`, `AutoExposure`, `Ssr`, `LensFlare`, a grade per hour | every milestone |
+
+What is *not* copied, on purpose: its creature, place, item and boss names, its music and sounds, its models and textures, its map and seed, its lore, and anything out of its files or its code. A reviewer should be able to play both and find the same *kind* of game and no shared asset.
+
 ## What I will not claim
 
 * That the five Wardens, the five regions or the two kilometres exist before they are played and photographed.
