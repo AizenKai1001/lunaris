@@ -46,6 +46,8 @@ pub enum PipeId {
     DepthShadow,
     Resolve,
     Ssao,
+    /// Temporal anti-aliasing: the picture blended with the last ones, drawn to the output and to the history.
+    Taa,
     /// Bounced light from the last picture (`GlobalIllumination`).
     Gi,
     SsaoBlur,
@@ -93,6 +95,7 @@ pub struct Layouts {
     pub resolve: BindGroupLayout,
     pub ssao: BindGroupLayout,
     pub gi0: BindGroupLayout,
+    pub taa0: BindGroupLayout,
     pub blur: BindGroupLayout,
     pub bloom_first: BindGroupLayout,
     pub bloom_chain: BindGroupLayout,
@@ -189,6 +192,7 @@ impl Layouts {
             text0: make("text0", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering())]),
             resolve: make("resolve", &[entry(2, tex_float())]),
             ssao: make("ssao", &[entry(0, uniform()), entry(1, tex_depth())]),
+            taa0: make("taa0", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(16, tex_float())]),
             gi0: make("gi0", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float())]),
             blur: make("ssao-blur", &[entry(0, uniform()), entry(1, tex_depth()), entry(5, sampler_filtering()), entry(6, tex_float()), entry(14, tex_float()), entry(15, tex_float())]),
             bloom_first: make("bloom-first", &[entry(0, uniform()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(8, storage_ro())]),
@@ -302,6 +306,20 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
                 multisample: ms,
                 fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_mesh"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),
+                multiview_mask: None,
+                cache: None,
+            })
+        }
+        PipeId::Taa => {
+            let pl = layout("taa", &[&ly.taa0]);
+            device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("fs_taa"),
+                layout: Some(&pl),
+                vertex: VertexState { module: &sh.post, entry_point: Some("vs_full"), compilation_options: Default::default(), buffers: &[] },
+                primitive: tri(None),
+                depth_stencil: None,
+                multisample: none,
+                fragment: Some(FragmentState { module: &sh.post, entry_point: Some("fs_taa"), compilation_options: Default::default(), targets: &[target(key.format.expect("format"), None), target(HDR, None)] }),
                 multiview_mask: None,
                 cache: None,
             })

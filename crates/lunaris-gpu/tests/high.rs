@@ -741,3 +741,99 @@ fn the_penumbra_of_a_sun_shadow_widens_with_the_height_of_what_casts_it() {
     let zero = draw_owned(&mut gpu, &scene(r#"{"softness":0}"#), &q, 640, 360);
     assert_eq!(hard.rgba, zero.rgba);
 }
+
+#[test]
+fn the_sky_of_the_air_is_blue_at_noon_red_at_sunset_and_dark_at_night() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // rotations as [x, y, z, w]: yaw about up, pitch about the side
+    let q = |yaw: f32, pitch: f32| -> String {
+        let (sy, cy) = ((yaw.to_radians() * 0.5).sin(), (yaw.to_radians() * 0.5).cos());
+        let (sp, cp) = ((pitch.to_radians() * 0.5).sin(), (pitch.to_radians() * 0.5).cos());
+        // Ry(yaw) * Rx(pitch)
+        format!("[{},{},{},{}]", cy * sp, sy * cp, -sy * sp, cy * cp)
+    };
+    // the camera looks along +x and a little up; the sun stands at +x (the light travels towards -x) at an elevation given in degrees
+    let scene = |elevation: f32, air: &str| -> Vec<String> {
+        let mut v = vec![
+            format!(r#"{{"uid":1,"components":{{"Camera":{{"fov_y":60,"clear":[0,0,0,1]}},"Transform":{{"pos":[0,1.7,0],"rot":{}}}}}}}"#, q(-90.0, 22.0)),
+            format!(r#"{{"uid":2,"components":{{"Light":{{"kind":0,"intensity":3,"color":[1,1,1]}},"Transform":{{"rot":{}}}}}}}"#, q(90.0, -elevation)),
+            r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"bloom":0,"ssao":0,"shadows":false,"tonemap":1,"exposure":1.0,"vignette":0}}}"#.to_string(),
+        ];
+        if !air.is_empty() {
+            v.push(format!(r#"{{"uid":10,"components":{{"Atmosphere":{air}}}}}"#));
+        }
+        v
+    };
+    let mean = |f: &Frame| -> [f32; 3] {
+        let mut s = [0.0f32; 3];
+        for p in f.rgba.chunks_exact(4) {
+            for k in 0..3 {
+                s[k] += p[k] as f32;
+            }
+        }
+        let n = (f.rgba.len() / 4) as f32;
+        [s[0] / n, s[1] / n, s[2] / n]
+    };
+    let qh = Quality::high();
+    let noon = mean(&draw_owned(&mut gpu, &scene(80.0, "{}"), &qh, 320, 180));
+    let sunset = mean(&draw_owned(&mut gpu, &scene(3.0, "{}"), &qh, 320, 180));
+    let night = mean(&draw_owned(&mut gpu, &scene(-25.0, "{}"), &qh, 320, 180));
+    eprintln!("noon {noon:?}, sunset {sunset:?}, night {night:?}");
+    assert!(noon[2] > noon[0] * 1.25, "a noon sky is blue: {noon:?}");
+    let (r_noon, r_sunset) = (noon[0] / noon[2], sunset[0] / sunset[2]);
+    assert!(r_sunset > r_noon * 1.6, "looking at a low sun the sky is red: {r_sunset} vs {r_noon}");
+    assert!(lum([night[0] as u8, night[1] as u8, night[2] as u8]) < 0.2 * lum([noon[0] as u8, noon[1] as u8, noon[2] as u8]), "{night:?} vs {noon:?}");
+    // haze whitens: more turbidity, less blue over red
+    let hazy = mean(&draw_owned(&mut gpu, &scene(80.0, r#"{"turbidity":9}"#), &qh, 320, 180));
+    assert!(hazy[2] / hazy[0] < noon[2] / noon[0], "haze whitens the sky: {hazy:?} vs {noon:?}");
+    // switched off it is the picture without it, and the lower qualities and classic do not draw it
+    let off = draw_owned(&mut gpu, &scene(80.0, ""), &qh, 320, 180);
+    let disabled = draw_owned(&mut gpu, &scene(80.0, r#"{"enabled":false}"#), &qh, 320, 180);
+    assert_eq!(off.rgba, disabled.rgba);
+    for quality in [Quality::classic(), Quality::low()] {
+        let (a, b) = (draw_owned(&mut gpu, &scene(80.0, ""), &quality, 160, 90), draw_owned(&mut gpu, &scene(80.0, "{}"), &quality, 160, 90));
+        if quality.mode == lunaris_gpu::Mode::Classic {
+            assert_eq!(a.rgba, b.rgba, "classic has no atmosphere");
+        }
+    }
+}
+
+#[test]
+fn temporal_anti_aliasing_smooths_the_edges_and_is_the_same_every_time() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // a white block turned a little, seen against black: its edges are the only places where the picture has in-between values
+    let scene: Vec<String> = [
+        r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0,0,0,1]},"Transform":{"pos":[0,0.5,6]}}}"#,
+        r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":2.5},"Transform":{"rot":[-0.2,0.35,0,0.91]}}}"#,
+        r#"{"uid":3,"components":{"Transform":{"pos":[0,0,0],"rot":[0.0,0.19,0.0,0.98],"scale":[1.6,1.6,1.6]},"MeshRenderer":{"mesh":"cube","color":[1,1,1,1],"roughness":0.9,"emissive":0.6}}}"#,
+        r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":0.3,"bloom":0,"ssao":0,"shadows":false,"tonemap":2,"vignette":0}}}"#,
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    let on = Quality::high();
+    let off = Quality { taa: false, ..Quality::high() };
+    let levels = |f: &Frame| -> usize {
+        let mut seen = std::collections::BTreeSet::new();
+        for y in 0..f.height {
+            for x in 0..f.width {
+                let l = lum(px(f, x, y)) as i32;
+                if (12..243).contains(&l) {
+                    seen.insert(l);
+                }
+            }
+        }
+        seen.len()
+    };
+    let (a, b) = (draw_owned(&mut gpu, &scene, &on, 480, 270), draw_owned(&mut gpu, &scene, &off, 480, 270));
+    let (la, lb) = (levels(&a), levels(&b));
+    eprintln!("in-between values on the edges: with {la}, without {lb}");
+    assert!(la > lb + 8, "temporal anti-aliasing gives the edges more steps: {la} vs {lb}");
+    // a still made twice is the same picture, and it is a different picture from the one without
+    assert_eq!(a.rgba, draw_owned(&mut gpu, &scene, &on, 480, 270).rgba);
+    assert_ne!(a.rgba, b.rgba);
+    // the picture is not smeared: the block is where it was (the middle of the picture is as bright)
+    assert!((lum(px(&a, 240, 135)) - lum(px(&b, 240, 135))).abs() < 25.0);
+    // the lower qualities do not have it
+    assert!(!Quality::medium().taa && !Quality::low().taa && !Quality::classic().taa && Quality::ultra().taa);
+}

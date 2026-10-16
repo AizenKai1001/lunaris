@@ -887,6 +887,9 @@ pub struct EnvData {
     pub gi: [f32; 4],
     /// `Shadows.softness` (0 = the plain filter).
     pub shadow_soft: f32,
+    /// `Atmosphere`: on (0/1), turbidity, rayleigh, mie_g, intensity, haze glow. The sky colours below are then these, in the linear working space.
+    pub atmo: [f32; 6],
+    pub atmo_linear: Option<[V3; 3]>,
     /// `ColorGrade`: lift rgb + temperature, gamma rgb + tint shift, gain rgb, and the fade colour + amount (all identity by default).
     pub grade_a: [f32; 4],
     pub grade_b: [f32; 4],
@@ -910,7 +913,7 @@ impl EnvData {
         let c = [clear[0], clear[1], clear[2]];
         let mix = |a: V3, b: V3, t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
         let sky = mix(c, [0.52, 0.55, 0.62], 0.7);
-        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], volumetrics: [0.0; 8], gi: [0.0; 4], shadow_soft: 0.0, grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
+        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], volumetrics: [0.0; 8], gi: [0.0; 4], shadow_soft: 0.0, atmo: [0.0; 6], atmo_linear: None, grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
     }
 
     fn from_component(e: &Environment) -> EnvData {
@@ -947,6 +950,8 @@ impl EnvData {
             volumetrics: [0.0; 8],
             gi: [0.0; 4],
             shadow_soft: 0.0,
+            atmo: [0.0; 6],
+            atmo_linear: None,
             grade_a: [0.0; 4],
             grade_b: [1.0, 1.0, 1.0, 0.0],
             grade_c: [1.0, 1.0, 1.0, 0.0],
@@ -1259,6 +1264,27 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         .collect();
     // both renderers draw the first sixteen; the GPU renderer may choose its sixteen from all of them (the nearest ones)
     let mut lights: Vec<LightData> = all_lights.iter().take(16).copied().collect();
+    // the sky of the air: its colours at the zenith and the horizon (ambient light, fog) from the direction of the sun, and the sun's light reddened and dimmed on its way down
+    {
+        let mut atm: Vec<(u64, lunaris_sim::components::Atmosphere)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::Atmosphere,), _>(|_, uid, (a,)| atm.push((uid, *a)))?;
+        if let Some((_, a)) = atm.into_iter().filter(|x| x.1.enabled).min_by_key(|x| x.0) {
+            if let Some(sun) = all_lights.iter().find(|l| !l.point).map(|l| l.vec) {
+                let f = |x: f32, lo: f32, hi: f32, d: f32| if x.is_finite() { x.clamp(lo, hi) } else { d };
+                let air = crate::atmosphere::Air { turbidity: f(a.turbidity, 0.5, 30.0, 2.0), rayleigh: f(a.rayleigh, 0.1, 6.0, 1.0), mie_g: f(a.mie_g, 0.0, 0.95, 0.76), intensity: f(a.intensity, 0.0, 16.0, 1.0) };
+                let h_km = (cam.pos[1] * 0.001).clamp(0.0, 5.0);
+                let (zenith, horizon, factor) = crate::atmosphere::summary(h_km, sun, &air);
+                env.atmo = [1.0, air.turbidity, air.rayleigh, air.mie_g, air.intensity, f(a.haze_glow, 0.0, 8.0, 1.5)];
+                env.atmo_linear = Some([zenith, horizon, horizon]);
+                for l in all_lights.iter_mut().filter(|l| !l.point) {
+                    l.color = [l.color[0] * factor[0], l.color[1] * factor[1], l.color[2] * factor[2]];
+                }
+                for l in lights.iter_mut().filter(|l| !l.point) {
+                    l.color = [l.color[0] * factor[0], l.color[1] * factor[1], l.color[2] * factor[2]];
+                }
+            }
+        }
+    }
     if lights.is_empty() {
         lights.push(LightData { vec: normalize([-0.4, 0.8, 0.6]), point: false, color: [1.0, 1.0, 1.0], range: 1.0, spot_dir: [0.0, -1.0, 0.0], cos_outer: -2.0, cos_inner: -2.0 });
         lights.push(LightData { vec: normalize([0.7, 0.2, 0.3]), point: false, color: [0.3, 0.3, 0.35], range: 1.0, spot_dir: [0.0, -1.0, 0.0], cos_outer: -2.0, cos_inner: -2.0 });

@@ -91,10 +91,18 @@ struct Frame {
     p23: vec4<f32>,
     // the share of the new bounced light in what is shown
     p24: vec4<f32>,
+    // the sky of the air: turbidity, rayleigh, mie_g, intensity; then (x) on, (y) the glow of fog towards the sun
+    p25: vec4<f32>,
+    p26: vec4<f32>,
+    // temporal anti-aliasing: the share of the new picture, and (y) 1 when it is on
+    p27: vec4<f32>,
     // each probe: its centre (xyz), then half the size of its box (xyz)
     probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)
     prev_view_proj: mat4x4<f32>,
+    // the view-projection of this picture and of the last one, without the sub-pixel shift (temporal anti-aliasing)
+    unj_vp: mat4x4<f32>,
+    unj_prev_vp: mat4x4<f32>,
     psh: array<PointShadow, 2>,
     lights: array<Light, 16>,
 };

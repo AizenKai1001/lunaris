@@ -76,10 +76,96 @@ fn cloud_layer(dir: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(mix(dark, bright, lit), d * fade);
 }
 
+// ---- the sky of the air (`Atmosphere`): Nishita's single scattering, summed along the view ray in 16 steps with 6 towards the sun at each. The same sums as `lunaris_render::atmosphere` (kilometres).
+const R_EARTH: f32 = 6360.0;
+const R_TOP: f32 = 6420.0;
+
+fn far_hit(o: vec3<f32>, d: vec3<f32>, r: f32) -> f32 {
+    let b = dot(o, d);
+    let c = dot(o, o) - r * r;
+    let disc = b * b - c;
+    if (disc < 0.0) {
+        return -1.0;
+    }
+    return -b + sqrt(disc);
+}
+
+fn atmosphere_sky(dir: vec3<f32>) -> vec3<f32> {
+    let beta_r = vec3<f32>(0.0058, 0.0135, 0.0331);
+    let beta_m = 0.021;
+    let turb = frame.p25.x * 0.5;
+    let ray = frame.p25.y;
+    let g = frame.p25.z;
+    let sun = normalize(frame.sun_dir.xyz);
+    let h0 = clamp(frame.eye.y * 0.001, 0.0, 5.0);
+    let o = vec3<f32>(0.0, R_EARTH + h0 + 0.0005, 0.0);
+    let d = normalize(vec3<f32>(dir.x, max(dir.y, 0.0), dir.z));
+    let t_max = far_hit(o, d, R_TOP);
+    if (t_max <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let ds = t_max / 16.0;
+    var od_r = 0.0;
+    var od_m = 0.0;
+    var sum_r = vec3<f32>(0.0);
+    var sum_m = vec3<f32>(0.0);
+    for (var i = 0; i < 16; i = i + 1) {
+        let p = o + d * ((f32(i) + 0.5) * ds);
+        let h = length(p) - R_EARTH;
+        let hr = exp(-h / 8.0) * ds * ray;
+        let hm = exp(-h / 1.2) * ds * turb;
+        od_r = od_r + hr;
+        od_m = od_m + hm;
+        let tl = far_hit(p, sun, R_TOP);
+        if (tl <= 0.0) {
+            continue;
+        }
+        let dl = tl / 6.0;
+        var odr_l = 0.0;
+        var odm_l = 0.0;
+        var shadow = false;
+        for (var j = 0; j < 6; j = j + 1) {
+            let q = p + sun * ((f32(j) + 0.5) * dl);
+            let hq = length(q) - R_EARTH;
+            if (hq < 0.0) {
+                shadow = true;
+                break;
+            }
+            odr_l = odr_l + exp(-hq / 8.0) * dl * ray;
+            odm_l = odm_l + exp(-hq / 1.2) * dl * turb;
+        }
+        if (shadow) {
+            continue;
+        }
+        let att = exp(-(beta_r * (od_r + odr_l) + vec3<f32>(beta_m * 1.1 * (od_m + odm_l))));
+        sum_r = sum_r + att * hr;
+        sum_m = sum_m + att * hm;
+    }
+    let cosg = dot(d, sun);
+    let ph_r = 3.0 / (16.0 * PI) * (1.0 + cosg * cosg);
+    let ph_m = 3.0 / (8.0 * PI) * ((1.0 - g * g) * (1.0 + cosg * cosg)) / ((2.0 + g * g) * pow(max(1.0 + g * g - 2.0 * g * cosg, 1.0e-4), 1.5));
+    return 20.0 * frame.p25.w * (sum_r * beta_r * ph_r + sum_m * beta_m * ph_m);
+}
+
+// The colour fog has looking along `dir`: its own colour, and (with the sky of the air) brighter towards the sun, the haze that glows round it.
+fn fog_color_toward(dir: vec3<f32>) -> vec3<f32> {
+    if (frame.p26.x < 0.5) {
+        return frame.fog.rgb;
+    }
+    let cs = max(dot(dir, normalize(frame.sun_dir.xyz)), 0.0);
+    return frame.fog.rgb * (1.0 + frame.p26.y * pow(cs, 6.0)) + frame.sun_color.rgb * (0.04 * frame.p26.y * pow(cs, 24.0));
+}
+
 fn sky_color(dir: vec3<f32>, with_sun: bool) -> vec3<f32> {
     let t = dir.y;
     var c: vec3<f32>;
-    if (t >= 0.0) {
+    if (frame.p26.x > 0.5 && with_sun) {
+        // the sky of the air, and below the horizon the ground
+        c = atmosphere_sky(dir);
+        if (t < 0.0) {
+            c = mix(c, frame.ground.rgb, clamp(-t * 6.0, 0.0, 1.0));
+        }
+    } else if (t >= 0.0) {
         c = mix(frame.sky_horizon.rgb, frame.sky_top.rgb, pow(clamp(t, 0.0, 1.0), 0.36));
     } else {
         c = mix(frame.sky_horizon.rgb, frame.ground.rgb, clamp(-t * 6.0, 0.0, 1.0));

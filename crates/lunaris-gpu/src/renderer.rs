@@ -42,27 +42,29 @@ pub struct Quality {
     pub bloom: bool,
     /// Depth of field (when the `Environment` asks for it).
     pub dof: bool,
+    /// Temporal anti-aliasing: the picture is drawn with the pixel grid shifted a little every time and blended with the last ones (a still is drawn several times and averaged).
+    pub taa: bool,
 }
 
 impl Quality {
     pub fn classic() -> Quality {
-        Quality { mode: Mode::Classic, msaa: 1, shadow_size: 1024, point_shadow_size: 0, shadows: false, ssao: false, bloom: false, dof: false }
+        Quality { mode: Mode::Classic, msaa: 1, shadow_size: 1024, point_shadow_size: 0, shadows: false, ssao: false, bloom: false, dof: false, taa: false }
     }
 
     pub fn low() -> Quality {
-        Quality { mode: Mode::High, msaa: 1, shadow_size: 1024, point_shadow_size: 0, shadows: true, ssao: false, bloom: false, dof: false }
+        Quality { mode: Mode::High, msaa: 1, shadow_size: 1024, point_shadow_size: 0, shadows: true, ssao: false, bloom: false, dof: false, taa: false }
     }
 
     pub fn medium() -> Quality {
-        Quality { mode: Mode::High, msaa: 4, shadow_size: 1024, point_shadow_size: 512, shadows: true, ssao: false, bloom: true, dof: false }
+        Quality { mode: Mode::High, msaa: 4, shadow_size: 1024, point_shadow_size: 512, shadows: true, ssao: false, bloom: true, dof: false, taa: false }
     }
 
     pub fn high() -> Quality {
-        Quality { mode: Mode::High, msaa: 4, shadow_size: 2048, point_shadow_size: 1024, shadows: true, ssao: true, bloom: true, dof: true }
+        Quality { mode: Mode::High, msaa: 4, shadow_size: 2048, point_shadow_size: 1024, shadows: true, ssao: true, bloom: true, dof: true, taa: true }
     }
 
     pub fn ultra() -> Quality {
-        Quality { mode: Mode::High, msaa: 4, shadow_size: 4096, point_shadow_size: 2048, shadows: true, ssao: true, bloom: true, dof: true }
+        Quality { mode: Mode::High, msaa: 4, shadow_size: 4096, point_shadow_size: 2048, shadows: true, ssao: true, bloom: true, dof: true, taa: true }
     }
 
     /// "classic", "low", "medium", "high" or "ultra".
@@ -162,8 +164,16 @@ struct FrameU {
     p23: [f32; 4],
     /// the share of the new bounced light in what is shown (the rest is the last pictures')
     p24: [f32; 4],
+    /// the sky of the air: turbidity, rayleigh, mie_g, intensity; then (x) on, (y) the glow of fog towards the sun
+    p25: [f32; 4],
+    p26: [f32; 4],
+    /// temporal anti-aliasing: the share of the new picture, and (y) 1 when it is on
+    p27: [f32; 4],
     probes: [[f32; 4]; 8],
     prev_view_proj: [f32; 16],
+    /// the view-projection of this picture and of the last one, without the sub-pixel shift (temporal anti-aliasing)
+    unj_vp: [f32; 16],
+    unj_prev_vp: [f32; 16],
     psh: [PointShadowU; 2],
     lights: [[f32; 4]; MAX_LIGHTS * 4],
 }
@@ -278,6 +288,10 @@ struct Targets {
     bg_resolve: wgpu::BindGroup,
     bg_ssao: Option<wgpu::BindGroup>,
     bg_gi: Option<wgpu::BindGroup>,
+    /// Temporal anti-aliasing: the composite's picture, and the two histories that take turns (the bind group of index i writes history i and reads the other).
+    taa_in: Option<wgpu::TextureView>,
+    taa_hist: Option<[wgpu::TextureView; 2]>,
+    bg_taa: Option<[wgpu::BindGroup; 2]>,
     bg_blur: Option<[wgpu::BindGroup; 2]>,
 }
 
@@ -396,6 +410,11 @@ pub struct GpuRenderer {
     /// Which of the two `ao` textures the last picture with bounced light made, and how many pictures the bounce has been blended over.
     gi_flip: usize,
     gi_age: u32,
+    /// Temporal anti-aliasing: which history the last picture wrote, how many pictures are blended, the place in the jitter sequence, and the last picture's view-projection without the jitter.
+    taa_flip: usize,
+    taa_age: u32,
+    taa_index: u32,
+    prev_unj_vp: Option<[f32; 16]>,
     out_image: Option<(u32, u32, wgpu::Texture)>,
     readback: Option<(u64, wgpu::Buffer)>,
     id_targets: Option<IdTargets>,
@@ -586,6 +605,10 @@ impl GpuRenderer {
             fx_frame: 0,
             gi_flip: 0,
             gi_age: 0,
+            taa_flip: 0,
+            taa_age: 0,
+            taa_index: 0,
+            prev_unj_vp: None,
             out_image: None,
             readback: None,
             id_targets: None,
@@ -1067,6 +1090,7 @@ impl GpuRenderer {
         }
         self.targets = None;
         self.gi_age = 0;
+        self.taa_age = 0;
         let rt = wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING;
         let view = |t: &wgpu::Texture| t.create_view(&wgpu::TextureViewDescriptor::default());
         let high = mode == Mode::High;
@@ -1076,7 +1100,7 @@ impl GpuRenderer {
         let hdr_ms = if samples > 1 { Some(view(&self.texture("hdr-ms", w, h, 1, 1, samples, HDR, rt))) } else { None };
         let depth = view(&self.texture("depth", w, h, 1, 1, samples, DEPTH, wgpu::TextureUsages::RENDER_ATTACHMENT));
         let bg_resolve = self.group("resolve", &self.layouts.resolve, &[wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&hdr) }]);
-        let mut t = Targets { w, h, mode, msaa, hdr, hdr_ms, depth, pre_depth: None, ao: None, ao_raw: None, gi_raw: None, bloom: None, bg_resolve, bg_ssao: None, bg_gi: None, bg_blur: None };
+        let mut t = Targets { w, h, mode, msaa, hdr, hdr_ms, depth, pre_depth: None, ao: None, ao_raw: None, gi_raw: None, bloom: None, bg_resolve, bg_ssao: None, bg_gi: None, taa_in: None, taa_hist: None, bg_taa: None, bg_blur: None };
         if high {
             let pre = view(&self.texture("pre-depth", w, h, 1, 1, 1, DEPTH, rt));
             let ao_raw = view(&self.texture("ao-raw", w, h, 1, 1, 1, AO_RAW, rt));
@@ -1097,6 +1121,12 @@ impl GpuRenderer {
             let down: Vec<wgpu::BindGroup> = (0..levels - 1).map(|l| chain_bg(&views[l])).collect();
             let up: Vec<wgpu::BindGroup> = (0..levels - 1).map(|l| chain_bg(&views[l + 1])).collect();
             t.bloom = Some(Bloom { levels, first, down, up, views });
+            let taa_in = view(&self.texture("taa-in", w, h, 1, 1, 1, HDR, rt));
+            let taa_hist = [view(&self.texture("taa-history-a", w, h, 1, 1, 1, HDR, rt)), view(&self.texture("taa-history-b", w, h, 1, 1, 1, HDR, rt))];
+            let taa_bg = |read: &wgpu::TextureView| self.group("taa", &self.layouts.taa0, &[wgpu::BindGroupEntry { binding: 0, resource: frame.clone() }, wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&pre) }, wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&taa_in) }, wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&self.samplers.linear_clamp) }, wgpu::BindGroupEntry { binding: 16, resource: wgpu::BindingResource::TextureView(read) }]);
+            t.bg_taa = Some([taa_bg(&taa_hist[1]), taa_bg(&taa_hist[0])]);
+            t.taa_in = Some(taa_in);
+            t.taa_hist = Some(taa_hist);
             t.pre_depth = Some(pre);
             t.ao_raw = Some(ao_raw);
             t.gi_raw = Some(gi_raw);
@@ -1507,14 +1537,36 @@ impl GpuRenderer {
             self.gi_age = 0;
         }
         let gi_idx = self.gi_flip;
-        let need_depth = ao_pass || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
+        let taa_wants = high && q.taa && !probe_out && have_meshes;
+        let need_depth = taa_wants || ao_pass || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
         let bloom_on = high && q.bloom && env.bloom > 0.0;
         // eye adaptation needs something to measure: a flat 2D scene keeps its authored colours
         let ae_on = high && have_meshes && env.auto_exposure.is_some() && !probe_out;
         let aspect = w as f32 / h as f32;
 
         // ---- the frame uniform
-        let vp = to_gpu_clip(&scene.view_proj);
+        let taa_on = high && q.taa && !probe_out && have_meshes;
+        let vp_unj = to_gpu_clip(&scene.view_proj);
+        let mut vp = vp_unj;
+        // (a picture that is asked for the entity at each pixel is drawn without the shift, so that the ids are those of the picture's grid)
+        if taa_on && !want_ids {
+            // the pixel grid is shifted by a point of the Halton sequence (2, 3), up to half a pixel, a different one every picture
+            let halton = |mut i: u32, b: u32| -> f32 {
+                let (mut f, mut r) = (1.0f32, 0.0f32);
+                while i > 0 {
+                    f /= b as f32;
+                    r += f * (i % b) as f32;
+                    i /= b;
+                }
+                r
+            };
+            let k = self.taa_index % 8 + 1;
+            let (jx, jy) = (halton(k, 2) - 0.5, halton(k, 3) - 0.5);
+            let mut shift = lunaris_render::math::M4::identity();
+            shift.0[12] = jx * 2.0 / w as f32;
+            shift.0[13] = -jy * 2.0 / h as f32;
+            vp = shift.mul(&vp_unj);
+        }
         let view = scene.view;
         let lin = |c: V3| if high { display_to_linear(c) } else { c };
         let mut fu: FrameU = Zeroable::zeroed();
@@ -1561,10 +1613,12 @@ impl GpuRenderer {
             fu.sun_dir = v4(lights_sel[i].vec, 1.0);
             fu.sun_color = v4(lights_sel[i].color, 0.0);
         }
-        fu.sky_top = v4(lin(env.sky_top), 0.0);
-        fu.sky_horizon = v4(lin(env.sky_horizon), 0.0);
+        fu.sky_top = v4(env.atmo_linear.map_or_else(|| lin(env.sky_top), |a| a[0]), 0.0);
+        fu.sky_horizon = v4(env.atmo_linear.map_or_else(|| lin(env.sky_horizon), |a| a[1]), 0.0);
+        fu.p25 = [env.atmo[1], env.atmo[2], env.atmo[3], env.atmo[4]];
+        fu.p26 = [if env.atmo[0] > 0.5 && high { 1.0 } else { 0.0 }, env.atmo[5], 0.0, 0.0];
         fu.ground = v4(lin(env.ground), 0.0);
-        fu.fog = v4(lin(env.fog_color), env.fog);
+        fu.fog = v4(env.atmo_linear.map_or_else(|| lin(env.fog_color), |a| a[2]), env.fog);
         {
             let c = scene.cam.clear;
             fu.clear_color = v4(lin([c[0], c[1], c[2]]), 0.0);
@@ -1625,6 +1679,21 @@ impl GpuRenderer {
             }
         }
         fu.prev_view_proj = self.prev_vp.unwrap_or(vp.0);
+        fu.unj_vp = vp_unj.0;
+        fu.unj_prev_vp = self.prev_unj_vp.unwrap_or(vp_unj.0);
+        let taa_alpha = if taa_on { (1.0 / (self.taa_age as f32 + 1.0)).max(0.1) } else { 1.0 };
+        fu.p27 = [taa_alpha, if taa_on { 1.0 } else { 0.0 }, 0.0, 0.0];
+        if !probe_out {
+            self.prev_unj_vp = Some(vp_unj.0);
+        }
+        if taa_on {
+            self.taa_age = (self.taa_age + 1).min(1000);
+            self.taa_index = self.taa_index.wrapping_add(1);
+            self.taa_flip ^= 1;
+        } else {
+            self.taa_age = 0;
+        }
+        let taa_idx = self.taa_flip;
         self.prev_vp = Some(vp.0);
         fu.p4 = [if shadows_on { sun.expect("checked") as f32 } else { -1.0 }, 1.0, samples as f32, if scene.cam.ortho.is_some() { 1.0 } else { 0.0 }];
         for (i, l) in lights_sel.iter().take(MAX_LIGHTS).enumerate() {
@@ -1701,7 +1770,10 @@ impl GpuRenderer {
             if probe_out {
                 self.need(PipeId::ProbeResolve, 1, None)?;
             } else {
-                self.need(PipeId::Composite, samples, Some(out_format))?;
+                self.need(PipeId::Composite, samples, Some(if taa_on { HDR } else { out_format }))?;
+                if taa_on {
+                    self.need(PipeId::Taa, 1, Some(out_format))?;
+                }
             }
             if nverts > ui_n && !probe_out {
                 self.need(PipeId::TextOut, 1, Some(out_format))?;
@@ -2106,7 +2178,26 @@ impl GpuRenderer {
                 );
                 fullscreen(&mut enc, "probe-face", out_view, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::ProbeResolve, 1, None), &bg);
             } else {
-                fullscreen(&mut enc, "composite", out_view, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Composite, samples, Some(out_format)), composite_bg.as_ref().expect("high composite"));
+                if taa_on {
+                    fullscreen(&mut enc, "composite", t.taa_in.as_ref().expect("taa targets"), wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Composite, samples, Some(HDR)), composite_bg.as_ref().expect("high composite"));
+                    let hist = t.taa_hist.as_ref().expect("taa targets");
+                    let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("taa"),
+                        color_attachments: &[
+                            Some(wgpu::RenderPassColorAttachment { view: out_view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store } }),
+                            Some(wgpu::RenderPassColorAttachment { view: &hist[taa_idx], depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store } }),
+                        ],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    });
+                    pass.set_pipeline(self.pipe(PipeId::Taa, 1, Some(out_format)));
+                    pass.set_bind_group(0, &t.bg_taa.as_ref().expect("taa targets")[taa_idx], &[]);
+                    pass.draw(0..3, 0..1);
+                } else {
+                    fullscreen(&mut enc, "composite", out_view, wgpu::LoadOp::Clear(wgpu::Color::BLACK), self.pipe(PipeId::Composite, samples, Some(out_format)), composite_bg.as_ref().expect("high composite"));
+                }
             }
             if nverts > 0 && !probe_out {
                 let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -2211,7 +2302,7 @@ impl GpuRenderer {
             let s = self.probe_set.as_ref().expect("probe set");
             (s.size, s.levels)
         };
-        let q = Quality { mode: Mode::High, msaa: 1, shadow_size: base.shadow_size, point_shadow_size: base.point_shadow_size, shadows: true, ssao: false, bloom: false, dof: false };
+        let q = Quality { mode: Mode::High, msaa: 1, shadow_size: base.shadow_size, point_shadow_size: base.point_shadow_size, shadows: true, ssao: false, bloom: false, dof: false, taa: false };
         let dirs: [(V3, V3); 6] = [([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]), ([-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]), ([0.0, 1.0, 0.0], [0.0, 0.0, -1.0]), ([0.0, -1.0, 0.0], [0.0, 0.0, 1.0]), ([0.0, 0.0, 1.0], [0.0, 1.0, 0.0]), ([0.0, 0.0, -1.0], [0.0, 1.0, 0.0])];
         // what the pictures of the main view keep from one to the next is put back afterwards
         let (ae_valid, prev_vp, nested) = (self.ae_valid, self.prev_vp, textures.nested);
@@ -2332,13 +2423,18 @@ impl GpuRenderer {
         }
         let (w, h) = (opts.width, opts.height);
         let adapt = self.adapt_dt;
-        // bounced light is read from the last picture and blended over the last ones: a still lets it settle (seven pictures, a running average)
-        if quality.mode == Mode::High && quality.ssao && scene.env.gi[0] > 0.0 {
-            // the same pictures in the same order every time: a still made twice is the same picture
+        // bounced light is read from the last picture and blended over the last ones, and the anti-aliasing blends pictures with the pixel grid shifted: a still is drawn several times, the same ones in the same order
+        let gi_still = quality.mode == Mode::High && quality.ssao && scene.env.gi[0] > 0.0;
+        let taa_still = quality.mode == Mode::High && quality.taa;
+        if gi_still || taa_still {
             self.gi_age = 0;
+            self.taa_age = 0;
+            self.taa_index = 0;
             self.fx_frame = 0;
+            // the pictures before the last do not let the eye adapt any further (a step of no time)
+            let warm_adapt = adapt.map(|_| 0.0);
             for _ in 0..7 {
-                self.draw(&scene, w, h, Out::Image, quality, false, adapt)?;
+                self.draw(&scene, w, h, Out::Image, quality, false, warm_adapt)?;
             }
         }
         self.draw(&scene, w, h, Out::Image, quality, want_ids, adapt)?;

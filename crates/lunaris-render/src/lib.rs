@@ -1,5 +1,6 @@
 //! Lunaris reference renderer: deterministic CPU rasteriser for 2D sprites and 3D meshes, with entity-id and depth buffers.
 //! It exists so every machine (and every AI agent, headless) can render the same pixels; a GPU renderer is validated against it.
+pub mod atmosphere;
 pub mod font;
 pub mod fonts;
 pub mod frame;

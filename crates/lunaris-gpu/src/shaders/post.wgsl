@@ -23,6 +23,8 @@
 @group(0) @binding(14) var gi_in: texture_2d<f32>;
 // the bounced light of the last pictures (the blur blends the new light with it)
 @group(0) @binding(15) var gi_hist: texture_2d<f32>;
+// the last pictures of the temporal anti-aliasing (the picture of this one is `hdr_tex`)
+@group(0) @binding(16) var taa_hist: texture_2d<f32>;
 // the state of the eye adaptation (see exposure.wgsl): x is the exposure it has settled on
 @group(0) @binding(8) var<storage, read> ae_state: array<vec4<f32>>;
 
@@ -761,6 +763,17 @@ fn grade(c_in: vec3<f32>) -> vec3<f32> {
     return mix(c, frame.p12.xyz, frame.p12.w);
 }
 
+// Film grain (a different pattern every picture, a little stronger in the shadows) and the dither that keeps smooth gradients from banding in 8 bits.
+fn grain_and_dither(c: vec3<f32>, frag: vec2<f32>) -> vec3<f32> {
+    var out_c = c;
+    if (frame.p7.y > 0.0) {
+        let g = interleaved_noise(frag + vec2<f32>(frame.p8.w * 7.31, frame.p8.w * 3.17)) + interleaved_noise(frag * 1.37 + vec2<f32>(frame.p8.w * 1.9, 5.0)) - 1.0;
+        out_c = out_c + vec3<f32>(g * frame.p7.y * 0.12 * (1.2 - 0.6 * luminance(out_c)));
+    }
+    let n = interleaved_noise(frag) + interleaved_noise(frag + vec2<f32>(17.0, 31.0)) - 1.0;
+    return out_c + vec3<f32>(n / 255.0);
+}
+
 fn finish(c_in: vec3<f32>, uv: vec2<f32>, frag: vec2<f32>) -> vec4<f32> {
     var c = c_in;
     // saturation
@@ -779,14 +792,9 @@ fn finish(c_in: vec3<f32>, uv: vec2<f32>, frag: vec2<f32>) -> vec4<f32> {
     if (frame.p7.z != 1.0) {
         out_c = clamp((out_c - vec3<f32>(0.5)) * frame.p7.z + vec3<f32>(0.5), vec3<f32>(0.0), vec3<f32>(1.0));
     }
-    if (frame.p7.y > 0.0) {
-        // film grain: a different pattern every picture, a little stronger in the shadows
-        let g = interleaved_noise(frag + vec2<f32>(frame.p8.w * 7.31, frame.p8.w * 3.17)) + interleaved_noise(frag * 1.37 + vec2<f32>(frame.p8.w * 1.9, 5.0)) - 1.0;
-        out_c = out_c + vec3<f32>(g * frame.p7.y * 0.12 * (1.2 - 0.6 * luminance(out_c)));
+    if (frame.p27.y < 0.5) {
+        out_c = grain_and_dither(out_c, frag);
     }
-    // dither so that smooth gradients do not band in 8 bits
-    let n = interleaved_noise(frag) + interleaved_noise(frag + vec2<f32>(17.0, 31.0)) - 1.0;
-    out_c = out_c + vec3<f32>(n / 255.0);
     return vec4<f32>(out_c, 1.0);
 }
 
@@ -1142,4 +1150,68 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
     return finish(lens_ms(in.pos.xy), in.uv, in.pos.xy);
+}
+
+// ---- temporal anti-aliasing: the picture of this time (`hdr_tex`, the composite's, already in display colours) is blended with the history, which is looked up where the surface was in the last picture (the matrices
+// without the sub-pixel shift, so a still camera finds the same pixel) and kept inside the range of colours the neighbours of this pixel have (so what changed is not smeared); then grain and dither, which belong after it.
+struct TaaOut {
+    @location(0) display: vec4<f32>,
+    @location(1) history: vec4<f32>,
+};
+
+@fragment
+fn fs_taa(in: FullOut) -> TaaOut {
+    let px = vec2<i32>(in.pos.xy);
+    let size = vec2<i32>(frame.p1.xy);
+    let cur = textureLoad(hdr_tex, px, 0).rgb;
+    var lo = cur;
+    var hi = cur;
+    var mean = cur;
+    var m2 = cur * cur;
+    for (var y = -1; y <= 1; y = y + 1) {
+        for (var x = -1; x <= 1; x = x + 1) {
+            if (x == 0 && y == 0) {
+                continue;
+            }
+            let c = textureLoad(hdr_tex, clamp(px + vec2<i32>(x, y), vec2<i32>(0), size - vec2<i32>(1)), 0).rgb;
+            lo = min(lo, c);
+            hi = max(hi, c);
+            mean = mean + c;
+            m2 = m2 + c * c;
+        }
+    }
+    mean = mean / 9.0;
+    let sd = sqrt(max(m2 / 9.0 - mean * mean, vec3<f32>(0.0)));
+    // the range the neighbours span, narrowed to the mean and its spread so that one odd neighbour does not widen it
+    let box_lo = max(lo, mean - sd * 1.25);
+    let box_hi = min(hi, mean + sd * 1.25);
+    var result = cur;
+    let alpha = frame.p27.x;
+    if (alpha < 0.999) {
+        let d0 = depth_at(px);
+        let uv = (vec2<f32>(px) + 0.5) * frame.p1.zw;
+        let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+        let w4 = frame.inv_view_proj * vec4<f32>(ndc, select(0.0001, d0, d0 > 0.0), 1.0);
+        let world = w4.xyz / w4.w;
+        let pc = frame.unj_prev_vp * vec4<f32>(world, 1.0);
+        let cc = frame.unj_vp * vec4<f32>(world, 1.0);
+        if (pc.w > 0.0 && cc.w > 0.0) {
+            let pn = pc.xy / pc.w;
+            let cn = cc.xy / cc.w;
+            let puv = vec2<f32>(pn.x * 0.5 + 0.5, 0.5 - pn.y * 0.5);
+            let cuv = vec2<f32>(cn.x * 0.5 + 0.5, 0.5 - cn.y * 0.5);
+            let huv = uv + (puv - cuv);
+            if (huv.x >= 0.0 && huv.x < 1.0 && huv.y >= 0.0 && huv.y < 1.0) {
+                let hist = textureSampleLevel(taa_hist, post_samp, huv, 0.0).rgb;
+                let clamped = clamp(hist, box_lo, box_hi);
+                // the more the history had to be pulled in, the less it can be trusted
+                let off = length(hist - clamped) / max(length(hist), 0.05);
+                result = mix(clamped, cur, clamp(alpha + off * 0.5, 0.0, 1.0));
+            }
+        }
+    }
+    var out: TaaOut;
+    out.history = vec4<f32>(result, 1.0);
+    out.display = vec4<f32>(grain_and_dither(result, in.pos.xy), 1.0);
+    return out;
 }

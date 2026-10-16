@@ -2038,3 +2038,20 @@ component! {
         pub enabled: bool = true,
     }
 }
+
+component! {
+    /// A sky made by the physics of the air (the GPU renderer's high qualities; the first enabled `Atmosphere` counts, the reference picture and classic mode keep the `Environment`'s colours): the air is a layer of
+    /// molecules that scatters blue light (Rayleigh) and a layer of haze and dust (Mie), and the sun's light is scattered towards the eye along every line of sight (Nishita's single scattering, worked out for every pixel
+    /// of the sky). The sky is blue at noon with a pale horizon, the sun reddens and dims as it gets low, the sky glows round it, and after sunset it goes dark: all from the direction of the first directional light, which
+    /// is the sun. The ambient light (the zenith and horizon colours), the fog colour (a haze towards the sun is brighter) and the colour of the sun's light follow the same numbers; the sun's colour and intensity on its `Light`
+    /// are what it is at noon. `turbidity` is how hazy the air is (1 very clear, 2 clear, 6 hazy: haze whitens the sky and brightens it round the sun), `rayleigh` scales the density of the molecules (more makes the
+    /// sky bluer and the sunset redder), `mie_g` is how far forward the haze throws the light (0.76), `intensity` how bright the sky is, `haze_glow` how much brighter fog is when looking at the sun. A new component.
+    pub struct Atmosphere {
+        pub turbidity: f32 = 2.0,
+        pub rayleigh: f32 = 1.0,
+        pub mie_g: f32 = 0.76,
+        pub intensity: f32 = 1.0,
+        pub haze_glow: f32 = 1.5,
+        pub enabled: bool = true,
+    }
+}

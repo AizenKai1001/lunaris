@@ -615,7 +615,7 @@ fn lit_splat(in: MeshOut) -> Lit {
 @fragment
 fn fs_mesh(in: MeshOut) -> @location(0) vec4<f32> {
     let l = lit_mesh(in);
-    let c = (l.diffuse + l.spec) * (1.0 - l.fog) + frame.fog.rgb * l.fog;
+    let c = (l.diffuse + l.spec) * (1.0 - l.fog) + fog_color_toward(normalize(in.world - frame.eye.xyz)) * l.fog;
     return vec4<f32>(min(c, vec3<f32>(60000.0)), 1.0);
 }
 
@@ -623,7 +623,7 @@ fn fs_mesh(in: MeshOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_mesh_splat(in: MeshOut) -> @location(0) vec4<f32> {
     let l = lit_splat(in);
-    let c = (l.diffuse + l.spec) * (1.0 - l.fog) + frame.fog.rgb * l.fog;
+    let c = (l.diffuse + l.spec) * (1.0 - l.fog) + fog_color_toward(normalize(in.world - frame.eye.xyz)) * l.fog;
     return vec4<f32>(min(c, vec3<f32>(60000.0)), 1.0);
 }
 
@@ -631,7 +631,7 @@ fn fs_mesh_splat(in: MeshOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_mesh_blend(in: MeshOut) -> @location(0) vec4<f32> {
     let l = lit_mesh(in);
-    let body = (l.diffuse * (1.0 - l.fog) + frame.fog.rgb * l.fog) * l.alpha;
+    let body = (l.diffuse * (1.0 - l.fog) + fog_color_toward(normalize(in.world - frame.eye.xyz)) * l.fog) * l.alpha;
     let c = body + l.spec * (1.0 - l.fog);
     return vec4<f32>(min(c, vec3<f32>(60000.0)), l.alpha);
 }
