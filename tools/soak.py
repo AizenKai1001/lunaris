@@ -32,7 +32,7 @@ def run(scene, threads):
     # a game that saves and loads itself has the files in its history: every run starts without any (the first run's saves must not be the second's past)
     shutil.rmtree(os.path.join(ROOT, "saves"), ignore_errors=True)
     rng = random.Random(seed)
-    keys = GAME_KEYS if scene.startswith("examples/depths/") else KEYS
+    keys = GAME_KEYS if scene.startswith(("examples/depths/", "examples/caldera/")) else KEYS
     with Engine(root=ROOT, threads=threads) as eng:
         eng.load_scene(path=scene)
         eng.record_start()
@@ -53,7 +53,7 @@ bad = 0
 held = os.path.join(ROOT, "saves.held-by-soak")
 if os.path.isdir(os.path.join(ROOT, "saves")):
     os.replace(os.path.join(ROOT, "saves"), held)
-for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "depths", "*.lunaris.json"))):
+for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "depths", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "caldera", "*.lunaris.json"))):
     rel = os.path.relpath(scene, ROOT).replace("\\", "/")
     if only and only not in rel:
         continue

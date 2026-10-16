@@ -1,0 +1,302 @@
+{
+ "name": "Caldera: the Caldera Warden charges, slams and kneels; its defeat frees the last shard",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "HitPoints",
+     "value": {
+      "value": 3000,
+      "max": 3000
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -18,
+       55.343,
+       -34
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "name": "Caldera Warden",
+    "field": "Golem.mode",
+    "ge": 0
+   }
+  },
+  {
+   "until": {
+    "name": "Caldera Warden",
+    "field": "Golem.mode",
+    "ge": 1,
+    "max_ticks": 120
+   }
+  },
+  {
+   "until": {
+    "name": "Caldera Warden",
+    "field": "Golem.attack",
+    "eq": 2,
+    "max_ticks": 900
+   }
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "events": "golem_roar",
+    "ge": 1,
+    "message": "its first attack from a distance is a charge"
+   }
+  },
+  {
+   "until": {
+    "name": "Caldera Warden",
+    "field": "Golem.mode",
+    "eq": 7,
+    "max_ticks": 2400
+   }
+  },
+  {
+   "expect": {
+    "events": "boss_tired",
+    "ge": 1,
+    "message": "after three attacks it kneels: the sword's chance"
+   }
+  },
+  {
+   "expect": {
+    "name": "Shard 6",
+    "field": "Shard.locked",
+    "eq": 1,
+    "message": "its shard waits until it is beaten"
+   }
+  },
+  {
+   "expect": {
+    "events": "boss_slam",
+    "ge": 1,
+    "message": "it slammed the ground"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 300,
+     "component": "HitPoints",
+     "value": {
+      "value": 60
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 300,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -18,
+       54.74296188354492,
+       -46
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -18,
+       55.043,
+       -43.0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "name": "Caldera Warden",
+    "field": "Golem.mode",
+    "eq": 7,
+    "message": "still kneeling"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "until": {
+    "exists": "Caldera Warden",
+    "eq": false,
+    "max_ticks": 900
+   }
+  },
+  {
+   "step": 10
+  },
+  {
+   "expect": {
+    "resource": "g.boss",
+    "eq": 1,
+    "message": "the Warden is beaten"
+   }
+  },
+  {
+   "expect": {
+    "name": "Shard 6",
+    "field": "Shard.locked",
+    "eq": 0,
+    "message": "and its shard is free"
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

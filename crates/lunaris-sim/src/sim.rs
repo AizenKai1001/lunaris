@@ -851,6 +851,7 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::Ssr>().expect("standard component");
     world.register_native::<crate::components::LensFlare>().expect("standard component");
     world.register_native::<crate::components::ReflectionProbe>().expect("standard component");
+    world.register_native::<crate::components::CameraCollide>().expect("standard component");
 }
 
 impl RecordedRead {

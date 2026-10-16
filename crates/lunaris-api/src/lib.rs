@@ -56,6 +56,8 @@ mod ui_tests;
 #[cfg(test)]
 mod draw_order_tests;
 #[cfg(test)]
+mod dogfood3d_tests;
+#[cfg(test)]
 mod language_tests;
 #[cfg(test)]
 mod menus_tests;

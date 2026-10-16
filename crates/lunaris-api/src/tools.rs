@@ -259,8 +259,9 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ),
         tool(
             "profile",
-            "Run some ticks and report where the time goes: the average and slowest tick, and every stage of a tick (each built-in system, the graph systems one by one, navigation, characters, gameplay blocks, the interface) with its average and worst time and share of the total, plus advice when the game cannot keep up with 60 ticks a second or spikes. The ticks really run (the game advances). With `render` true it also times one picture. Times are wall-clock measurements of this machine.",
-            vec![("ticks", int("How many ticks to run (default 120, at most 3600).")), ("render", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Also time one 640x360 picture with the current render quality."))]))],
+            "Run some ticks and report where the time goes: the average and slowest tick, and every stage of a tick (each built-in system, the graph systems one by one, navigation, characters, gameplay blocks, the interface) with its average and worst time and share of the total, plus advice when the game cannot keep up with 60 ticks a second or spikes. The ticks really run (the game advances). With `render` true it also times a picture (`width` and `height` of it, 640x360 by default; `pictures` of them: the first alone as `render_first_ms`, the median of the rest as `render_ms`). Times are wall-clock measurements of this machine.",
+            vec![("ticks", int("How many ticks to run (default 120, at most 3600).")), ("render", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Also time a picture with the current render quality."))])),
+                 ("width", int("With `render`: the picture's width (default 640).")), ("height", int("With `render`: the picture's height (default 360).")), ("pictures", int("With `render`: how many pictures to time (default 1, at most 100)."))],
             &[],
         ),
         tool(

@@ -66,11 +66,31 @@ impl Engine {
             ("stages", Json::Arr(rows)),
         ]);
         if want_render {
-            let t = std::time::Instant::now();
-            let r = self.call("render", &Json::obj([("width", Json::from(640)), ("height", Json::from(360)), ("image", Json::Bool(false))]));
-            match r {
-                Ok(_) => out.set("render_ms", Json::from(round(t.elapsed().as_secs_f64() * 1e3, 2))),
-                Err(e) => out.set("render_error", Json::str(e.to_string())),
+            // the pictures of a game are the size of its window: `width` and `height` (default 640 x 360); the first picture builds the meshes and textures, so with `pictures` above 1 the
+            // first is reported on its own and `render_ms` is the median of the rest
+            let (w, h) = (a.opt_u64("width")?.unwrap_or(640).clamp(16, 4096), a.opt_u64("height")?.unwrap_or(360).clamp(16, 4096));
+            let pictures = a.opt_u64("pictures")?.unwrap_or(1).clamp(1, 100) as usize;
+            let mut times: Vec<f64> = Vec::new();
+            for _ in 0..pictures {
+                let t = std::time::Instant::now();
+                match self.call("render", &Json::obj([("width", Json::from(w as i64)), ("height", Json::from(h as i64)), ("image", Json::Bool(false))])) {
+                    Ok(_) => times.push(t.elapsed().as_secs_f64() * 1e3),
+                    Err(e) => {
+                        out.set("render_error", Json::str(e.to_string()));
+                        break;
+                    }
+                }
+            }
+            if let Some(first) = times.first().copied() {
+                if times.len() > 1 {
+                    let mut rest: Vec<f64> = times[1..].to_vec();
+                    rest.sort_by(|x, y| x.total_cmp(y));
+                    out.set("render_first_ms", Json::from(round(first, 2)));
+                    out.set("render_ms", Json::from(round(rest[rest.len() / 2], 2)));
+                } else {
+                    out.set("render_ms", Json::from(round(first, 2)));
+                }
+                out.set("render_size", Json::arr([Json::from(w as i64), Json::from(h as i64)]));
             }
         }
         if !advice.is_empty() {

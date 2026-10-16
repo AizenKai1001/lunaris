@@ -1,7 +1,7 @@
 //! Gameplay building blocks that are data: input actions, state machines (for animation and for AI), tweens, camera rigs and sensors.
 //! Each is a component with its text or numbers on it, run in entity-uid order inside the fixed step, so they are deterministic, recorded,
 //! hashed and replayed like everything else. See `docs/GAMEPLAY.md`.
-use crate::components::{AnimEvents, RootMotion, BehaviorTree, HitPoints, StreamZone, PathFollower, Spline, Timeline, Animator, CameraRig, Environment, InputMap, Lifetime, Light, Parent, Sensor, PrefabSpawner, StateMachine, TimeOfDay, Transform, Tween};
+use crate::components::{AnimEvents, CameraCollide, RootMotion, BehaviorTree, HitPoints, StreamZone, PathFollower, Spline, Timeline, Animator, CameraRig, Environment, InputMap, Lifetime, Light, Parent, Sensor, PrefabSpawner, StateMachine, TimeOfDay, Transform, Tween};
 use crate::graph::ScriptSet;
 use crate::detmath;
 use crate::expr::Cond;
@@ -1077,6 +1077,45 @@ fn camera_rigs(world: &mut World, tick: u64, dt: f32) {
     }
 }
 
+/// `CameraCollide`: a camera that a rig has just placed is pulled in when a wall, a tree, a rock or the ground is between it and what it looks at.
+fn camera_collisions(world: &mut World, fields: &Terrains, meshes: &crate::meshcol::MeshStore) {
+    let mut list: Vec<(u64, Entity, CameraCollide, CameraRig, Transform)> = Vec::new();
+    let _ = world.for_each_uid::<(&CameraCollide, &CameraRig, &Transform), _>(|e, uid, (c, r, t)| list.push((uid, e, *c, *r, *t)));
+    if list.is_empty() {
+        return;
+    }
+    list.sort_by_key(|l| l.0);
+    let level = meshes.instances(world);
+    let hulls = meshes.hull_instances(world);
+    for (uid, e, cc, rig, t) in list {
+        let Some(target) = world.entity(rig.target.0).and_then(|te| world.get::<Transform>(te)).map(|tt| tt.pos) else { continue };
+        let focus = add(target, rig.look_offset);
+        let d = sub(t.pos, focus);
+        let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+        if len < 1.0e-4 || !len.is_finite() {
+            continue;
+        }
+        let skip = [rig.target.0, uid];
+        if !blocked(world, fields, &level, &hulls, focus, t.pos, skip, None) {
+            continue;
+        }
+        let dir = [d[0] / len, d[1] / len, d[2] / len];
+        let (mut free, mut hit) = (0.0f32, len);
+        for _ in 0..9 {
+            let mid = 0.5 * (free + hit);
+            if blocked(world, fields, &level, &hulls, focus, add(focus, [dir[0] * mid, dir[1] * mid, dir[2] * mid]), skip, None) {
+                hit = mid;
+            } else {
+                free = mid;
+            }
+        }
+        let keep = (free - cc.radius.max(0.0)).max(cc.min_distance.max(0.0)).min(len);
+        if let Some(tr) = world.get_mut::<Transform>(e) {
+            tr.pos = add(focus, [dir[0] * keep, dir[1] * keep, dir[2] * keep]);
+        }
+    }
+}
+
 // ================================================================================================================ sensors
 
 /// Does anything solid stand between `a` and `b`? (spheres and boxes of colliders other than `skip`, and terrain). `eyes` is the sensor's collision layer
@@ -1779,4 +1818,5 @@ pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fi
     scripts.events.extend(events);
     tweens(world, dt);
     camera_rigs(world, tick, dt);
+    camera_collisions(world, fields, meshes);
 }

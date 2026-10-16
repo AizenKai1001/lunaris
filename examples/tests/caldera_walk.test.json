@@ -1,0 +1,286 @@
+{
+ "name": "Caldera: a bot walks the computed path over the terrain (5 legs) from the beach to the first ember shard and takes it",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "expect": {
+    "resource": "g.shards",
+    "eq": 0
+   }
+  },
+  {
+   "expect": {
+    "exists": "Shard 1",
+    "eq": true
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8423,
+    "gamepad.ly": 0.539
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 24.266,
+    "max_ticks": 421
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8423,
+    "gamepad.ly": 0.539
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 31.902,
+    "max_ticks": 421
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8423,
+    "gamepad.ly": 0.539
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 39.538,
+    "max_ticks": 421
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8423,
+    "gamepad.ly": 0.539
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 47.174,
+    "max_ticks": 421
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8,
+    "gamepad.ly": 0.6
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 53.841,
+    "max_ticks": 406
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8,
+    "gamepad.ly": 0.6
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 60.507,
+    "max_ticks": 406
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8,
+    "gamepad.ly": 0.6
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 67.174,
+    "max_ticks": 406
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8944,
+    "gamepad.ly": 0.4472
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 76.174,
+    "max_ticks": 441
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.8944,
+    "gamepad.ly": 0.4472
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 85.174,
+    "max_ticks": 441
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.717,
+    "gamepad.ly": 0.6971
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 92.374,
+    "max_ticks": 440
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.717,
+    "gamepad.ly": 0.6971
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 99.574,
+    "max_ticks": 440
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.717,
+    "gamepad.ly": 0.6971
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 106.774,
+    "max_ticks": 440
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.717,
+    "gamepad.ly": 0.6971
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 113.974,
+    "max_ticks": 440
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.717,
+    "gamepad.ly": 0.6971
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 121.174,
+    "max_ticks": 440
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.9696,
+    "gamepad.ly": -0.2448
+   }
+  },
+  {
+   "until": {
+    "entity": 100,
+    "field": "Transform.pos[0]",
+    "ge": 122.98,
+    "max_ticks": 277
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 1.0,
+    "gamepad.ly": -0.0
+   }
+  },
+  {
+   "until": {
+    "resource": "g.shards",
+    "ge": 1,
+    "max_ticks": 240
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.0,
+    "gamepad.ly": 0.0
+   }
+  },
+  {
+   "step": 12
+  },
+  {
+   "expect": {
+    "resource": "g.shards",
+    "eq": 1,
+    "message": "the bot picked up the shard"
+   }
+  },
+  {
+   "expect": {
+    "resource": "g.s1",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "exists": "Shard 1",
+    "eq": false
+   }
+  },
+  {
+   "expect": {
+    "events": "shard",
+    "ge": 1
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

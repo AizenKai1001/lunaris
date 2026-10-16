@@ -1,6 +1,11 @@
 examples/animation.lunaris.json          state b480ff31f0dcdea6  frame 9c084d75b5a2336b
 examples/arena.lunaris.json              state d5955fa47c844967  frame 55eb6f10b5b3b3f9
 examples/bouncing.lunaris.json           state 4bc78dd0e544766a  frame 005f4fae50e7d484
+examples/caldera/boot.lunaris.json       state 02aa8807310104c6  frame 686acbcee03a3af7
+examples/caldera/gameover.lunaris.json   state f2adcc8806f77ab5  frame 5e214c42c164123c
+examples/caldera/island.lunaris.json     state 348d4647d8265059  frame dd929476bb6937d5
+examples/caldera/title.lunaris.json      state eb5239e9e7dbab54  frame aa689195630f729e
+examples/caldera/win.lunaris.json        state dedf15284991dc95  frame f2ea49420e31e84b
 examples/clockwork.lunaris.json          state c32fcd7bfaefa1ab  frame ea751e3087ca27d5
 examples/coin_chase.lunaris.json         state dfc30a7034177467  frame f6afca59ac7f3008
 examples/depth_of_field.lunaris.json     state a68dd4a7d9992e11  frame 14778f6614f4016f

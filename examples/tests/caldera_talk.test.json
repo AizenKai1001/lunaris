@@ -1,0 +1,253 @@
+{
+ "name": "Caldera: E next to Maren starts a conversation (typed with the keys 1 to 4 and Enter); asking where the shards are, then farewell ends it",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       41.7,
+       13.4,
+       45.5
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "resource": "prompt",
+    "eq": 1,
+    "message": "next to Maren the prompt says talk"
+   }
+  },
+  {
+   "expect": {
+    "name": "Choice 1",
+    "field": "Ui.visible",
+    "eq": false
+   }
+  },
+  {
+   "input": {
+    "e": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "e": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "resource": "talking",
+    "eq": 1,
+    "message": "E starts the conversation"
+   }
+  },
+  {
+   "expect": {
+    "events": "select",
+    "ge": 1
+   }
+  },
+  {
+   "expect": {
+    "name": "Dialogue text",
+    "field": "Ui.visible",
+    "eq": true
+   }
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "CharacterBody.walk[0]",
+    "eq": 0,
+    "message": "the hero stands still while it talks"
+   }
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "name": "Choice 1",
+    "field": "Ui.visible",
+    "eq": true,
+    "message": "after the greeting four things to ask"
+   }
+  },
+  {
+   "expect": {
+    "name": "Choice 4",
+    "field": "Ui.visible",
+    "eq": true
+   }
+  },
+  {
+   "input": {
+    "2": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "2": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "input": {
+    "2": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "2": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "input": {
+    "4": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "4": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 8
+  },
+  {
+   "expect": {
+    "resource": "talking",
+    "eq": 0,
+    "message": "Farewell ends it"
+   }
+  },
+  {
+   "expect": {
+    "name": "Dialogue text",
+    "field": "Ui.visible",
+    "eq": false
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

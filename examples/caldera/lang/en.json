@@ -1,0 +1,102 @@
+{
+  "npc": {
+    "name": "Maren",
+    "hello": "You came ashore at dawn. Few do, these days. I am Maren, I keep the fire.",
+    "q_quest": "What must I do?",
+    "q_where": "Where are the shards?",
+    "q_night": "What about the night?",
+    "q_bye": "Farewell.",
+    "quest1": "Six ember shards fell from the mountain's mouth when it last woke. Together they lit the beacon that kept the dark away.",
+    "quest2": "Bring them to the altar here, one by one or all together, and light the beacon. Take care: stone golems sleep over the shards.",
+    "h1": "One lies in the wreck on the east beach. Walk along the shore.",
+    "h2": "Another rests among the whale bones on the south shore.",
+    "h3": "Look for the old ruin in the forest. A golem sleeps nearby.",
+    "h4": "A shard lies on the little island in the lake. You will have to swim.",
+    "h5": "The standing stones in the highlands hold one, and a golem guards it.",
+    "h6": "The last is on the rim of the caldera, and the Warden will not give it up. Strike it when it kneels.",
+    "h_all": "You have them all. Put them on the altar and light the beacon.",
+    "night1": "At night wraiths rise. Only fire shows them to you, and your lantern when it burns bright.",
+    "night2": "Stay near a fire and they will not come. Rest here, and I will keep your place in the book.",
+    "bring": "You carry embers! Put them on the altar, there by the big stone.",
+    "beacon": "All six! Go to the beacon and light it. The island has waited long."
+  },
+  "hud": {
+    "hp": "HP",
+    "stamina": "ST",
+    "n": "N",
+    "e": "E",
+    "s": "S",
+    "w": "W",
+    "camp": "CAMP",
+    "fallen": "YOU FELL"
+  },
+  "prompt": {
+    "talk": "E   Talk",
+    "rest": "E   Rest by the fire and save",
+    "altar": "E   Place the ember shards",
+    "beacon": "E   Light the beacon"
+  },
+  "toast": {
+    "shard": "An ember shard!",
+    "saved": "Game saved",
+    "placed": "The shards glow on the altar",
+    "night": "Night falls: stay near the fire"
+  },
+  "hint": {
+    "keys": "WASD walk    mouse look    Shift run    Space jump    click attack    right click roll    E use    L quest log    Esc pause"
+  },
+  "boss": {
+    "name": "THE CALDERA WARDEN"
+  },
+  "quest": {
+    "title": "QUEST LOG",
+    "lead": "Find the six ember shards, carry them to the altar, light the beacon.",
+    "s1": "The wreck on the east beach",
+    "s2": "The whale bones on the south shore",
+    "s3": "The ruin in the forest",
+    "s4": "The island in the lake",
+    "s5": "The standing stones of the highlands",
+    "s6": "The rim of the caldera",
+    "close": "L closes"
+  },
+  "pause": {
+    "title": "PAUSED",
+    "resume": "Resume",
+    "settings": "Settings",
+    "title_screen": "Quit to the title"
+  },
+  "settings": {
+    "title": "SETTINGS",
+    "sens": "Mouse sensitivity",
+    "music": "Music",
+    "sfx": "Effects",
+    "language": "Language",
+    "back": "Back"
+  },
+  "language": {
+    "name": "English"
+  },
+  "menu": {
+    "title": "CALDERA",
+    "subtitle": "an island adventure made with Lunaris",
+    "play": "Play",
+    "continue": "Continue",
+    "settings": "Settings",
+    "quit": "Quit",
+    "nosave": "No saved game yet",
+    "hint": "W S or arrows to choose, Enter to confirm, or use the mouse"
+  },
+  "over": {
+    "title": "YOU FELL",
+    "stats": "Shards placed {g.dep} of 6      Foes defeated {g.kills}",
+    "retry": "Back to the last fire",
+    "title_screen": "Title screen"
+  },
+  "win": {
+    "title": "THE BEACON BURNS",
+    "line": "The ember shards are home, and the night is over.",
+    "stats": "Foes defeated {g.kills}",
+    "again": "Play again",
+    "title_screen": "Title screen"
+  }
+}

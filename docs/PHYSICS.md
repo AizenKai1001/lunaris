@@ -377,7 +377,9 @@ Numbers from the tests (`cargo test -p lunaris-sim --lib vehicle -- --nocapture`
 
 * Balls, boxes, capsules, convex hulls and triangle meshes (a `MeshCollider` is static; there is no compound shape). Rays hit oriented boxes and capsules as
   they are, but characters and navigation (`CharacterBody`, `NavAgent`) see every box as axis-aligned, a capsule as the box `size` and a hull as the box around
-  it; they see the triangles of a mesh as they are. The sound tracer sees boxes and spheres only.
+  it; they see the triangles of a mesh as they are. The sound tracer sees boxes and spheres only. A long wall turned by an angle that is not a multiple of 90 degrees
+  is therefore much bigger to a character than to a rock thrown at it (a ruin of turned walls was sealed in the game Caldera, `docs/DOGFOOD_3D.md`): `check` warns about
+  such boxes in a world that has a `CharacterBody` or a `NavAgent`; keep the walls square to the axes or build a turned wall from several small boxes.
 * **Nothing is remembered from tick to tick**, so that a snapshot or a replay from the middle of a run gives exactly the same future. A stack of
   turning boxes therefore does not settle as firmly as in an engine that remembers its contact forces: a tower of six boxes creeps sideways by a
   few centimetres in ten seconds. Four boxes or fewer stay put; give tall piles a bit more friction.

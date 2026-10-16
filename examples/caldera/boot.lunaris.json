@@ -1,0 +1,832 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "",
+      "fields": [
+        {
+          "name": "state",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "cd",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "stamina",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "exhaust",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "regen",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "rx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "rz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "swim",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "moving",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "sprint",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "combo",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "air",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Foe",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Golem",
+      "doc": "",
+      "fields": [
+        {
+          "name": "mode",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "cd",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "repath",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "wake_r",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dist",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "home_x",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "home_z",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "leash",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "boss",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "attack",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "combo",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "rest",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "hitdone",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dirx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dirz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "tx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "tz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dmg",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Wraith",
+      "doc": "",
+      "fields": [
+        {
+          "name": "slot",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "state",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "cd",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dist",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Shard",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "base_y",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "locked",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Campfire",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Altar",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Beacon",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BeaconFire",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BeaconFlame",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Socket",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Npc",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HeroLight",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Fader",
+      "doc": "",
+      "fields": [
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "out",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "leaving",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "target",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fired",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SwitchId",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "PauseUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "PauseBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SettingsUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "SettingBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SettingSlider",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "HudHp",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HudSt",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HudShard",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "HudItem",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "PromptText",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "ToastText",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "CompassMark",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MapCam",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "NpcLabel",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "MapBlip",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "DeadUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HurtFlash",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "QuestUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "QuestRow",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "QuestRowText",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "FxPool",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SplashFx",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "MusicTrack",
+      "doc": "",
+      "fields": [
+        {
+          "name": "id",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MenuBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MenuUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "ContinueBtn",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "NoSaveText",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Spin",
+      "doc": "",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "BossBar",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BossBarText",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Hint",
+      "doc": "",
+      "fields": [
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "OverBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "WinBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Orbit",
+      "doc": "",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Tree",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Prop",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "CreditsUi",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 9011,
+  "entities": [
+    {
+      "uid": 2,
+      "components": {
+        "Camera": {
+          "fov_y": 50,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.05000000074505806,
+            0.05000000074505806,
+            0.07999999821186066,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2,
+            8
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Name": {
+          "value": "To the title"
+        },
+        "SceneSwitch": {
+          "path": "examples/caldera/title.lunaris.json",
+          "go": true,
+          "keep_resources": true,
+          "keep_systems": false
+        }
+      }
+    },
+    {
+      "uid": 9000,
+      "components": {
+        "MusicPlayer": {
+          "playlist": "examples/caldera/music_title.wav",
+          "crossfade": 4,
+          "volume": 0.8999999761581421,
+          "shuffle": false,
+          "repeat": true,
+          "playing": true,
+          "skip": 0
+        },
+        "MusicTrack": {
+          "id": 1
+        },
+        "Name": {
+          "value": "Music 1"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    },
+    {
+      "uid": 9001,
+      "components": {
+        "MusicPlayer": {
+          "playlist": "examples/caldera/music_day.wav",
+          "crossfade": 4,
+          "volume": 0.8999999761581421,
+          "shuffle": false,
+          "repeat": true,
+          "playing": false,
+          "skip": 0
+        },
+        "MusicTrack": {
+          "id": 2
+        },
+        "Name": {
+          "value": "Music 2"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    },
+    {
+      "uid": 9002,
+      "components": {
+        "MusicPlayer": {
+          "playlist": "examples/caldera/music_night.wav",
+          "crossfade": 4,
+          "volume": 0.8999999761581421,
+          "shuffle": false,
+          "repeat": true,
+          "playing": false,
+          "skip": 0
+        },
+        "MusicTrack": {
+          "id": 3
+        },
+        "Name": {
+          "value": "Music 3"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    },
+    {
+      "uid": 9003,
+      "components": {
+        "MusicPlayer": {
+          "playlist": "examples/caldera/music_boss.wav",
+          "crossfade": 4,
+          "volume": 0.8999999761581421,
+          "shuffle": false,
+          "repeat": true,
+          "playing": false,
+          "skip": 0
+        },
+        "MusicTrack": {
+          "id": 4
+        },
+        "Name": {
+          "value": "Music 4"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    },
+    {
+      "uid": 9010,
+      "components": {
+        "AudioMixer": {
+          "config": "bus master volume=1\nbus music parent=master volume=0.8\nbus sfx parent=master volume=0.9\nroute examples/caldera/music_* -> music\nroute * -> sfx"
+        },
+        "Name": {
+          "value": "Mixer"
+        },
+        "Persist": {
+          "keep": true
+        }
+      }
+    }
+  ],
+  "resources": {
+    "music": 1
+  },
+  "systems": [
+    {
+      "name": "music_select",
+      "doc": "The tracks are one `MusicPlayer` each (in the boot scene, `Persist`); the scene says which should play with `$music`: 1 the title, 2 day, 3 night, 4 the boss.",
+      "each": [
+        "MusicTrack",
+        "MusicPlayer"
+      ],
+      "order": 80,
+      "do": [
+        {
+          "set": "MusicPlayer.playing",
+          "to": {
+            "eq": [
+              {
+                "res": "music"
+              },
+              {
+                "get": "MusicTrack.id"
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

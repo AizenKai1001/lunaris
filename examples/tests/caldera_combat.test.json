@@ -1,0 +1,343 @@
+{
+ "name": "Caldera: a sleeping golem wakes near the hero, hunts it and is brought down by the sword",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -28.304,
+       22.079,
+       -12.469
+      ]
+     }
+    }
+   }
+  },
+  {
+   "step": 40
+  },
+  {
+   "expect": {
+    "name": "Golem forest",
+    "field": "Golem.mode",
+    "eq": 0,
+    "message": "far away the golem sleeps"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -56.104,
+       21.679,
+       -12.469
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "until": {
+    "name": "Golem forest",
+    "field": "Golem.mode",
+    "ge": 1,
+    "max_ticks": 60
+   }
+  },
+  {
+   "expect": {
+    "events": "golem_wake",
+    "ge": 1,
+    "message": "it wakes when the hero is close and in its sight"
+   }
+  },
+  {
+   "until": {
+    "name": "Golem forest",
+    "field": "Golem.mode",
+    "eq": 2,
+    "max_ticks": 200
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "expect": {
+    "name": "Golem forest",
+    "field": "HitPoints.value",
+    "lt": 100,
+    "message": "the sword hurts it"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "input": {
+    "mouse_left": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "mouse_left": false
+   }
+  },
+  {
+   "step": 44
+  },
+  {
+   "until": {
+    "exists": "Golem forest",
+    "eq": false,
+    "max_ticks": 400
+   }
+  },
+  {
+   "step": 30
+  },
+  {
+   "expect": {
+    "resource": "g.kills",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "events": "golem_hit",
+    "ge": 2
+   }
+  },
+  {
+   "expect": {
+    "events": "golem_break",
+    "ge": 1
+   }
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "HitPoints.dead",
+    "eq": false,
+    "message": "the hero stands"
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

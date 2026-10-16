@@ -53,8 +53,8 @@ held = saves + ".held-by-xplat-hashes"
 if os.path.isdir(saves):
     os.replace(saves, held)
 try:
-    # the examples, and the scenes of the games that keep theirs in a folder of their own (examples/depths: a menu, three levels, a game over and a win screen)
-    for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "depths", "*.lunaris.json"))):
+    # the examples, and the scenes of the games that keep theirs in a folder of their own (examples/depths: a menu, three levels, a game over and a win screen; examples/caldera: a title, an island, a game over and a win screen)
+    for scene in sorted(glob.glob(os.path.join(ROOT, "examples", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "depths", "*.lunaris.json")) + glob.glob(os.path.join(ROOT, "examples", "caldera", "*.lunaris.json"))):
         rel = os.path.relpath(scene, ROOT).replace(os.sep, "/")
         state, frame = hashes_of(rel)
         lines.append(f"{rel:40} state {state}  frame {frame}")

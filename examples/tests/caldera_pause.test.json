@@ -1,0 +1,328 @@
+{
+ "name": "Caldera: Escape pauses and unlocks the mouse; the settings change the mouse, the volume and the language; Escape goes on",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 20
+  },
+  {
+   "input": {
+    "escape": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "escape": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "resource": "paused",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "resource": "time.scale",
+    "eq": 0
+   }
+  },
+  {
+   "expect": {
+    "name": "Resume",
+    "field": "Ui.visible",
+    "eq": true
+   }
+  },
+  {
+   "step": 30
+  },
+  {
+   "expect": {
+    "resource": "cursor.lock",
+    "eq": 0,
+    "message": "the mouse is let go in the menu"
+   }
+  },
+  {
+   "input": {
+    "s": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "resource": "settings",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "name": "Setting slider 1",
+    "field": "Ui.visible",
+    "eq": true
+   }
+  },
+  {
+   "expect": {
+    "resource": "opt.sens",
+    "eq": 1.0
+   }
+  },
+  {
+   "input": {
+    "a": true
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "input": {
+    "a": false
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "input": {
+    "a": true
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "input": {
+    "a": false
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "input": {
+    "a": true
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "input": {
+    "a": false
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "expect": {
+    "resource": "opt.sens",
+    "lt": 0.99,
+    "message": "the left arrow lowers the sensitivity of the mouse"
+   }
+  },
+  {
+   "input": {
+    "s": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "resource": "language.index",
+    "eq": 1,
+    "message": "the language button picks German"
+   }
+  },
+  {
+   "expect": {
+    "name": "Localization",
+    "field": "Localization.language",
+    "eq": "examples/caldera/lang/de"
+   }
+  },
+  {
+   "input": {
+    "s": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "resource": "settings",
+    "eq": 0,
+    "message": "Back closes the settings"
+   }
+  },
+  {
+   "input": {
+    "escape": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "escape": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "resource": "paused",
+    "eq": 0
+   }
+  },
+  {
+   "expect": {
+    "resource": "time.scale",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

@@ -1,0 +1,258 @@
+{
+ "name": "Caldera: six shards on the altar, the beacon is lit, the cutscene plays and the end screen follows",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.shards",
+     "value": 6
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s1",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s2",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s3",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s4",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s5",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s6",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       55.8,
+       13.0,
+       34.8
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "resource": "prompt",
+    "eq": 3,
+    "message": "at the altar with the shards"
+   }
+  },
+  {
+   "input": {
+    "e": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "e": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 8
+  },
+  {
+   "expect": {
+    "resource": "g.dep",
+    "eq": 6
+   }
+  },
+  {
+   "expect": {
+    "resource": "g.shards",
+    "eq": 0
+   }
+  },
+  {
+   "expect": {
+    "name": "Altar socket 6",
+    "field": "Light.intensity",
+    "gt": 0.5,
+    "message": "all six sockets glow"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       53.5,
+       15.351,
+       32.0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "resource": "prompt",
+    "eq": 4,
+    "message": "at the beacon: light it"
+   }
+  },
+  {
+   "input": {
+    "e": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "e": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 30
+  },
+  {
+   "expect": {
+    "resource": "cutscene",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "resource": "g.lit",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "events": "beacon",
+    "ge": 1
+   }
+  },
+  {
+   "expect": {
+    "name": "Beacon fire",
+    "field": "Light.intensity",
+    "gt": 1
+   }
+  },
+  {
+   "until": {
+    "exists": "Win title",
+    "eq": true,
+    "max_ticks": 1400
+   }
+  },
+  {
+   "step": 30
+  },
+  {
+   "expect": {
+    "resource": "g.lit",
+    "eq": 1,
+    "message": "the end screen knows the beacon burns"
+   }
+  },
+  {
+   "expect": {
+    "events": "win",
+    "ge": 1
+   }
+  }
+ ]
+}

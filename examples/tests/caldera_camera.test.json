@@ -1,0 +1,108 @@
+{
+ "name": "Caldera: the orbit camera is kept out of the beacon tower and eases out again where the way is free",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       61.1,
+       14.751,
+       29
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "step": 20
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 7,
+     "component": "CameraRig",
+     "value": {
+      "yaw": -1.5708,
+      "pitch": 0.25,
+      "distance": 6.0
+     }
+    }
+   }
+  },
+  {
+   "step": 80
+  },
+  {
+   "expect": {
+    "name": "Camera",
+    "field": "Transform.pos[0]",
+    "ge": 58.3,
+    "message": "the camera hangs west of the hero, where the beacon tower stands: it is kept in front of the tower"
+   }
+  },
+  {
+   "expect": {
+    "name": "Camera",
+    "field": "Transform.pos[0]",
+    "le": 60.7,
+    "message": "and nearer to the hero than the tower's far side"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 7,
+     "component": "CameraRig",
+     "value": {
+      "yaw": 1.5708
+     }
+    }
+   }
+  },
+  {
+   "step": 120
+  },
+  {
+   "expect": {
+    "name": "Camera",
+    "field": "Transform.pos[0]",
+    "ge": 65.6,
+    "message": "turned to the free side it eases out to its full distance again"
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

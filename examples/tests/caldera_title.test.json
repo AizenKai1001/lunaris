@@ -1,0 +1,103 @@
+{
+ "name": "Caldera: the boot scene leads to the title, Play (Enter) leads to the island with the music playing on",
+ "scene": "examples/caldera/boot.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "until": {
+    "exists": "Play button",
+    "eq": true,
+    "max_ticks": 40
+   }
+  },
+  {
+   "step": 12
+  },
+  {
+   "expect": {
+    "exists": "Music 1",
+    "eq": true,
+    "message": "the music is a Persist entity of the boot scene"
+   }
+  },
+  {
+   "expect": {
+    "resource": "music",
+    "eq": 1,
+    "message": "the title asks for the title tune"
+   }
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "until": {
+    "exists": "Hero",
+    "eq": true,
+    "max_ticks": 300
+   }
+  },
+  {
+   "step": 20
+  },
+  {
+   "expect": {
+    "exists": "Music 2",
+    "eq": true,
+    "message": "the music went on into the island"
+   }
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "HitPoints.value",
+    "eq": 100
+   }
+  },
+  {
+   "expect": {
+    "resource": "g.shards",
+    "eq": 0
+   }
+  },
+  {
+   "expect": {
+    "resource": "music",
+    "eq": 2,
+    "message": "and now plays the day's tune"
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0,
+    "message": "the island passes check"
+   }
+  },
+  {
+   "expect": {
+    "count": {
+     "with": [
+      "Shard"
+     ]
+    },
+    "eq": 6,
+    "message": "six ember shards on the island"
+   }
+  }
+ ]
+}

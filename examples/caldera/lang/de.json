@@ -1,0 +1,102 @@
+{
+  "npc": {
+    "name": "Maren",
+    "hello": "Du bist im Morgengrauen gelandet. Das tun nur wenige. Ich bin Maren, ich huete das Feuer.",
+    "q_quest": "Was soll ich tun?",
+    "q_where": "Wo sind die Splitter?",
+    "q_night": "Und die Nacht?",
+    "q_bye": "Lebe wohl.",
+    "quest1": "Sechs Glutsplitter fielen aus dem Maul des Berges, als er zuletzt erwachte. Zusammen entzuendeten sie das Leuchtfeuer, das die Dunkelheit fernhielt.",
+    "quest2": "Bring sie zum Altar hier, einzeln oder alle zusammen, und entzuende das Leuchtfeuer. Hab acht: Steingolems schlafen ueber den Splittern.",
+    "h1": "Einer liegt im Wrack am Oststrand. Geh am Ufer entlang.",
+    "h2": "Ein anderer ruht zwischen den Walknochen am Suedufer.",
+    "h3": "Suche die alte Ruine im Wald. In der Naehe schlaeft ein Golem.",
+    "h4": "Ein Splitter liegt auf der kleinen Insel im See. Du musst schwimmen.",
+    "h5": "Die Steine im Hochland bergen einen, und ein Golem bewacht ihn.",
+    "h6": "Der letzte liegt am Rand der Caldera, und der Waechter gibt ihn nicht her. Schlag zu, wenn er kniet.",
+    "h_all": "Du hast sie alle. Leg sie auf den Altar und entzuende das Leuchtfeuer.",
+    "night1": "Nachts erheben sich Geister. Nur Feuer zeigt sie dir, und deine Laterne, wenn sie hell brennt.",
+    "night2": "Bleib in der Naehe eines Feuers, dann kommen sie nicht. Rast hier, und ich halte deinen Platz im Buch fest.",
+    "bring": "Du traegst Glut! Leg sie auf den Altar, dort beim grossen Stein.",
+    "beacon": "Alle sechs! Geh zum Leuchtfeuer und entzuende es. Die Insel hat lange gewartet."
+  },
+  "hud": {
+    "hp": "LP",
+    "stamina": "AU",
+    "n": "N",
+    "e": "O",
+    "s": "S",
+    "w": "W",
+    "camp": "LAGER",
+    "fallen": "DU BIST GEFALLEN"
+  },
+  "prompt": {
+    "talk": "E   Sprechen",
+    "rest": "E   Am Feuer rasten und speichern",
+    "altar": "E   Die Glutsplitter ablegen",
+    "beacon": "E   Das Leuchtfeuer entzuenden"
+  },
+  "toast": {
+    "shard": "Ein Glutsplitter!",
+    "saved": "Spiel gespeichert",
+    "placed": "Die Splitter gluehen auf dem Altar",
+    "night": "Die Nacht bricht an: bleib am Feuer"
+  },
+  "hint": {
+    "keys": "WASD gehen    Maus schauen    Shift rennen    Leertaste springen    Klick Angriff    Rechtsklick rollen    E benutzen    L Aufgaben    Esc Pause"
+  },
+  "boss": {
+    "name": "DER WAECHTER DER CALDERA"
+  },
+  "quest": {
+    "title": "AUFGABEN",
+    "lead": "Finde die sechs Glutsplitter, bring sie zum Altar, entzuende das Leuchtfeuer.",
+    "s1": "Das Wrack am Oststrand",
+    "s2": "Die Walknochen am Suedufer",
+    "s3": "Die Ruine im Wald",
+    "s4": "Die Insel im See",
+    "s5": "Die Steine im Hochland",
+    "s6": "Der Rand der Caldera",
+    "close": "L schliesst"
+  },
+  "pause": {
+    "title": "PAUSE",
+    "resume": "Weiter",
+    "settings": "Einstellungen",
+    "title_screen": "Zum Titel"
+  },
+  "settings": {
+    "title": "EINSTELLUNGEN",
+    "sens": "Mausempfindlichkeit",
+    "music": "Musik",
+    "sfx": "Effekte",
+    "language": "Sprache",
+    "back": "Zurueck"
+  },
+  "language": {
+    "name": "Deutsch"
+  },
+  "menu": {
+    "title": "CALDERA",
+    "subtitle": "ein Inselabenteuer, gemacht mit Lunaris",
+    "play": "Spielen",
+    "continue": "Fortsetzen",
+    "settings": "Einstellungen",
+    "quit": "Beenden",
+    "nosave": "Noch kein Spielstand",
+    "hint": "W S oder Pfeile waehlen, Enter bestaetigt, oder die Maus"
+  },
+  "over": {
+    "title": "DU BIST GEFALLEN",
+    "stats": "Splitter abgelegt {g.dep} von 6      Gegner besiegt {g.kills}",
+    "retry": "Zurueck zum letzten Feuer",
+    "title_screen": "Titelbild"
+  },
+  "win": {
+    "title": "DAS LEUCHTFEUER BRENNT",
+    "line": "Die Glutsplitter sind zuhause, und die Nacht ist vorbei.",
+    "stats": "Gegner besiegt {g.kills}",
+    "again": "Nochmal spielen",
+    "title_screen": "Titelbild"
+  }
+}

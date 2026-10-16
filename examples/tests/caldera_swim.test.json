@@ -1,0 +1,154 @@
+{
+ "name": "Caldera: the hero wades into the lake, swims in the deep water and walks out again",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -60.0,
+       14.0,
+       50.0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "step": 90
+  },
+  {
+   "expect": {
+    "count": {
+     "with": [
+      "InWater"
+     ]
+    },
+    "eq": 1,
+    "message": "the hero is in the lake"
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": -0.8944,
+    "gamepad.ly": 0.4472
+   }
+  },
+  {
+   "step": 100
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "Hero.swim",
+    "eq": 1,
+    "message": "in the deep it swims"
+   }
+  },
+  {
+   "expect": {
+    "resource": "hero.depth",
+    "gt": 1.2
+   }
+  },
+  {
+   "expect": {
+    "events": "splash",
+    "ge": 1
+   }
+  },
+  {
+   "input": {
+    "gamepad.lx": 0.0,
+    "gamepad.ly": 0.0
+   }
+  },
+  {
+   "step": 20
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       -41.0,
+       20.0,
+       56.0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": -1,
+      "fz": 0
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "step": 120
+  },
+  {
+   "expect": {
+    "count": {
+     "with": [
+      "InWater"
+     ]
+    },
+    "eq": 0,
+    "message": "and out again"
+   }
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "Hero.swim",
+    "eq": 0
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

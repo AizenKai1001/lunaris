@@ -1,0 +1,327 @@
+{
+ "name": "Caldera: the fire saves the game; Retry after a death and Continue from the title bring the run back",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.dep",
+     "value": 3
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s1",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s2",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s3",
+     "value": 1
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       47.5,
+       14.4,
+       42.5
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "step": 6
+  },
+  {
+   "expect": {
+    "resource": "prompt",
+    "eq": 2,
+    "message": "the fire offers to save"
+   }
+  },
+  {
+   "input": {
+    "e": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "e": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "step": 10
+  },
+  {
+   "expect": {
+    "resource": "game.saved",
+    "gt": 0,
+    "message": "E at the fire saves the game"
+   }
+  },
+  {
+   "expect": {
+    "events": "save",
+    "ge": 1
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       16.63,
+       8.214,
+       118.34
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "HitPoints",
+     "value": {
+      "value": 0
+     }
+    }
+   }
+  },
+  {
+   "until": {
+    "exists": "Retry button",
+    "eq": true,
+    "max_ticks": 700
+   }
+  },
+  {
+   "step": 10
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.dep",
+     "value": 0
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.s1",
+     "value": 0
+    }
+   }
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "until": {
+    "exists": "Hero",
+    "eq": true,
+    "max_ticks": 120
+   }
+  },
+  {
+   "step": 10
+  },
+  {
+   "expect": {
+    "resource": "g.dep",
+    "eq": 3,
+    "message": "Retry loaded the saved run: three shards on the altar"
+   }
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "HitPoints.dead",
+    "eq": false
+   }
+  },
+  {
+   "expect": {
+    "resource": "g.s2",
+    "eq": 1
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "g.dep",
+     "value": 0
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set_resource",
+    "args": {
+     "name": "leave",
+     "value": 3
+    }
+   }
+  },
+  {
+   "until": {
+    "exists": "Play button",
+    "eq": true,
+    "max_ticks": 300
+   }
+  },
+  {
+   "step": 20
+  },
+  {
+   "expect": {
+    "name": "Continue button",
+    "field": "Ui.color[3]",
+    "gt": 0.9,
+    "message": "Continue is lit: there is a saved game"
+   }
+  },
+  {
+   "input": {
+    "s": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "s": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": true
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "input": {
+    "enter": false
+   }
+  },
+  {
+   "step": 2
+  },
+  {
+   "until": {
+    "exists": "Hero",
+    "eq": true,
+    "max_ticks": 120
+   }
+  },
+  {
+   "step": 10
+  },
+  {
+   "expect": {
+    "resource": "g.dep",
+    "eq": 3,
+    "message": "Continue brought it back"
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

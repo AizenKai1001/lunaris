@@ -1,0 +1,131 @@
+{
+ "name": "Caldera: at night wraiths come out of the dark and bite; the fire sends them away",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 10
+  },
+  {
+   "expect": {
+    "resource": "night",
+    "eq": 0,
+    "message": "the game starts at dawn"
+   }
+  },
+  {
+   "expect": {
+    "name": "Wraith 1",
+    "field": "Wraith.state",
+    "eq": 0,
+    "message": "the wraiths wait at the bottom of the world"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 3,
+     "component": "TimeOfDay",
+     "value": {
+      "time": 21.0
+     }
+    }
+   }
+  },
+  {
+   "step": 4
+  },
+  {
+   "expect": {
+    "resource": "night",
+    "eq": 1
+   }
+  },
+  {
+   "until": {
+    "name": "Wraith 1",
+    "field": "Wraith.state",
+    "eq": 1,
+    "max_ticks": 60
+   }
+  },
+  {
+   "expect": {
+    "events": "wraith_rise",
+    "ge": 1
+   }
+  },
+  {
+   "until": {
+    "name": "Hero",
+    "field": "HitPoints.value",
+    "lt": 100,
+    "max_ticks": 900
+   }
+  },
+  {
+   "expect": {
+    "events": "wraith_bite",
+    "ge": 1,
+    "message": "a wraith bit the hero"
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Transform",
+     "value": {
+      "pos": [
+       47.5,
+       14.4,
+       42.5
+      ]
+     }
+    }
+   }
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "Hero",
+     "value": {
+      "fx": 0,
+      "fz": -1
+     }
+    }
+   }
+  },
+  {
+   "step": 6
+  },
+  {
+   "step": 120
+  },
+  {
+   "expect": {
+    "name": "Wraith 1",
+    "field": "Wraith.state",
+    "eq": 0,
+    "message": "at the fire the wraiths go away"
+   }
+  },
+  {
+   "expect": {
+    "resource": "dist.fire",
+    "lt": 4
+   }
+  },
+  {
+   "expect": {
+    "check": "errors",
+    "eq": 0
+   }
+  }
+ ]
+}

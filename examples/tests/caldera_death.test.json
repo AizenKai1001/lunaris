@@ -1,0 +1,69 @@
+{
+ "name": "Caldera: when the hero is dead the world slows, the picture goes red and the game over screen follows",
+ "scene": "examples/caldera/island.lunaris.json",
+ "seed": 1,
+ "replay_check": true,
+ "steps": [
+  {
+   "step": 20
+  },
+  {
+   "call": {
+    "tool": "set",
+    "args": {
+     "uid": 100,
+     "component": "HitPoints",
+     "value": {
+      "value": 0
+     }
+    }
+   }
+  },
+  {
+   "step": 3
+  },
+  {
+   "expect": {
+    "name": "Hero",
+    "field": "HitPoints.dead",
+    "eq": true
+   }
+  },
+  {
+   "expect": {
+    "resource": "dead",
+    "eq": 1
+   }
+  },
+  {
+   "expect": {
+    "events": "lose",
+    "ge": 1
+   }
+  },
+  {
+   "until": {
+    "exists": "Retry button",
+    "eq": true,
+    "max_ticks": 600
+   }
+  },
+  {
+   "step": 20
+  },
+  {
+   "expect": {
+    "name": "Retry button",
+    "field": "Ui.visible",
+    "eq": true
+   }
+  },
+  {
+   "expect": {
+    "resource": "music",
+    "eq": 1,
+    "message": "the game over screen has the title's tune"
+   }
+  }
+ ]
+}

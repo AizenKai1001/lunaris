@@ -66,6 +66,27 @@ fn placeholders(template: &str) -> Vec<String> {
     out
 }
 
+/// How much bigger, seen from above, is the axis-aligned box round a turned box than the box itself (1 = not at all)? `rot` is a quaternion (x, y, z, w), `half` the half sizes.
+/// A box turned by a multiple of 90 degrees is its own axis-aligned box (1); a square post turned by 45 degrees is twice as big (2); a long thin wall turned a little is much more.
+fn turned_growth(rot: [f32; 4], half: [f32; 3]) -> f32 {
+    let n = (rot[0] * rot[0] + rot[1] * rot[1] + rot[2] * rot[2] + rot[3] * rot[3]).sqrt();
+    if !n.is_finite() || n < 1.0e-6 {
+        return 1.0;
+    }
+    let (x, y, z, w) = (rot[0] / n, rot[1] / n, rot[2] / n, rot[3] / n);
+    let m = [
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+        [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+        [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+    ];
+    if m.iter().all(|row| row.iter().any(|v| v.abs() > 0.998)) {
+        return 1.0;
+    }
+    let (hx, hz) = ((m[0][0].abs() * half[0] + m[0][1].abs() * half[1] + m[0][2].abs() * half[2]), (m[2][0].abs() * half[0] + m[2][1].abs() * half[1] + m[2][2].abs() * half[2]));
+    let own = (half[0] * half[2]).max(1.0e-6);
+    hx * hz / own
+}
+
 fn file_exists(root: &Path, rel: &str) -> bool {
     lunaris_json::safe_relative(rel).is_ok_and(|norm| root.join(norm).is_file())
 }
@@ -477,8 +498,47 @@ impl Engine {
             })?;
             // bodies of a 2D scene (an orthographic camera) stand in one plane: the contact normal of two solid bodies at different z has a part along z, which pushes
             // them out of the plane and apart, so they stop meeting (a hero drawn "above" a guard by a bigger z walks through it)
-            let mut ortho = false;
-            w.for_each_uid::<(&Camera,), _>(|_, _, (c,)| ortho |= c.ortho)?;
+            // (the picture is the one of the active camera with the lowest uid: an orthographic camera that is switched off, a minimap's, does not make a 3D scene 2D)
+            let mut main_camera: Option<(u64, bool)> = None;
+            w.for_each_uid::<(&Camera,), _>(|_, uid, (c,)| {
+                if c.active && main_camera.is_none_or(|b| uid < b.0) {
+                    main_camera = Some((uid, c.ortho));
+                }
+            })?;
+            let ortho = main_camera.is_some_and(|c| c.1);
+            let mut collide: Vec<u64> = Vec::new();
+            w.for_each_uid::<(&lunaris_sim::components::CameraCollide,), _>(|_, uid, _| collide.push(uid))?;
+            for uid in collide {
+                if !rigs.iter().any(|r| r.0 == uid) {
+                    problems.add("warning", Some(uid), "has a CameraCollide but no CameraRig, so nothing places the camera it would keep out of the walls".into(), "put it on the entity with the CameraRig");
+                }
+            }
+            // a solid box that is turned (not by a multiple of 90 degrees): physics keeps its true shape, but characters and navigation agents see only the axis-aligned box round it,
+            // which is bigger and can close a doorway (a ruin built from turned walls was sealed in Caldera)
+            let mut movers = false;
+            w.for_each_uid::<(&lunaris_sim::components::CharacterBody,), _>(|_, _, _| movers = true)?;
+            w.for_each_uid::<(&lunaris_sim::components::NavAgent,), _>(|_, _, _| movers = true)?;
+            if movers {
+                let mut moving: BTreeSet<u64> = BTreeSet::new();
+                w.for_each_uid::<(&lunaris_sim::components::Velocity,), _>(|_, uid, _| {
+                    moving.insert(uid);
+                })?;
+                let mut turned: Vec<u64> = Vec::new();
+                w.for_each_uid::<(&Collider, &Transform), _>(|_, uid, (c, t)| {
+                    // (a square trunk or rock turned any way is at most twice as big from above: only long walls turned a little are a problem)
+                    if c.shape == 1 && !c.trigger && !moving.contains(&uid) && turned_growth(t.rot, [0.5 * c.size[0].abs() * t.scale[0], 0.5 * c.size[1].abs() * t.scale[1], 0.5 * c.size[2].abs() * t.scale[2]]) > 2.3 {
+                        turned.push(uid);
+                    }
+                })?;
+                if let Some(first) = turned.first() {
+                    problems.add(
+                        "warning",
+                        Some(*first),
+                        format!("{} long solid box Colliders (walls) are turned by an angle that is not a multiple of 90 degrees (first: entity {}); characters and navigation agents see only the axis-aligned box round a turned box, which is much bigger and can close a gap or a doorway", turned.len(), first),
+                        "keep walls that must be walked through or along square to the axes (docs/NAVIGATION.md), or build a turned wall from several small boxes",
+                    );
+                }
+            }
             if ortho {
                 let mut bodies: Vec<(u64, f32)> = Vec::new();
                 w.for_each_uid::<(&lunaris_sim::components::RigidBody, &Collider, &Transform), _>(|_, uid, (_, c, t)| {
@@ -825,7 +885,7 @@ impl Engine {
             }
             for r in s.resources() {
                 // (the engine itself sets these: raw input, the actions of an InputMap, the time scale, saved-game answers, the screen shape)
-                let engine_made = r.starts_with("input.") || r.starts_with("action.") || r.starts_with("game.") || r == "time.scale" || r == "screen.aspect";
+                let engine_made = r.starts_with("input.") || r.starts_with("action.") || r.starts_with("game.") || r.starts_with("scene.") || r == "language.count" || r == "language.index" || r == "time.scale" || r == "screen.aspect";
                 if !engine_made && !written.contains(r) && !defined_resources.contains(r) {
                     problems.add("warning", None, format!("graph system `{}` reads the resource `{r}`, which nothing sets (it always reads 0)", s.name), "set it with `set_resource`, or write it with res_set / res_add");
                 }

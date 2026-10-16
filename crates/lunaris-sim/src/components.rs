@@ -1821,3 +1821,14 @@ component! {
         pub resolution: u32 = 128,
     }
 }
+
+component! {
+    /// Keeps a third-person camera out of the walls (put it beside a `CameraRig`): every tick, after the rig has placed the camera, a line is looked along from the point the camera looks at (the rig's
+    /// target plus its `look_offset`) towards the camera; when something solid (a `Collider` that is not a trigger, terrain, the triangles of a `MeshCollider`, a convex hull) is in the way, the camera is
+    /// pulled in to `radius` metres in front of it, but never nearer to the target than `min_distance`. Without this a camera orbiting a character goes through trees, ruins and the side of a hill. The rig eases
+    /// the camera out again when the way is free (`CameraRig.follow_speed`), so a camera that is pulled in does not snap back.
+    pub struct CameraCollide {
+        pub radius: f32 = 0.35,
+        pub min_distance: f32 = 0.9,
+    }
+}

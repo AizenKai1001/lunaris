@@ -393,6 +393,10 @@ setting `Timeline.playing`.
 On the camera entity (for a flat 2D picture set `look_at` to false: the default turns the camera toward `target` plus `look_offset` [0, 1, 0], which tilts it a few degrees, and `check` says so): `target` (a uid), `mode` 0 follow (stay at `offset`, eased at `follow_speed` per second, 0 snaps) or 1 orbit (`distance`, `yaw`, `pitch` in radians: a graph system
 can add the mouse movement to them), `look_at` with `look_offset` to face the target, and `shake` (0 to 1: set it to 1 when something explodes) with `shake_decay` per second and `shake_amount` metres.
 
+An orbit camera (`mode` 1) places itself at `target + look_offset + distance * (sin(yaw) cos(pitch), sin(pitch), cos(yaw) cos(pitch))`: at yaw 0 it hangs behind the target on the +z side, so the way the camera looks along the ground is (-sin yaw, -cos yaw) and its right is (cos yaw, -sin yaw): a walking system turns the stick or the keys by the camera's yaw, a mouse turn to the right lowers the yaw (`CameraRig.yaw -= $input.mouse_dx * 0.004`), and pushing the mouse down raises the pitch.
+
+**Keeping the camera out of the walls: `CameraCollide {radius, min_distance}`** beside a `CameraRig`. After the rig has placed the camera each tick, a line is looked along from the point it looks at (target plus `look_offset`) to the camera; if a solid `Collider` (not a trigger), a terrain, a `MeshCollider` or a convex hull is in the way, the camera is put `radius` metres in front of it, never nearer to the target than `min_distance`. The rig eases it out again when the way is free (give the rig a `follow_speed` of 10 or so; with 0 it snaps). The target's own collider does not count. It was added by the 3D game Caldera (`docs/DOGFOOD_3D.md`): without it an orbit camera sees the inside of every tree and hill. `check` warns about a `CameraCollide` beside no `CameraRig`.
+
 ## Sensors: `Sensor`
 
 Every tick the nearest entity that has the component named in `filter` (say `HitPoints`), within `radius` metres and `fov` degrees in front (the entity's local -z; 360 sees all around), is written to

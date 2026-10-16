@@ -1,0 +1,2176 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Hero",
+      "doc": "",
+      "fields": [
+        {
+          "name": "state",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "cd",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "stamina",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "exhaust",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "regen",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "rx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "rz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "swim",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "moving",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "sprint",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "combo",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "air",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Foe",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Golem",
+      "doc": "",
+      "fields": [
+        {
+          "name": "mode",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "cd",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "repath",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "wake_r",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dist",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "home_x",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "home_z",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "leash",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "boss",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "attack",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "combo",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "rest",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "hitdone",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dirx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dirz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "tx",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "tz",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dmg",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Wraith",
+      "doc": "",
+      "fields": [
+        {
+          "name": "slot",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "state",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "cd",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "dist",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Shard",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "base_y",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "locked",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Campfire",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Altar",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Beacon",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BeaconFire",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BeaconFlame",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Socket",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Npc",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HeroLight",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Fader",
+      "doc": "",
+      "fields": [
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "out",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "leaving",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "target",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "fired",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SwitchId",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "PauseUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "PauseBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SettingsUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "SettingBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SettingSlider",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "HudHp",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HudSt",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HudShard",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "HudItem",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "PromptText",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "ToastText",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "CompassMark",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        },
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MapCam",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "NpcLabel",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "MapBlip",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "DeadUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "HurtFlash",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "QuestUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "QuestRow",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "QuestRowText",
+      "doc": "",
+      "fields": [
+        {
+          "name": "n",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "FxPool",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SplashFx",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "MusicTrack",
+      "doc": "",
+      "fields": [
+        {
+          "name": "id",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MenuBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MenuUi",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "ContinueBtn",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "NoSaveText",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Spin",
+      "doc": "",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "BossBar",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BossBarText",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Hint",
+      "doc": "",
+      "fields": [
+        {
+          "name": "t",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "OverBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "WinBtn",
+      "doc": "",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Orbit",
+      "doc": "",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Tree",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "Prop",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "CreditsUi",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 3028,
+  "entities": [
+    {
+      "uid": 1,
+      "components": {
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.03999999910593033,
+            0.05000000074505806,
+            0.1599999964237213
+          ],
+          "sky_horizon": [
+            0.44999998807907104,
+            0.2199999988079071,
+            0.14000000059604645
+          ],
+          "ground": [
+            0.05000000074505806,
+            0.03999999910593033,
+            0.03999999910593033
+          ],
+          "ambient": 0.5,
+          "exposure": 1,
+          "clouds": 0.20000000298023224,
+          "fog": 0,
+          "fog_color": [
+            0.7200000286102295,
+            0.8199999928474426,
+            0.949999988079071
+          ],
+          "shadows": true,
+          "shadow_distance": 80,
+          "ssao": 0.800000011920929,
+          "bloom": 0.8999999761581421,
+          "bloom_threshold": 1,
+          "vignette": 0.3499999940395355,
+          "saturation": 1.149999976158142,
+          "tonemap": 0,
+          "dof": 0,
+          "focus": 10,
+          "focus_range": 4
+        },
+        "Name": {
+          "value": "Look"
+        }
+      }
+    },
+    {
+      "uid": 2,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            0.6000000238418579,
+            0.30000001192092896
+          ],
+          "intensity": 1.2000000476837158,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.20000000298023224,
+            0.30000001192092896,
+            0,
+            0.9300000071525574
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 3,
+      "components": {
+        "Light": {
+          "kind": 1,
+          "color": [
+            1,
+            0.6499999761581421,
+            0.30000001192092896
+          ],
+          "intensity": 7,
+          "range": 40,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Flame light"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            2.5,
+            3
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 5,
+      "components": {
+        "InputMap": {
+          "bindings": "move_x = d, a:-1, gamepad.lx, arrowright, arrowleft:-1\nmove_y = w, s:-1, gamepad.ly, arrowup, arrowdown:-1\nlook_x = gamepad.rx\nlook_y = gamepad.ry\nattack = mouse_left, j, gamepad.x, gamepad.rt\nroll = mouse_right, q, gamepad.b, gamepad.lt\njump = space, gamepad.a\nsprint = shift, gamepad.ls, gamepad.lb\ninteract = e, gamepad.y\nquest = l, gamepad.back\npause = escape, gamepad.start\ndialogue_next = enter, space, gamepad.a\ndialogue_choice_1 = 1\ndialogue_choice_2 = 2, gamepad.b\ndialogue_choice_3 = 3, gamepad.x\ndialogue_choice_4 = 4, gamepad.y\nui_up = w, arrowup, gamepad.dpad_up\nui_down = s, arrowdown, gamepad.dpad_down\nui_left = a, arrowleft, gamepad.dpad_left\nui_right = d, arrowright, gamepad.dpad_right\nui_accept = enter, gamepad.a\ndeadzone = 0.15"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 6,
+      "components": {
+        "LanguageList": {
+          "languages": "examples/caldera/lang/en, examples/caldera/lang/de"
+        },
+        "Localization": {
+          "language": "examples/caldera/lang/en"
+        },
+        "Name": {
+          "value": "Localization"
+        }
+      }
+    },
+    {
+      "uid": 7,
+      "components": {
+        "Camera": {
+          "fov_y": 50,
+          "near": 0.10000000149011612,
+          "far": 1000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.05000000074505806,
+            0.05000000074505806,
+            0.07999999821186066,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Camera"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            3,
+            12
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 8,
+      "components": {
+        "Name": {
+          "value": "Flames"
+        },
+        "ParticleModules": {
+          "modules": "color 0:1,0.95,0.7,0 0.1:1,0.85,0.4,0.95 0.5:1,0.5,0.12,0.8 1:0.3,0.08,0.04,0\nsize 0:0.4 0.25:1.4 1:0.2\nnoise strength=0.7 scale=0.8 speed=0.9"
+        },
+        "Particles": {
+          "count": 900,
+          "lifetime": 1.600000023841858,
+          "looping": true,
+          "prewarm": true,
+          "playing": true,
+          "time": 0,
+          "speed": 1,
+          "spread_time": 0,
+          "shape": 3,
+          "extent": [
+            1,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 10,
+          "speed_range": [
+            2.5,
+            5
+          ],
+          "gravity": [
+            0,
+            2.4000000953674316,
+            0
+          ],
+          "drag": 0,
+          "turbulence": 0.4000000059604645,
+          "turbulence_scale": 1,
+          "size": [
+            1.5,
+            0.20000000298023224
+          ],
+          "size_jitter": 0.30000001192092896,
+          "color": [
+            1,
+            0.699999988079071,
+            0.20000000298023224,
+            0.8999999761581421
+          ],
+          "color_end": [
+            0.8999999761581421,
+            0.11999999731779099,
+            0.019999999552965164,
+            0
+          ],
+          "fade_in": 0.05000000074505806,
+          "spin": 0,
+          "stretch": 0,
+          "texture": "",
+          "sheet": [
+            1,
+            1
+          ],
+          "additive": true,
+          "seed": 8,
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            2
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 9,
+      "components": {
+        "Name": {
+          "value": "Embers"
+        },
+        "Particles": {
+          "count": 300,
+          "lifetime": 4.5,
+          "looping": true,
+          "prewarm": true,
+          "playing": true,
+          "time": 0,
+          "speed": 1,
+          "spread_time": 0,
+          "shape": 3,
+          "extent": [
+            5,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "cone": 30,
+          "speed_range": [
+            0.6000000238418579,
+            1.7999999523162842
+          ],
+          "gravity": [
+            0,
+            0.3499999940395355,
+            0
+          ],
+          "drag": 0,
+          "turbulence": 0.6000000238418579,
+          "turbulence_scale": 1,
+          "size": [
+            0.11999999731779099,
+            0.019999999552965164
+          ],
+          "size_jitter": 0.30000001192092896,
+          "color": [
+            1,
+            0.5,
+            0.15000000596046448,
+            0.8999999761581421
+          ],
+          "color_end": [
+            1,
+            0.20000000298023224,
+            0.019999999552965164,
+            0
+          ],
+          "fade_in": 0.05000000074505806,
+          "spin": 0,
+          "stretch": 0,
+          "texture": "",
+          "sheet": [
+            1,
+            1
+          ],
+          "additive": true,
+          "seed": 3,
+          "visible": true
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 14,
+      "components": {
+        "Name": {
+          "value": "Nav"
+        },
+        "UiNav": {
+          "current": 0
+        },
+        "UiNavAuto": {
+          "enabled": true
+        }
+      }
+    },
+    {
+      "uid": 15,
+      "components": {
+        "Name": {
+          "value": "Interface shape"
+        },
+        "UiScale": {
+          "aspect": 1.7777999639511108
+        }
+      }
+    },
+    {
+      "uid": 900,
+      "components": {
+        "ColorGrade": {
+          "lift": [
+            0,
+            0,
+            0
+          ],
+          "gamma": [
+            1,
+            1,
+            1
+          ],
+          "gain": [
+            1,
+            1,
+            1
+          ],
+          "temperature": 0,
+          "tint_shift": 0,
+          "fade": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        "Fader": {
+          "t": 0,
+          "out": 0,
+          "leaving": 0,
+          "target": 0,
+          "fired": 0
+        },
+        "Name": {
+          "value": "Fader"
+        }
+      }
+    },
+    {
+      "uid": 901,
+      "components": {
+        "Name": {
+          "value": "Switch 3"
+        },
+        "SceneReset": {
+          "resources": "paused leave fire time.scale cutscene talking settings questlog dead dead.t hitstop swing dmg shake flash fxgo splash prompt toast toast.k toast.t tgt tgt.d wraith.next wraith.timer lit.t boss.mode kills g.*"
+        },
+        "SceneSwitch": {
+          "path": "examples/caldera/title.lunaris.json",
+          "go": false,
+          "keep_resources": true,
+          "keep_systems": false
+        },
+        "SwitchId": {
+          "n": 3
+        }
+      }
+    },
+    {
+      "uid": 902,
+      "components": {
+        "Name": {
+          "value": "Switch 11"
+        },
+        "SceneReset": {
+          "resources": "paused leave fire time.scale cutscene talking settings questlog dead dead.t hitstop swing dmg shake flash fxgo splash prompt toast toast.k toast.t tgt tgt.d wraith.next wraith.timer lit.t boss.mode kills g.*"
+        },
+        "SceneSwitch": {
+          "path": "examples/caldera/island.lunaris.json",
+          "go": false,
+          "keep_resources": true,
+          "keep_systems": false
+        },
+        "SwitchId": {
+          "n": 11
+        }
+      }
+    },
+    {
+      "uid": 1290,
+      "components": {
+        "Name": {
+          "value": "Win title"
+        },
+        "Text": {
+          "value": "{#win.title}",
+          "pos": [
+            0.5,
+            0.10000000149011612
+          ],
+          "size": 0.11999999731779099,
+          "color": [
+            1,
+            0.8600000143051147,
+            0.44999998807907104,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 1291,
+      "components": {
+        "Name": {
+          "value": "Win line"
+        },
+        "Text": {
+          "value": "{#win.line}",
+          "pos": [
+            0.5,
+            0.30000001192092896
+          ],
+          "size": 0.03400000184774399,
+          "color": [
+            1,
+            0.949999988079071,
+            0.8500000238418579,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 1292,
+      "components": {
+        "Name": {
+          "value": "Win stats"
+        },
+        "Text": {
+          "value": "{#win.stats}",
+          "pos": [
+            0.5,
+            0.550000011920929
+          ],
+          "size": 0.03999999910593033,
+          "color": [
+            1,
+            0.8999999761581421,
+            0.699999988079071,
+            1
+          ],
+          "align": 1,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 1301,
+      "components": {
+        "Name": {
+          "value": "Again button"
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        },
+        "Ui": {
+          "pos": [
+            0.2800000011920929,
+            0.7599999904632568
+          ],
+          "size": [
+            0.2199999988079071,
+            0.09000000357627869
+          ],
+          "color": [
+            0.6200000047683716,
+            0.3400000035762787,
+            0.14000000059604645,
+            0.9599999785423279
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            0.8199999928474426,
+            0.5,
+            0.8999999761581421
+          ],
+          "border": 0.003000000026077032,
+          "text": "{#win.again}",
+          "text_size": 0.03400000184774399,
+          "text_color": [
+            1,
+            0.9700000286102295,
+            0.8799999952316284,
+            1
+          ],
+          "layer": 3,
+          "visible": true,
+          "button": true,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.017999999225139618,
+          "color2": [
+            0.3400000035762787,
+            0.1599999964237213,
+            0.07999999821186066,
+            0.9599999785423279
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.5
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.00800000037997961
+          ]
+        },
+        "WinBtn": {
+          "kind": 1
+        }
+      }
+    },
+    {
+      "uid": 1302,
+      "components": {
+        "Name": {
+          "value": "Title button"
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        },
+        "Ui": {
+          "pos": [
+            0.5199999809265137,
+            0.7599999904632568
+          ],
+          "size": [
+            0.20000000298023224,
+            0.09000000357627869
+          ],
+          "color": [
+            0.6200000047683716,
+            0.3400000035762787,
+            0.14000000059604645,
+            0.9599999785423279
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            0.8199999928474426,
+            0.5,
+            0.8999999761581421
+          ],
+          "border": 0.003000000026077032,
+          "text": "{#win.title_screen}",
+          "text_size": 0.03400000184774399,
+          "text_color": [
+            1,
+            0.9700000286102295,
+            0.8799999952316284,
+            1
+          ],
+          "layer": 3,
+          "visible": true,
+          "button": true,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.017999999225139618,
+          "color2": [
+            0.3400000035762787,
+            0.1599999964237213,
+            0.07999999821186066,
+            0.9599999785423279
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0.5
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.00800000037997961
+          ]
+        },
+        "WinBtn": {
+          "kind": 2
+        }
+      }
+    },
+    {
+      "uid": 3000,
+      "components": {
+        "Name": {
+          "value": "Sound swing"
+        },
+        "Sound": {
+          "name": "swing",
+          "wave": 4,
+          "freq": 700,
+          "freq_end": 200,
+          "duration": 0.1599999964237213,
+          "volume": 0.1599999964237213
+        }
+      }
+    },
+    {
+      "uid": 3001,
+      "components": {
+        "Name": {
+          "value": "Sound golem_hit"
+        },
+        "Sound": {
+          "name": "golem_hit",
+          "wave": 2,
+          "freq": 260,
+          "freq_end": 70,
+          "duration": 0.18000000715255737,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3002,
+      "components": {
+        "Name": {
+          "value": "Sound wraith_hit"
+        },
+        "Sound": {
+          "name": "wraith_hit",
+          "wave": 3,
+          "freq": 900,
+          "freq_end": 300,
+          "duration": 0.20000000298023224,
+          "volume": 0.2199999988079071
+        }
+      }
+    },
+    {
+      "uid": 3003,
+      "components": {
+        "Name": {
+          "value": "Sound golem_die"
+        },
+        "Sound": {
+          "name": "golem_die",
+          "wave": 2,
+          "freq": 200,
+          "freq_end": 40,
+          "duration": 0.5,
+          "volume": 0.2800000011920929
+        }
+      }
+    },
+    {
+      "uid": 3004,
+      "components": {
+        "Name": {
+          "value": "Sound golem_break"
+        },
+        "Sound": {
+          "name": "golem_break",
+          "wave": 4,
+          "freq": 300,
+          "freq_end": 30,
+          "duration": 0.699999988079071,
+          "volume": 0.36000001430511475
+        }
+      }
+    },
+    {
+      "uid": 3005,
+      "components": {
+        "Name": {
+          "value": "Sound golem_wake"
+        },
+        "Sound": {
+          "name": "golem_wake",
+          "wave": 2,
+          "freq": 70,
+          "freq_end": 140,
+          "duration": 0.8999999761581421,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3006,
+      "components": {
+        "Name": {
+          "value": "Sound golem_swing"
+        },
+        "Sound": {
+          "name": "golem_swing",
+          "wave": 4,
+          "freq": 220,
+          "freq_end": 90,
+          "duration": 0.30000001192092896,
+          "volume": 0.14000000059604645
+        }
+      }
+    },
+    {
+      "uid": 3007,
+      "components": {
+        "Name": {
+          "value": "Sound golem_thud"
+        },
+        "Sound": {
+          "name": "golem_thud",
+          "wave": 2,
+          "freq": 120,
+          "freq_end": 40,
+          "duration": 0.30000001192092896,
+          "volume": 0.3799999952316284
+        }
+      }
+    },
+    {
+      "uid": 3008,
+      "components": {
+        "Name": {
+          "value": "Sound boss_slam"
+        },
+        "Sound": {
+          "name": "boss_slam",
+          "wave": 2,
+          "freq": 90,
+          "freq_end": 30,
+          "duration": 0.6000000238418579,
+          "volume": 0.44999998807907104
+        }
+      }
+    },
+    {
+      "uid": 3009,
+      "components": {
+        "Name": {
+          "value": "Sound golem_roar"
+        },
+        "Sound": {
+          "name": "golem_roar",
+          "wave": 2,
+          "freq": 120,
+          "freq_end": 220,
+          "duration": 0.800000011920929,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3010,
+      "components": {
+        "Name": {
+          "value": "Sound boss_tired"
+        },
+        "Sound": {
+          "name": "boss_tired",
+          "wave": 3,
+          "freq": 300,
+          "freq_end": 90,
+          "duration": 0.800000011920929,
+          "volume": 0.2199999988079071
+        }
+      }
+    },
+    {
+      "uid": 3011,
+      "components": {
+        "Name": {
+          "value": "Sound hurt"
+        },
+        "Sound": {
+          "name": "hurt",
+          "wave": 2,
+          "freq": 240,
+          "freq_end": 80,
+          "duration": 0.25,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3012,
+      "components": {
+        "Name": {
+          "value": "Sound roll"
+        },
+        "Sound": {
+          "name": "roll",
+          "wave": 4,
+          "freq": 500,
+          "freq_end": 150,
+          "duration": 0.25999999046325684,
+          "volume": 0.10000000149011612
+        }
+      }
+    },
+    {
+      "uid": 3013,
+      "components": {
+        "Name": {
+          "value": "Sound jump"
+        },
+        "Sound": {
+          "name": "jump",
+          "wave": 3,
+          "freq": 280,
+          "freq_end": 520,
+          "duration": 0.11999999731779099,
+          "volume": 0.10000000149011612
+        }
+      }
+    },
+    {
+      "uid": 3014,
+      "components": {
+        "Name": {
+          "value": "Sound splash"
+        },
+        "Sound": {
+          "name": "splash",
+          "wave": 4,
+          "freq": 900,
+          "freq_end": 200,
+          "duration": 0.4000000059604645,
+          "volume": 0.2199999988079071
+        }
+      }
+    },
+    {
+      "uid": 3015,
+      "components": {
+        "Name": {
+          "value": "Sound shard"
+        },
+        "Sound": {
+          "name": "shard",
+          "wave": 3,
+          "freq": 660,
+          "freq_end": 1580,
+          "duration": 0.5,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3016,
+      "components": {
+        "Name": {
+          "value": "Sound shard_appear"
+        },
+        "Sound": {
+          "name": "shard_appear",
+          "wave": 0,
+          "freq": 880,
+          "freq_end": 1320,
+          "duration": 0.6000000238418579,
+          "volume": 0.23999999463558197
+        }
+      }
+    },
+    {
+      "uid": 3017,
+      "components": {
+        "Name": {
+          "value": "Sound deposit"
+        },
+        "Sound": {
+          "name": "deposit",
+          "wave": 3,
+          "freq": 440,
+          "freq_end": 880,
+          "duration": 0.699999988079071,
+          "volume": 0.2800000011920929
+        }
+      }
+    },
+    {
+      "uid": 3018,
+      "components": {
+        "Name": {
+          "value": "Sound save"
+        },
+        "Sound": {
+          "name": "save",
+          "wave": 0,
+          "freq": 523,
+          "freq_end": 784,
+          "duration": 0.5,
+          "volume": 0.2199999988079071
+        }
+      }
+    },
+    {
+      "uid": 3019,
+      "components": {
+        "Name": {
+          "value": "Sound beacon"
+        },
+        "Sound": {
+          "name": "beacon",
+          "wave": 3,
+          "freq": 220,
+          "freq_end": 880,
+          "duration": 2.4000000953674316,
+          "volume": 0.36000001430511475
+        }
+      }
+    },
+    {
+      "uid": 3020,
+      "components": {
+        "Name": {
+          "value": "Sound select"
+        },
+        "Sound": {
+          "name": "select",
+          "wave": 1,
+          "freq": 520,
+          "freq_end": 780,
+          "duration": 0.07999999821186066,
+          "volume": 0.11999999731779099
+        }
+      }
+    },
+    {
+      "uid": 3021,
+      "components": {
+        "Name": {
+          "value": "Sound win"
+        },
+        "Sound": {
+          "name": "win",
+          "wave": 3,
+          "freq": 523,
+          "freq_end": 1046,
+          "duration": 1.2000000476837158,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3022,
+      "components": {
+        "Name": {
+          "value": "Sound lose"
+        },
+        "Sound": {
+          "name": "lose",
+          "wave": 2,
+          "freq": 220,
+          "freq_end": 55,
+          "duration": 1.2000000476837158,
+          "volume": 0.30000001192092896
+        }
+      }
+    },
+    {
+      "uid": 3023,
+      "components": {
+        "Name": {
+          "value": "Sound wraith_rise"
+        },
+        "Sound": {
+          "name": "wraith_rise",
+          "wave": 0,
+          "freq": 180,
+          "freq_end": 90,
+          "duration": 0.699999988079071,
+          "volume": 0.14000000059604645
+        }
+      }
+    },
+    {
+      "uid": 3024,
+      "components": {
+        "Name": {
+          "value": "Sound wraith_bite"
+        },
+        "Sound": {
+          "name": "wraith_bite",
+          "wave": 2,
+          "freq": 400,
+          "freq_end": 120,
+          "duration": 0.20000000298023224,
+          "volume": 0.20000000298023224
+        }
+      }
+    },
+    {
+      "uid": 3025,
+      "components": {
+        "Name": {
+          "value": "Sound step"
+        },
+        "Sound": {
+          "name": "step",
+          "wave": 4,
+          "freq": 240,
+          "freq_end": 120,
+          "duration": 0.05000000074505806,
+          "volume": 0.05000000074505806
+        }
+      }
+    },
+    {
+      "uid": 3026,
+      "components": {
+        "Name": {
+          "value": "Sound golem_step"
+        },
+        "Sound": {
+          "name": "golem_step",
+          "wave": 2,
+          "freq": 90,
+          "freq_end": 40,
+          "duration": 0.11999999731779099,
+          "volume": 0.18000000715255737
+        }
+      }
+    },
+    {
+      "uid": 3027,
+      "components": {
+        "Name": {
+          "value": "Sound dialogue_start"
+        },
+        "Sound": {
+          "name": "dialogue_start",
+          "wave": 0,
+          "freq": 620,
+          "freq_end": 760,
+          "duration": 0.10000000149011612,
+          "volume": 0.11999999731779099
+        }
+      }
+    }
+  ],
+  "resources": {
+    "app.quit_on_escape": 0,
+    "bus.music.volume": 0.7,
+    "bus.sfx.volume": 0.9,
+    "language.count": 2,
+    "language.index": 0,
+    "opt.sens": 1
+  },
+  "systems": [
+    {
+      "name": "scene_init",
+      "doc": "The first tick of a scene.",
+      "each": [
+        "Fader"
+      ],
+      "order": 0,
+      "do": [
+        {
+          "if": {
+            "eq": [
+              {
+                "get": "Fader.t"
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "set": "Fader.t",
+              "to": 0.0001
+            },
+            {
+              "emit": "win"
+            },
+            {
+              "res_set": "music",
+              "to": 1
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "fader",
+      "doc": "Anything that wants to leave sets `$leave` to the number of a switch; the picture fades to black, then the switch is thrown.",
+      "each": [
+        "Fader",
+        "ColorGrade"
+      ],
+      "order": 60,
+      "do": [
+        {
+          "set": "Fader.t",
+          "to": {
+            "add": [
+              {
+                "get": "Fader.t"
+              },
+              {
+                "dt": true
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "leave"
+                  },
+                  0
+                ]
+              },
+              {
+                "eq": [
+                  {
+                    "get": "Fader.leaving"
+                  },
+                  0
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "Fader.leaving",
+              "to": 1
+            },
+            {
+              "set": "Fader.target",
+              "to": {
+                "res": "leave"
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "gt": [
+              {
+                "get": "Fader.leaving"
+              },
+              0
+            ]
+          },
+          "then": [
+            {
+              "set": "Fader.out",
+              "to": {
+                "add": [
+                  {
+                    "get": "Fader.out"
+                  },
+                  {
+                    "div": [
+                      {
+                        "dt": true
+                      },
+                      0.6
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "if": {
+                "and": [
+                  {
+                    "ge": [
+                      {
+                        "get": "Fader.out"
+                      },
+                      1
+                    ]
+                  },
+                  {
+                    "eq": [
+                      {
+                        "get": "Fader.fired"
+                      },
+                      0
+                    ]
+                  }
+                ]
+              },
+              "then": [
+                {
+                  "set": "Fader.fired",
+                  "to": 1
+                },
+                {
+                  "res_set": "fire",
+                  "to": {
+                    "get": "Fader.target"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "set": "ColorGrade.fade[3]",
+          "to": {
+            "max": [
+              {
+                "clamp": [
+                  {
+                    "sub": [
+                      1,
+                      {
+                        "div": [
+                          {
+                            "get": "Fader.t"
+                          },
+                          0.9
+                        ]
+                      }
+                    ]
+                  },
+                  0,
+                  1
+                ]
+              },
+              {
+                "clamp": [
+                  {
+                    "get": "Fader.out"
+                  },
+                  0,
+                  1
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "fire_switch",
+      "each": [
+        "SwitchId",
+        "SceneSwitch"
+      ],
+      "order": 70,
+      "do": [
+        {
+          "if": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "fire"
+                  },
+                  0
+                ]
+              },
+              {
+                "eq": [
+                  {
+                    "res": "fire"
+                  },
+                  {
+                    "get": "SwitchId.n"
+                  }
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "SceneSwitch.go",
+              "to": true
+            },
+            {
+              "res_set": "fire",
+              "to": 0
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "win_buttons",
+      "each": [
+        "WinBtn",
+        "Ui"
+      ],
+      "order": 20,
+      "do": [
+        {
+          "if": {
+            "and": [
+              {
+                "get": "Ui.clicked"
+              },
+              {
+                "eq": [
+                  {
+                    "res": "leave"
+                  },
+                  0
+                ]
+              }
+            ]
+          },
+          "then": [
+            {
+              "emit": "select"
+            },
+            {
+              "if": {
+                "eq": [
+                  {
+                    "get": "WinBtn.kind"
+                  },
+                  1
+                ]
+              },
+              "then": [
+                {
+                  "res_set": "leave",
+                  "to": 11
+                }
+              ]
+            },
+            {
+              "if": {
+                "eq": [
+                  {
+                    "get": "WinBtn.kind"
+                  },
+                  2
+                ]
+              },
+              "then": [
+                {
+                  "res_set": "leave",
+                  "to": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "music_select",
+      "doc": "The tracks are one `MusicPlayer` each (in the boot scene, `Persist`); the scene says which should play with `$music`: 1 the title, 2 day, 3 night, 4 the boss.",
+      "each": [
+        "MusicTrack",
+        "MusicPlayer"
+      ],
+      "order": 80,
+      "do": [
+        {
+          "set": "MusicPlayer.playing",
+          "to": {
+            "eq": [
+              {
+                "res": "music"
+              },
+              {
+                "get": "MusicTrack.id"
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

@@ -65,6 +65,8 @@ mod flow_tests;
 #[cfg(test)]
 mod gameplay_tests;
 #[cfg(test)]
+mod camera_collide_tests;
+#[cfg(test)]
 mod joint_tests;
 #[cfg(test)]
 mod layers_tests;
