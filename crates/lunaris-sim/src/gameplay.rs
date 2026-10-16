@@ -1540,6 +1540,15 @@ fn sways(world: &mut World, dt: f32) {
     });
 }
 
+/// The clock of the wind of every `GrassField`.
+fn grass_fields(world: &mut World, dt: f32) {
+    let _ = world.for_each::<(&mut crate::components::GrassField,), _>(|_, (g,)| {
+        if g.wind_speed.is_finite() {
+            g.phase = (g.phase + g.wind_speed * std::f32::consts::TAU * dt).rem_euclid(6283.0);
+        }
+    });
+}
+
 /// The clock of the waves of every `Water`.
 fn waters(world: &mut World, dt: f32) {
     let _ = world.for_each::<(&mut crate::components::Water,), _>(|_, (w,)| {
@@ -1797,6 +1806,7 @@ pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fi
     particle_clocks(world, dt);
     root_motion(world);
     sways(world, dt);
+    grass_fields(world, dt);
     streaming(world, scripts);
     anim_layers(world, dt);
     spawners(world, scripts, dt);

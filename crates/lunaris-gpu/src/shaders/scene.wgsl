@@ -19,6 +19,8 @@
 // `PbrMaps`: a tangent-space normal map (DirectX convention) and occlusion / roughness / metallic in r / g / b; plain numbers, not colours
 @group(1) @binding(3) var normal_tex: texture_2d<f32>;
 @group(1) @binding(4) var arm_tex: texture_2d<f32>;
+// a height map (white = high) for parallax occlusion mapping
+@group(1) @binding(5) var disp_tex: texture_2d<f32>;
 
 // What the maps of the mesh being shaded say, handed from `lit_mesh` to `lit_tail` (a negative roughness means "no map": the object's own numbers count).
 var<private> g_ao: f32 = 1.0;
@@ -265,6 +267,39 @@ fn map_normal(n: vec3<f32>, dpx: vec3<f32>, dpy: vec3<f32>, duvx: vec2<f32>, duv
     return normalize(t * (inv * nm.x) + b * (inv * nm.y) + n * nm.z);
 }
 
+// Parallax occlusion mapping: march a ray from the eye through the height map's volume (as many layers as the angle needs) and see where it meets the surface; the picture is sampled there. `uv` runs down the picture,
+// like the frame of `map_normal`, and the offsets are in uv units (`scale` is a share of one repeat of the picture).
+fn parallax_uv(uv: vec2<f32>, v: vec3<f32>, n: vec3<f32>, dpx: vec3<f32>, dpy: vec3<f32>, duvx: vec2<f32>, duvy: vec2<f32>, scale: f32) -> vec2<f32> {
+    let r1 = cross(dpy, n);
+    let r2 = cross(n, dpx);
+    let sg = select(-1.0, 1.0, dot(dpx, r1) >= 0.0);
+    let t = (r1 * duvx.x + r2 * duvy.x) * sg;
+    let b = (r1 * duvx.y + r2 * duvy.y) * sg;
+    let inv = inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+    let vt = vec3<f32>(dot(v, t * inv), dot(v, b * inv), dot(v, n));
+    let vz = max(vt.z, 0.12);
+    let layers = mix(40.0, 12.0, clamp(vt.z, 0.0, 1.0));
+    let layer_depth = 1.0 / layers;
+    let delta = vt.xy / vz * scale / layers;
+    var cur = uv;
+    var depth = 0.0;
+    var map_depth = 1.0 - textureSampleGrad(disp_tex, tex_samp, cur, duvx, duvy).r;
+    var prev_depth = map_depth;
+    for (var i = 0; i < 40; i = i + 1) {
+        if (depth >= map_depth || f32(i) >= layers) {
+            break;
+        }
+        prev_depth = map_depth;
+        cur = cur - delta;
+        map_depth = 1.0 - textureSampleGrad(disp_tex, tex_samp, cur, duvx, duvy).r;
+        depth = depth + layer_depth;
+    }
+    let after = map_depth - depth;
+    let before = prev_depth - (depth - layer_depth);
+    let w = clamp(after / (after - before - 1e-5), 0.0, 1.0);
+    return mix(cur, cur + delta, w);
+}
+
 fn d_ggx(nh: f32, a: f32) -> f32 {
     let a2 = a * a;
     let d = nh * nh * (a2 - 1.0) + 1.0;
@@ -384,24 +419,27 @@ fn lit_mesh(in: MeshOut) -> Lit {
     }
     // the texture is always sampled (derivatives need uniform control flow); whether it counts is decided afterwards
     let uvs = in.uv * o.misc.xy;
-    let tuv = vec2<f32>(uvs.x, 1.0 - uvs.y);
-    let t = textureSample(tex, tex_samp, tuv);
-    // the relief of the built-in materials: the height map's slope, as seen from this pixel, tilts the normal
-    let relief = textureSample(height_tex, tex_samp, tuv).r * o.uvrect.x;
+    var tuv = vec2<f32>(uvs.x, 1.0 - uvs.y);
     let dpx = dpdx(in.world);
     let dpy = dpdy(in.world);
+    let duvx = dpdx(tuv);
+    let duvy = dpdy(tuv);
+    let classic = frame.p2.x < 0.5;
+    let maps = u32(o.pbr.z + 0.5);
+    if (!classic && (maps & 4u) != 0u && o.uvrect.y > 0.0) {
+        tuv = parallax_uv(tuv, normalize(frame.eye.xyz - in.world), normalize(in.nrm), dpx, dpy, duvx, duvy, o.uvrect.y);
+    }
+    let t = textureSampleGrad(tex, tex_samp, tuv, duvx, duvy);
+    // the relief of the built-in materials: the height map's slope, as seen from this pixel, tilts the normal
+    let relief = textureSampleGrad(height_tex, tex_samp, tuv, duvx, duvy).r * o.uvrect.x;
     let dhx = dpdx(relief);
     let dhy = dpdy(relief);
-    let classic = frame.p2.x < 0.5;
     if (!classic && o.uvrect.x > 0.0) {
         n = bump_normal(n, dpx, dpy, dhx, dhy);
     }
     // the maps are always sampled (derivatives need uniform control flow); whether they count is decided afterwards
-    let nmap = textureSample(normal_tex, tex_samp, tuv).xyz * 2.0 - vec3<f32>(1.0);
-    let armv = textureSample(arm_tex, tex_samp, tuv);
-    let duvx = dpdx(tuv);
-    let duvy = dpdy(tuv);
-    let maps = u32(o.pbr.z + 0.5);
+    let nmap = textureSampleGrad(normal_tex, tex_samp, tuv, duvx, duvy).xyz * 2.0 - vec3<f32>(1.0);
+    let armv = textureSampleGrad(arm_tex, tex_samp, tuv, duvx, duvy);
     if (!classic && (maps & 1u) != 0u) {
         n = map_normal(n, dpx, dpy, duvx, duvy, vec3<f32>(nmap.xy * o.pbr.x, nmap.z));
     }
@@ -720,4 +758,132 @@ fn fs_id_sprite(in: SpriteOut) -> @location(0) u32 {
         discard;
     }
     return o.ids.x;
+}
+
+// ------------------------------------------------------------------------------------------------ grass made on the card (`GrassField`)
+
+// One ring of one field: the tufts are the cells of a lattice that follows the camera (so they stay where they are as it moves), each placed, sized, tinted and bent by hashes of its cell.
+struct GrassU {
+    // cell size, inner radius, outer radius, cells along a side
+    ring: vec4<f32>,
+    // the lattice's corner (in cells, x and z), the object that holds the material, the width of the fade at the edges
+    orig: vec4<f32>,
+    // the terrain: where it stands (xyz) and how high white is
+    tpos: vec4<f32>,
+    // its size (x, z) and the picture's columns and rows
+    tsize: vec4<f32>,
+    // wind: lean of the tops, metres between crests, direction (radians), clock
+    wind: vec4<f32>,
+    // the smallest and biggest scale of a tuft, 0, a seed
+    tuft: vec4<f32>,
+    ca: vec4<f32>,
+    cb: vec4<f32>,
+    // the camera's place
+    eye: vec4<f32>,
+};
+
+@group(2) @binding(12) var<uniform> gu: GrassU;
+@group(2) @binding(13) var grass_heights: texture_2d<f32>;
+
+fn hash_u(a: u32) -> u32 {
+    var x = a;
+    x = x ^ (x >> 16u);
+    x = x * 0x7feb352du;
+    x = x ^ (x >> 15u);
+    x = x * 0x846ca68bu;
+    x = x ^ (x >> 16u);
+    return x;
+}
+
+fn hash3(ix: i32, iz: i32, seed: f32) -> vec3<f32> {
+    let h1 = hash_u(bitcast<u32>(ix) * 73856093u ^ bitcast<u32>(iz) * 19349663u ^ bitcast<u32>(seed));
+    let h2 = hash_u(h1 + 0x9e3779b9u);
+    let h3 = hash_u(h2 + 0x85ebca6bu);
+    return vec3<f32>(f32(h1 & 0xffffffu), f32(h2 & 0xffffffu), f32(h3 & 0xffffffu)) / 16777216.0;
+}
+
+// The terrain's height at (x, z): the picture's four nearest samples, blended (the first row is -z).
+fn grass_ground(x: f32, z: f32) -> f32 {
+    let cols = gu.tsize.z;
+    let rows = gu.tsize.w;
+    let fx = clamp((x - (gu.tpos.x - gu.tsize.x * 0.5)) / gu.tsize.x * (cols - 1.0), 0.0, cols - 1.001);
+    let fz = clamp((z - (gu.tpos.z - gu.tsize.y * 0.5)) / gu.tsize.y * (rows - 1.0), 0.0, rows - 1.001);
+    let i = i32(floor(fx));
+    let j = i32(floor(fz));
+    let tx = fx - floor(fx);
+    let tz = fz - floor(fz);
+    let h00 = textureLoad(grass_heights, vec2<i32>(i, j), 0).r;
+    let h10 = textureLoad(grass_heights, vec2<i32>(i + 1, j), 0).r;
+    let h01 = textureLoad(grass_heights, vec2<i32>(i, j + 1), 0).r;
+    let h11 = textureLoad(grass_heights, vec2<i32>(i + 1, j + 1), 0).r;
+    return gu.tpos.y + mix(mix(h00, h10, tx), mix(h01, h11, tx), tz) * gu.tpos.w;
+}
+
+@vertex
+fn vs_grass(in: VsIn) -> MeshOut {
+    var out: MeshOut;
+    out.inst = u32(gu.orig.z);
+    out.nrm = vec3<f32>(0.0, 1.0, 0.0);
+    out.uv = in.uv;
+    out.tw = 1.0;
+    out.col = vec3<f32>(1.0);
+    out.world = vec3<f32>(0.0);
+    out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0);
+    let m = u32(gu.ring.w);
+    let ix = i32(gu.orig.x) + i32(in.inst % m);
+    let iz = i32(gu.orig.y) + i32(in.inst / m);
+    let r = hash3(ix, iz, gu.tuft.w);
+    let cell = gu.ring.x;
+    let px = (f32(ix) + r.x) * cell;
+    let pz = (f32(iz) + r.y) * cell;
+    let d = distance(vec2<f32>(px, pz), gu.eye.xz);
+    // inside its ring, fading out at the edges (the rings overlap, so the change from one to the next is a swap of scale, not a pop)
+    var fade = smoothstep(gu.ring.z, gu.ring.z - gu.orig.w, d);
+    if (gu.ring.y > 0.0) {
+        fade = fade * smoothstep(gu.ring.y, gu.ring.y + gu.orig.w, d);
+    }
+    if (fade <= 0.01) {
+        return out;
+    }
+    let ground = grass_ground(px, pz);
+    let r2 = hash3(ix * 3 + 1, iz * 7 + 5, gu.tuft.w + 3.0);
+    let size = mix(gu.tuft.x, gu.tuft.y, r2.x) * fade;
+    let yaw = r.z * 6.2831853;
+    let local = in.pos * size;
+    let cy = cos(yaw);
+    let sy = sin(yaw);
+    var wp = vec3<f32>(px + cy * local.x - sy * local.z, ground + local.y - 0.03, pz + sy * local.x + cy * local.z);
+    // the wind: a gust that travels across the field (a long wave along the wind with a slow wobble across it), a quick flutter of its own for every tuft; the foot stays, the top leans (by the square of the height)
+    let hn = clamp(in.pos.y / 0.62, 0.0, 1.0);
+    let dir = vec2<f32>(cos(gu.wind.z), sin(gu.wind.z));
+    let side = vec2<f32>(-dir.y, dir.x);
+    let k = 6.2831853 / gu.wind.y;
+    let t = gu.wind.w;
+    let along = dot(vec2<f32>(px, pz), dir);
+    let across = dot(vec2<f32>(px, pz), side);
+    let gust = 0.5 + 0.5 * sin(along * k - t + 0.8 * sin(across * k * 0.6 + t * 0.2));
+    let flutter = 0.22 * sin(t * 4.1 + along * 0.9 + r2.y * 6.28) + 0.12 * sin(t * 6.3 + r2.z * 6.28);
+    let lean = hn * hn * gu.wind.x * size * (0.3 + 0.7 * gust);
+    let shake = hn * hn * gu.wind.x * size * flutter * 0.5;
+    wp.x = wp.x + dir.x * lean + side.x * shake;
+    wp.z = wp.z + dir.y * lean + side.y * shake;
+    wp.y = wp.y - 0.5 * lean * lean / max(local.y + 0.3, 0.3);
+    out.world = wp;
+    out.clip = frame.view_proj * vec4<f32>(wp, 1.0);
+    // a tint between the two colours, and a darker foot (grass at the bottom of a field is in shade)
+    // patches of lush and dry grass over long stretches (a slow noise of the place), and the sun through the blades when looking towards it
+    let ps = max(gu.tuft.z, 5.0);
+    let n1 = 0.5 + 0.5 * sin(px / ps + sin(pz / (1.37 * ps)) * 2.0);
+    let n2 = 0.5 + 0.5 * sin(pz / (0.83 * ps) - px / (1.9 * ps) + 1.3);
+    let dry = smoothstep(0.45, 0.9, n1 * 0.65 + n2 * 0.35);
+    let tint = mix(gu.ca.rgb, gu.cb.rgb, clamp(r2.y * 0.4 + dry * 0.75, 0.0, 1.0));
+    var back = 0.0;
+    let sun = i32(frame.p4.x);
+    if (sun >= 0) {
+        let toward_sun = frame.lights[u32(sun)].vec.xyz;
+        back = pow(clamp(dot(normalize(wp - gu.eye.xyz), toward_sun), 0.0, 1.0), 3.0);
+    }
+    out.col = tint * mix(0.4, 1.0, hn * 0.8 + 0.2 * gust) * (vec3<f32>(1.0) + back * hn * vec3<f32>(1.5, 1.35, 0.55));
+    out.nrm = normalize(vec3<f32>(dir.x * lean * 0.8, 1.0, dir.y * lean * 0.8));
+    return out;
 }

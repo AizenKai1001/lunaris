@@ -252,7 +252,7 @@ spawn("Sun", Transform={"rot": [-0.31, 0.35, 0.11, 0.88]}, Light={"kind": 0, "co
 spawn("Haze", HeightFog={"density": 0.0004, "falloff": 0.04, "height": 20, "color": [0.76, 0.83, 0.9]})
 spawn("Picture effects", PostFx={"shafts": 0.35, "contrast": 1.08, "grain": 0.5, "tint": [0.98, 1.0, 1.0]})
 spawn("Eyes", AutoExposure={"min": 0.6, "max": 1.6, "speed": 1.2, "target": 0.3})
-LAYERS = chr(10).join([f"grass {T}/sparse_grass/sparse_grass_diff.jpg uv_scale=900 tint=0.8,1.35,0.65", f"mixed {T}/grass_ground/grass_ground_diff.jpg uv_scale=700 tint=0.75,1.3,0.55", f"withered {T}/withered_grass/withered_grass_diff.jpg uv_scale=800 tint=0.95,1.05,0.8", f"mossy {T}/aerial_grass_rock/aerial_grass_rock_diff.jpg uv_scale=600 tint=0.8,1.1,0.65"])
+LAYERS = chr(10).join([f"grass {T}/sparse_grass/sparse_grass_diff.jpg uv_scale=900 tint=0.5,1.0,0.38", f"mixed {T}/grass_ground/grass_ground_diff.jpg uv_scale=700 tint=0.48,0.95,0.34", f"withered {T}/withered_grass/withered_grass_diff.jpg uv_scale=800 tint=0.7,0.85,0.5", f"mossy {T}/aerial_grass_rock/aerial_grass_rock_diff.jpg uv_scale=600 tint=0.5,0.85,0.4"])
 ground = spawn("Ground", Transform={"pos": [0, 0, 0]}, Terrain={"heightmap": f"{H}/ground.png", "size": [SIZE, SIZE], "height": RELIEF, "step": 2, "color": [1, 1, 1, 1], "friction": 0.9}, TerrainLayers={"splat": f"{H}/splat.png", "layers": LAYERS})
 call("step", {"ticks": 1})
 gy = call("terrain_height", {"x": 0.0, "z": 0.0}).get("height", 5.0)
@@ -264,39 +264,16 @@ script = R.install(call, spawn, 0.0, gy + 0.1, 0.0, date="2026-10-17", start_sec
 SND = f"{D}/sounds"
 spawn("Wind", Transform={"pos": [0, gy + 2, 0]}, AudioSource={"file": f"{SND}/wind.wav", "looped": True, "playing": True, "spatial": False, "volume": 0.7})
 
-# ---- the grass: a tuft is one entity (three crossed cards), the same way up so the wind bends them together; the far ones are not drawn
-call("define_component", {"name": "Grass", "fields": []})
-tuft = {"MeshRenderer": {"mesh": f"{H}/grass.glb", "texture": f"{H}/grass.png", "color": [0.95, 1.0, 0.9, 1.0], "roughness": 0.9, "cast_shadow": False}, "Grass": {}, "Sway": {"amount": 0.13, "extent": 0.7, "speed": 1.35}, "Lod": {"cull": 240}}
-placed = 0
-for count, half, apart, seed in ((12000, 45.0, 0.12, 31), (14000, 200.0, 0.9, 32)):
-    r = call("scatter", {"terrain": ground, "components": tuft, "count": count, "slope": [0, 40], "min_distance": apart, "scale": [0.5, 1.05], "seed": seed, "yaw": False, "sink": 0.03, "area": [-half, -half, half, half]})
-    placed += r.get("placed", 0)
-print("grass tufts:", placed)
-# a gust travels across the field: each tuft's phase comes from where it stands
-offset = 0
-total = 0
-cmds = []
-while True:
-    q = call("query", {"with": ["Grass"], "select": ["Transform"], "limit": 500, "offset": offset})
-    ents = q.get("entities") or []
-    for e in ents:
-        pos = ((e.get("components") or e).get("Transform") or {}).get("pos") or [0, 0, 0]
-        cmds.append({"op": "set", "uid": e["uid"], "component": "Sway", "value": {"offset": round(pos[0] * 0.045 + pos[2] * 0.03, 3)}})
-        k = ((int(pos[0] * 37.0) * 7919 + int(pos[2] * 53.0) * 104729) % 1000) / 1000.0
-        cmds.append({"op": "set", "uid": e["uid"], "component": "MeshRenderer", "value": {"color": [round(0.78 + 0.3 * k, 3), round(0.9 + 0.12 * (1 - k), 3), round(0.62 + 0.15 * k, 3), 1.0]}})
-    offset += len(ents)
-    if len(ents) < 500:
-        break
-for i in range(0, len(cmds), 400):
-    call("batch", {"commands": cmds[i:i + 400]})
-print("wind offsets set:", len(cmds))
+# ---- the grass: a `GrassField`, made on the card round the camera (no entities: a field of a few hundred thousand tufts is one entity and a few numbers)
+spawn("Grass", GrassField={"terrain": ground, "mesh": f"{H}/grass.glb", "radius": 320.0, "density": 10.0, "size": [0.6, 1.25], "wind_amount": 0.24, "wind_wavelength": 38.0, "wind_speed": 0.55, "wind_dir": 0.45,
+                           "color_a": [0.8, 1.0, 0.62], "color_b": [1.2, 1.08, 0.78], "seed": 3.0})
 
 
 r = call("define_script", {"source": script})
 print("script:", json.dumps(r)[:140])
 call("step", {"ticks": 3})
 rc = call("check")
-print("check:", json.dumps({k: rc.get(k) for k in ("errors", "warnings")}))
+print("check:", json.dumps({k: rc.get(k) for k in ("errors", "warnings")}), [p.get("message") for p in rc.get("problems", [])][:3])
 for name, eye, target in (("view", [0.0, gy + 1.34, 0.0], [0.0, gy + 6.0, 900.0]), ("high", [0.0, gy + 160.0, -1300.0], [0.0, gy + 10.0, 600.0]), ("grass", [6.0, gy + 0.9, 4.0], [14.0, gy + 0.6, 22.0])):
     rr = call("render", {"quality": "high", "width": 1600, "height": 900, "eye": eye, "target": target, "fov": 92, "path": f"{SHOTS}_{name}.png", "image": False})
     print(name, rr.get("renderer"), rr.get("warnings"))

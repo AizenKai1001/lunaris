@@ -82,6 +82,9 @@ struct Frame {
     // the lens: distortion, zoom, chromatic fringe, soften; then block size, scan lines
     p19: vec4<f32>,
     p20: vec4<f32>,
+    // volumetric light: density, anisotropy, steps, farthest; then colour and intensity
+    p21: vec4<f32>,
+    p22: vec4<f32>,
     // each probe: its centre (xyz), then half the size of its box (xyz)
     probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)

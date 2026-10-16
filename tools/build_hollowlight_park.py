@@ -60,10 +60,10 @@ def spawn(name, **c):
     return u
 
 
-def tex(tid, scale, strength=1.0, color=(1, 1, 1), rough=None, ao=1.0):
+def tex(tid, scale, strength=1.0, color=(1, 1, 1), rough=None, ao=1.0, depth=0.025):
     """The MeshRenderer texture fields and the PbrMaps of a Poly Haven set, as two dicts."""
     mr = {"texture": f"{T}/{tid}/{tid}_diff.jpg", "uv_scale": list(scale), "color": [*color, 1.0], "roughness": 0.6 if rough is None else rough}
-    pbr = {"normal": f"{T}/{tid}/{tid}_nor_dx.jpg", "arm": f"{T}/{tid}/{tid}_arm.jpg", "normal_strength": strength, "ao_strength": ao}
+    pbr = {"normal": f"{T}/{tid}/{tid}_nor_dx.jpg", "arm": f"{T}/{tid}/{tid}_arm.jpg", "normal_strength": strength, "ao_strength": ao, "height": "" if os.environ.get("NO_POM") else f"{T}/{tid}/{tid}_disp.jpg", "height_scale": depth}
     return mr, pbr
 
 
@@ -241,7 +241,7 @@ for i in range(LN // 2 - 2, LN // 2 + 2):
     open_s[0][i] = open_s[0][i] or rng.random() < 0.5
 # walls, runs of closed segments joined into one box each
 wall = {"texture": f"{T}/yellow_plaster/yellow_plaster_diff.jpg", "color": [1.0, 0.98, 0.9, 1.0], "roughness": 0.85}
-wpbr = {"normal": f"{T}/yellow_plaster/yellow_plaster_nor_dx.jpg", "arm": f"{T}/yellow_plaster/yellow_plaster_arm.jpg", "normal_strength": 1.0}
+wpbr = {"normal": f"{T}/yellow_plaster/yellow_plaster_nor_dx.jpg", "arm": f"{T}/yellow_plaster/yellow_plaster_arm.jpg", "normal_strength": 1.0, "height": "" if os.environ.get("NO_POM") else f"{T}/yellow_plaster/yellow_plaster_disp.jpg", "height_scale": 0.03}
 def lobby_wall(x0, z0, x1, z1):
     sx, sz = max(abs(x1 - x0), 0.2), max(abs(z1 - z0), 0.2)
     m = dict(wall)
@@ -271,7 +271,7 @@ for i in range(-1, LN):  # walls along z, on the line east of column i
         x = LX0 + (i + 1) * LC
         lobby_wall(x, LZ0 + j * LC, x, LZ0 + (k + 1) * LC)
         j = k + 1
-carpet, cpbr = tex("dirty_carpet", (1, 1), color=(1.0, 0.95, 0.85), rough=0.95)
+carpet, cpbr = tex("dirty_carpet", (1, 1), color=(1.0, 0.95, 0.85), rough=0.95, depth=0.05)
 deck("Lobby carpet", (0.0, 0.002, LZ0 + LN * LC / 2), (LN * LC, LN * LC), carpet, cpbr, 2.0)
 box("Lobby floor", (0.0, -0.5, LZ0 + LN * LC / 2), (LN * LC, 1.0, LN * LC), {"color": [0.3, 0.28, 0.25, 1.0]})
 ceil, ceilpbr = tex("ceiling_interior", (1, 1), color=(0.95, 0.93, 0.85), rough=0.9)
@@ -284,6 +284,11 @@ for j in range(0, LN, 2):
         box("Lobby light panel", (x, LH - 0.03, z), (1.2, 0.05, 0.6), {"color": [1.0, 0.96, 0.8, 1.0], "emissive": 3.0, "roughness": 0.4}, collide=False, shadow=False)
         spawn("Lobby light", Transform={"pos": [x, LH - 0.35, z]}, Flicker={}, Light={"kind": 1, "color": [1.0, 0.92, 0.7], "intensity": 2.6, "range": 11.0})
 PLAYER_X, PLAYER_Z = LX0 + (LN // 2 + 0.5) * LC, LZ0 + (LN - 0.5) * LC
+# air that shows the light (a flashlight beam, the glow of the tubes) and probes that give each space its own ambient light and reflections
+spawn("Dusty air", Volumetrics={"density": 0.02, "anisotropy": 0.65, "intensity": 1.0, "color": [1.0, 0.96, 0.88], "steps": 24, "max_distance": 150.0})
+if not os.environ.get("NO_PROBE"):
+  spawn("Lobby probe", Transform={"pos": [0.0, LH / 2, LZ0 + LN * LC / 2]}, ReflectionProbe={"size": [LN * LC, LH, LN * LC], "resolution": 128})
+  spawn("Hall probe", Transform={"pos": [0.0, ROOF / 2, 0.0]}, ReflectionProbe={"size": [2 * HX, ROOF, 2 * HZ], "resolution": 128})
 
 # ---- sounds (tools/make_hollowlight_sounds.py): beds that follow the player's zone, and drips and lapping at fixed places
 call("define_component", {"name": "AmbientBed", "fields": [{"name": "zone", "type": "f32", "default": 0}]})
@@ -424,6 +429,7 @@ system flashlight each Flashlight, Light order 11 {
 r = call("define_script", {"source": SCRIPT})
 print("script:", json.dumps(r)[:160])
 call("step", {"ticks": 3})
+print("probes:", json.dumps(call("bake_probe", {}))[:160])
 r = call("check")
 print("check:", json.dumps({k: r.get(k) for k in ("errors", "warnings")}))
 for name, eye, target in (("entry", [0.0, 1.7, HZ - 34.0], [0.0, 25.0, -200.0]), ("edge", [-60.0, 1.7, BZ1 + 6.0], [60.0, 14.0, BZ0 - 80.0]), ("tower", [-250.0, 2.0, -200.0], [-330.0, 32.0, -240.0]), ("deck", [-60.0, 4.0, BZ1 + 12.0], [-60.0, 0.0, BZ1 + 5.0]), ("giant", [0.0, 1.7, BZ1 + 8.0], [-150.0, 22.0, -30.0]), ("lobby", [PLAYER_X, 1.62, PLAYER_Z - 6.0], [PLAYER_X, 1.5, PLAYER_Z - 30.0]), ("door", [0.0, 1.62, LZ0 + 14.0], [0.0, 6.0, HZ - 60.0])):

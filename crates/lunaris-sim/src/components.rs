@@ -1941,10 +1941,14 @@ component! {
     /// (a PNG or JPEG of the workspace, DirectX convention: green points down the picture, which is what Poly Haven's `nor_dx` and Unreal's maps are) and `arm` a map with ambient occlusion in red, roughness in green and
     /// metallic in blue (the usual packed form). Both hold numbers, not colours: they are read as they are, never turned from sRGB. They repeat `MeshRenderer.uv_scale` times like the colour texture. `normal_strength`
     /// scales the bumps (1 as authored, 0 flat), `ao_strength` how much the occlusion map darkens the ambient light (0 to 1), `roughness_scale` multiplies the map's roughness. A name left empty is not used: the mesh's own
-    /// roughness and metallic count and the surface's own normal stays. New in the engine's standard set; a world without it is what it was.
+    /// roughness and metallic count and the surface's own normal stays. `height` is a height map (white = high; Poly Haven's `disp`): the surface is given real depth by parallax occlusion mapping, a cheap ray march through the
+    /// picture that shifts what you see by how high it is, so a carpet, a tile floor or a brick wall has relief that changes as you move. `height_scale` is how deep it goes, as a share of one repeat of the picture (0.03 is a
+    /// good start). New in the engine's standard set; a world without it is what it was.
     pub struct PbrMaps {
         pub normal: Sym = Sym(0),
         pub arm: Sym = Sym(0),
+        pub height: Sym = Sym(0),
+        pub height_scale: f32 = 0.03,
         pub normal_strength: f32 = 1.0,
         pub ao_strength: f32 = 1.0,
         pub roughness_scale: f32 = 1.0,
@@ -1963,5 +1967,48 @@ component! {
         pub soften: f32 = 0.0,
         pub block: f32 = 1.0,
         pub scan: f32 = 0.0,
+    }
+}
+
+component! {
+    /// Grass the GPU draws by itself (the GPU renderer's high qualities; the reference picture and classic mode do not draw it, and a world without it is what it was). Nothing of it is an entity: round the camera, up to
+    /// `radius` metres, the renderer lays tufts of the model `mesh` (a few crossed cards of grass, a `.glb` with its picture as a material, standing on y = 0 and about 0.6 m tall) on the ground of the `Terrain` that
+    /// the entity `terrain` is (0 = the first one) at about `density` tufts per square metre near the camera, thinner and bigger further out in three rings that fade into each other, each tuft turned and sized by where it
+    /// stands (`size` is the smallest and the biggest scale), tinted between `color_a` and `color_b` (multipliers of the picture) and darker at its foot. The wind is a gust travelling across the field:
+    /// `wind_amount` metres of lean at the top, `wind_wavelength` metres between the crests, `wind_speed` crests a second, going the way `wind_dir` says (radians about up, 0 = +x). `phase` is the engine's clock
+    /// (it runs in the simulation, so replays are the same). The field is patchy: over stretches of about `patch_size` metres it turns from lush to dry (towards `color_b`), the way the grass of a real plain does, and the sun shining
+    /// through the blades lights them up when you look towards it. `texture` replaces the model's picture. One field costs a few hundred thousand tufts' vertices a picture and no entities, no scene file, no CPU.
+    pub struct GrassField {
+        pub terrain: Uid = Uid(0),
+        pub mesh: Sym = Sym(0),
+        pub texture: Sym = Sym(0),
+        pub radius: f32 = 150.0,
+        pub density: f32 = 8.0,
+        pub size: [f32; 2] = [0.7, 1.3],
+        pub wind_amount: f32 = 0.2,
+        pub wind_wavelength: f32 = 26.0,
+        pub wind_speed: f32 = 0.8,
+        pub wind_dir: f32 = 0.5,
+        pub patch_size: f32 = 180.0,
+        pub color_a: [f32; 3] = [0.85, 1.0, 0.7],
+        pub color_b: [f32; 3] = [1.15, 1.05, 0.85],
+        pub seed: f32 = 1.0,
+        pub phase: f32 = 0.0,
+        pub enabled: bool = true,
+    }
+}
+
+component! {
+    /// Light scattered by the air, for the GPU renderer's high qualities (the first `Volumetrics` counts; the reference picture and classic mode ignore it): every point and spot light (a flashlight, a fluorescent tube) makes a visible glow and
+    /// beam in dusty or humid air, the way it does on a body camera in a dark place. From the camera to the first thing it sees (at most `max_distance` metres, in `steps` steps) the picture adds up the light of every lamp that reaches the
+    /// air there: `density` is how thick the air is per metre (0.01 a faint haze, 0.05 a fog), `anisotropy` (0 to 0.95) how much it throws the light on towards the viewer (0.6 makes lamps glow when you look at them),
+    /// `intensity` scales the whole, `color` tints it. The sun is not in it (`PostFx.shafts` is its own). The light is not shadowed: it stops at the first surface seen, but a lamp behind a thin wall still glows in the air next to it.
+    pub struct Volumetrics {
+        pub density: f32 = 0.02,
+        pub anisotropy: f32 = 0.6,
+        pub intensity: f32 = 1.0,
+        pub color: [f32; 3] = [1.0, 1.0, 1.0],
+        pub steps: f32 = 24.0,
+        pub max_distance: f32 = 120.0,
     }
 }

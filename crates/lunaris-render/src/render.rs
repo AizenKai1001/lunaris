@@ -695,6 +695,8 @@ pub struct SceneMesh {
 pub struct MeshPbr {
     pub normal: Option<Arc<Texture>>,
     pub arm: Option<Arc<Texture>>,
+    pub disp: Option<Arc<Texture>>,
+    pub height_scale: f32,
     pub normal_strength: f32,
     pub ao_strength: f32,
     pub roughness_scale: f32,
@@ -879,6 +881,8 @@ pub struct EnvData {
     pub tint: V3,
     /// `Lens`: distortion, zoom, chromatic fringe, soften, block size, scan lines (identity by default).
     pub lens: [f32; 6],
+    /// `Volumetrics`: density, anisotropy, steps, the farthest it looks, colour rgb, intensity (density 0 = off).
+    pub volumetrics: [f32; 8],
     /// `ColorGrade`: lift rgb + temperature, gamma rgb + tint shift, gain rgb, and the fade colour + amount (all identity by default).
     pub grade_a: [f32; 4],
     pub grade_b: [f32; 4],
@@ -902,7 +906,7 @@ impl EnvData {
         let c = [clear[0], clear[1], clear[2]];
         let mix = |a: V3, b: V3, t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
         let sky = mix(c, [0.52, 0.55, 0.62], 0.7);
-        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
+        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], volumetrics: [0.0; 8], grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
     }
 
     fn from_component(e: &Environment) -> EnvData {
@@ -936,6 +940,7 @@ impl EnvData {
             contrast: 1.0,
             tint: [1.0; 3],
             lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0],
+            volumetrics: [0.0; 8],
             grade_a: [0.0; 4],
             grade_b: [1.0, 1.0, 1.0, 0.0],
             grade_c: [1.0, 1.0, 1.0, 0.0],
@@ -946,6 +951,25 @@ impl EnvData {
             lens_flare: None,
         }
     }
+}
+
+/// A `GrassField`: the ground it grows on and how it looks and moves (only the GPU renderer's high qualities draw it).
+pub struct SceneGrass {
+    pub uid: u64,
+    pub heights: Arc<lunaris_sim::terrain::Heightfield>,
+    pub terrain_pos: V3,
+    pub terrain_size: [f32; 2],
+    pub terrain_height: f32,
+    pub mesh: MeshRef,
+    pub tex: Option<Arc<Texture>>,
+    pub radius: f32,
+    pub density: f32,
+    pub size: [f32; 2],
+    pub wind: [f32; 4],
+    pub color_a: V3,
+    pub color_b: V3,
+    pub seed: f32,
+    pub patch_size: f32,
 }
 
 /// A `ReflectionProbe`: where it stands, half the size of its box of influence and the size of the pictures it captures.
@@ -965,6 +989,8 @@ pub struct Scene {
     pub proj: M4,
     pub view_proj: M4,
     pub lights: Vec<LightData>,
+    /// Every light of the world (`lights` is the first sixteen of them): the GPU renderer picks the sixteen that matter for a picture from these.
+    pub all_lights: Vec<LightData>,
     pub meshes: Vec<SceneMesh>,
     pub layers: Vec<SceneLayer>,
     pub particles: Vec<SceneParticles>,
@@ -973,6 +999,8 @@ pub struct Scene {
     pub env: EnvData,
     /// The reflection probes, lowest uid first (only the GPU renderer's high qualities use them).
     pub probes: Vec<SceneProbe>,
+    /// The grass fields, lowest uid first (only the GPU renderer's high qualities use them).
+    pub grass: Vec<SceneGrass>,
     pub warnings: Vec<String>,
 }
 
@@ -1128,6 +1156,14 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         }
     }
     {
+        let mut vols: Vec<(u64, lunaris_sim::components::Volumetrics)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::Volumetrics,), _>(|_, uid, (v,)| vols.push((uid, *v)))?;
+        if let Some((_, v)) = vols.into_iter().min_by_key(|x| x.0) {
+            let nz = |x: f32, lo: f32, hi: f32, d: f32| if x.is_finite() { x.clamp(lo, hi) } else { d };
+            env.volumetrics = [nz(v.density, 0.0, 2.0, 0.0), nz(v.anisotropy, 0.0, 0.95, 0.6), nz(v.steps, 4.0, 64.0, 24.0), nz(v.max_distance, 1.0, 5000.0, 120.0), nz(v.color[0], 0.0, 8.0, 1.0), nz(v.color[1], 0.0, 8.0, 1.0), nz(v.color[2], 0.0, 8.0, 1.0), nz(v.intensity, 0.0, 64.0, 1.0)];
+        }
+    }
+    {
         let mut lenses: Vec<(u64, lunaris_sim::components::Lens)> = Vec::new();
         world.for_each_uid::<(&lunaris_sim::components::Lens,), _>(|_, uid, (l,)| lenses.push((uid, *l)))?;
         if let Some((_, l)) = lenses.into_iter().min_by_key(|x| x.0) {
@@ -1186,9 +1222,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     let view_proj = proj.mul(&view);
 
     // ---- lights
-    let mut lights: Vec<LightData> = lights_raw
+    let mut all_lights: Vec<LightData> = lights_raw
         .iter()
-        .take(16)
         .map(|(_, l, t)| {
             let color = scale(l.color, l.intensity);
             if l.kind >= 1 {
@@ -1201,9 +1236,12 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             }
         })
         .collect();
+    // both renderers draw the first sixteen; the GPU renderer may choose its sixteen from all of them (the nearest ones)
+    let mut lights: Vec<LightData> = all_lights.iter().take(16).copied().collect();
     if lights.is_empty() {
         lights.push(LightData { vec: normalize([-0.4, 0.8, 0.6]), point: false, color: [1.0, 1.0, 1.0], range: 1.0, spot_dir: [0.0, -1.0, 0.0], cos_outer: -2.0, cos_inner: -2.0 });
         lights.push(LightData { vec: normalize([0.7, 0.2, 0.3]), point: false, color: [0.3, 0.3, 0.35], range: 1.0, spot_dir: [0.0, -1.0, 0.0], cos_outer: -2.0, cos_inner: -2.0 });
+        all_lights = lights.clone();
     }
 
     // ---- what to draw, in drawing order: meshes by uid, sprites and tile maps far to near, then text
@@ -1471,11 +1509,12 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             pbr: pbr_raw.get(uid).and_then(|p| {
                 let name_n = world.strings().get(p.normal.0).to_string();
                 let name_a = world.strings().get(p.arm.0).to_string();
-                if name_n.is_empty() && name_a.is_empty() {
+                let name_h = world.strings().get(p.height.0).to_string();
+                if name_n.is_empty() && name_a.is_empty() && name_h.is_empty() {
                     return None;
                 }
                 let fin = |v: f32, hi: f32| if v.is_finite() { v.clamp(0.0, hi) } else { 1.0 };
-                Some(MeshPbr { normal: (!name_n.is_empty()).then(|| textures.get(&name_n)), arm: (!name_a.is_empty()).then(|| textures.get(&name_a)), normal_strength: fin(p.normal_strength, 4.0), ao_strength: fin(p.ao_strength, 1.0), roughness_scale: fin(p.roughness_scale, 4.0) })
+                Some(MeshPbr { normal: (!name_n.is_empty()).then(|| textures.get(&name_n)), arm: (!name_a.is_empty()).then(|| textures.get(&name_a)), disp: (!name_h.is_empty()).then(|| textures.get(&name_h)), height_scale: fin(p.height_scale, 0.3), normal_strength: fin(p.normal_strength, 4.0), ao_strength: fin(p.ao_strength, 1.0), roughness_scale: fin(p.roughness_scale, 4.0) })
             }),
         });
     }
@@ -1612,6 +1651,50 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             pbr: None,
         });
     }
+    // grass: what grows where, found once here (the picture of the ground and the tuft model come from the caches)
+    let mut grass: Vec<SceneGrass> = Vec::new();
+    {
+        let mut raw: Vec<(u64, lunaris_sim::components::GrassField)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::GrassField,), _>(|_, uid, (g,)| raw.push((uid, *g)))?;
+        raw.sort_by_key(|g| g.0);
+        let fin = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+        for (uid, g) in raw {
+            if !g.enabled {
+                continue;
+            }
+            let Some((_, t, tr)) = terrains_raw.iter().find(|(tu, _, _)| g.terrain.0 == 0 || *tu == g.terrain.0) else {
+                warnings.push(format!("entity {uid}: GrassField.terrain is not an entity with a Terrain"));
+                continue;
+            };
+            let hname = world.strings().get(t.heightmap.0).to_string();
+            let Some(heights) = textures.heightfield(&hname) else { continue };
+            let mname = world.strings().get(g.mesh.0).to_string();
+            let Some(mesh) = textures.model(&mname) else {
+                warnings.push(format!("entity {uid}: GrassField.mesh `{mname}` could not be loaded (a .glb of a few crossed cards of grass)"));
+                continue;
+            };
+            let tname = world.strings().get(g.texture.0).to_string();
+            let tex = if tname.is_empty() { None } else { Some(textures.get(&tname)) };
+            let lin = |c: [f32; 3]| [fin(c[0], 0.0, 4.0, 1.0), fin(c[1], 0.0, 4.0, 1.0), fin(c[2], 0.0, 4.0, 1.0)];
+            grass.push(SceneGrass {
+                uid,
+                heights,
+                terrain_pos: tr.pos,
+                terrain_size: [fin(t.size[0].abs(), 0.01, 1.0e6, 1.0), fin(t.size[1].abs(), 0.01, 1.0e6, 1.0)],
+                terrain_height: fin(t.height, -1.0e5, 1.0e5, 0.0),
+                mesh: MeshRef::Shared(mesh),
+                tex,
+                radius: fin(g.radius, 5.0, 2000.0, 150.0),
+                density: fin(g.density, 0.05, 60.0, 8.0),
+                size: [fin(g.size[0], 0.05, 20.0, 0.7), fin(g.size[1], 0.05, 20.0, 1.3)],
+                wind: [fin(g.wind_amount, 0.0, 5.0, 0.2), fin(g.wind_wavelength, 1.0, 1000.0, 26.0), fin(g.wind_dir, -100.0, 100.0, 0.5), g.phase],
+                color_a: lin(g.color_a),
+                color_b: lin(g.color_b),
+                seed: fin(g.seed, -1000.0, 1000.0, 1.0),
+                patch_size: fin(g.patch_size, 5.0, 5000.0, 180.0),
+            });
+        }
+    }
     let mut scene_layers: Vec<SceneLayer> = Vec::with_capacity(layers.len());
     for ((key, layer), tex) in layers.into_iter().zip(layer_tex) {
         let uid = key.uid;
@@ -1738,7 +1821,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             probes.push(SceneProbe { uid, pos: t.pos, half: [half(p.size[0]), half(p.size[1]), half(p.size[2])], resolution: p.resolution.clamp(16, 256) });
         }
     }
-    Ok(Scene { cam, view, proj, view_proj, lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, probes, warnings })
+    Ok(Scene { cam, view, proj, view_proj, lights, all_lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, probes, grass, warnings })
 }
 
 pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptions) -> Result<Frame> {

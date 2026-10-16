@@ -62,6 +62,11 @@ impl Heightfield {
         Heightfield::from_png(&bytes).map_err(|e| format!("{name}: {e}"))
     }
 
+    /// The raw samples, row by row (row 0 is the top of the picture, which is -z), 0 to 65535: for a renderer that keeps the picture on the card.
+    pub fn samples(&self) -> &[u16] {
+        &self.samples
+    }
+
     /// The sample at a column and row, 0 to 1.
     pub fn sample(&self, c: usize, r: usize) -> f32 {
         self.samples[r.min(self.rows - 1) * self.cols + c.min(self.cols - 1)] as f32 * (1.0 / 65535.0)

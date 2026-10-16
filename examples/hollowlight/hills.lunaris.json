@@ -1,0 +1,1667 @@
+{
+  "lunaris": 1,
+  "components": [
+    {
+      "name": "Player",
+      "doc": "",
+      "fields": [
+        {
+          "name": "stamina",
+          "type": "f32",
+          "default": 100
+        },
+        {
+          "name": "tired",
+          "type": "f32",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "Flashlight",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "BodyCam",
+      "doc": "",
+      "fields": []
+    },
+    {
+      "name": "RecDot",
+      "doc": "",
+      "fields": []
+    }
+  ],
+  "next_uid": 114,
+  "entities": [
+    {
+      "uid": 50,
+      "components": {
+        "InputMap": {
+          "bindings": "move_x = d, a:-1, gamepad.lx\nmove_y = w, s:-1, gamepad.ly\njump = space, gamepad.a\nsprint = shift, gamepad.ls\nsneak = control, gamepad.rs\nflash = f, gamepad.y\ndeadzone = 0.15"
+        },
+        "Name": {
+          "value": "Input"
+        }
+      }
+    },
+    {
+      "uid": 51,
+      "components": {
+        "CharacterBody": {
+          "radius": 0.3499999940395355,
+          "height": 1.7999999523162842,
+          "walk": [
+            0,
+            -0
+          ],
+          "jump": 0,
+          "gravity_scale": 1,
+          "step_height": 0.4000000059604645,
+          "max_slope": 50,
+          "fall": -0.49000000953674316,
+          "grounded": false
+        },
+        "Name": {
+          "value": "Player"
+        },
+        "Player": {
+          "stamina": 100,
+          "tired": 0
+        },
+        "Transform": {
+          "pos": [
+            0,
+            10.58340072631836,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            -0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 52,
+      "components": {
+        "LocalTransform": {
+          "pos": [
+            0,
+            1.6200000047683716,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            -0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "MouseLook": {
+          "sensitivity": 0.002199999988079071,
+          "stick_speed": 2.5,
+          "pitch_min": -1.4500000476837158,
+          "pitch_max": 1.4500000476837158,
+          "invert_y": false,
+          "enabled": true,
+          "body": 0,
+          "yaw": 0,
+          "pitch": 0,
+          "forward": [
+            -0,
+            0,
+            -1
+          ],
+          "right": [
+            1,
+            0,
+            -0
+          ]
+        },
+        "Name": {
+          "value": "Head"
+        },
+        "Parent": {
+          "target": 51
+        },
+        "Transform": {
+          "pos": [
+            0,
+            12.203400611877441,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 53,
+      "components": {
+        "Flashlight": {},
+        "Light": {
+          "kind": 2,
+          "color": [
+            1,
+            0.949999988079071,
+            0.8199999928474426
+          ],
+          "intensity": 9.106844902038574,
+          "range": 60,
+          "angle": 26,
+          "softness": 0.44999998807907104
+        },
+        "LocalTransform": {
+          "pos": [
+            0.11999999731779099,
+            0.03999999910593033,
+            -0.10000000149011612
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Flashlight"
+        },
+        "Parent": {
+          "target": 54
+        },
+        "Transform": {
+          "pos": [
+            0.11999256163835526,
+            11.96402359008789,
+            0.00001545250415802002
+          ],
+          "rot": [
+            0.00019296378013677895,
+            0,
+            0.00009286600106861442,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 54,
+      "components": {
+        "BodyCam": {},
+        "Camera": {
+          "fov_y": 92,
+          "near": 0.10000000149011612,
+          "far": 6000,
+          "ortho": false,
+          "ortho_height": 10,
+          "active": true,
+          "clear": [
+            0.05000000074505806,
+            0.05000000074505806,
+            0.07999999821186066,
+            1
+          ]
+        },
+        "LocalTransform": {
+          "pos": [
+            0,
+            -0.2794378697872162,
+            0.10000000149011612
+          ],
+          "rot": [
+            0.00019296378013677895,
+            0,
+            0.00009286600106861442,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Name": {
+          "value": "Body camera"
+        },
+        "Parent": {
+          "target": 52
+        },
+        "Transform": {
+          "pos": [
+            0,
+            11.923962593078613,
+            0.10000000149011612
+          ],
+          "rot": [
+            0.00019296378013677895,
+            0,
+            0.00009286600106861442,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 100,
+      "components": {
+        "Environment": {
+          "sky": true,
+          "sky_top": [
+            0.2199999988079071,
+            0.41999998688697815,
+            0.7799999713897705
+          ],
+          "sky_horizon": [
+            0.800000011920929,
+            0.8600000143051147,
+            0.9200000166893005
+          ],
+          "ground": [
+            0.3199999928474426,
+            0.3400000035762787,
+            0.27000001072883606
+          ],
+          "ambient": 0.75,
+          "exposure": 0.800000011920929,
+          "clouds": 0.6000000238418579,
+          "fog": 0.00005999999848427251,
+          "fog_color": [
+            0.7200000286102295,
+            0.800000011920929,
+            0.8799999952316284
+          ],
+          "shadows": true,
+          "shadow_distance": 450,
+          "ssao": 1,
+          "bloom": 0.25,
+          "bloom_threshold": 1,
+          "vignette": 0.5,
+          "saturation": 0.949999988079071,
+          "tonemap": 0,
+          "dof": 0,
+          "focus": 10,
+          "focus_range": 4
+        },
+        "Name": {
+          "value": "Environment"
+        }
+      }
+    },
+    {
+      "uid": 101,
+      "components": {
+        "Light": {
+          "kind": 0,
+          "color": [
+            1,
+            0.9300000071525574,
+            0.800000011920929
+          ],
+          "intensity": 2,
+          "range": 20,
+          "angle": 35,
+          "softness": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Sun"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            -0.3100000023841858,
+            0.3499999940395355,
+            0.10999999940395355,
+            0.8799999952316284
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 102,
+      "components": {
+        "HeightFog": {
+          "density": 0.00039999998989515007,
+          "falloff": 0.03999999910593033,
+          "height": 20,
+          "color": [
+            0.7599999904632568,
+            0.8299999833106995,
+            0.8999999761581421
+          ]
+        },
+        "Name": {
+          "value": "Haze"
+        }
+      }
+    },
+    {
+      "uid": 103,
+      "components": {
+        "Name": {
+          "value": "Picture effects"
+        },
+        "PostFx": {
+          "shafts": 0.3499999940395355,
+          "motion_blur": 0,
+          "grain": 0.5,
+          "contrast": 1.0800000429153442,
+          "tint": [
+            0.9800000190734863,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 104,
+      "components": {
+        "AutoExposure": {
+          "min": 0.6000000238418579,
+          "max": 1.600000023841858,
+          "speed": 1.2000000476837158,
+          "target": 0.30000001192092896
+        },
+        "Name": {
+          "value": "Eyes"
+        }
+      }
+    },
+    {
+      "uid": 105,
+      "components": {
+        "Name": {
+          "value": "Ground"
+        },
+        "Terrain": {
+          "heightmap": "examples/hollowlight/hills/ground.png",
+          "size": [
+            4000,
+            4000
+          ],
+          "height": 140,
+          "step": 2,
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "texture": "",
+          "uv_scale": [
+            64,
+            64
+          ],
+          "friction": 0.8999999761581421,
+          "restitution": 0.10000000149011612,
+          "solid": true,
+          "visible": true
+        },
+        "TerrainLayers": {
+          "splat": "examples/hollowlight/hills/splat.png",
+          "layers": "grass examples/hollowlight/textures/sparse_grass/sparse_grass_diff.jpg uv_scale=900 tint=0.5,1.0,0.38\nmixed examples/hollowlight/textures/grass_ground/grass_ground_diff.jpg uv_scale=700 tint=0.48,0.95,0.34\nwithered examples/hollowlight/textures/withered_grass/withered_grass_diff.jpg uv_scale=800 tint=0.7,0.85,0.5\nmossy examples/hollowlight/textures/aerial_grass_rock/aerial_grass_rock_diff.jpg uv_scale=600 tint=0.5,0.85,0.4"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 106,
+      "components": {
+        "Lens": {
+          "distortion": 0.30000001192092896,
+          "zoom": 0.6200000047683716,
+          "chromatic": 0.006000000052154064,
+          "soften": 0.800000011920929,
+          "block": 2,
+          "scan": 0.10000000149011612
+        },
+        "Name": {
+          "value": "Body camera lens"
+        }
+      }
+    },
+    {
+      "uid": 107,
+      "components": {
+        "Name": {
+          "value": "Rec dot"
+        },
+        "RecDot": {},
+        "Ui": {
+          "pos": [
+            0.03999999910593033,
+            0.04699999839067459
+          ],
+          "size": [
+            0.010499999858438969,
+            0.018699999898672104
+          ],
+          "color": [
+            0.949999988079071,
+            0.07999999821186066,
+            0.07999999821186066,
+            1
+          ],
+          "back_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "fill": 1,
+          "border_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "border": 0,
+          "text": "",
+          "text_size": 0.03999999910593033,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 3,
+          "visible": true,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        },
+        "UiStyle": {
+          "radius": 0.009999999776482582,
+          "color2": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "image": "",
+          "image_uv": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "tint": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "fit": 0,
+          "smooth": true,
+          "shadow_color": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadow_offset": [
+            0.004000000189989805,
+            0.006000000052154064
+          ]
+        }
+      }
+    },
+    {
+      "uid": 108,
+      "components": {
+        "Name": {
+          "value": "Rec text"
+        },
+        "Text": {
+          "value": "REC",
+          "pos": [
+            0.057999998331069946,
+            0.03799999877810478
+          ],
+          "size": 0.03400000184774399,
+          "color": [
+            0.9599999785423279,
+            0.9599999785423279,
+            0.9599999785423279,
+            0.9200000166893005
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 109,
+      "components": {
+        "Name": {
+          "value": "Clock text"
+        },
+        "Text": {
+          "value": "{bc.h1}{bc.h0}:{bc.m1}{bc.m0}:{bc.s1}{bc.s0}",
+          "pos": [
+            0.03999999910593033,
+            0.08799999952316284
+          ],
+          "size": 0.03400000184774399,
+          "color": [
+            0.9599999785423279,
+            0.9599999785423279,
+            0.9599999785423279,
+            0.9200000166893005
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 110,
+      "components": {
+        "Name": {
+          "value": "Camera name"
+        },
+        "Text": {
+          "value": "BODYCAM 07   2026-10-17",
+          "pos": [
+            0.03999999910593033,
+            0.9300000071525574
+          ],
+          "size": 0.02800000086426735,
+          "color": [
+            0.9599999785423279,
+            0.9599999785423279,
+            0.9599999785423279,
+            0.8500000238418579
+          ],
+          "align": 0,
+          "shadow": true,
+          "visible": true
+        },
+        "TextFont": {
+          "file": "examples/fonts/pixel.ttf",
+          "wrap": 0,
+          "line_spacing": 0.25
+        }
+      }
+    },
+    {
+      "uid": 111,
+      "components": {
+        "Name": {
+          "value": "Battery"
+        },
+        "Ui": {
+          "pos": [
+            0.8999999761581421,
+            0.04500000178813934
+          ],
+          "size": [
+            0.05000000074505806,
+            0.02199999988079071
+          ],
+          "color": [
+            0.8500000238418579,
+            0.8500000238418579,
+            0.8500000238418579,
+            0.8999999761581421
+          ],
+          "back_color": [
+            0.10000000149011612,
+            0.10000000149011612,
+            0.10000000149011612,
+            0.6000000238418579
+          ],
+          "fill": 0.7200000286102295,
+          "border_color": [
+            0.949999988079071,
+            0.949999988079071,
+            0.949999988079071,
+            0.8999999761581421
+          ],
+          "border": 0.001500000013038516,
+          "text": "",
+          "text_size": 0.03999999910593033,
+          "text_color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "layer": 3,
+          "visible": true,
+          "button": false,
+          "hover": false,
+          "pressed": false,
+          "clicked": false
+        }
+      }
+    },
+    {
+      "uid": 112,
+      "components": {
+        "AudioSource": {
+          "file": "examples/hollowlight/sounds/wind.wav",
+          "voice": "",
+          "volume": 0.699999988079071,
+          "pitch": 1,
+          "looped": true,
+          "playing": true,
+          "spatial": false,
+          "range": 40,
+          "near": 2
+        },
+        "Name": {
+          "value": "Wind"
+        },
+        "Transform": {
+          "pos": [
+            0,
+            12.499732971191406,
+            0
+          ],
+          "rot": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "uid": 113,
+      "components": {
+        "GrassField": {
+          "terrain": 105,
+          "mesh": "examples/hollowlight/hills/grass.glb",
+          "texture": "",
+          "radius": 320,
+          "density": 10,
+          "size": [
+            0.6000000238418579,
+            1.25
+          ],
+          "wind_amount": 0.23999999463558197,
+          "wind_wavelength": 38,
+          "wind_speed": 0.550000011920929,
+          "wind_dir": 0.44999998807907104,
+          "color_a": [
+            0.800000011920929,
+            1,
+            0.6200000047683716
+          ],
+          "color_b": [
+            1.2000000476837158,
+            1.0800000429153442,
+            0.7799999713897705
+          ],
+          "seed": 3,
+          "phase": 0.172787606716156,
+          "enabled": true
+        },
+        "Name": {
+          "value": "Grass"
+        }
+      }
+    }
+  ],
+  "resources": {
+    "action.flash": 0,
+    "action.flash.pressed": 0,
+    "action.flash.released": 0,
+    "action.jump": 0,
+    "action.jump.pressed": 0,
+    "action.jump.released": 0,
+    "action.move_x": 0,
+    "action.move_x.pressed": 0,
+    "action.move_x.released": 0,
+    "action.move_y": 0,
+    "action.move_y.pressed": 0,
+    "action.move_y.released": 0,
+    "action.sneak": 0,
+    "action.sneak.pressed": 0,
+    "action.sneak.released": 0,
+    "action.sprint": 0,
+    "action.sprint.pressed": 0,
+    "action.sprint.released": 0,
+    "bc.h0": 5,
+    "bc.h1": 1,
+    "bc.m0": 2,
+    "bc.m1": 4,
+    "bc.phase": 0.04500000234693289,
+    "bc.s0": 8,
+    "bc.s1": 1,
+    "bc.t": 56538.05000000261,
+    "cursor.lock": 1,
+    "flash.on": 1,
+    "look.fx": -0,
+    "look.fz": -1,
+    "look.rx": 1,
+    "look.rz": -0,
+    "player.x": 0,
+    "player.y": 10.591567039489746,
+    "player.z": 0,
+    "stamina": 100,
+    "walk.v": 0
+  },
+  "systems": [
+    {
+      "name": "fp_axes",
+      "doc": "Which way is ahead and to the right on the ground, from the look.",
+      "each": [
+        "MouseLook"
+      ],
+      "order": 9,
+      "do": [
+        {
+          "res_set": "look.fx",
+          "to": {
+            "get": "MouseLook.forward[0]"
+          }
+        },
+        {
+          "res_set": "look.fz",
+          "to": {
+            "get": "MouseLook.forward[2]"
+          }
+        },
+        {
+          "res_set": "look.rx",
+          "to": {
+            "get": "MouseLook.right[0]"
+          }
+        },
+        {
+          "res_set": "look.rz",
+          "to": {
+            "get": "MouseLook.right[2]"
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "fp_walk",
+      "doc": "Walk, sprint (stamina), creep, jump; F is the flashlight.",
+      "each": [
+        "Player",
+        "CharacterBody",
+        "Transform"
+      ],
+      "order": 10,
+      "do": [
+        {
+          "res_set": "player.x",
+          "to": {
+            "get": "Transform.pos[0]"
+          }
+        },
+        {
+          "res_set": "player.y",
+          "to": {
+            "get": "Transform.pos[1]"
+          }
+        },
+        {
+          "res_set": "player.z",
+          "to": {
+            "get": "Transform.pos[2]"
+          }
+        },
+        {
+          "let": "want",
+          "be": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "action.sprint"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "lt": [
+                  {
+                    "get": "Player.tired"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "gt": [
+                  {
+                    "add": [
+                      {
+                        "abs": {
+                          "res": "action.move_x"
+                        }
+                      },
+                      {
+                        "abs": {
+                          "res": "action.move_y"
+                        }
+                      }
+                    ]
+                  },
+                  0.1
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "let": "speed",
+          "be": {
+            "select": [
+              {
+                "var": "want"
+              },
+              6.4,
+              {
+                "select": [
+                  {
+                    "gt": [
+                      {
+                        "res": "action.sneak"
+                      },
+                      0.5
+                    ]
+                  },
+                  1.8,
+                  3.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "set": "CharacterBody.walk[0]",
+          "to": {
+            "mul": [
+              {
+                "add": [
+                  {
+                    "mul": [
+                      {
+                        "res": "look.rx"
+                      },
+                      {
+                        "res": "action.move_x"
+                      }
+                    ]
+                  },
+                  {
+                    "mul": [
+                      {
+                        "res": "look.fx"
+                      },
+                      {
+                        "res": "action.move_y"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "var": "speed"
+              }
+            ]
+          }
+        },
+        {
+          "set": "CharacterBody.walk[1]",
+          "to": {
+            "mul": [
+              {
+                "add": [
+                  {
+                    "mul": [
+                      {
+                        "res": "look.rz"
+                      },
+                      {
+                        "res": "action.move_x"
+                      }
+                    ]
+                  },
+                  {
+                    "mul": [
+                      {
+                        "res": "look.fz"
+                      },
+                      {
+                        "res": "action.move_y"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "var": "speed"
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "var": "want"
+          },
+          "then": [
+            {
+              "set": "Player.stamina",
+              "to": {
+                "max": [
+                  {
+                    "sub": [
+                      {
+                        "get": "Player.stamina"
+                      },
+                      {
+                        "mul": [
+                          14,
+                          {
+                            "dt": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  0
+                ]
+              }
+            }
+          ],
+          "else": [
+            {
+              "set": "Player.stamina",
+              "to": {
+                "min": [
+                  {
+                    "add": [
+                      {
+                        "get": "Player.stamina"
+                      },
+                      {
+                        "mul": [
+                          9,
+                          {
+                            "dt": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  100
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "set": "Player.tired",
+          "to": {
+            "select": [
+              {
+                "le": [
+                  {
+                    "get": "Player.stamina"
+                  },
+                  0
+                ]
+              },
+              1,
+              {
+                "select": [
+                  {
+                    "gt": [
+                      {
+                        "get": "Player.stamina"
+                      },
+                      35
+                    ]
+                  },
+                  0,
+                  {
+                    "get": "Player.tired"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "and": [
+              {
+                "gt": [
+                  {
+                    "res": "action.jump.pressed"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "get": "CharacterBody.grounded"
+              }
+            ]
+          },
+          "then": [
+            {
+              "set": "CharacterBody.jump",
+              "to": 4.6
+            }
+          ]
+        },
+        {
+          "if": {
+            "gt": [
+              {
+                "res": "action.flash.pressed"
+              },
+              0.5
+            ]
+          },
+          "then": [
+            {
+              "res_set": "flash.on",
+              "to": {
+                "sub": [
+                  1,
+                  {
+                    "res": "flash.on"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "res_set": "stamina",
+          "to": {
+            "get": "Player.stamina"
+          }
+        },
+        {
+          "res_set": "walk.v",
+          "to": {
+            "mul": [
+              {
+                "var": "speed"
+              },
+              {
+                "select": [
+                  {
+                    "and": [
+                      {
+                        "gt": [
+                          {
+                            "add": [
+                              {
+                                "abs": {
+                                  "res": "action.move_x"
+                                }
+                              },
+                              {
+                                "abs": {
+                                  "res": "action.move_y"
+                                }
+                              }
+                            ]
+                          },
+                          0.1
+                        ]
+                      },
+                      {
+                        "get": "CharacterBody.grounded"
+                      }
+                    ]
+                  },
+                  1,
+                  0
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "bodycam",
+      "doc": "The camera is on the chest: it sways with the step, rolls a little, breathes.",
+      "each": [
+        "BodyCam",
+        "LocalTransform"
+      ],
+      "order": 15,
+      "do": [
+        {
+          "res_set": "bc.phase",
+          "to": {
+            "add": [
+              {
+                "res": "bc.phase"
+              },
+              {
+                "mul": [
+                  {
+                    "dt": true
+                  },
+                  {
+                    "add": [
+                      0.9,
+                      {
+                        "mul": [
+                          {
+                            "res": "walk.v"
+                          },
+                          1.5
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "let": "amp",
+          "be": {
+            "div": [
+              {
+                "res": "walk.v"
+              },
+              3.4
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.pos[0]",
+          "to": {
+            "mul": [
+              0.012,
+              {
+                "sin": {
+                  "res": "bc.phase"
+                }
+              },
+              {
+                "var": "amp"
+              }
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.pos[1]",
+          "to": {
+            "add": [
+              -0.28,
+              {
+                "mul": [
+                  0.03,
+                  {
+                    "var": "amp"
+                  },
+                  {
+                    "sin": {
+                      "mul": [
+                        {
+                          "res": "bc.phase"
+                        },
+                        2
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "mul": [
+                  0.004,
+                  {
+                    "sin": {
+                      "mul": [
+                        {
+                          "tick": true
+                        },
+                        0.047
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.pos[2]",
+          "to": 0.1
+        },
+        {
+          "let": "rz",
+          "be": {
+            "add": [
+              {
+                "mul": [
+                  0.025,
+                  {
+                    "var": "amp"
+                  },
+                  {
+                    "sin": {
+                      "res": "bc.phase"
+                    }
+                  }
+                ]
+              },
+              {
+                "mul": [
+                  0.002,
+                  {
+                    "sin": {
+                      "mul": [
+                        {
+                          "tick": true
+                        },
+                        0.031
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "let": "rx",
+          "be": {
+            "add": [
+              {
+                "mul": [
+                  0.014,
+                  {
+                    "var": "amp"
+                  },
+                  {
+                    "sin": {
+                      "add": [
+                        {
+                          "mul": [
+                            {
+                              "res": "bc.phase"
+                            },
+                            2
+                          ]
+                        },
+                        0.8
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "mul": [
+                  0.003,
+                  {
+                    "sin": {
+                      "mul": [
+                        {
+                          "tick": true
+                        },
+                        0.043
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.rot[0]",
+          "to": {
+            "mul": [
+              {
+                "var": "rx"
+              },
+              0.5
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.rot[1]",
+          "to": 0
+        },
+        {
+          "set": "LocalTransform.rot[2]",
+          "to": {
+            "mul": [
+              {
+                "var": "rz"
+              },
+              0.5
+            ]
+          }
+        },
+        {
+          "set": "LocalTransform.rot[3]",
+          "to": 1
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "bodycam_clock",
+      "doc": "The recorder's clock: hours, minutes and seconds as digits for the on-screen text; the red dot blinks.",
+      "each": [
+        "Player"
+      ],
+      "order": 16,
+      "do": [
+        {
+          "res_set": "bc.t",
+          "to": {
+            "add": [
+              {
+                "res": "bc.t"
+              },
+              {
+                "dt": true
+              }
+            ]
+          }
+        },
+        {
+          "let": "tt",
+          "be": {
+            "floor": {
+              "res": "bc.t"
+            }
+          }
+        },
+        {
+          "let": "h",
+          "be": {
+            "mod": [
+              {
+                "floor": {
+                  "div": [
+                    {
+                      "var": "tt"
+                    },
+                    3600
+                  ]
+                }
+              },
+              24
+            ]
+          }
+        },
+        {
+          "let": "m",
+          "be": {
+            "mod": [
+              {
+                "floor": {
+                  "div": [
+                    {
+                      "var": "tt"
+                    },
+                    60
+                  ]
+                }
+              },
+              60
+            ]
+          }
+        },
+        {
+          "let": "sc",
+          "be": {
+            "mod": [
+              {
+                "var": "tt"
+              },
+              60
+            ]
+          }
+        },
+        {
+          "res_set": "bc.h1",
+          "to": {
+            "floor": {
+              "div": [
+                {
+                  "var": "h"
+                },
+                10
+              ]
+            }
+          }
+        },
+        {
+          "res_set": "bc.h0",
+          "to": {
+            "mod": [
+              {
+                "var": "h"
+              },
+              10
+            ]
+          }
+        },
+        {
+          "res_set": "bc.m1",
+          "to": {
+            "floor": {
+              "div": [
+                {
+                  "var": "m"
+                },
+                10
+              ]
+            }
+          }
+        },
+        {
+          "res_set": "bc.m0",
+          "to": {
+            "mod": [
+              {
+                "var": "m"
+              },
+              10
+            ]
+          }
+        },
+        {
+          "res_set": "bc.s1",
+          "to": {
+            "floor": {
+              "div": [
+                {
+                  "var": "sc"
+                },
+                10
+              ]
+            }
+          }
+        },
+        {
+          "res_set": "bc.s0",
+          "to": {
+            "mod": [
+              {
+                "var": "sc"
+              },
+              10
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "rec_dot",
+      "each": [
+        "RecDot",
+        "Ui"
+      ],
+      "order": 31,
+      "do": [
+        {
+          "set": "Ui.visible",
+          "to": {
+            "lt": [
+              {
+                "sub": [
+                  {
+                    "res": "bc.t"
+                  },
+                  {
+                    "floor": {
+                      "res": "bc.t"
+                    }
+                  }
+                ]
+              },
+              0.65
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "flashlight",
+      "each": [
+        "Flashlight",
+        "Light"
+      ],
+      "order": 11,
+      "do": [
+        {
+          "set": "Light.intensity",
+          "to": {
+            "select": [
+              {
+                "gt": [
+                  {
+                    "res": "flash.on"
+                  },
+                  0.5
+                ]
+              },
+              {
+                "add": [
+                  9,
+                  {
+                    "mul": [
+                      0.25,
+                      {
+                        "sin": {
+                          "mul": [
+                            {
+                              "tick": true
+                            },
+                            0.9
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              0
+            ]
+          }
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}

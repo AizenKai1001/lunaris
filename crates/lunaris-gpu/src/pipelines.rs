@@ -20,6 +20,8 @@ pub enum PipeId {
     Mesh,
     /// Painted terrain (`TerrainLayers`): the mesh shader with a splat map and up to four layers in a third bind group.
     MeshSplat,
+    /// Grass made on the card (`GrassField`): the mesh shader's fragment with a vertex shader that places the tufts itself.
+    Grass,
     /// See-through meshes: sorted far to near, blended over the picture, not writing depth.
     MeshBlend,
     Sprite,
@@ -79,6 +81,8 @@ pub struct Layouts {
     pub tex1: BindGroupLayout,
     /// `tex1` without the normal and arm maps: a painted terrain's pipeline has its own nine textures and the card allows 16 per stage.
     pub tex1_small: BindGroupLayout,
+    /// A grass field: its numbers and the picture of the ground (heights) it stands on.
+    pub grass2: BindGroupLayout,
     pub splat2: BindGroupLayout,
     pub depth0: BindGroupLayout,
     pub text0: BindGroupLayout,
@@ -142,6 +146,10 @@ fn tex_float_array() -> BindingType {
     BindingType::Texture { sample_type: TextureSampleType::Float { filterable: true }, view_dimension: TextureViewDimension::D2Array, multisampled: false }
 }
 
+fn tex_unfiltered() -> BindingType {
+    BindingType::Texture { sample_type: TextureSampleType::Float { filterable: false }, view_dimension: TextureViewDimension::D2, multisampled: false }
+}
+
 fn tex_depth() -> BindingType {
     BindingType::Texture { sample_type: TextureSampleType::Depth, view_dimension: TextureViewDimension::D2, multisampled: false }
 }
@@ -167,8 +175,9 @@ impl Layouts {
         let make = |label: &str, entries: &[BindGroupLayoutEntry]| device.create_bind_group_layout(&BindGroupLayoutDescriptor { label: Some(label), entries });
         Layouts {
             scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering())]),
-            tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float()), entry(3, tex_float()), entry(4, tex_float())]),
+            tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float()), entry(3, tex_float()), entry(4, tex_float()), entry(5, tex_float())]),
             tex1_small: make("tex1-small", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float())]),
+            grass2: make("grass2", &[entry(12, uniform()), entry(13, tex_unfiltered())]),
             // a painted terrain: its numbers, the splat map and its sampler, the layers' sampler, four colour textures and four relief maps
             splat2: make("splat2", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering()), entry(3, sampler_filtering()), entry(4, tex_float()), entry(5, tex_float()), entry(6, tex_float()), entry(7, tex_float()), entry(8, tex_float()), entry(9, tex_float()), entry(10, tex_float()), entry(11, tex_float())]),
             depth0: make("depth0", &[entry(0, uniform()), entry(1, storage_ro())]),
@@ -270,6 +279,20 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 layout: Some(&pl),
                 vertex: VertexState { module: &sh.scene, entry_point: Some("vs_mesh"), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
                 primitive: tri(Some(Face::Back)),
+                depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
+                multisample: ms,
+                fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_mesh"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),
+                multiview_mask: None,
+                cache: None,
+            })
+        }
+        PipeId::Grass => {
+            let pl = layout("grass", &[&ly.scene0, &ly.tex1, &ly.grass2]);
+            device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("grass"),
+                layout: Some(&pl),
+                vertex: VertexState { module: &sh.scene, entry_point: Some("vs_grass"), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
+                primitive: tri(None),
                 depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
                 multisample: ms,
                 fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_mesh"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),

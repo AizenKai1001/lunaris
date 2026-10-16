@@ -157,6 +157,22 @@ A test on the real GPU (`a_lens_flare_appears_with_the_sun_in_view_and_vanishes_
 
 A mesh with a `PbrMaps` beside its `MeshRenderer` gets the detail of a photographed material (high quality only; the reference picture and classic mode ignore it). `normal` is a tangent-space normal map (a PNG or JPEG of the workspace, **DirectX** convention: green points down the picture, what Poly Haven's `nor_dx` and Unreal's maps are) and `arm` a map with ambient occlusion in red, roughness in green and metallic in blue. Both hold numbers, not colours: they are never converted from sRGB, and they repeat `MeshRenderer.uv_scale` times with the colour texture. `normal_strength` scales the bumps (1 as authored), `ao_strength` (0 to 1) how much the occlusion map darkens the ambient light, `roughness_scale` multiplies the map's roughness; a name left empty is not used. No tangents are needed in the model: the frame comes from the screen-space change of position and picture coordinates. `examples/hollowlight/` uses it with the CC0 sets `tools/fetch_polyhaven.py` downloads.
 
+## Light in the air: `Volumetrics`
+
+A `Volumetrics` makes every point and spot light visible in the air: from the camera to the first surface it sees (at most `max_distance` metres, in `steps` steps) the picture adds up the light of each lamp that reaches the air there, scattered towards the viewer. `density` is how thick the air is per metre (0.01 a faint haze, 0.05 a fog), `anisotropy` (0 to 0.95) how much the air throws light on towards the viewer (0.6 makes a lamp glow when you look at it and a flashlight show its beam), `intensity` and `color` scale and tint it. It is not shadowed (the light stops at the first surface seen, but a lamp behind a thin wall still glows in the air next to it); the sun is not in it (`PostFx.shafts` is its own). High quality only.
+
+## Which sixteen lights
+
+The GPU renderer lights each picture with at most sixteen lights. It takes the sun and the other directional lights first, then the point and spot lights **nearest the camera** (a lamp's reach counts), so a hall with hundreds of lamps is lit by the ones round you and the choice changes smoothly as you walk (a lamp's light is zero at its range, and the sixteenth nearest is further than that). The reference picture and the classic mode keep drawing the first sixteen by entity number.
+
+## Depth in a flat picture: `PbrMaps.height`
+
+Give `PbrMaps` a `height` map (white = high; Poly Haven's `disp`) and `height_scale` and the surface gets parallax occlusion mapping: a ray march through the height map that shifts what you see by how high it is, so carpet, tile and brick have relief that changes as you move.
+
+## Grass made on the card: `GrassField`
+
+A `GrassField` puts grass on a `Terrain` without a single entity for it: round the camera, up to `radius` metres, the GPU lays tufts of the model `mesh` (a `.glb` of a few crossed cards of grass, standing on y = 0 and about 0.6 m tall, with its picture as a material so it is cut out) on the ground at about `density` tufts per square metre near the camera. The ground is read from the terrain's heightmap on the card, so the tufts follow it. Three rings (fine tufts near, bigger ones further out) overlap and swap by scale, so nothing pops. Every tuft is turned, sized (`size`, the smallest and biggest scale) and tinted (between `color_a` and `color_b`, multipliers of the picture) by hashes of where it stands, and is darker at its foot (the grass at the bottom of a field is in shade); its normal leans with the wind. The wind is a gust that travels across the field: `wind_amount` metres of lean at the top, `wind_wavelength` metres between crests, `wind_speed` crests a second, going `wind_dir` (radians about up); the foot stays and the top leans by the square of the height, and every tuft flutters a little by itself. `phase` is the engine's clock, so replays show the same wind. Only the GPU renderer's high qualities draw it (the reference picture ignores it). Hundreds of thousands of tufts cost vertices and no CPU, and the scene file stays a few lines (`tools/build_hollowlight_hills.py` makes a 4 km field of smooth hills and its grass in 19 entities).
+
 ## Reflection probes: `ReflectionProbe`
 
 ```

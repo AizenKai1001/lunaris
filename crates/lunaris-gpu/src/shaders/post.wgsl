@@ -748,11 +748,71 @@ fn velocity_px(px: vec2<i32>) -> vec2<f32> {
     return v;
 }
 
+
+// ---- volumetric light (`Volumetrics`): from the eye to the first thing seen, the glow of every point and spot light in the air on the way
+fn hg_phase(cos_t: f32, g: f32) -> f32 {
+    let g2 = g * g;
+    return (1.0 - g2) / (12.566371 * pow(max(1.0 + g2 - 2.0 * g * cos_t, 0.001), 1.5));
+}
+
+fn volumetric_at(px: vec2<i32>, pos: vec2<f32>) -> vec3<f32> {
+    let eye = frame.eye.xyz;
+    let size = vec2<i32>(frame.p1.xy);
+    let q = clamp(px, vec2<i32>(0), size - vec2<i32>(1));
+    let d = textureLoad(depth_tex, q, 0);
+    let uv = (vec2<f32>(q) + 0.5) * frame.p1.zw;
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let w4 = frame.inv_view_proj * vec4<f32>(ndc, max(d, 0.0001), 1.0);
+    let to_pt = w4.xyz / w4.w - eye;
+    let dir = normalize(to_pt);
+    let dist = min(length(to_pt), frame.p21.w);
+    let n = max(i32(frame.p21.z), 4);
+    let dt = dist / f32(n);
+    let jitter = interleaved_noise(pos + vec2<f32>(frame.p8.w * 3.7, 1.3));
+    let density = frame.p21.x;
+    let g = frame.p21.y;
+    let count = u32(frame.p2.y);
+    var acc = vec3<f32>(0.0);
+    var tr = 1.0;
+    for (var i = 0; i < n; i = i + 1) {
+        let t = (f32(i) + jitter) * dt;
+        let p = eye + dir * t;
+        var lum = vec3<f32>(0.0);
+        for (var li = 0u; li < count; li = li + 1u) {
+            let l = frame.lights[li];
+            if (l.vec.w < 0.5) {
+                continue;
+            }
+            let tl = l.vec.xyz - p;
+            let dl = length(tl);
+            if (dl > l.color.w) {
+                continue;
+            }
+            let k = dl / l.color.w;
+            let a = 1.0 - k * k;
+            var att = a * a;
+            let ld = tl / max(dl, 0.001);
+            if (l.spot.w > -1.5) {
+                att = att * smoothstep(l.spot.w, l.cone.x, dot(-ld, l.spot.xyz));
+            }
+            if (att > 0.0) {
+                lum = lum + l.color.rgb * (att * hg_phase(dot(ld, dir), g));
+            }
+        }
+        acc = acc + lum * (density * tr * dt);
+        tr = tr * exp(-density * dt);
+    }
+    return acc * frame.p22.rgb * frame.p22.w;
+}
+
 fn composite_core(pos: vec2<f32>) -> vec3<f32> {
     let uv = pos / frame.p1.xy;
     let px = vec2<i32>(pos);
     let ae = ae_factor();
     var rays = shafts_at(uv, pos);
+    if (frame.p21.x > 0.0) {
+        rays = rays + volumetric_at(px, pos);
+    }
     if (frame.p17.w > 0.5) {
         rays = rays + flare_at(uv);
     }
@@ -796,6 +856,9 @@ fn composite_core_ms(pos: vec2<f32>) -> vec3<f32> {
     let px = vec2<i32>(pos);
     let ae = ae_factor();
     var rays = shafts_at(uv, pos);
+    if (frame.p21.x > 0.0) {
+        rays = rays + volumetric_at(px, pos);
+    }
     if (frame.p17.w > 0.5) {
         rays = rays + flare_at(uv);
     }
@@ -861,79 +924,94 @@ fn lens_inside(q: vec2<f32>) -> bool {
     return q.x >= 0.0 && q.y >= 0.0 && q.x < frame.p1.x && q.y < frame.p1.y;
 }
 
+// One cheap look at the picture at a pixel (no light shafts, no blurs): the red and blue of a colour fringe and the taps of a soft sensor come from it, so that the heavy composite above is written once per entry point.
+fn quick_plain(q: vec2<f32>) -> vec3<f32> {
+    let px = clamp(vec2<i32>(q), vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1));
+    let bloom = textureSampleLevel(bloom_tex, post_samp, (vec2<f32>(px) + 0.5) * frame.p1.zw, 0.0).rgb * frame.p3.x;
+    return resolve_sample(textureLoad(hdr_tex, px, 0), bloom, ae_factor(), ssr_at(px));
+}
+
+fn quick_ms(q: vec2<f32>) -> vec3<f32> {
+    let px = clamp(vec2<i32>(q), vec2<i32>(0), vec2<i32>(frame.p1.xy) - vec2<i32>(1));
+    let bloom = textureSampleLevel(bloom_tex, post_samp, (vec2<f32>(px) + 0.5) * frame.p1.zw, 0.0).rgb * frame.p3.x;
+    return resolve_sample(textureLoad(hdr_ms, px, 0), bloom, ae_factor(), ssr_at(px));
+}
+
+// What the lens does to the picture at an output pixel: where it looks (barrel, blocks), the fringe, the soft sensor, the scan lines. The picture itself is worked out once, at the pixel the lens looks at.
 fn lens_plain(pos_in: vec2<f32>) -> vec3<f32> {
+    let on = lens_on();
     var p = pos_in;
-    if (frame.p20.x > 1.5) {
+    if (on && frame.p20.x > 1.5) {
         p = (floor(p / frame.p20.x) + vec2<f32>(0.5)) * frame.p20.x;
     }
-    let c = frame.p19.z;
-    let qg = lens_src(p, 0.0);
-    if (!lens_inside(qg)) {
-        return vec3<f32>(0.0);
+    var qg = p;
+    if (on) {
+        qg = lens_src(p, 0.0);
+        if (!lens_inside(qg)) {
+            return vec3<f32>(0.0);
+        }
     }
     var col = composite_core(qg);
-    if (c > 0.0) {
-        let qr = lens_src(p, c * 6.0);
-        let qb = lens_src(p, 0.0 - c * 6.0);
-        col.r = composite_core(clamp(qr, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).r;
-        col.b = composite_core(clamp(qb, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).b;
-    }
-    if (frame.p19.w > 0.0) {
-        let o = frame.p19.w;
-        let lo = vec2<f32>(0.0);
-        let hi = frame.p1.xy - vec2<f32>(1.0);
-        let around = (composite_core(clamp(qg + vec2<f32>(o, 0.0), lo, hi)) + composite_core(clamp(qg - vec2<f32>(o, 0.0), lo, hi)) + composite_core(clamp(qg + vec2<f32>(0.0, o), lo, hi)) + composite_core(clamp(qg - vec2<f32>(0.0, o), lo, hi))) * 0.25;
-        col = mix(col, around, 0.6);
-    }
-    if (frame.p20.y > 0.0) {
-        col = col * (1.0 - frame.p20.y * 0.4 * (0.5 + 0.5 * cos(pos_in.y * 3.14159265)));
+    if (on) {
+        let c = frame.p19.z;
+        if (c > 0.0) {
+            // the fringe is how much the red and the blue differ between where they are looked up and where green is: that keeps what the full picture holds (glows, light shafts)
+            let here = quick_plain(qg);
+            col.r = col.r + (quick_plain(lens_src(p, c * 6.0)).r - here.r);
+            col.b = col.b + (quick_plain(lens_src(p, 0.0 - c * 6.0)).b - here.b);
+        }
+        if (frame.p19.w > 0.0) {
+            let o = frame.p19.w;
+            let around = (quick_plain(qg + vec2<f32>(o, 0.0)) + quick_plain(qg - vec2<f32>(o, 0.0)) + quick_plain(qg + vec2<f32>(0.0, o)) + quick_plain(qg - vec2<f32>(0.0, o))) * 0.25;
+            col = mix(col, around, 0.6);
+        }
+        if (frame.p20.y > 0.0) {
+            col = col * (1.0 - frame.p20.y * 0.4 * (0.5 + 0.5 * cos(pos_in.y * 3.14159265)));
+        }
     }
     return col;
 }
 
 fn lens_ms(pos_in: vec2<f32>) -> vec3<f32> {
+    let on = lens_on();
     var p = pos_in;
-    if (frame.p20.x > 1.5) {
+    if (on && frame.p20.x > 1.5) {
         p = (floor(p / frame.p20.x) + vec2<f32>(0.5)) * frame.p20.x;
     }
-    let c = frame.p19.z;
-    let qg = lens_src(p, 0.0);
-    if (!lens_inside(qg)) {
-        return vec3<f32>(0.0);
+    var qg = p;
+    if (on) {
+        qg = lens_src(p, 0.0);
+        if (!lens_inside(qg)) {
+            return vec3<f32>(0.0);
+        }
     }
     var col = composite_core_ms(qg);
-    if (c > 0.0) {
-        let qr = lens_src(p, c * 6.0);
-        let qb = lens_src(p, 0.0 - c * 6.0);
-        col.r = composite_core_ms(clamp(qr, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).r;
-        col.b = composite_core_ms(clamp(qb, vec2<f32>(0.0), frame.p1.xy - vec2<f32>(1.0))).b;
-    }
-    if (frame.p19.w > 0.0) {
-        let o = frame.p19.w;
-        let lo = vec2<f32>(0.0);
-        let hi = frame.p1.xy - vec2<f32>(1.0);
-        let around = (composite_core_ms(clamp(qg + vec2<f32>(o, 0.0), lo, hi)) + composite_core_ms(clamp(qg - vec2<f32>(o, 0.0), lo, hi)) + composite_core_ms(clamp(qg + vec2<f32>(0.0, o), lo, hi)) + composite_core_ms(clamp(qg - vec2<f32>(0.0, o), lo, hi))) * 0.25;
-        col = mix(col, around, 0.6);
-    }
-    if (frame.p20.y > 0.0) {
-        col = col * (1.0 - frame.p20.y * 0.4 * (0.5 + 0.5 * cos(pos_in.y * 3.14159265)));
+    if (on) {
+        let c = frame.p19.z;
+        if (c > 0.0) {
+            // the fringe is how much the red and the blue differ between where they are looked up and where green is: that keeps what the full picture holds (glows, light shafts)
+            let here = quick_ms(qg);
+            col.r = col.r + (quick_ms(lens_src(p, c * 6.0)).r - here.r);
+            col.b = col.b + (quick_ms(lens_src(p, 0.0 - c * 6.0)).b - here.b);
+        }
+        if (frame.p19.w > 0.0) {
+            let o = frame.p19.w;
+            let around = (quick_ms(qg + vec2<f32>(o, 0.0)) + quick_ms(qg - vec2<f32>(o, 0.0)) + quick_ms(qg + vec2<f32>(0.0, o)) + quick_ms(qg - vec2<f32>(0.0, o))) * 0.25;
+            col = mix(col, around, 0.6);
+        }
+        if (frame.p20.y > 0.0) {
+            col = col * (1.0 - frame.p20.y * 0.4 * (0.5 + 0.5 * cos(pos_in.y * 3.14159265)));
+        }
     }
     return col;
 }
 
 @fragment
 fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
-    if (lens_on()) {
-        return finish(lens_plain(in.pos.xy), in.uv, in.pos.xy);
-    }
-    return finish(composite_core(in.pos.xy), in.uv, in.pos.xy);
+    return finish(lens_plain(in.pos.xy), in.uv, in.pos.xy);
 }
-
 
 @fragment
 fn fs_composite_ms(in: FullOut) -> @location(0) vec4<f32> {
-    if (lens_on()) {
-        return finish(lens_ms(in.pos.xy), in.uv, in.pos.xy);
-    }
-    return finish(composite_core_ms(in.pos.xy), in.uv, in.pos.xy);
+    return finish(lens_ms(in.pos.xy), in.uv, in.pos.xy);
 }

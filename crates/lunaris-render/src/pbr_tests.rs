@@ -27,3 +27,15 @@ fn a_mesh_with_pbr_maps_carries_them_into_the_scene_and_one_without_carries_none
     assert!(by(3).pbr.is_none(), "no component, no maps");
     assert!(by(4).pbr.is_none(), "a component with no picture named is the same as none");
 }
+
+#[test]
+fn a_grass_field_needs_a_terrain_to_grow_on() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,1.5,6]},"Camera":{}}"#);
+    spawn(&mut s, 2, r#"{"GrassField":{"mesh":"grass.glb"}}"#);
+    s.step_n(1);
+    let mut tex = TextureCache::new(None);
+    let scene = render::gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 64, ..RenderOptions::default() }).unwrap();
+    assert!(scene.grass.is_empty(), "no terrain, no grass");
+    assert!(scene.warnings.iter().any(|w| w.contains("GrassField.terrain")), "{:?}", scene.warnings);
+}

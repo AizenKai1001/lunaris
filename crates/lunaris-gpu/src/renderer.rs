@@ -153,6 +153,9 @@ struct FrameU {
     /// the lens: distortion, zoom, chromatic fringe, soften; then block size, scan lines
     p19: [f32; 4],
     p20: [f32; 4],
+    /// volumetric light: density, anisotropy, steps, farthest; then colour and intensity
+    p21: [f32; 4],
+    p22: [f32; 4],
     probes: [[f32; 4]; 8],
     prev_view_proj: [f32; 16],
     psh: [PointShadowU; 2],
@@ -179,8 +182,23 @@ struct GpuMesh {
     radius: f32,
 }
 
+/// The numbers of one ring of a grass field (see `GrassU` in `scene.wgsl`).
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct GrassU {
+    ring: [f32; 4],
+    orig: [f32; 4],
+    tpos: [f32; 4],
+    tsize: [f32; 4],
+    wind: [f32; 4],
+    tuft: [f32; 4],
+    ca: [f32; 4],
+    cb: [f32; 4],
+    eye: [f32; 4],
+}
+
 /// A texture bind group's key: the colour texture, the quality, the sampler, and the addresses of the normal and occlusion-roughness-metallic maps (0 for none).
-type TexKey = (usize, bool, SamplerKind, usize, usize);
+type TexKey = (usize, bool, SamplerKind, usize, usize, usize);
 
 struct GpuTex {
     view: wgpu::TextureView,
@@ -334,8 +352,12 @@ pub struct GpuRenderer {
     data_textures: HashMap<usize, GpuTex>,
     /// Group 1 of a painted terrain's draws (it has no colour texture of its own): white, a sampler, a flat relief; made on first use.
     splat_tex_bg: Option<wgpu::BindGroup>,
+    /// The pictures of the ground that grass fields stand on, on the card (R32Float, by the picture's address), and the uniform buffers of the rings.
+    grass_heights: HashMap<usize, (wgpu::TextureView, Arc<lunaris_sim::terrain::Heightfield>, u64)>,
+    grass_bufs: Vec<wgpu::Buffer>,
     flat_normal: wgpu::TextureView,
     arm_default: wgpu::TextureView,
+    flat_height: wgpu::TextureView,
     /// Bind groups of interface pictures: (texture address, filtered), the texture in its display-colour form.
     ui_bgs: HashMap<(usize, bool), wgpu::BindGroup>,
     white: [wgpu::TextureView; 2],
@@ -468,6 +490,11 @@ impl GpuRenderer {
             gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[255, 200, 0, 255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
             t.create_view(&wgpu::TextureViewDescriptor::default())
         };
+        let flat_height = {
+            let t = make_tex("flat-height", 1, 1, 1, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
+            gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[128, 128, 128, 255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
+            t.create_view(&wgpu::TextureViewDescriptor::default())
+        };
         let ao_white = {
             let t = make_tex("ao-white", 1, 1, 1, wgpu::TextureFormat::R8Unorm, wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
             gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, &[255], wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(1), rows_per_image: Some(1) }, wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 });
@@ -518,8 +545,11 @@ impl GpuRenderer {
             tex_bgs: HashMap::new(),
             data_textures: HashMap::new(),
             splat_tex_bg: None,
+            grass_heights: HashMap::new(),
+            grass_bufs: Vec::new(),
             flat_normal,
             arm_default,
+            flat_height,
             ui_bgs: HashMap::new(),
             white,
             white_height,
@@ -871,16 +901,17 @@ impl GpuRenderer {
             }
             _ => 0,
         };
-        let (np, ap) = match maps {
-            Some(m) => (data_ptr(self, &m.normal), data_ptr(self, &m.arm)),
-            None => (0, 0),
+        let (np, ap, dp) = match maps {
+            Some(m) => (data_ptr(self, &m.normal), data_ptr(self, &m.arm), data_ptr(self, &m.disp)),
+            None => (0, 0, 0),
         };
-        let key = (ptr, high, kind, np, ap);
+        let key = (ptr, high, kind, np, ap, dp);
         if !self.tex_bgs.contains_key(&key) {
             let view = if ptr == 0 { &self.white[high as usize] } else { &self.textures[&(ptr, high)].view };
             let height = if ptr == 0 { &self.white_height } else { self.textures[&(ptr, high)].height.as_ref().unwrap_or(&self.white_height) };
             let normal = if np == 0 { &self.flat_normal } else { &self.data_textures[&np].view };
             let arm = if ap == 0 { &self.arm_default } else { &self.data_textures[&ap].view };
+            let disp = if dp == 0 { &self.flat_height } else { &self.data_textures[&dp].view };
             let sampler = match kind {
                 SamplerKind::NearestRepeat => &self.samplers.nearest_repeat,
                 SamplerKind::NearestClamp => &self.samplers.nearest_clamp,
@@ -896,10 +927,35 @@ impl GpuRenderer {
                     wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(height) },
                     wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(normal) },
                     wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(arm) },
+                    wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::TextureView(disp) },
                 ],
             });
             self.tex_bgs.insert(key, bg);
         }
+        key
+    }
+
+    /// The picture of a terrain's heights on the card (once; kept while used): one 32-bit float a sample, 0 to 1.
+    fn ensure_grass_heights(&mut self, f: &Arc<lunaris_sim::terrain::Heightfield>, frame: u64) -> usize {
+        let key = Arc::as_ptr(f) as usize;
+        if let Some(e) = self.grass_heights.get_mut(&key) {
+            e.2 = frame;
+            return key;
+        }
+        let (w, h) = (f.cols as u32, f.rows as u32);
+        let t = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("grass-heights"),
+            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R32Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let data: Vec<f32> = f.samples().iter().map(|v| *v as f32 * (1.0 / 65535.0)).collect();
+        self.gpu.queue.write_texture(wgpu::TexelCopyTextureInfo { texture: &t, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All }, bytemuck::cast_slice(&data), wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * 4), rows_per_image: Some(h) }, wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 });
+        self.grass_heights.insert(key, (t.create_view(&wgpu::TextureViewDescriptor::default()), f.clone(), frame));
         key
     }
 
@@ -940,10 +996,11 @@ impl GpuRenderer {
         self.tile_meshes.retain(|_, g| !dead(g.last_used));
         self.dyn_meshes.retain(|_, g| !dead(g.last_used));
         self.splat_textures.retain(|_, g| !dead(g.last_used));
+        self.grass_heights.retain(|_, e| !dead(e.2));
         let gone_data: Vec<usize> = self.data_textures.iter().filter(|(_, t)| dead(t.last_used)).map(|(k, _)| *k).collect();
         for k in gone_data {
             self.data_textures.remove(&k);
-            self.tex_bgs.retain(|bk, _| bk.3 != k && bk.4 != k);
+            self.tex_bgs.retain(|bk, _| bk.3 != k && bk.4 != k && bk.5 != k);
         }
         let gone: Vec<(usize, bool)> = self.textures.iter().filter(|(_, t)| dead(t.last_used)).map(|(k, _)| *k).collect();
         for k in gone {
@@ -1119,6 +1176,18 @@ impl GpuRenderer {
     // ------------------------------------------------------------------------------------------ drawing
 
     fn draw(&mut self, scene: &Scene, w: u32, h: u32, out: Out<'_>, q: &Quality, want_ids: bool, adapt: Option<f32>) -> Result<(), String> {
+        // the sixteen lights that matter most for this picture: the sun and other directional lights first, then the point and spot lights nearest the camera (a light's reach counts, so a big far lamp is not lost behind many small near ones);
+        // with sixteen or fewer nothing changes
+        let lights_sel: Vec<lunaris_render::render::LightData> = if scene.all_lights.len() <= MAX_LIGHTS {
+            scene.all_lights.clone()
+        } else {
+            let eye = scene.cam.pos;
+            let mut idx: Vec<usize> = (0..scene.all_lights.len()).collect();
+            let key = |l: &lunaris_render::render::LightData| if l.point { let d = length(sub(l.vec, eye)); 1.0 + d - l.range * 0.5 } else { f32::MIN };
+            idx.sort_by(|&a, &b| key(&scene.all_lights[a]).partial_cmp(&key(&scene.all_lights[b])).unwrap_or(std::cmp::Ordering::Equal).then(a.cmp(&b)));
+            idx.truncate(MAX_LIGHTS);
+            idx.iter().map(|&i| scene.all_lights[i]).collect()
+        };
         let mode = q.mode;
         let high = mode == Mode::High;
         let samples = if high { if q.msaa >= 4 { 4 } else { 1 } } else { 1 };
@@ -1180,11 +1249,11 @@ impl GpuRenderer {
                 uvrect: match (m.water, m.sway) {
                     (Some(wv), _) if high => [0.0, wv[0], wv[1], wv[2]],
                     (None, Some(sw)) if high => [0.0, sw[0], sw[1], sw[2]],
-                    _ => [if high && tex.as_ref().is_some_and(|t| t.heights.is_some()) { m.bump } else { 0.0 }, 0.0, 1.0, 1.0],
+                    _ => [if high && tex.as_ref().is_some_and(|t| t.heights.is_some()) { m.bump } else { 0.0 }, if high { m.pbr.as_ref().filter(|p| p.disp.is_some()).map_or(0.0, |p| p.height_scale) } else { 0.0 }, 1.0, 1.0],
                 },
                 ids: [slots.len() as u32, if !high { 0 } else if m.water.is_some() { 1 } else if m.sway.is_some() { 2 } else { 0 }, 0, 0],
                 pbr: match &m.pbr {
-                    Some(p) if high && (p.normal.is_some() || p.arm.is_some()) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32, p.roughness_scale],
+                    Some(p) if high && (p.normal.is_some() || p.arm.is_some() || p.disp.is_some()) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32 + 4.0 * p.disp.is_some() as u32 as f32, p.roughness_scale],
                     _ => [0.0; 4],
                 },
             };
@@ -1193,7 +1262,7 @@ impl GpuRenderer {
             items.push(MeshItem { id, tex: tkey, cast: m.cast_shadow && !see_through, glows: m.emissive > 0.0, clear: see_through, depth, data, sphere: (m.model.transform_point(center), radius * scale), splat });
         }
         let mut order: Vec<usize> = (0..items.len()).filter(|&i| !items[i].clear).collect();
-        order.sort_by_key(|&i| (items[i].id, items[i].tex.0, items[i].tex.2 as u8, items[i].tex.3, items[i].tex.4, items[i].cast, items[i].splat));
+        order.sort_by_key(|&i| (items[i].id, items[i].tex.0, items[i].tex.2 as u8, items[i].tex.3, items[i].tex.4, items[i].tex.5, items[i].cast, items[i].splat));
         let mut objects: Vec<ObjectData> = Vec::with_capacity(items.len() + scene.layers.len());
         let mut mesh_batches: Vec<Batch> = Vec::new();
         for &i in &order {
@@ -1271,8 +1340,7 @@ impl GpuRenderer {
         let mut point_sel: Vec<usize> = Vec::new();
         let mut point_batches: Vec<Vec<Batch>> = Vec::new();
         if high && q.point_shadow_size > 0 && env.shadows && !casters.spheres.is_empty() {
-            let mut cand: Vec<(f32, usize)> = scene
-                .lights
+            let mut cand: Vec<(f32, usize)> = lights_sel
                 .iter()
                 .enumerate()
                 .take(MAX_LIGHTS)
@@ -1284,7 +1352,7 @@ impl GpuRenderer {
                 .collect();
             cand.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.cmp(&b.1)));
             for &(_, li) in cand.iter().take(2) {
-                let l = &scene.lights[li];
+                let l = &lights_sel[li];
                 let mut batches: Vec<Batch> = Vec::new();
                 for &i in &order {
                     let it = &items[i];
@@ -1307,6 +1375,74 @@ impl GpuRenderer {
                 point_batches.push(batches);
             }
         }
+        // grass: an object (the material numbers) for each field and a uniform for each of its three rings, which cover the ground round the camera from fine tufts near to big ones far
+        struct GrassDraw {
+            mesh: MeshId,
+            tex: TexKey,
+            hkey: usize,
+            ubuf: usize,
+            instances: u32,
+        }
+        let mut grass_draws: Vec<GrassDraw> = Vec::new();
+        let mut grass_us: Vec<GrassU> = Vec::new();
+        if high {
+            let eye = scene.cam.pos;
+            for g in &scene.grass {
+                let id = self.ensure_mesh(&g.mesh, frame_no);
+                let (mesh_tex, count) = {
+                    let gm = self.mesh(id);
+                    (gm.texture.clone(), gm.count)
+                };
+                if count == 0 {
+                    continue;
+                }
+                let tex = g.tex.clone().or(mesh_tex);
+                let tkey = self.texture_group(tex.as_ref(), None, true, SamplerKind::Aniso, frame_no);
+                let hkey = self.ensure_grass_heights(&g.heights, frame_no);
+                objects.push(ObjectData {
+                    model: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                    n0: [1.0, 0.0, 0.0, 0.0],
+                    n1: [0.0, 1.0, 0.0, 0.0],
+                    n2: [0.0, 0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                    mat: [32.0, 0.0, 0.0, 0.92],
+                    misc: [1.0, 1.0, if tex.is_some() { 1.0 } else { 0.0 }, 1.0],
+                    uvrect: [0.0, 0.0, 1.0, 1.0],
+                    ids: [0, 0, 0, 0],
+                    pbr: [0.0; 4],
+                });
+                let slot = (objects.len() - 1) as f32;
+                let near_cell = 1.0 / g.density.sqrt();
+                let edges = [0.0, g.radius * 0.26, g.radius * 0.62, g.radius];
+                for k in 0..3usize {
+                    let cell = near_cell * 2.4f32.powi(k as i32);
+                    let outer = edges[k + 1];
+                    let inner = if k == 0 { 0.0 } else { edges[k] * 0.8 };
+                    let cells = ((2.0 * outer / cell).ceil() as u32 + 2).min(640);
+                    let mult = 2.4f32.powf(0.85 * k as f32);
+                    let ox = (eye[0] / cell).floor() - (cells / 2) as f32;
+                    let oz = (eye[2] / cell).floor() - (cells / 2) as f32;
+                    grass_us.push(GrassU {
+                        ring: [cell, inner, outer, cells as f32],
+                        orig: [ox, oz, slot, ((outer - inner) * 0.18).max(0.5)],
+                        tpos: [g.terrain_pos[0], g.terrain_pos[1], g.terrain_pos[2], g.terrain_height],
+                        tsize: [g.terrain_size[0], g.terrain_size[1], g.heights.cols as f32, g.heights.rows as f32],
+                        wind: g.wind,
+                        tuft: [g.size[0] * mult, g.size[1] * mult, g.patch_size, g.seed + 17.0 * k as f32],
+                        ca: [g.color_a[0], g.color_a[1], g.color_a[2], 0.0],
+                        cb: [g.color_b[0], g.color_b[1], g.color_b[2], 0.0],
+                        eye: [eye[0], eye[1], eye[2], 0.0],
+                    });
+                    grass_draws.push(GrassDraw { mesh: id, tex: tkey, hkey, ubuf: grass_us.len() - 1, instances: cells * cells });
+                }
+            }
+        }
+        while self.grass_bufs.len() < grass_us.len() {
+            self.grass_bufs.push(self.gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some("grass-ring"), size: std::mem::size_of::<GrassU>() as u64, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false }));
+        }
+        for (i, u) in grass_us.iter().enumerate() {
+            self.gpu.queue.write_buffer(&self.grass_bufs[i], 0, bytemuck::bytes_of(u));
+        }
         self.grow_objects(objects.len().max(1) as u64);
         if !objects.is_empty() {
             self.gpu.queue.write_buffer(&self.objects, 0, bytemuck::cast_slice(&objects));
@@ -1321,7 +1457,7 @@ impl GpuRenderer {
         // ---- which effects run
         let have_clear = !clear_batches.is_empty();
         let have_meshes = !scene.meshes.is_empty();
-        let sun = scene.lights.iter().position(|l| !l.point);
+        let sun = lights_sel.iter().position(|l| !l.point);
         let shadows_on = high && q.shadows && env.shadows && have_meshes && sun.is_some() && !casters.spheres.is_empty();
         let ssao_on = high && q.ssao && env.ssao > 0.0 && have_meshes;
         let dof_on = high && q.dof && env.dof > 0.0 && have_meshes;
@@ -1336,7 +1472,8 @@ impl GpuRenderer {
         }
         // the lens flare looks at the depth where the sun is, to see whether something covers it
         let flare_on = high && q.dof && have_meshes && sun.is_some() && env.lens_flare.is_some();
-        let need_depth = ssao_on || dof_on || shafts_on || blur_on || refl_on || flare_on;
+        let vol_on = high && env.volumetrics[0] > 0.0 && have_meshes;
+        let need_depth = ssao_on || dof_on || shafts_on || blur_on || refl_on || flare_on || vol_on;
         let bloom_on = high && q.bloom && env.bloom > 0.0;
         // eye adaptation needs something to measure: a flat 2D scene keeps its authored colours
         let ae_on = high && have_meshes && env.auto_exposure.is_some() && !probe_out;
@@ -1352,7 +1489,7 @@ impl GpuRenderer {
         fu.view = view.0;
         let cascades = if shadows_on {
             self.ensure_shadow(q.shadow_size.clamp(256, 8192));
-            let sun_dir = scene.lights[sun.expect("checked")].vec;
+            let sun_dir = lights_sel[sun.expect("checked")].vec;
             Some(fit_cascades(&scene.cam, aspect, sun_dir, env.shadow_distance, q.shadow_size.clamp(256, 8192), &casters))
         } else {
             None
@@ -1374,7 +1511,7 @@ impl GpuRenderer {
             fu.psh[k].info = [-1.0, 0.1, 1.0, 0.0];
         }
         for (k, &li) in point_sel.iter().enumerate() {
-            let l = &scene.lights[li];
+            let l = &lights_sel[li];
             let near = 0.1f32.min(l.range * 0.25);
             let faces = point_light_faces(l.vec, near, l.range);
             for f in 0..6 {
@@ -1386,8 +1523,8 @@ impl GpuRenderer {
         }
         fu.eye = v4(scene.cam.pos, scene.cam.near);
         if let Some(i) = sun {
-            fu.sun_dir = v4(scene.lights[i].vec, 1.0);
-            fu.sun_color = v4(scene.lights[i].color, 0.0);
+            fu.sun_dir = v4(lights_sel[i].vec, 1.0);
+            fu.sun_color = v4(lights_sel[i].color, 0.0);
         }
         fu.sky_top = v4(lin(env.sky_top), 0.0);
         fu.sky_horizon = v4(lin(env.sky_horizon), 0.0);
@@ -1403,7 +1540,7 @@ impl GpuRenderer {
         };
         fu.p0 = [env.ambient, env.exposure, if ssao_on { env.ssao } else { 0.0 }, if shadows_on { 1.0 } else { 0.0 }];
         fu.p1 = [w as f32, h as f32, 1.0 / w as f32, 1.0 / h as f32];
-        fu.p2 = [if high { 1.0 } else { 0.0 }, scene.lights.len().min(MAX_LIGHTS) as f32, tonemap, env.saturation];
+        fu.p2 = [if high { 1.0 } else { 0.0 }, lights_sel.len().min(MAX_LIGHTS) as f32, tonemap, env.saturation];
         fu.p3 = [if bloom_on { env.bloom } else { 0.0 }, env.bloom_threshold, env.vignette, if env.sky { 1.0 } else { 0.0 }];
         fu.p5 = [if env.sky { env.clouds } else { 0.0 }, psize as f32, 0.0, 0.0];
         // depth of field: strength, focus distance, the depth that stays sharp around it
@@ -1411,6 +1548,8 @@ impl GpuRenderer {
         self.fx_frame = self.fx_frame.wrapping_add(1);
         fu.p19 = if high { [env.lens[0], env.lens[1], env.lens[2], env.lens[3]] } else { [0.0, 1.0, 0.0, 0.0] };
         fu.p20 = if high { [env.lens[4], env.lens[5], 0.0, 0.0] } else { [1.0, 0.0, 0.0, 0.0] };
+        fu.p21 = if vol_on { [env.volumetrics[0], env.volumetrics[1], env.volumetrics[2], env.volumetrics[3]] } else { [0.0, 0.6, 24.0, 120.0] };
+        fu.p22 = if vol_on { [env.volumetrics[4], env.volumetrics[5], env.volumetrics[6], env.volumetrics[7]] } else { [1.0, 1.0, 1.0, 0.0] };
         fu.p7 = [if shafts_on { env.shafts } else { 0.0 }, if high { env.grain } else { 0.0 }, if high { env.contrast } else { 1.0 }, if blur_on { env.motion_blur } else { 0.0 }];
         fu.p8 = [if high { env.tint[0] } else { 1.0 }, if high { env.tint[1] } else { 1.0 }, if high { env.tint[2] } else { 1.0 }, (self.fx_frame % 4096) as f32];
         // colour grading and the fade (the high qualities only; the identity otherwise)
@@ -1451,7 +1590,7 @@ impl GpuRenderer {
         fu.prev_view_proj = self.prev_vp.unwrap_or(vp.0);
         self.prev_vp = Some(vp.0);
         fu.p4 = [if shadows_on { sun.expect("checked") as f32 } else { -1.0 }, 1.0, samples as f32, if scene.cam.ortho.is_some() { 1.0 } else { 0.0 }];
-        for (i, l) in scene.lights.iter().take(MAX_LIGHTS).enumerate() {
+        for (i, l) in lights_sel.iter().take(MAX_LIGHTS).enumerate() {
             fu.lights[i * 4] = v4(l.vec, if l.point { 1.0 } else { 0.0 });
             fu.lights[i * 4 + 1] = v4(l.color, l.range);
             // the classic mode draws every spot light as a point light, like the reference renderer
@@ -1507,6 +1646,19 @@ impl GpuRenderer {
         if !splat_bgs.is_empty() {
             self.need(PipeId::MeshSplat, samples, None)?;
         }
+        if !grass_draws.is_empty() {
+            self.need(PipeId::Grass, samples, None)?;
+        }
+        let grass_bgs: Vec<wgpu::BindGroup> = grass_draws
+            .iter()
+            .map(|d| {
+                self.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("grass"),
+                    layout: &self.layouts.grass2,
+                    entries: &[wgpu::BindGroupEntry { binding: 12, resource: self.grass_bufs[d.ubuf].as_entire_binding() }, wgpu::BindGroupEntry { binding: 13, resource: wgpu::BindingResource::TextureView(&self.grass_heights[&d.hkey].0) }],
+                })
+            })
+            .collect();
         if high {
             self.need(PipeId::Sky, samples, None)?;
             if probe_out {
@@ -1748,6 +1900,17 @@ impl GpuRenderer {
                     draw_batches(&mut pass, std::slice::from_ref(b), false, false);
                 }
                 pass.set_pipeline(self.pipe(PipeId::Mesh, samples, None));
+            }
+            if !grass_draws.is_empty() {
+                pass.set_pipeline(self.pipe(PipeId::Grass, samples, None));
+                for (i, d) in grass_draws.iter().enumerate() {
+                    let gm = self.mesh(d.mesh);
+                    pass.set_bind_group(1, &self.tex_bgs[&d.tex], &[]);
+                    pass.set_bind_group(2, &grass_bgs[i], &[]);
+                    pass.set_vertex_buffer(0, gm.vbuf.slice(..));
+                    pass.set_index_buffer(gm.ibuf.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.draw_indexed(0..gm.count, 0, 0..d.instances);
+                }
             }
             if have_clear {
                 pass.set_pipeline(self.pipe(PipeId::MeshBlend, samples, None));
