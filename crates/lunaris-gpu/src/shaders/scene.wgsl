@@ -26,6 +26,8 @@
 
 // What the maps of the mesh being shaded say, handed from `lit_mesh` to `lit_tail` (a negative roughness means "no map": the object's own numbers count).
 var<private> g_ao: f32 = 1.0;
+// How much the surface normal changes across this pixel (set by `lit_mesh`, which has the derivatives): `lit_tail` widens the highlight by it, so that a shiny surface with fine bumps or ripples shimmers less (specular anti-aliasing).
+var<private> g_nvar: f32 = 0.0;
 var<private> g_rough: f32 = -1.0;
 var<private> g_metal: f32 = 0.0;
 
@@ -113,6 +115,7 @@ fn vs_sky(@builtin(vertex_index) i: u32) -> SkyOut {
 @fragment
 fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
     g_pix = in.clip.xy;
+    g_fine = true;
     // the view direction of this pixel: unproject a point on the far plane
     let pa = frame.inv_view_proj * vec4<f32>(in.ndc, 1.0, 1.0);
     let pb = frame.inv_view_proj * vec4<f32>(in.ndc, 0.0001, 1.0);
@@ -495,6 +498,10 @@ fn lit_mesh(in: MeshOut) -> Lit {
         g_rough = clamp(armv.g * o.pbr.w, 0.045, 1.0);
         g_metal = armv.b;
     }
+    // the spread of the normal over the pixel (Kaplanyan / Tokuyoshi): twice the variance of its screen-space slope, capped
+    let dndx = dpdx(n);
+    let dndy = dpdy(n);
+    g_nvar = min(0.5 * (dot(dndx, dndx) + dot(dndy, dndy)), 0.18);
     if (o.misc.z > 0.5 && in.tw > 0.001) {
         if (in.tw > 0.999 && t.a < 0.5) {
             discard;
@@ -554,7 +561,9 @@ fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool
     let aot = textureSampleLevel(ao_tex, lin_samp, uv, 0.0);
     let ao = aot.a * g_ao;
     let metal = select(o.mat.z, g_metal, g_rough >= 0.0);
-    let rough = select(o.mat.w, g_rough, g_rough >= 0.0);
+    // roughness filtered by the pixel's normal spread: alpha^2 grows by it
+    let rough_raw = select(o.mat.w, g_rough, g_rough >= 0.0);
+    let rough = sqrt(clamp(rough_raw * rough_raw + g_nvar, 0.0, 1.0));
     var shadow = 1.0;
     if (i32(frame.p4.x) >= 0) {
         g_pix = in.clip.xy;

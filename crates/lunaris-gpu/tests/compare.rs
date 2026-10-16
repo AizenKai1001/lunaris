@@ -57,17 +57,21 @@ fn load(root: &PathBuf, name: &str, ticks: u64) -> Sim {
     sim
 }
 
-fn gpu_or_skip() -> Option<GpuRenderer> {
-    match GpuRenderer::headless() {
+/// One renderer for every test of this file (they take turns): building one compiles every pipeline it uses, which takes minutes on a machine that draws with the CPU, and a test needs only to
+/// find the renderer as a fresh picture would, which a still always does (its effects start from nothing).
+fn gpu_or_skip() -> Option<std::sync::MutexGuard<'static, GpuRenderer>> {
+    static GPU: std::sync::OnceLock<Option<std::sync::Mutex<GpuRenderer>>> = std::sync::OnceLock::new();
+    let cell = GPU.get_or_init(|| match GpuRenderer::headless() {
         Ok(g) => {
             println!("{}", g.adapter_name());
-            Some(g)
+            Some(std::sync::Mutex::new(g))
         }
         Err(e) => {
             eprintln!("no GPU here ({e}): skipping");
             None
         }
-    }
+    });
+    cell.as_ref().map(|m| m.lock().unwrap_or_else(|e| e.into_inner()))
 }
 
 #[test]

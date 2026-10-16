@@ -64,6 +64,9 @@ for uid, comps in (
     (905, {"HeightFog": {"density": 0.0007, "falloff": 0.05, "height": 6, "color": [0.8, 0.82, 0.86]}}),
 ):
     call("spawn", {"uid": uid, "components": comps})
+# a plain that looks like grass in a photograph: a deep natural green that goes to straw in patches, not the lime of the texture's own colour
+for e in call("query", {"with": ["GrassField"], "select": []}).get("entities", []):
+    call("set", {"uid": e["uid"], "component": "GrassField", "value": {"color_a": [0.5, 0.66, 0.38], "color_b": [0.95, 0.82, 0.52], "patch_size": 90.0, "density": 12.0}})
 # trees and stones on the plain, so that the sun has something to throw shadows with and the haze something to hide: Poly Haven's CC0 models when `tools/fetch_polyhaven_model.py` and
 # `tools/prepare_polyhaven_models.py` have been run (young conifers in threes, boulders, stones, a fallen trunk), the low-poly pine of the caldera example otherwise
 ground = [e["uid"] for e in call("query", {"with": ["Terrain"], "select": []}).get("entities", [])][0]
@@ -100,7 +103,7 @@ shots = (
     ("low", [4.0, gy + 0.55, -3.0], [-60.0, gy + 6.0, 6.0], 58),
     ("back", [0.0, gy + 1.6, 0.0], [80.0, gy + 12.0, -20.0], 64),
 )
-for name, eye, target, fov in shots:
+for name, eye, target, fov in [x for x in shots if x[0] in os.environ.get("ONLY", "sunset,low,back").split(",")]:
     r = call("render", {"quality": "ultra", "width": W, "height": H, "eye": eye, "target": target, "fov": fov, "path": f"showcase_{name}.png", "image": False})
     print(name, r.get("renderer"), r.get("warnings"), r.get("measured"), (r.get("timing_ms") or {}).get("total"))
 proc.stdin.close()

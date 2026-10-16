@@ -41,7 +41,7 @@ def quat(yaw, pitch):
 
 for name, elevation in (("noon", 70.0), ("afternoon", 28.0), ("sunset", 3.0), ("dusk", -4.5)):
     call("reset")
-    call("spawn", {"uid": 1, "components": {"Environment": {"sky": True, "clouds": 0.0, "bloom": 0.35, "bloom_threshold": 1.0, "ssao": 1.0, "shadows": True, "tonemap": 1, "exposure": 1.0, "ground": [0.2, 0.26, 0.14], "fog": 0.00045, "vignette": 0.15}}})
+    call("spawn", {"uid": 1, "components": {"Environment": {"sky": True, "clouds": float(os.environ.get("CLOUDS", "0.0")), "bloom": 0.35, "bloom_threshold": 1.0, "ssao": 1.0, "shadows": True, "tonemap": 1, "exposure": 1.0, "ground": [0.2, 0.26, 0.14], "fog": 0.00045, "vignette": 0.15}}})
     call("spawn", {"uid": 2, "components": {"Light": {"kind": 0, "intensity": 3.2, "color": [1.0, 1.0, 1.0]}, "Transform": {"rot": quat(90.0, -elevation)}}})
     call("spawn", {"uid": 3, "components": {"Atmosphere": {"turbidity": 2.5, "haze_glow": 2.0}}})
     call("spawn", {"uid": 4, "components": {"Shadows": {"softness": 0.03}}})

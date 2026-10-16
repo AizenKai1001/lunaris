@@ -4,14 +4,21 @@ use lunaris_gpu::{GpuRenderer, Quality};
 use lunaris_render::{Frame, RenderOptions, TextureCache};
 use lunaris_sim::Sim;
 
-fn gpu_or_skip() -> Option<GpuRenderer> {
-    match GpuRenderer::headless() {
-        Ok(g) => Some(g),
+/// One renderer for every test of this file (they take turns): building one compiles every pipeline it uses, which takes minutes on a machine that draws with the CPU, and a test needs only to
+/// find the renderer as a fresh picture would, which a still always does (its effects start from nothing).
+fn gpu_or_skip() -> Option<std::sync::MutexGuard<'static, GpuRenderer>> {
+    static GPU: std::sync::OnceLock<Option<std::sync::Mutex<GpuRenderer>>> = std::sync::OnceLock::new();
+    let cell = GPU.get_or_init(|| match GpuRenderer::headless() {
+        Ok(g) => {
+            println!("{}", g.adapter_name());
+            Some(std::sync::Mutex::new(g))
+        }
         Err(e) => {
             eprintln!("no GPU here ({e}): skipping");
             None
         }
-    }
+    });
+    cell.as_ref().map(|m| m.lock().unwrap_or_else(|e| e.into_inner()))
 }
 
 fn draw(gpu: &mut GpuRenderer, entities: &[&str], quality: &Quality, w: u32, h: u32) -> Frame {
@@ -904,4 +911,25 @@ fn ambient_occlusion_leaves_open_ground_alone_and_darkens_a_crease_gradually() {
     // somewhere along a column through the foot of the wall the floor is clearly darker with the occlusion than without
     let dip = (40..230).map(|y| lum(px(&off, 240, y)) - lum(px(&on, 240, y))).fold(0.0f32, f32::max);
     assert!(dip > 6.0, "the floor under the wall is only {dip} darker");
+}
+
+#[test]
+fn clouds_have_a_bright_side_and_a_shaded_underside() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let sky = |clouds: f32| format!(r#"{{"uid":9,"components":{{"Environment":{{"sky":true,"clouds":{clouds},"shadows":false,"ssao":0,"bloom":0,"vignette":0,"tonemap":1,"ambient":1.0}}}}}}"#);
+    // a camera looking up into the sky from the ground, the sun a little to one side
+    let cam = |x: f32| format!(r#"{{"uid":1,"components":{{"Camera":{{"fov_y":70}},"Transform":{{"pos":[{x},2,0],"rot":[0.42,0,0,0.907]}}}}}}"#);
+    let sun = r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3.0},"Transform":{"rot":[-0.3,0.3,0,0.9]}}}"#;
+    let clear = draw(&mut gpu, &[&cam(0.0), sun, &sky(0.0)], &Quality::high(), 320, 180);
+    let cloudy = draw(&mut gpu, &[&cam(0.0), sun, &sky(0.8)], &Quality::high(), 320, 180);
+    let spread = |f: &Frame| {
+        let l: Vec<f32> = f.rgba.chunks(4).map(|p| lum([p[0], p[1], p[2]])).collect();
+        let mean = l.iter().sum::<f32>() / l.len() as f32;
+        (l.iter().map(|v| (v - mean) * (v - mean)).sum::<f32>() / l.len() as f32).sqrt()
+    };
+    // clouds make the sky vary clearly more than the smooth clear one (which has its own sun glow), and have both light and shaded parts
+    assert!(spread(&cloudy) > spread(&clear) * 1.4, "{} vs {}", spread(&cloudy), spread(&clear));
+    let lums: Vec<f32> = cloudy.rgba.chunks(4).map(|p| lum([p[0], p[1], p[2]])).collect();
+    let (lo, hi) = (lums.iter().cloned().fold(f32::MAX, f32::min), lums.iter().cloned().fold(0.0f32, f32::max));
+    assert!(hi > lo + 50.0, "{lo} .. {hi}");
 }

@@ -58,8 +58,58 @@ fn cloud_fbm(p_in: vec2<f32>) -> f32 {
     return s;
 }
 
+// Set by the sky pass only: the clouds seen there are a slab with depth (below); a reflection of the sky in a glossy surface, the sky's light on a mesh and the fog take the cheap flat layer.
+var<private> g_fine: bool = false;
+
+// The density (0 to 1) of the cloud slab at a place of its plane and a height `h` across its thickness (0 the flat base, 1 the top): the noise decides where the clouds are, and the threshold it has to
+// pass rises towards the base and the top, so that a cloud is flat underneath and domed on top.
+fn cloud_density(p: vec2<f32>, h: f32, cover: f32) -> f32 {
+    let n = cloud_fbm(p);
+    let shape = smoothstep(0.0, 0.14, h) * (1.0 - smoothstep(0.4, 1.0, h));
+    return clamp((n - (0.7 - cover * 0.42) - (1.0 - shape) * 0.3) * 4.5, 0.0, 1.0);
+}
+
+// Clouds with depth: six steps through the slab along the view ray (so the clouds shift against each other as the eye moves and show their tops and undersides), and at each a look up the slab
+// towards the sun for how much cloud lies between there and the light. What is thick and shaded is grey, what faces the sun is bright, and the thin edges next to the sun glow (the silver lining).
+fn cloud_slab(dir: vec3<f32>) -> vec4<f32> {
+    let cover = frame.p5.x;
+    if (cover <= 0.001 || dir.y < 0.012) {
+        return vec4<f32>(0.0);
+    }
+    let p0 = dir.xz / (dir.y + 0.2) * 1.5;
+    let across = dir.xz / max(dir.y, 0.05) * 0.35;
+    let sun = normalize(frame.sun_dir.xyz);
+    let sun_xz = sun.xz / max(sun.y, 0.15) * 0.18;
+    let bright = frame.sun_color.rgb * 0.45 + frame.sky_horizon.rgb * 0.8 + vec3<f32>(0.1);
+    let dark = frame.sky_top.rgb * 0.4 + frame.sky_horizon.rgb * 0.3 + frame.ground.rgb * 0.15;
+    let cs = max(dot(dir, sun), 0.0);
+    let jitter = interleaved_noise(g_pix);
+    var trans = 1.0;
+    var col = vec3<f32>(0.0);
+    for (var i = 0; i < 6; i = i + 1) {
+        let h = (f32(i) + jitter) / 6.0;
+        let p = p0 + across * h;
+        let d = cloud_density(p, h, cover);
+        if (d > 0.005) {
+            let ds = cloud_density(p + sun_xz, min(h + 0.25, 1.0), cover) + 0.7 * cloud_density(p + sun_xz * 2.4, min(h + 0.55, 1.0), cover);
+            let lit = exp(-ds * 1.9);
+            let silver = (1.0 - d) * pow(cs, 6.0) * 1.2 * lit;
+            let c = mix(dark, bright, lit) * (0.75 + 0.25 * h) + frame.sun_color.rgb * (silver * 0.5);
+            let a = clamp(d * 0.3, 0.0, 1.0);
+            col = col + c * (trans * a);
+            trans = trans * (1.0 - a);
+        }
+    }
+    let alpha = 1.0 - trans;
+    let fade = smoothstep(0.012, 0.25, dir.y);
+    return vec4<f32>(col / max(alpha, 1.0e-3), alpha * fade);
+}
+
 // A layer of clouds on a plane high above the viewer: rgb colour, a coverage.
 fn cloud_layer(dir: vec3<f32>) -> vec4<f32> {
+    if (g_fine) {
+        return cloud_slab(dir);
+    }
     let cover = frame.p5.x;
     if (cover <= 0.001 || dir.y < 0.012) {
         return vec4<f32>(0.0);
