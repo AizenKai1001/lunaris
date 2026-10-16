@@ -1,0 +1,596 @@
+{
+ "nodes": [
+  {
+   "id": "core",
+   "type": "text",
+   "text": "# Wyrdwood\nAn **original** 3D survival and building game for 1 to 10 players, built on **Lunaris** to find what the engine lacks (like Caldera did).\n\nSeeded archipelago, five Wardens, bases that must stand, stamina fights, boats, weather.\n\nPlan file: `examples/wyrdwood/PLAN.md`",
+   "x": -320,
+   "y": -90,
+   "width": 640,
+   "height": 250,
+   "color": "6"
+  },
+  {
+   "id": "status",
+   "type": "text",
+   "text": "## Where it stands (2026-10-15)\n- Plan written and committed.\n- **Character motion done**: swim, wade, roll, ladders, ledge pull-up (`CharacterMotion`, `Climbable`) and the three Caldera traps fixed (characters report contacts, a `Steer` walks a character, a `Probe` gives scripts the ground and a ray). 12 new tests; every old test, the 51 golden scenes and the 51 playtests unchanged.\n- Next: foot IK, then destruction, then the M1 island.\n- **This board is the editor's Canvas tab** (`lunaris-editor --canvas examples/wyrdwood/wyrdwood.canvas`): it reads Obsidian's canvas files and follows the file when it is saved, so the plan stays on screen while the work goes on.",
+   "x": 400,
+   "y": -90,
+   "width": 560,
+   "height": 250,
+   "color": "4"
+  },
+  {
+   "id": "g_pillars",
+   "type": "group",
+   "label": "The five pillars",
+   "x": -1480,
+   "y": -420,
+   "width": 1000,
+   "height": 640,
+   "color": "5"
+  },
+  {
+   "id": "p1",
+   "type": "text",
+   "text": "**1. Build anywhere, and it has to stand**\nPieces snap; wood and stone carry weight; a wall with nothing under it falls. A base is a place you made.",
+   "x": -1450,
+   "y": -360,
+   "width": 450,
+   "height": 170,
+   "color": "5"
+  },
+  {
+   "id": "p2",
+   "type": "text",
+   "text": "**2. Stamina fights**\nSwing, block, parry, roll. Every blow costs breath. A big animal teaches you to wait.",
+   "x": -970,
+   "y": -360,
+   "width": 450,
+   "height": 170,
+   "color": "5"
+  },
+  {
+   "id": "p3",
+   "type": "text",
+   "text": "**3. The land is the progression**\nNo levels. A region is a wall until you own the tool that opens it.",
+   "x": -1450,
+   "y": -160,
+   "width": 450,
+   "height": 170,
+   "color": "5"
+  },
+  {
+   "id": "p4",
+   "type": "text",
+   "text": "**4. A world that looks like weather**\nFog in valleys, a low red sun, rain on water, firelight on timber. The GPU renderer is the art direction.",
+   "x": -970,
+   "y": -160,
+   "width": 450,
+   "height": 170,
+   "color": "5"
+  },
+  {
+   "id": "p5",
+   "type": "text",
+   "text": "**5. Together, loosely**\n1 to 10 players who may come and go; alone is a full game.",
+   "x": -1450,
+   "y": 40,
+   "width": 450,
+   "height": 170,
+   "color": "5"
+  },
+  {
+   "id": "g_world",
+   "type": "group",
+   "label": "The world: regions gate your tools (a Warden sleeps in each)",
+   "x": -300,
+   "y": -1250,
+   "width": 2780,
+   "height": 560,
+   "color": "4"
+  },
+  {
+   "id": "r1",
+   "type": "text",
+   "text": "**Meadow**\ngreen hills, birches, berries, deer, boars\n+ wood, stone, flint, hide\n! boars, crows\nWarden: the **Moss Colossus**",
+   "x": -270,
+   "y": -1180,
+   "width": 430,
+   "height": 230,
+   "color": "4"
+  },
+  {
+   "id": "r2",
+   "type": "text",
+   "text": "**Gloomwood**\ndense old fir, blue light, mist\n+ bog ore, resin, strong timber\n! wolves, bark-skinned stalkers\nWarden: the **Thornmother**",
+   "x": 185,
+   "y": -1180,
+   "width": 430,
+   "height": 230,
+   "color": "4"
+  },
+  {
+   "id": "r3",
+   "type": "text",
+   "text": "**Moor**\nswamp, rain, rotten water, ruins\n+ peat iron, reeds, bones\n! leeches, mire hounds, sickness\nWarden: the **Drowned Jarl**",
+   "x": 640,
+   "y": -1180,
+   "width": 430,
+   "height": 230,
+   "color": "4"
+  },
+  {
+   "id": "r4",
+   "type": "text",
+   "text": "**Crag**\nmountain, snow, cold that hurts\n+ silver, ice stone\n! frost wolves, cold, rockfall\nWarden: the **Rime Wyrm**",
+   "x": 1095,
+   "y": -1180,
+   "width": 430,
+   "height": 230,
+   "color": "4"
+  },
+  {
+   "id": "r5",
+   "type": "text",
+   "text": "**Barrens**\nash plains, cinder wind\n+ black iron, fire stone\n! raiders, ash storms\nWarden: the **Cinder King**",
+   "x": 1550,
+   "y": -1180,
+   "width": 430,
+   "height": 230,
+   "color": "4"
+  },
+  {
+   "id": "r6",
+   "type": "text",
+   "text": "**Sea**\nopen water between the islands\n+ fish, wrecks, new islands\n! storms, sea beasts\nno Warden",
+   "x": 2005,
+   "y": -1180,
+   "width": 430,
+   "height": 230,
+   "color": "4"
+  },
+  {
+   "id": "r_end",
+   "type": "text",
+   "text": "**The end**: light all five beacons and the road home appears.   **How the world is made**: Tellus (our terrain tool) writes the height tiles, splat pictures, water and forests; Lunaris loads them with `Terrain` + `TerrainLayers` + `WaterBody` + `scatter`. One seed, the same world on every machine.",
+   "x": 520,
+   "y": -930,
+   "width": 1200,
+   "height": 150,
+   "color": "4"
+  },
+  {
+   "id": "loop",
+   "type": "text",
+   "text": "## The loop\n\n**gather** (wood, stone, fibre, berries)\n↓\n**craft** at a station\n↓\n**build** a base, cook, rest\n↓\n**explore** a new region\n↓\n**meet its Warden**\n↓\nbetter tools → next region",
+   "x": -1480,
+   "y": -1250,
+   "width": 1000,
+   "height": 700,
+   "color": "6"
+  },
+  {
+   "id": "g_sys",
+   "type": "group",
+   "label": "Systems and where the engine stands today",
+   "x": -1480,
+   "y": 330,
+   "width": 3000,
+   "height": 900
+  },
+  {
+   "id": "sys_have",
+   "type": "text",
+   "text": "## Have (in the engine now)\n- Terrain, materials, water, floating (`Terrain`, `TerrainLayers`, `WaterBody`, `Buoyant`)\n- **Swim, wade, roll, ladders, ledge pull-up** (`CharacterMotion`, `Climbable`: new, 2026-10-15)\n- Third-person camera with collision (`CameraRig`, `CameraCollide`)\n- Creature parts: `Steer`, `Sensor`, `BehaviorTree`, navigation, spawners\n- Day and night, fog, weather look (`TimeOfDay`, `HeightFog`, GPU high)\n- UI kit v3: bars, drag-and-drop slots, menus\n- Audio mixer; tools: playtests, golden hashes, `profile`",
+   "x": -1450,
+   "y": 380,
+   "width": 940,
+   "height": 800,
+   "color": "4"
+  },
+  {
+   "id": "sys_part",
+   "type": "text",
+   "text": "## Part (exists, not enough)\n- Big world: `StreamZone` streams prefabs; **terrain tile streaming is new**\n- Forests at a distance: instanced meshes exist; occlusion and LOD to measure\n- Combat: `HitPoints`, `Sensor`, contacts; the rules are game content\n- Items and inventory: UI slots exist; item data and rules new\n- Boats: floating exists; a boat controller is new\n- Characters you see: skinned `.glb` works; retargeting and morph targets new\n- Multiplayer: lockstep and rollback to 16 players; **no drop-in**\n- Saves: scenes and snapshots; world-changes save new",
+   "x": -450,
+   "y": 380,
+   "width": 940,
+   "height": 800,
+   "color": "3"
+  },
+  {
+   "id": "sys_new",
+   "type": "text",
+   "text": "## New (to build)\n- **Building with a support graph** (the core of the game)\n- **Destruction**: fell a tree, break a rock, pieces and sound\n- Crafting and stations (spatial query + recipes)\n- Survival loop: food buffs, rest, cold and wet\n- **Snapshot join** for the network (state at tick N + the log)\n- Foot IK on slopes (presentation only)\n- Runtime world generation from a seed (Tellus tiles)",
+   "x": 550,
+   "y": 380,
+   "width": 940,
+   "height": 800,
+   "color": "1"
+  },
+  {
+   "id": "g_ms",
+   "type": "group",
+   "label": "Milestones: each ends with something you can play, a playtest, and screenshots",
+   "x": -1480,
+   "y": 1280,
+   "width": 4040,
+   "height": 600,
+   "color": "6"
+  },
+  {
+   "id": "m1",
+   "type": "text",
+   "text": "**M1 Shore**\n400 m island; walk, run, swim, roll; day and night; fell trees, mine rocks; hotbar, inventory; workbench, axe, hammer; one boar",
+   "x": -1450,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m2",
+   "type": "text",
+   "text": "**M2 Hearth**\nBuild a house from snapping pieces that has to stand; door, fire, bed; rest and cook; save and load",
+   "x": -950,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m3",
+   "type": "text",
+   "text": "**M3 Blood**\nStamina combat with sword, shield, block, parry; boars, wolves, deer; hurt, heal, eat; the first Warden",
+   "x": -450,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m4",
+   "type": "text",
+   "text": "**M4 Wood**\nThe whole island with Meadow and Gloomwood from a seed; thousands of trees; streaming; the second Warden",
+   "x": 50,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m5",
+   "type": "text",
+   "text": "**M5 Together**\n2 to 4 players on a host, one joining mid-game",
+   "x": 550,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m6",
+   "type": "text",
+   "text": "**M6 Sail**\nBuild a boat, sail to a second island with a Moor",
+   "x": 1050,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m7",
+   "type": "text",
+   "text": "**M7 Mountain and ash**\nCrag and Barrens, the last three Wardens, the beacon ending",
+   "x": 1550,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m8",
+   "type": "text",
+   "text": "**M8 Polish**\nMenus, settings, controller, sound, map, 60 fps on the weakest machine tested",
+   "x": 2050,
+   "y": 1460,
+   "width": 470,
+   "height": 220,
+   "color": "1"
+  },
+  {
+   "id": "m0",
+   "type": "text",
+   "text": "**M0 (done)**: the plan. **First target = M1 to M3, the game's first hour.** M4 and M5 are what make it a real engine test (scale and multiplayer); the rest is content on a finished foundation.",
+   "x": -1450,
+   "y": 1330,
+   "width": 3900,
+   "height": 100,
+   "color": "4"
+  },
+  {
+   "id": "g_eng",
+   "type": "group",
+   "label": "Engine work, in order, and which milestone waits for it",
+   "x": -1480,
+   "y": 1930,
+   "width": 4040,
+   "height": 560,
+   "color": "2"
+  },
+  {
+   "id": "w1",
+   "type": "text",
+   "text": "**1. Character toolkit**\nswim, wade, roll, ladders, ledges and the three Caldera traps (contacts, `Steer`, `Probe`): DONE.\nLeft: foot IK (presentation only)",
+   "x": -1450,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "3"
+  },
+  {
+   "id": "w2",
+   "type": "text",
+   "text": "**2. Destruction**\nfelling, breaking rocks, pieces, sound. Cloth waits (sails can be vertex-animated)",
+   "x": -890,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "1"
+  },
+  {
+   "id": "w3",
+   "type": "text",
+   "text": "**3. 3D performance + tile streaming**\ninstancing at forest scale, occlusion, LOD, measured with `profile`",
+   "x": -330,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "1"
+  },
+  {
+   "id": "w4",
+   "type": "text",
+   "text": "**4. Building support graph**\nas game scripts first; into the engine if 2,000 pieces measure too slow",
+   "x": 230,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "1"
+  },
+  {
+   "id": "w5",
+   "type": "text",
+   "text": "**5. Snapshot join**\nfor the network: a player joins mid-game",
+   "x": 790,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "1"
+  },
+  {
+   "id": "w6",
+   "type": "text",
+   "text": "**6. Morph targets + retargeting**\nwhen equipment on bodies is wanted",
+   "x": 1350,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "1"
+  },
+  {
+   "id": "w7",
+   "type": "text",
+   "text": "**7. gpu `high.rs` hang**\nwhenever it blocks",
+   "x": 1910,
+   "y": 1990,
+   "width": 530,
+   "height": 250,
+   "color": "1"
+  },
+  {
+   "id": "rules",
+   "type": "text",
+   "text": "**What I will not claim**: that the Wardens, regions or two kilometres exist before they are played and photographed; that combat or building feels good because it works (every playtest note goes in `docs/DOGFOOD_WYRDWOOD.md`, bad parts included); that multiplayer works until two real windows on two machines finish a session with the same state hash.",
+   "x": -1450,
+   "y": 2270,
+   "width": 3900,
+   "height": 160,
+   "color": "2"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e_r1_r2",
+   "fromNode": "r1",
+   "fromSide": "right",
+   "toNode": "r2",
+   "toSide": "left",
+   "label": "Warden beaten opens"
+  },
+  {
+   "id": "e_r2_r3",
+   "fromNode": "r2",
+   "fromSide": "right",
+   "toNode": "r3",
+   "toSide": "left",
+   "label": "Warden beaten opens"
+  },
+  {
+   "id": "e_r3_r4",
+   "fromNode": "r3",
+   "fromSide": "right",
+   "toNode": "r4",
+   "toSide": "left",
+   "label": "Warden beaten opens"
+  },
+  {
+   "id": "e_r4_r5",
+   "fromNode": "r4",
+   "fromSide": "right",
+   "toNode": "r5",
+   "toSide": "left",
+   "label": "Warden beaten opens"
+  },
+  {
+   "id": "e_core_r1",
+   "fromNode": "core",
+   "fromSide": "top",
+   "toNode": "r1",
+   "toSide": "bottom",
+   "label": "starts here"
+  },
+  {
+   "id": "e_loop_r1",
+   "fromNode": "loop",
+   "fromSide": "right",
+   "toNode": "r1",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m1_m2",
+   "fromNode": "m1",
+   "fromSide": "right",
+   "toNode": "m2",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m2_m3",
+   "fromNode": "m2",
+   "fromSide": "right",
+   "toNode": "m3",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m3_m4",
+   "fromNode": "m3",
+   "fromSide": "right",
+   "toNode": "m4",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m4_m5",
+   "fromNode": "m4",
+   "fromSide": "right",
+   "toNode": "m5",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m5_m6",
+   "fromNode": "m5",
+   "fromSide": "right",
+   "toNode": "m6",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m6_m7",
+   "fromNode": "m6",
+   "fromSide": "right",
+   "toNode": "m7",
+   "toSide": "left"
+  },
+  {
+   "id": "e_m7_m8",
+   "fromNode": "m7",
+   "fromSide": "right",
+   "toNode": "m8",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w1_w2",
+   "fromNode": "w1",
+   "fromSide": "right",
+   "toNode": "w2",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w2_w3",
+   "fromNode": "w2",
+   "fromSide": "right",
+   "toNode": "w3",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w3_w4",
+   "fromNode": "w3",
+   "fromSide": "right",
+   "toNode": "w4",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w4_w5",
+   "fromNode": "w4",
+   "fromSide": "right",
+   "toNode": "w5",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w5_w6",
+   "fromNode": "w5",
+   "fromSide": "right",
+   "toNode": "w6",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w6_w7",
+   "fromNode": "w6",
+   "fromSide": "right",
+   "toNode": "w7",
+   "toSide": "left"
+  },
+  {
+   "id": "e_w1_m1",
+   "fromNode": "w1",
+   "fromSide": "top",
+   "toNode": "m1",
+   "toSide": "bottom",
+   "label": "needs",
+   "color": "2"
+  },
+  {
+   "id": "e_w2_m1",
+   "fromNode": "w2",
+   "fromSide": "top",
+   "toNode": "m1",
+   "toSide": "bottom",
+   "label": "needs",
+   "color": "2"
+  },
+  {
+   "id": "e_w4_m2",
+   "fromNode": "w4",
+   "fromSide": "top",
+   "toNode": "m2",
+   "toSide": "bottom",
+   "label": "needs",
+   "color": "2"
+  },
+  {
+   "id": "e_w3_m4",
+   "fromNode": "w3",
+   "fromSide": "top",
+   "toNode": "m4",
+   "toSide": "bottom",
+   "label": "needs",
+   "color": "2"
+  },
+  {
+   "id": "e_w5_m5",
+   "fromNode": "w5",
+   "fromSide": "top",
+   "toNode": "m5",
+   "toSide": "bottom",
+   "label": "needs",
+   "color": "2"
+  },
+  {
+   "id": "e_core_sys_part",
+   "fromNode": "core",
+   "fromSide": "bottom",
+   "toNode": "sys_part",
+   "toSide": "top",
+   "label": "what it needs"
+  }
+ ]
+}

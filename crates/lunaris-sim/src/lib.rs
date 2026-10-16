@@ -15,6 +15,8 @@ pub mod layers;
 pub mod meshcol;
 pub mod meshcol_gltf;
 pub mod meshcol_shapes;
+pub mod motion;
+pub mod probe;
 pub mod nav;
 pub mod noise;
 pub mod physics;
@@ -48,6 +50,8 @@ pub use sim::{default_threads, register_standard_components, Checkpoint, Event, 
 
 #[cfg(test)]
 mod character_tests;
+#[cfg(test)]
+mod motion_tests;
 #[cfg(test)]
 mod dialogue_tests;
 #[cfg(test)]

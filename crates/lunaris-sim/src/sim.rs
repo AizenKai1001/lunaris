@@ -149,6 +149,8 @@ pub struct Sim {
     pub nav: crate::nav::NavState,
     /// Contacts found by the physics system in the last tick (derived from the state, so not hashed).
     pub contacts: Vec<Contact>,
+    /// What the characters with a `CharacterMotion` touched at the end of the last tick, waiting to be handed to the next one's graph systems (derived, not hashed).
+    pub(crate) char_contacts: Vec<Contact>,
     /// The most recent events emitted by graph systems, oldest first.
     pub events: Vec<Event>,
     /// The workspace folder that the heightmaps of `Terrain` entities are read from (none: terrain has no ground).
@@ -176,7 +178,7 @@ impl Sim {
     pub fn new(seed: u64) -> Sim {
         let mut world = World::new();
         register_standard_components(&mut world);
-        let mut sim = Sim { world, tick: 0, dt: 1.0 / 60.0, seed, rng: Rng::new(seed), threads: default_threads(), scripts: ScriptSet::default(), nav: Default::default(), contacts: Vec::new(), events: Vec::new(), asset_root: None, heightfields: Arc::default(), terrain_errors: Default::default(), meshes: Arc::default(), mesh_errors: Default::default(), mesh_stamps: Default::default(), profile: None, systems: Vec::new(), recording: None, replay_reads: None };
+        let mut sim = Sim { world, tick: 0, dt: 1.0 / 60.0, seed, rng: Rng::new(seed), threads: default_threads(), scripts: ScriptSet::default(), nav: Default::default(), contacts: Vec::new(), char_contacts: Vec::new(), events: Vec::new(), asset_root: None, heightfields: Arc::default(), terrain_errors: Default::default(), meshes: Arc::default(), mesh_errors: Default::default(), mesh_stamps: Default::default(), profile: None, systems: Vec::new(), recording: None, replay_reads: None };
         sim.add_system("ui", systems::ui);
         sim.add_system("wander", systems::wander);
         sim.add_system("particles", systems::particles);
@@ -380,6 +382,7 @@ impl Sim {
         self.scripts = ScriptSet { plugin_root: self.scripts.plugin_root.clone(), wasm: self.scripts.wasm.clone(), ..ScriptSet::default() };
         self.nav = Default::default();
         self.contacts.clear();
+        self.char_contacts.clear();
         self.events.clear();
         self.recording = None;
     }
@@ -433,6 +436,8 @@ impl Sim {
         }
         self.rng = ctx.rng;
         self.contacts = std::mem::take(&mut ctx.contacts);
+        // what the characters touched at the end of the last tick (`CharacterMotion.report_contacts`) is handed to this tick's graph systems like any contact
+        self.contacts.append(&mut self.char_contacts);
         stage!("event resources", crate::gameplay::publish_events(&mut self.world, &self.events, self.tick));
         stage!("input actions", crate::gameplay::actions(&mut self.world));
         stage!("interface widgets", crate::ui_kit::update(&mut self.world, self.tick, self.dt));
@@ -446,7 +451,9 @@ impl Sim {
         // navigation agents choose their walk (after the graph systems, which may give them targets), then characters walk with this
         // tick's input, then attached entities follow their parents after everything else has moved them
         stage!("navigation", crate::nav::step(&mut self.world, &mut self.nav, dt, &self.heightfields, &self.meshes));
-        stage!("characters", crate::character::step(&mut self.world, dt, &self.heightfields, &self.meshes));
+        stage!("characters", {
+            self.char_contacts = crate::character::step(&mut self.world, dt, &self.heightfields, &self.meshes);
+        });
         // the waves' clock, and `InWater` on the characters that now stand in a water body
         stage!("water", {
             crate::water::Water::waves(&mut self.world, dt);
@@ -635,6 +642,7 @@ impl Sim {
         self.scripts.bt = c.bt.clone();
         self.scripts.events.clear();
         self.contacts.clear();
+        self.char_contacts.clear();
         self.events.retain(|e| e.tick < c.tick);
         Ok(())
     }
@@ -852,6 +860,9 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::LensFlare>().expect("standard component");
     world.register_native::<crate::components::ReflectionProbe>().expect("standard component");
     world.register_native::<crate::components::CameraCollide>().expect("standard component");
+    world.register_native::<crate::components::CharacterMotion>().expect("standard component");
+    world.register_native::<crate::components::Climbable>().expect("standard component");
+    world.register_native::<crate::components::Probe>().expect("standard component");
 }
 
 impl RecordedRead {

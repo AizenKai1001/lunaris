@@ -84,3 +84,15 @@ Q W E R tools - F frame the selection - Ctrl+Z / Ctrl+Y undo, redo - Ctrl+D dupl
 `lunaris-editor [scene] [--root DIR] [--seed N] [--size WxH] [--quality classic|low|medium|high|ultra|reference] [--select NAME] [--play] [--mute] [--tab project|console|systems] [--view scene|2d|game] [--shot FILE [--shot-delay SECONDS]]`. `--shot` saves a picture of the window and quits (the documentation and the tests use it). Windows only for now; the engine, the tools and the browser editor below run elsewhere.
 
 ---
+
+## The Canvas tab
+
+A board for plans and maps, in the editor: notes, groups and arrows on an endless surface. The files are `*.canvas` in the JSON Canvas format (the one Obsidian reads and writes: `nodes` of type `text`, `file`, `link` and `group`, and `edges` with a label and a colour), so a canvas made there opens here and the other way round; fields the editor does not know are kept when it saves.
+
+* **Open** one from the list in the tab's toolbar (every `.canvas` file of the workspace), or start the editor with `--canvas FILE` (or `--tab canvas`). The game plan of `examples/wyrdwood/` is one: `lunaris-editor --canvas examples/wyrdwood/wyrdwood.canvas`.
+* **Move around**: drag the background (or the middle button) to pan, scroll to zoom around the pointer, `F` or the **Fit** button shows the whole board. Far away a note shows only its first line, so the shape of the board still says what is where.
+* **Edit**: click a note, then change its text (a little Markdown: `#` headings, `-` bullets, `**bold**`, `` `code` ``, `[[links]]` shown as their text), colour (Obsidian's six presets), position and size in the **Details** panel; drag a note to move it (dragging a group takes what is inside it); **+ Note** and **+ Group** add one in the middle of the view; right-click the board for a note where the pointer is; `Delete` removes the selected note and its arrows. `Ctrl+S` or **Save** writes the file.
+* **Notes** (the left panel) lists the notes in order with a search box: click one to select it and bring it to the middle.
+* **It follows the file**: when another program saves the open canvas (an agent keeping a plan up to date) and the board has no unsaved changes, the editor reads it again and keeps the view and the selection. With unsaved changes of its own it never throws them away.
+
+Arrows are drawn and shown in the Details of the notes they join; they are not edited in the editor yet (edit them in the file or in Obsidian). Code: `crates/lunaris-studio/src/canvas_ui.rs`.

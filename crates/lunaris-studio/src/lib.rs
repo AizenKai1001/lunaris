@@ -6,6 +6,7 @@
 mod app;
 mod blueprint;
 mod blueprint_ui;
+mod canvas_ui;
 mod center;
 mod chrome;
 mod code_edit;
@@ -34,7 +35,7 @@ mod ui_tests;
 
 pub use state::Options;
 
-pub const USAGE: &str = "lunaris-editor [scene.lunaris.json] [--root DIR] [--seed N] [--size WxH] [--quality classic|low|medium|high|ultra|reference] [--select NAME|UID] [--play] [--mute] [--tab project|console|systems|script|blueprint|ui] [--script FILE.lun] [--system NAME] [--build GAME.exe] [--view scene|2d|game] [--shot FILE [--shot-delay SECONDS]]";
+pub const USAGE: &str = "lunaris-editor [scene.lunaris.json] [--root DIR] [--seed N] [--size WxH] [--quality classic|low|medium|high|ultra|reference] [--select NAME|UID] [--play] [--mute] [--tab project|console|systems|script|blueprint|ui|canvas] [--canvas FILE.canvas] [--script FILE.lun] [--system NAME] [--build GAME.exe] [--view scene|2d|game] [--shot FILE [--shot-delay SECONDS]]";
 
 /// Read the command line (without the program name).
 pub fn parse_args(args: &[String]) -> Result<Options, String> {
@@ -62,6 +63,7 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
             "--script" => o.script = Some(value("--script")?),
             "--build" => o.build = Some(std::path::PathBuf::from(value("--build")?)),
             "--view" => o.view = Some(value("--view")?),
+            "--canvas" => o.canvas = Some(value("--canvas")?),
             s if s.starts_with("--") => return Err(format!("unknown option {s}")),
             s => o.scene = Some(s.to_string()),
         }

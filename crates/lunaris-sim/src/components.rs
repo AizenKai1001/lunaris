@@ -1832,3 +1832,91 @@ component! {
         pub min_distance: f32 = 0.9,
     }
 }
+
+// ------------------------------------------------------------------------------------------------ character motion
+// Swimming, rolling, ladders and ledges for `CharacterBody` (docs/GAMEPLAY.md, "Character motion"; the work is `motion.rs`, called from `character.rs`). New components, never fields of `CharacterBody`: a world
+// without them is bit for bit what it was. Kept at the end of the file.
+
+component! {
+    /// More ways to move for a `CharacterBody` (put it beside one; docs/GAMEPLAY.md, "Character motion"). **Water**: in a `WaterBody` the character wades while the surface is less than `swim_depth` metres above its
+    /// feet (its `walk` is slowed down to `wade_speed` times at that depth, in proportion on the way) and swims from there on: no gravity, the feet rest `float_depth` metres under the surface (the shoulders at it),
+    /// the horizontal speed is at most `swim_speed`, and `vertical` (-1 to 1, set by a graph system) dives (negative) or rises (positive) at `dive_speed`; it cannot rise above its floating height. **Roll**: set `roll`
+    /// (a request, cleared every tick) on the ground and the character rolls for `roll_time` seconds along `walk` (or, with no `walk`, along `roll_dir`), at `roll_speed` metres per second slowing down to a quarter, deaf
+    /// to `walk` and `jump` until it is over; then `roll_cooldown` seconds must pass before the next one. The engine says `rolling` and `roll_left`: a game makes the roll untouchable by reading them (the engine
+    /// does not touch `HitPoints`). **Ladders** (a `Climbable`): a character that walks into one, or pushes `vertical` while at it, grabs it and climbs with `vertical` at `climb_speed` times the ladder's `speed`;
+    /// `jump` lets go, going down to the ground lets go, and at the top it steps onto whatever is behind the ladder. **Ledges**: `jump` against a ledge that is higher than `step_height` and at most `mantle_height`
+    /// above the feet pulls the character up onto it in `mantle_time` seconds (and a swimmer pushing against a bank does the same, so a lake can be left over a dock or a rock). Everything the engine writes
+    /// (`wading`, `swimming`, `under`, `depth`, `rolling`, `roll_left`, `climbing`, `ladder`, `mantling`, and the rest) is rewritten every tick: read it, leave it alone. **Contacts**: with `report_contacts` (on by default) the solid things the character touches (a wall, the ground, a crate, a terrain) are reported like physics contacts (from the character to the thing, so `on_contact` sees them), one tick late. All of it is deterministic.
+    pub struct CharacterMotion {
+        pub swim_depth: f32 = 1.1,
+        pub float_depth: f32 = 1.35,
+        pub swim_speed: f32 = 2.4,
+        pub dive_speed: f32 = 2.0,
+        pub wade_speed: f32 = 0.7,
+        pub roll_speed: f32 = 7.0,
+        pub roll_time: f32 = 0.6,
+        pub roll_cooldown: f32 = 0.25,
+        pub climb_speed: f32 = 2.0,
+        pub mantle_height: f32 = 1.6,
+        pub mantle_time: f32 = 0.55,
+        pub vertical: f32 = 0.0,
+        pub roll: bool = false,
+        pub roll_dir: [f32; 2] = [0.0, 0.0],
+        pub depth: f32 = 0.0,
+        pub wading: bool = false,
+        pub swimming: bool = false,
+        pub under: bool = false,
+        pub rolling: bool = false,
+        pub roll_left: f32 = 0.0,
+        pub roll_wait: f32 = 0.0,
+        pub climbing: bool = false,
+        pub ladder: Uid = Uid(0),
+        pub climb_lock: f32 = 0.0,
+        pub mantling: bool = false,
+        pub mantle_left: f32 = 0.0,
+        pub mantle_from: [f32; 3] = [0.0, 0.0, 0.0],
+        pub mantle_to: [f32; 3] = [0.0, 0.0, 0.0],
+        pub report_contacts: bool = true,
+    }
+}
+
+component! {
+    /// A ladder, a rope or a climbable wall for a `CharacterBody` that has a `CharacterMotion` (docs/GAMEPLAY.md, "Character motion"). The entity's `Transform.pos` is the **foot** of the ladder (its bottom,
+    /// in the middle) and its `Transform.rot` turns it: the side a climber stands on is the entity's local +z. The ladder is `width` metres wide and `height` metres tall; a character within `reach` metres in front of
+    /// it (and over the width and the height) can grab it. `speed` multiplies the climber's `climb_speed`. It has no shape of its own: put a model and, if it should be solid, a `Collider` beside it.
+    pub struct Climbable {
+        pub height: f32 = 3.0,
+        pub width: f32 = 0.8,
+        pub reach: f32 = 0.7,
+        pub speed: f32 = 1.0,
+    }
+}
+
+component! {
+    /// Eyes for graph systems and scripts (docs/GAMEPLAY.md, "Probe"): a system cannot cast a ray or ask the terrain, but it can read this. Every tick, after the physics step and before the graph systems, the engine
+    /// looks **down** from `up` metres above the entity's `Transform` (at most `depth` metres) and writes `over_ground`, the height of the first solid it meets in `ground` (terrain, a mesh level, a box, anything the entity
+    /// collides with by `CollisionLayer`; bodies that move are not ground), its unit `ground_normal` (so `ground_normal.y` is how flat it is) and its entity in `ground_uid`; and `wet` with the height of the water's
+    /// `surface` when the entity's x and z are over a `WaterBody`. With `ray_max` above 0 it also casts a ray from `ray_from` (metres from the entity, turned by its rotation when `ray_local` is set) along `ray_dir`
+    /// (a direction, any length) and writes `hit`, `hit_dist`, `hit_point`, `hit_normal` and `hit_uid`: the same answers `raycast` gives, but where a system can use them (put a pick-up on the ground, stop a
+    /// projectile at a wall, see whether a ledge is ahead). It sees what a wheel sees: static solids, not characters or moving bodies (use a `Sensor` for those), and not the entity itself. Cheap: a world with no
+    /// `Probe` pays nothing.
+    pub struct Probe {
+        pub up: f32 = 2.0,
+        pub depth: f32 = 100.0,
+        pub ray_from: [f32; 3] = [0.0, 1.0, 0.0],
+        pub ray_dir: [f32; 3] = [0.0, 0.0, -1.0],
+        pub ray_max: f32 = 0.0,
+        pub ray_local: bool = false,
+        pub over_ground: bool = false,
+        pub ground: f32 = 0.0,
+        pub ground_normal: [f32; 3] = [0.0, 1.0, 0.0],
+        pub ground_uid: Uid = Uid(0),
+        pub wet: bool = false,
+        pub surface: f32 = 0.0,
+        pub hit: bool = false,
+        pub hit_dist: f32 = 0.0,
+        pub hit_point: [f32; 3] = [0.0, 0.0, 0.0],
+        pub hit_normal: [f32; 3] = [0.0, 1.0, 0.0],
+        pub hit_uid: Uid = Uid(0),
+    }
+}

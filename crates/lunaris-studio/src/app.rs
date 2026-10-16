@@ -9,6 +9,7 @@ use crate::inspector::InspectorUi;
 use crate::console::ConsoleUi;
 use crate::panels::SystemsUi;
 use crate::blueprint_ui::BlueprintEditor;
+use crate::canvas_ui::CanvasUi;
 use crate::script_ui::ScriptEditor;
 use crate::ui_designer::UiDesigner;
 use crate::project::ProjectUi;
@@ -55,6 +56,7 @@ pub struct App {
     pub(crate) script: ScriptEditor,
     pub(crate) blueprint: BlueprintEditor,
     pub(crate) designer: UiDesigner,
+    pub(crate) canvas: CanvasUi,
     pub(crate) show_hierarchy: bool,
     pub(crate) show_inspector: bool,
     pub(crate) show_bottom: bool,
@@ -97,6 +99,7 @@ impl App {
             Some("script") => studio.center = Center::Script,
             Some("blueprint") => studio.center = Center::Blueprint,
             Some("ui") => studio.center = Center::Ui,
+            Some("canvas") => studio.center = Center::Canvas,
             _ => {}
         }
         let mut script = ScriptEditor::default();
@@ -110,6 +113,12 @@ impl App {
             studio.center = Center::Script;
             script.open_path(&mut studio, std::path::Path::new(file));
         }
+        let mut canvas = CanvasUi::default();
+        canvas.set_root(&opts.root);
+        if let Some(file) = &opts.canvas {
+            studio.center = Center::Canvas;
+            canvas.open(file);
+        }
         let mut app = App {
             studio,
             viewport,
@@ -121,6 +130,7 @@ impl App {
             script,
             blueprint,
             designer: UiDesigner::default(),
+            canvas,
             show_hierarchy: true,
             show_inspector: true,
             show_bottom: true,
@@ -742,6 +752,9 @@ impl App {
                 } else if self.studio.center == Center::Ui {
                     chrome::tab_strip(ui, &[(0, "Palette  /  Hierarchy")], 0, |_| {});
                     chrome::body().show(ui, |ui| self.designer.left_panel(ui, &mut self.studio));
+                } else if self.studio.center == Center::Canvas {
+                    chrome::tab_strip(ui, &[(0, "Notes")], 0, |_| {});
+                    chrome::body().show(ui, |ui| self.canvas.outline(ui));
                 } else {
                     chrome::tab_strip(ui, &[(0, "Hierarchy")], 0, |_| {});
                     chrome::body().show(ui, |ui| self.hierarchy.show(ui, &mut self.studio, at));
@@ -756,6 +769,9 @@ impl App {
                 } else if self.studio.center == Center::Ui {
                     chrome::tab_strip(ui, &[(0, "Details")], 0, |_| {});
                     chrome::body().show(ui, |ui| egui::ScrollArea::vertical().id_salt("ui-details").auto_shrink([false, false]).show(ui, |ui| self.designer.details(ui, &mut self.studio)));
+                } else if self.studio.center == Center::Canvas {
+                    chrome::tab_strip(ui, &[(0, "Details")], 0, |_| {});
+                    chrome::body().show(ui, |ui| egui::ScrollArea::vertical().id_salt("canvas-details").auto_shrink([false, false]).show(ui, |ui| self.canvas.details(ui)));
                 } else {
                     chrome::tab_strip(ui, &[(0, "Inspector")], 0, |_| {});
                     chrome::body().show(ui, |ui| self.inspector.show(ui, &mut self.studio));
@@ -783,6 +799,7 @@ impl App {
                         crate::center::CenterTab::Script => self.studio.center = Center::Script,
                         crate::center::CenterTab::Blueprint => self.studio.center = Center::Blueprint,
                         crate::center::CenterTab::Ui => {}
+                        crate::center::CenterTab::Canvas => self.studio.center = Center::Canvas,
                     }
                     if matches!(t, crate::center::CenterTab::Game | crate::center::CenterTab::Scene) {
                         self.studio.center = Center::View;
@@ -810,6 +827,7 @@ impl App {
                         crate::center::CenterTab::Script => self.studio.center = Center::Script,
                         crate::center::CenterTab::Ui => self.studio.center = Center::Ui,
                         crate::center::CenterTab::Blueprint => {}
+                        crate::center::CenterTab::Canvas => self.studio.center = Center::Canvas,
                     }
                     if matches!(t, crate::center::CenterTab::Game | crate::center::CenterTab::Scene) {
                         self.studio.center = Center::View;
@@ -817,6 +835,25 @@ impl App {
                 }
                 if self.studio.center == Center::Blueprint {
                     self.blueprint.show(ui, &mut self.studio);
+                }
+            }
+            Center::Canvas => {
+                let strip = crate::center::strip(ui, crate::center::CenterTab::Canvas, |_| {});
+                if let Some(t) = strip {
+                    match t {
+                        crate::center::CenterTab::Game => self.viewport.set_kind(crate::viewport::ViewKind::Game),
+                        crate::center::CenterTab::Scene => self.viewport.set_kind(crate::viewport::ViewKind::Scene),
+                        crate::center::CenterTab::Script => self.studio.center = Center::Script,
+                        crate::center::CenterTab::Blueprint => self.studio.center = Center::Blueprint,
+                        crate::center::CenterTab::Ui => self.studio.center = Center::Ui,
+                        crate::center::CenterTab::Canvas => {}
+                    }
+                    if matches!(t, crate::center::CenterTab::Game | crate::center::CenterTab::Scene) {
+                        self.studio.center = Center::View;
+                    }
+                }
+                if self.studio.center == Center::Canvas {
+                    self.canvas.show(ui);
                 }
             }
             Center::Script => {
@@ -831,6 +868,7 @@ impl App {
                         crate::center::CenterTab::Game => self.viewport.set_kind(crate::viewport::ViewKind::Game),
                         crate::center::CenterTab::Scene => self.viewport.set_kind(crate::viewport::ViewKind::Scene),
                         crate::center::CenterTab::Script => {}
+                        crate::center::CenterTab::Canvas => self.studio.center = Center::Canvas,
                         crate::center::CenterTab::Blueprint => self.studio.center = Center::Blueprint,
                         crate::center::CenterTab::Ui => self.studio.center = Center::Ui,
                     }

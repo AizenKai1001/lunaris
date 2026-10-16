@@ -246,6 +246,7 @@ impl Viewport {
                 crate::center::CenterTab::Script => self.goto = Some(crate::state::Center::Script),
                 crate::center::CenterTab::Blueprint => self.goto = Some(crate::state::Center::Blueprint),
                 crate::center::CenterTab::Ui => self.goto = Some(crate::state::Center::Ui),
+                crate::center::CenterTab::Canvas => self.goto = Some(crate::state::Center::Canvas),
                 _ => {
                     self.kind = if t == crate::center::CenterTab::Game { ViewKind::Game } else if self.kind == ViewKind::Scene2D { ViewKind::Scene2D } else { ViewKind::Scene };
                     self.forced = true;

@@ -30,6 +30,8 @@ pub struct Options {
     /// Which bottom tab and which view to start with (for pictures): `project`, `console`, `systems`; `scene`, `2d`, `game`.
     pub tab: Option<String>,
     pub view: Option<String>,
+    /// Open this canvas file (`*.canvas`) in the Canvas tab at start.
+    pub canvas: Option<String>,
     /// Open this graph system in the Systems tab at start.
     pub system: Option<String>,
     /// Build the scene as a game (the program's path) without opening a window.
@@ -40,7 +42,7 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { scene: None, root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")), seed: 1, size: (1600.0, 900.0), size_given: false, quality: "high".to_string(), shot: None, shot_delay: 2.0, select: None, play: false, mute: false, tab: None, view: None, system: None, build: None, script: None }
+        Options { scene: None, root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")), seed: 1, size: (1600.0, 900.0), size_given: false, quality: "high".to_string(), shot: None, shot_delay: 2.0, select: None, play: false, mute: false, tab: None, view: None, system: None, build: None, script: None, canvas: None }
     }
 }
 
@@ -51,6 +53,7 @@ pub enum Center {
     Ui,
     Blueprint,
     Script,
+    Canvas,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -224,6 +227,9 @@ pub struct Studio {
     pub prefabs: Vec<String>,
     pub quit: bool,
     next_refresh: Option<Instant>,
+    /// When the scene file had the modification time we know of (what we loaded or saved), and when to look again.
+    scene_stamp: Option<std::time::SystemTime>,
+    next_disk_check: Option<Instant>,
     pub rows_dirty: bool,
 }
 
@@ -267,6 +273,8 @@ impl Studio {
             prefabs: Vec::new(),
             quit: false,
             next_refresh: None,
+            scene_stamp: None,
+            next_disk_check: None,
             rows_dirty: true,
         };
         if let Some(p) = s.opts.scene.clone() {
@@ -336,6 +344,7 @@ impl Studio {
 
     /// Bring the hierarchy and the selected entity up to date with the engine. Cheap when nothing changed.
     pub fn sync(&mut self) {
+        self.follow_disk();
         let rev = self.engine.call("revision", &Json::Null).ok().and_then(|r| r.get("revision").and_then(|v| v.as_u64())).unwrap_or(0);
         let tick = self.engine.sim.tick;
         let playing = self.mode != Mode::Edit;
@@ -351,6 +360,36 @@ impl Studio {
         }
         self.tick = tick;
         self.refresh_entity();
+    }
+
+    /// The modification time of the scene file on disk, when there is one.
+    fn scene_mtime(&self) -> Option<std::time::SystemTime> {
+        let p = self.scene.as_ref()?;
+        std::fs::metadata(self.opts.root.join(p)).and_then(|m| m.modified()).ok()
+    }
+
+    /// The scene file was changed by another program (an agent saving the world it works on, a script that builds the scene): load it again, so that what the person
+    /// watches follows the work. Only while editing and only when the editor has no unsaved changes of its own (those are never thrown away), and at most twice a second.
+    fn follow_disk(&mut self) {
+        if self.mode != Mode::Edit || self.dirty {
+            return;
+        }
+        if !self.next_disk_check.is_none_or(|t| Instant::now() >= t) {
+            return;
+        }
+        self.next_disk_check = Some(Instant::now() + std::time::Duration::from_millis(500));
+        let (Some(stamp), Some(now)) = (self.scene_stamp, self.scene_mtime()) else { return };
+        if now == stamp {
+            return;
+        }
+        let (selected, path) = (self.selection, self.scene.clone());
+        if let Some(p) = path {
+            self.open_scene(&p);
+            if self.scene_stamp != Some(stamp) {
+                self.select(selected);
+                self.toast("Scene reloaded: the file changed on disk", false);
+            }
+        }
     }
 
     pub fn refresh_rows(&mut self) {
@@ -546,6 +585,7 @@ impl Studio {
         match self.call("load_scene", Self::obj(vec![("path", Json::str(rel.clone()))])) {
             Ok(_) => {
                 self.scene = Some(rel);
+                self.scene_stamp = self.scene_mtime();
                 self.dirty = false;
                 self.selection = None;
                 self.entity = None;
@@ -597,6 +637,7 @@ impl Studio {
         match self.call("save_scene", Self::obj(vec![("path", Json::str(rel.clone()))])) {
             Ok(_) => {
                 self.scene = Some(rel);
+                self.scene_stamp = self.scene_mtime();
                 self.dirty = false;
                 self.toast("Scene saved", false);
                 true

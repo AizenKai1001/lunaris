@@ -9,8 +9,10 @@
 //! as it is and, when a low obstacle blocks it, again lifted by `step_height` (stairs, kerbs) keeping whichever got further; the
 //! vertical move comes last; and after every move the capsule is pushed out of whatever it overlaps, which is what makes it slide
 //! along walls. Everything is f32 with only `+ - * / sqrt`, in a fixed order, so results are identical on every machine.
-use crate::components::{CharacterBody, Collider, PhysicsSettings, Terrain, Transform};
+use crate::physics::Contact;
+use crate::components::{CharacterBody, CharacterMotion, Climbable, Collider, PhysicsSettings, Steer, Terrain, Transform, Velocity};
 use crate::layers::{Filter, Layers};
+use crate::motion::{self, Ladder};
 use crate::meshcol::{MeshStore, PlacedMesh};
 use crate::terrain::{Placed, Terrains};
 use lunaris_ecs::{Entity, World};
@@ -30,6 +32,8 @@ enum Shape {
 }
 
 struct Obstacle {
+    /// The entity it is.
+    uid: u64,
     centre: V3,
     shape: Shape,
     /// Its collision layer (`CollisionLayer`): a character walks through what it does not collide with.
@@ -45,7 +49,7 @@ fn cell(v: f32) -> i32 {
 }
 
 /// The obstacles of the world, in a grid over the ground plane (x, z) so that a character only looks at what is near it.
-struct Grid<'a> {
+pub(crate) struct Grid<'a> {
     obstacles: Vec<Obstacle>,
     cells: HashMap<(i32, i32), Vec<usize>>,
     placed: Vec<Placed<'a>>,
@@ -244,7 +248,7 @@ fn depenetrate(pos: &mut V3, r: f32, height: f32, grid: &Grid<'_>, near: &mut Ve
 }
 
 /// Does the capsule at `pos` lean on terrain that is steeper than `min_up` allows (the cosine of the steepest walkable slope)?
-fn too_steep(pos: V3, r: f32, height: f32, grid: &Grid<'_>, min_up: f32) -> bool {
+pub(crate) fn too_steep(pos: V3, r: f32, height: f32, grid: &Grid<'_>, min_up: f32) -> bool {
     let probe = [pos[0], pos[1] - 0.02, pos[2]];
     grid.obstacles.iter().filter(|o| !grid.layered || grid.who.collides(o.filter)).any(|o| match o.shape {
         Shape::Terrain(_) => overlap(probe, r, height, o, &grid.placed, &grid.meshes).is_some_and(|(n, d)| d > EPS && n[1] < min_up),
@@ -258,13 +262,13 @@ fn too_steep(pos: V3, r: f32, height: f32, grid: &Grid<'_>, min_up: f32) -> bool
 }
 
 /// Is the capsule at `pos` overlapping anything?
-fn blocked(pos: V3, r: f32, height: f32, grid: &Grid<'_>, near: &mut Vec<usize>) -> bool {
+pub(crate) fn blocked(pos: V3, r: f32, height: f32, grid: &Grid<'_>, near: &mut Vec<usize>) -> bool {
     grid.near(pos[0], pos[2], r + EPS, near);
     near.iter().any(|&i| overlap(pos, r, height, &grid.obstacles[i], &grid.placed, &grid.meshes).is_some_and(|(_, d)| d > 0.002))
 }
 
 /// Lower the (free) capsule at `pos` by up to `drop` until it touches something. Returns the new position and whether it touched.
-fn lower_to_contact(pos: V3, drop: f32, r: f32, height: f32, grid: &Grid<'_>, near: &mut Vec<usize>) -> (V3, bool) {
+pub(crate) fn lower_to_contact(pos: V3, drop: f32, r: f32, height: f32, grid: &Grid<'_>, near: &mut Vec<usize>) -> (V3, bool) {
     let at = |d: f32| [pos[0], pos[1] - d, pos[2]];
     if !blocked(at(drop), r, height, grid, near) {
         return (at(drop), false);
@@ -282,11 +286,14 @@ fn lower_to_contact(pos: V3, drop: f32, r: f32, height: f32, grid: &Grid<'_>, ne
     (at(lo), true)
 }
 
-pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshStore) {
+/// Move the characters. Returns the solid contacts of the characters that have a `CharacterMotion` with `report_contacts` (a normal like a physics contact's: from the character to what it touches): the
+/// simulation hands them to the graph systems of the next tick, so that `on_contact` sees a character that walks into a wall, which physics contacts never did.
+pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshStore) -> Vec<Contact> {
+    let mut reported: Vec<Contact> = Vec::new();
     // ---- the characters (uid order); nothing to do without them
     let mut chars: Vec<(u64, Entity, Transform, CharacterBody)> = Vec::new();
     if world.for_each_uid::<(&Transform, &CharacterBody), _>(|e, uid, (t, c)| chars.push((uid, e, *t, *c))).is_err() || chars.is_empty() {
-        return;
+        return reported;
     }
     chars.sort_by_key(|c| c.0);
     // ---- the obstacles: every solid collider that is not a character
@@ -306,7 +313,7 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
         }
         let s = [t.scale[0].abs(), t.scale[1].abs(), t.scale[2].abs()];
         let shape = if c.shape == 0 { Shape::Sphere(0.5 * c.size[0].abs() * s[0].max(s[1]).max(s[2])) } else { Shape::Box([0.5 * c.size[0].abs() * s[0], 0.5 * c.size[1].abs() * s[1], 0.5 * c.size[2].abs() * s[2]]) };
-        obstacles.push(Obstacle { centre: t.pos, shape, filter: layers.of(uid) });
+        obstacles.push(Obstacle { uid, centre: t.pos, shape, filter: layers.of(uid) });
     }
     // the ground made from heightmaps
     let mut placed: Vec<Placed> = Vec::new();
@@ -323,7 +330,7 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
             let p = Placed::new(field, t.pos, &g);
             let (lo, hi) = p.y_range();
             placed.push(p);
-            obstacles.push(Obstacle { centre: [p.centre[0], (lo + hi) * 0.5, p.centre[1]], shape: Shape::Terrain(placed.len() - 1), filter: layers.of(uid) });
+            obstacles.push(Obstacle { uid, centre: [p.centre[0], (lo + hi) * 0.5, p.centre[1]], shape: Shape::Terrain(placed.len() - 1), filter: layers.of(uid) });
         }
     }
     // the level geometry of mesh colliders (a world without any has an empty store)
@@ -335,12 +342,12 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
                 continue;
             }
             let b = h.bounds();
-            obstacles.push(Obstacle { centre: b.centre(), shape: Shape::Box(b.half()), filter: layers.of(h.uid) });
+            obstacles.push(Obstacle { uid: h.uid, centre: b.centre(), shape: Shape::Box(b.half()), filter: layers.of(h.uid) });
         }
         for inst in mesh_store.instances(world) {
             meshes.push(inst.placed.clone());
             let c = inst.placed.bounds.centre();
-            obstacles.push(Obstacle { centre: c, shape: Shape::Mesh(meshes.len() - 1), filter: layers.of(inst.uid) });
+            obstacles.push(Obstacle { uid: inst.uid, centre: c, shape: Shape::Mesh(meshes.len() - 1), filter: layers.of(inst.uid) });
         }
     }
     let mut grid = Grid::new(obstacles, placed, meshes, !layers.is_empty());
@@ -349,8 +356,31 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
     ps.sort_by_key(|p| p.0);
     let gravity = ps.first().map(|p| p.2.gravity[1]).unwrap_or(-9.8);
     let mut near: Vec<usize> = Vec::new();
+    // the characters that swim, roll and climb (`CharacterMotion`), the ladders they climb and the water they swim in: none of it is looked at in a world without them
+    let mut motions: HashMap<u64, CharacterMotion> = HashMap::new();
+    let _ = world.for_each_uid::<(&CharacterMotion,), _>(|_, uid, (m,)| {
+        motions.insert(uid, *m);
+    });
+    let mut ladders: Vec<Ladder> = Vec::new();
+    let mut waters = Vec::new();
+    // a `Steer` on a character with a motion walks it: its walk is the velocity the steering worked out (on the ground plane), and the velocity is then what the character really did
+    let mut steered: HashMap<u64, [f32; 2]> = HashMap::new();
+    if !motions.is_empty() {
+        let _ = world.for_each_uid::<(&Steer, &Velocity), _>(|_, uid, (s, v)| {
+            if s.active && s.plane == 0 && motions.contains_key(&uid) {
+                steered.insert(uid, [v.lin[0], v.lin[2]]);
+            }
+        });
+        let _ = world.for_each_uid::<(&Transform, &Climbable), _>(|_, uid, (t, l)| ladders.push(Ladder { uid, pos: t.pos, rot: t.rot, c: *l }));
+        ladders.sort_by_key(|l| l.uid);
+        waters = crate::water::bodies(world, terrains);
+    }
 
     for (uid, entity, t, c) in chars {
+        let mut c = c;
+        if let Some(w) = steered.get(&uid) {
+            c.walk = *w;
+        }
         grid.who = layers.of(uid);
         let r = c.radius.abs().clamp(0.02, 50.0);
         let height = c.height.abs().max(2.0 * r);
@@ -359,17 +389,44 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
         let mut pos = t.pos;
         let mut fall = c.fall;
         let mut grounded = c.grounded;
+        let (mut walk, mut jump, mut gravity_on) = (c.walk, c.jump, true);
+        // ---- swimming, rolling, climbing and being pulled up a ledge decide what this tick's walk, jump and gravity are
+        let mut motion = motions.get(&uid).copied();
+        if let Some(m) = motion.as_mut() {
+            let surface = crate::water::surface_at(&waters, terrains, world.strings(), pos[0], pos[2]).map(|s| s.0);
+            let plan = {
+                let env = motion::Env { grid: &grid, r, height, step_h, min_up, dt, surface, ladders: &ladders };
+                motion::pre(m, &c, pos, grounded, fall, &env)
+            };
+            (walk, jump, gravity_on, fall) = (plan.walk, plan.jump, plan.gravity, plan.fall);
+            if let Some(at) = plan.carried {
+                if let Some(tr) = world.get_mut::<Transform>(entity) {
+                    tr.pos = at;
+                }
+                if let Some(cb) = world.get_mut::<CharacterBody>(entity) {
+                    cb.fall = 0.0;
+                    cb.grounded = false;
+                    cb.jump = 0.0;
+                }
+                if let Some(cm) = world.get_mut::<CharacterMotion>(entity) {
+                    *cm = *m;
+                }
+                continue;
+            }
+        }
         // ---- vertical speed
         if grounded && fall < 0.0 {
             fall = 0.0;
         }
-        fall += gravity * c.gravity_scale * dt;
-        if c.jump > 0.0 && grounded {
-            fall = c.jump;
+        if gravity_on {
+            fall += gravity * c.gravity_scale * dt;
+        }
+        if jump > 0.0 && grounded {
+            fall = jump;
             grounded = false;
         }
         // ---- horizontal move, plain and lifted over a step; keep the one that got further
-        let delta = [if c.walk[0].is_finite() { c.walk[0] * dt } else { 0.0 }, 0.0, if c.walk[1].is_finite() { c.walk[1] * dt } else { 0.0 }];
+        let delta = [if walk[0].is_finite() { walk[0] * dt } else { 0.0 }, 0.0, if walk[1].is_finite() { walk[1] * dt } else { 0.0 }];
         if delta[0] != 0.0 || delta[2] != 0.0 {
             let mut plain = [pos[0] + delta[0], pos[1], pos[2] + delta[2]];
             depenetrate(&mut plain, r, height, &grid, &mut near, min_up);
@@ -411,7 +468,7 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
             fall = 0.0;
         }
         // ---- stay on the ground going down stairs and slopes, and find the ground when standing still
-        if !grounded && fall <= 0.0 && c.grounded && c.jump <= 0.0 && !blocked(pos, r, height, &grid, &mut near) {
+        if !grounded && fall <= 0.0 && c.grounded && jump <= 0.0 && gravity_on && !blocked(pos, r, height, &grid, &mut near) {
             let (down, touched) = lower_to_contact(pos, step_h.max(0.05), r, height, &grid, &mut near);
             if touched {
                 pos = down;
@@ -435,6 +492,39 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
             cb.fall = fall;
             cb.grounded = grounded;
             cb.jump = 0.0;
+        }
+        if steered.contains_key(&uid) && dt > 0.0 {
+            if let Some(v) = world.get_mut::<Velocity>(entity) {
+                v.lin[0] = (pos[0] - t.pos[0]) / dt;
+                v.lin[2] = (pos[2] - t.pos[2]) / dt;
+            }
+        }
+        if let Some(m) = motion {
+            if m.report_contacts {
+                touching(uid, pos, r, height, &grid, &mut near, &mut reported);
+            }
+            if let Some(cm) = world.get_mut::<CharacterMotion>(entity) {
+                *cm = m;
+            }
+        }
+    }
+    reported
+}
+
+/// The solid things the capsule at `pos` touches (within a margin of 3 cm, and the floor under its feet): a contact for each, in the order of the obstacles.
+fn touching(uid: u64, pos: V3, r: f32, height: f32, grid: &Grid<'_>, near: &mut Vec<usize>, out: &mut Vec<Contact>) {
+    const MARGIN: f32 = 0.03;
+    let probe = [pos[0], pos[1] - 0.02, pos[2]];
+    grid.near(probe[0], probe[2], r + MARGIN + EPS, near);
+    for &i in near.iter() {
+        let o = &grid.obstacles[i];
+        if o.uid == uid {
+            continue;
+        }
+        if let Some((n, depth)) = overlap(probe, r + MARGIN, height, o, &grid.placed, &grid.meshes) {
+            if depth > 0.0 {
+                out.push(Contact { a: uid, b: o.uid, normal: [-n[0], -n[1], -n[2]], depth: (depth - MARGIN).max(0.0), trigger: false });
+            }
         }
     }
 }

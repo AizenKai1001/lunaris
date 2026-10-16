@@ -356,8 +356,15 @@ pub fn ui(world: &mut World, _ctx: &mut SimCtx) {
 /// Integrate position by linear velocity and rotation by angular velocity.
 pub fn movement(world: &mut World, ctx: &mut SimCtx) {
     let dt = ctx.dt;
+    // a character with a `CharacterMotion` is moved by the character controller (a `Steer` on it sets its walk from this velocity): moving it here too would be a second push
+    let mut walkers: Vec<u64> = Vec::new();
+    let _ = world.for_each_uid::<(&crate::components::CharacterMotion,), _>(|_, uid, _| walkers.push(uid));
+    walkers.sort_unstable();
     world
-        .par_for_each_uid::<(&mut Transform, &Velocity), _>(ctx.threads, |_, _, (t, v)| {
+        .par_for_each_uid::<(&mut Transform, &Velocity), _>(ctx.threads, |_, uid, (t, v)| {
+            if !walkers.is_empty() && walkers.binary_search(&uid).is_ok() {
+                return;
+            }
             t.pos[0] += v.lin[0] * dt;
             t.pos[1] += v.lin[1] * dt;
             t.pos[2] += v.lin[2] * dt;
@@ -406,4 +413,6 @@ pub fn physics(world: &mut World, ctx: &mut SimCtx) {
     ctx.contacts = crate::physics::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes);
     // raycast vehicles push their chassis with what the wheels meet (a world without a `Vehicle` finds none and goes on)
     crate::vehicle::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes);
+    // what the entities with a `Probe` can see of the ground, the water and one ray, for the graph systems that run next
+    crate::probe::step(world, &ctx.terrains, &ctx.meshes);
 }
