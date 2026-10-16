@@ -1782,6 +1782,15 @@ component! {
 }
 
 component! {
+    /// Lets characters swim in a flat `Water` sheet (beside the `Water` and its `Transform`): without it a sheet is only drawn (and floated on by `Floater`s) and characters walk through it, as they always did. With it a
+    /// `CharacterBody` whose feet are under the sheet's level inside its rectangle gets an `InWater` (`body` is the sheet's entity) and a character with a `CharacterMotion` wades and swims in it exactly as in a
+    /// `WaterBody` (docs/GAMEPLAY.md, "Character motion"). The level is the sheet's flat height: its waves are drawn, not part of the character's swimming. `enabled` false turns it off without removing it.
+    pub struct Swimmable {
+        pub enabled: bool = true,
+    }
+}
+
+component! {
     /// A current in the water of this entity (beside a `Water` sheet or a `WaterBody`): the water moves at `velocity` (metres per second in x and z). `Floater` bodies on it are carried along (and a body held still feels
     /// the push as drag); nothing else is moved by it. A river that follows a heightmap flows one way over all of it: put one `WaterFlow` on each stretch you want to run its own way.
     pub struct WaterFlow {

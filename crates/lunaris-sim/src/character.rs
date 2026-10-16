@@ -363,6 +363,7 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
     });
     let mut ladders: Vec<Ladder> = Vec::new();
     let mut waters = Vec::new();
+    let mut sheets = Vec::new();
     // a `Steer` on a character with a motion walks it: its walk is the velocity the steering worked out (on the ground plane), and the velocity is then what the character really did
     let mut steered: HashMap<u64, [f32; 2]> = HashMap::new();
     if !motions.is_empty() {
@@ -374,6 +375,7 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
         let _ = world.for_each_uid::<(&Transform, &Climbable), _>(|_, uid, (t, l)| ladders.push(Ladder { uid, pos: t.pos, rot: t.rot, c: *l }));
         ladders.sort_by_key(|l| l.uid);
         waters = crate::water::bodies(world, terrains);
+        sheets = crate::water::swim_sheets(world);
     }
 
     for (uid, entity, t, c) in chars {
@@ -393,7 +395,7 @@ pub fn step(world: &mut World, dt: f32, terrains: &Terrains, mesh_store: &MeshSt
         // ---- swimming, rolling, climbing and being pulled up a ledge decide what this tick's walk, jump and gravity are
         let mut motion = motions.get(&uid).copied();
         if let Some(m) = motion.as_mut() {
-            let surface = crate::water::surface_at(&waters, terrains, world.strings(), pos[0], pos[2]).map(|s| s.0);
+            let surface = crate::water::surface_any(&waters, &sheets, terrains, world.strings(), pos[0], pos[2]).map(|s| s.0);
             let plan = {
                 let env = motion::Env { grid: &grid, r, height, step_h, min_up, dt, surface, ladders: &ladders };
                 motion::pre(m, &c, pos, grounded, fall, &env)

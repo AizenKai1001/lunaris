@@ -190,7 +190,9 @@ What it does, every tick, before the physics step:
 
 **Cost.** A world without a `Floater` pays for one empty query. With some, the water surfaces are prepared once a tick; a body outside every surface's rectangle or above its highest wave is dropped after a few comparisons and writes nothing; one deep under a flat surface takes one comparison; only bodies at the surface sample their columns (one lookup and, with waves, four cheap sines each; the sine is a polynomial, so every machine finds the same bits). On a Linux test machine: 2000 crates away from the water 0.04 ms a tick, 2000 planks of 9 columns in a rough sea about 1 ms a tick (`cargo test --release -p lunaris-sim floaters_cost -- --ignored --nocapture`). Nothing is allocated per body, and the result is deterministic.
 
-`check` finds a `Floater` that lacks a `Collider`, `RigidBody`, `Velocity` or `Transform`, one without an `AngularVelocity` (it lifts but never tips), a density of 0 or less, and a world with no water for it. Limits: a body is lifted by the highest water under each column (overlapping waters do not add up); the wave motion lifts and tilts bodies but does not carry them round (no orbital drift); characters swim in `WaterBody`s only (`InWater`), not in `Water` sheets.
+`check` finds a `Floater` that lacks a `Collider`, `RigidBody`, `Velocity` or `Transform`, one without an `AngularVelocity` (it lifts but never tips), a density of 0 or less, and a world with no water for it. Limits: a body is lifted by the highest water under each column (overlapping waters do not add up); the wave motion lifts and tilts bodies but does not carry them round (no orbital drift).
+
+**Swimming in a sheet.** A flat `Water` sheet is only drawn (and floated on) unless it also has **`Swimmable {}`**: then a `CharacterBody` whose feet are under its level inside its rectangle gets `InWater` (`body` is the sheet's entity), and a character with a `CharacterMotion` wades and swims in it exactly as in a `WaterBody` (the level is the sheet's flat height: the waves are drawn, not part of the swimming). A scene without `Swimmable` behaves as before.
 
 ## Making a heightmap without a terrain program
 

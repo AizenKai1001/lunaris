@@ -5,7 +5,7 @@
 //! The surface is a grid like the terrain's: a vertex at every `step`-th sample, two triangles to a cell with the same diagonal (from the cell's north-east to its south-west corner). A cell is
 //! water when any of its four corners is wet; a dry corner of such a cell takes the average height of the wet samples around it, so the sheet runs on to the middle of the shore cell and the ground
 //! (which is higher there) hides the rest. Everything is plain `+ - * /` and `sqrt`, in a fixed order, so every machine finds the same water.
-use crate::components::{Buoyant, CharacterBody, Collider, InWater, PhysicsSettings, RigidBody, Terrain, Transform, Velocity, WaterBody};
+use crate::components::{Buoyant, CharacterBody, Collider, InWater, PhysicsSettings, RigidBody, Swimmable, Terrain, Transform, Velocity, Water as WaterSheet, WaterBody};
 use crate::terrain::{Heightfield, Placed, Terrains};
 use lunaris_ecs::World;
 
@@ -138,6 +138,29 @@ pub fn surface_at(list: &[(u64, V3, WaterBody)], fields: &Terrains, strings: &lu
     best
 }
 
+/// The flat `Water` sheets that characters may swim in (`Swimmable`), in uid order: (uid, level, middle (x, z), half size (x, z)). A world without a `Swimmable` finds none, at the cost of one empty query.
+pub fn swim_sheets(world: &mut World) -> Vec<(u64, f32, [f32; 2], [f32; 2])> {
+    let mut found: Vec<(u64, f32, [f32; 2], [f32; 2])> = Vec::new();
+    let _ = world.for_each_uid::<(&Swimmable, &WaterSheet, &Transform), _>(|_, uid, (s, w, t)| {
+        if s.enabled && w.size[0].is_finite() && w.size[1].is_finite() && t.pos.iter().all(|p| p.is_finite()) {
+            found.push((uid, t.pos[1], [t.pos[0], t.pos[2]], [w.size[0].abs() * 0.5, w.size[1].abs() * 0.5]));
+        }
+    });
+    found.sort_by_key(|f| f.0);
+    found
+}
+
+/// The surface at (x, z): the highest of the water pictures' (`surface_at`) and the swimmable sheets', with the uid of its body.
+pub fn surface_any(list: &[(u64, V3, WaterBody)], sheets: &[(u64, f32, [f32; 2], [f32; 2])], fields: &Terrains, strings: &lunaris_ecs::StringTable, x: f32, z: f32) -> Option<(f32, u64)> {
+    let mut best = if list.is_empty() { None } else { surface_at(list, fields, strings, x, z) };
+    for (uid, level, c, half) in sheets {
+        if (x - c[0]).abs() <= half[0] && (z - c[1]).abs() <= half[1] && best.is_none_or(|b| *level > b.0) {
+            best = Some((*level, *uid));
+        }
+    }
+    best
+}
+
 /// The height of the ground (the highest solid terrain) at (x, z), when there is one.
 pub fn ground_at(world: &mut World, fields: &Terrains, x: f32, z: f32) -> Option<f32> {
     let mut best: Option<f32> = None;
@@ -175,7 +198,8 @@ impl Water {
     /// characters in uid order, so what it writes never depends on how they are stored.
     pub fn swimmers(world: &mut World, fields: &Terrains) {
         let mut list = bodies(world, fields);
-        let any_water = !list.is_empty();
+        let sheets = swim_sheets(world);
+        let any_water = !list.is_empty() || !sheets.is_empty();
         let mut had: Vec<u64> = Vec::new();
         let _ = world.for_each_uid::<(&InWater,), _>(|_, uid, _| had.push(uid));
         if !any_water && had.is_empty() {
@@ -189,7 +213,7 @@ impl Water {
         list.sort_by_key(|b| b.0);
         let mut now: Vec<(u64, InWater)> = Vec::new();
         for (uid, pos) in &walkers {
-            if let Some((y, body)) = surface_at(&list, fields, world.strings(), pos[0], pos[2]) {
+            if let Some((y, body)) = surface_any(&list, &sheets, fields, world.strings(), pos[0], pos[2]) {
                 let depth = y - pos[1];
                 if depth > 0.0 {
                     now.push((*uid, InWater { depth, surface: y, body: lunaris_ecs::Uid(body) }));

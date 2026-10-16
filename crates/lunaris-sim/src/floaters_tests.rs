@@ -166,3 +166,28 @@ fn floaters_cost() {
         println!("{label}: {per:.3} ms per tick ({:.0} ns per body)", per * 1.0e6 / count as f64);
     }
 }
+
+#[test]
+fn characters_swim_in_a_water_sheet_that_is_swimmable_and_walk_through_one_that_is_not() {
+    for swimmable in [true, false] {
+        let mut s = Sim::new(1);
+        s.threads = 1;
+        let marker = if swimmable { r#","Swimmable":{}"# } else { "" };
+        spawn(&mut s, 1, &format!(r#"{{"Transform":{{"pos":[0,0,0]}},"Water":{{"size":[40,40],"wave_height":0}}{marker}}}"#));
+        // a pool bottom 3 m down, and a swimmer standing on it
+        spawn(&mut s, 2, r#"{"Transform":{"pos":[0,-3.5,0]},"Collider":{"shape":1,"size":[60,1,60]}}"#);
+        spawn(&mut s, 3, r#"{"Transform":{"pos":[0,-2.9,0]},"CharacterBody":{"radius":0.3,"height":1.8},"CharacterMotion":{}}"#);
+        s.step_n(300);
+        let e = s.world.entity(3).unwrap();
+        let wet = s.world.get::<components::InWater>(e).copied();
+        let swimming = s.world.get::<components::CharacterMotion>(e).unwrap().swimming;
+        let feet = pos(&s, 3)[1];
+        if swimmable {
+            let w = wet.expect("in the water");
+            assert_eq!(w.body.0, 1, "{w:?}");
+            assert!(swimming && feet > -1.7 && feet < -1.0, "swimming {swimming} feet {feet}");
+        } else {
+            assert!(wet.is_none() && !swimming && feet < -2.9, "{wet:?} swimming {swimming} feet {feet}");
+        }
+    }
+}
