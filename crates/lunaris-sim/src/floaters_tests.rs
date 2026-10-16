@@ -200,3 +200,33 @@ fn characters_swim_in_a_water_sheet_that_is_swimmable_and_walk_through_one_that_
         }
     }
 }
+
+#[test]
+fn floaters_ride_the_water_of_a_picture_and_not_the_dry_bank() {
+    use crate::png::tests::make_png;
+    // 33 x 33 samples: a bowl in the middle of a 64 m terrain (10 m of relief, 6 m at the rim) with a lake at 3 m within 8 samples of the middle
+    let radius = |x: usize, z: usize| (((x as f32 - 16.0).powi(2) + (z as f32 - 16.0).powi(2)).sqrt());
+    let dir = std::env::temp_dir().join(format!("lunaris-floaters-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let bowl: Vec<u16> = (0..33 * 33).map(|i| (0.6 * (radius(i % 33, i / 33) / 16.0).min(1.0) * 65535.0) as u16).collect();
+    let lake: Vec<u16> = (0..33 * 33).map(|i| if radius(i % 33, i / 33) <= 8.0 { (0.3 * 65535.0) as u16 } else { 0 }).collect();
+    std::fs::write(dir.join("bowl.png"), make_png(33, 33, 16, 0, 4, &bowl)).unwrap();
+    std::fs::write(dir.join("lake.png"), make_png(33, 33, 16, 0, 4, &lake)).unwrap();
+    let mut s = Sim::new(1);
+    s.threads = 1;
+    s.asset_root = Some(dir.clone());
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,0]},"Terrain":{"heightmap":"bowl.png","size":[64,64],"height":10}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[0,0,0]},"WaterBody":{"heightmap":"lake.png","size":[64,64],"relief":10,"wave_height":0,"speed":0}}"#);
+    // a crate of density 500 dropped over the lake, and one over the east bank (dry)
+    spawn(&mut s, 10, &cube(500.0, 6.0).replace("[0,6,0]", "[2,6,0]"));
+    spawn(&mut s, 11, &cube(500.0, 9.0).replace("[0,9,0]", "[28,9,0]"));
+    s.step_n(360);
+    // half under: the middle of the crate at the lake's surface, 3 m
+    assert!((pos(&s, 10)[1] - 3.0).abs() < 0.15, "{:?}", pos(&s, 10));
+    assert!((floater(&s, 10).submerged - 0.5).abs() < 0.12);
+    // the one over the bank never touched water: it lies on the ground (the rim, 5 m up and more) and nothing lifted it
+    assert_eq!(floater(&s, 11).submerged, 0.0);
+    assert!(pos(&s, 11)[1] > 5.0 && pos(&s, 11)[1] < 6.5, "{:?}", pos(&s, 11));
+    let _ = std::fs::remove_dir_all(&dir);
+}

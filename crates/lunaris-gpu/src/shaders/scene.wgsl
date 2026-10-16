@@ -28,6 +28,8 @@
 var<private> g_ao: f32 = 1.0;
 // How much the surface normal changes across this pixel (set by `lit_mesh`, which has the derivatives): `lit_tail` widens the highlight by it, so that a shiny surface with fine bumps or ripples shimmers less (specular anti-aliasing).
 var<private> g_nvar: f32 = 0.0;
+// How much sun shines through the blade being shaded (grass sends it in the length of its normal: one plus the amount); `lit_tail` adds it where the sun reaches, so the shadow of a rock falls on the blades too.
+var<private> g_trans: f32 = 0.0;
 // `MaterialExt` of the object being shaded (set by `lit_mesh` from the two spare words of its ids): the clear coat's strength and roughness, the sheen, and the subsurface strength with its colour.
 var<private> g_coat: vec2<f32> = vec2<f32>(0.0);
 var<private> g_sheen: f32 = 0.0;
@@ -504,6 +506,8 @@ struct Lit {
 fn lit_mesh(in: MeshOut) -> Lit {
     let o = objects[in.inst];
     var n = normalize(in.nrm);
+    // only grass (its object has kind 3) carries the amount in its normal's length; the normal of anything else is scaled by its transform
+    g_trans = select(0.0, max(length(in.nrm) - 1.0, 0.0), o.ids.y == 3u);
     if (o.ids.y == 1u) {
         // the ripples tilt the surface's own normal (flat for a sheet, leaning downstream for a river)
         n = normalize(wave_normal(in.world.xz, o.uvrect.y, o.uvrect.z, o.uvrect.w) + (n - vec3<f32>(0.0, 1.0, 0.0)));
@@ -619,6 +623,10 @@ fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool
         shadow = shadow_factor(in.world, n);
     }
     var pbr = shade_pbr(base, metal, rough, in.world, n, v, ao, shadow);
+    if (g_trans > 0.0 && i32(frame.p4.x) >= 0) {
+        // the sun through the blade, in the blade's colour, where the sun reaches it
+        pbr.diffuse = pbr.diffuse + base * frame.lights[u32(frame.p4.x)].color.rgb * vec3<f32>(0.9, 0.8, 0.33) * (g_trans * shadow);
+    }
     // light that bounced off the other surfaces in view (`GlobalIllumination`), in the colour of this one
     pbr.diffuse = pbr.diffuse + base * (1.0 - metal) * aot.rgb;
     let fog = fog_amount(in.world);
@@ -1026,7 +1034,7 @@ fn vs_grass(in: VsIn) -> MeshOut {
         let toward_sun = frame.lights[u32(sun)].vec.xyz;
         back = pow(clamp(dot(normalize(wp - gu.eye.xyz), toward_sun), 0.0, 1.0), 3.0);
     }
-    out.col = tint * mix(0.4, 1.0, hn * 0.8 + 0.2 * gust) * (vec3<f32>(1.0) + back * hn * vec3<f32>(1.5, 1.35, 0.55));
-    out.nrm = normalize(vec3<f32>(dir.x * lean * 0.8, 1.0, dir.y * lean * 0.8));
+    out.col = tint * mix(0.4, 1.0, hn * 0.8 + 0.2 * gust);
+    out.nrm = normalize(vec3<f32>(dir.x * lean * 0.8, 1.0, dir.y * lean * 0.8)) * (1.0 + back * hn);
     return out;
 }

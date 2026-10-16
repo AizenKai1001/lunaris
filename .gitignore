@@ -21,3 +21,4 @@ examples/wyrdwood/wyrdwood.lunaris.json
 # downloaded textures (tools/fetch_polyhaven.py)
 examples/hollowlight/textures/
 examples/gfx_lab/models/*/
+examples/gfx_lab/highlands/

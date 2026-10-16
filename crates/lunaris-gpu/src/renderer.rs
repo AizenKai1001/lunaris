@@ -1478,7 +1478,7 @@ impl GpuRenderer {
                     mat: [32.0, 0.0, 0.0, 0.92],
                     misc: [1.0, 1.0, if tex.is_some() { 1.0 } else { 0.0 }, 1.0],
                     uvrect: [0.0, 0.0, 1.0, 1.0],
-                    ids: [0, 0, 0, 0],
+                    ids: [0, 3, 0, 0],
                     pbr: [0.0; 4],
                 });
                 let slot = (objects.len() - 1) as f32;

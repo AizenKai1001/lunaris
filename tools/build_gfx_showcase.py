@@ -66,7 +66,7 @@ for uid, comps in (
     call("spawn", {"uid": uid, "components": comps})
 # a plain that looks like grass in a photograph: a deep natural green that goes to straw in patches, not the lime of the texture's own colour
 for e in call("query", {"with": ["GrassField"], "select": []}).get("entities", []):
-    call("set", {"uid": e["uid"], "component": "GrassField", "value": {"color_a": [0.5, 0.66, 0.38], "color_b": [0.95, 0.82, 0.52], "patch_size": 90.0, "density": 12.0}})
+    call("set", {"uid": e["uid"], "component": "GrassField", "value": {"color_a": [0.5, 0.66, 0.38], "color_b": [0.95, 0.82, 0.52], "patch_size": 90.0, "density": 14.0, "size": [0.4, 0.8]}})
 # trees and stones on the plain, so that the sun has something to throw shadows with and the haze something to hide: Poly Haven's CC0 models when `tools/fetch_polyhaven_model.py` and
 # `tools/prepare_polyhaven_models.py` have been run (young conifers in threes, boulders, stones, a fallen trunk), the low-poly pine of the caldera example otherwise
 ground = [e["uid"] for e in call("query", {"with": ["Terrain"], "select": []}).get("entities", [])][0]
