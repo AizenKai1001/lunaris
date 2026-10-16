@@ -6,7 +6,7 @@
 //! The cost is kept small on purpose: a world without a `Floater` pays for one empty query; a world with some builds its few water surfaces once a tick (a rectangle and a ceiling each); a body that is out of every
 //! surface's rectangle or above its highest wave is left alone after a few comparisons and writes nothing; a body deep under a flat surface takes one comparison instead of its columns; only the bodies at the
 //! surface sample columns, and a column costs one surface lookup (four sines when there are waves). Nothing is allocated per body.
-use crate::components::{AngularVelocity, Collider, Floater, PhysicsSettings, RigidBody, Transform, Velocity, Water, WaterFlow};
+use crate::components::{AngularVelocity, Collider, Floater, Lifetime, Particles, PhysicsSettings, RigidBody, Transform, Velocity, Water, WaterFlow};
 use crate::physics::Shape;
 use crate::physics_rot as rot;
 use crate::terrain::Terrains;
@@ -19,6 +19,8 @@ type V3 = [f32; 3];
 const MAX_COLUMNS: usize = 6;
 /// A body that hits the water faster than this (metres per second) makes a `splash` event.
 const SPLASH_SPEED: f32 = 1.0;
+/// The most splashes that throw up spray in one tick (a hundred crates dropped at once make the first few, not a hundred clouds).
+const MAX_FX_PER_TICK: u32 = 6;
 /// The most a single tick may add to a body's spin (radians per second), so that a stiff boat in a short wave never kicks itself over.
 const MAX_SPIN_STEP: f32 = 12.0;
 
@@ -248,6 +250,7 @@ pub fn step(world: &mut World, fields: &Terrains, dt: f32, events: &mut Vec<(Str
     let surfaces = surfaces(world, fields);
     let mut gravity: Option<V3> = None;
     let mut near: Vec<usize> = Vec::with_capacity(surfaces.len());
+    let mut fx_left = MAX_FX_PER_TICK;
     for b in &list {
         let s = [b.t.scale[0].abs(), b.t.scale[1].abs(), b.t.scale[2].abs()];
         // the body as a box (a ball and a capsule included: a capsule is a box as tall as it is and as wide as it is round)
@@ -356,8 +359,72 @@ pub fn step(world: &mut World, fields: &Terrains, dt: f32, events: &mut Vec<(Str
         }
         if hit > 0.0 {
             events.push(("splash".to_string(), b.uid, Some([b.t.pos[0], v.surface, b.t.pos[2]])));
+            if b.f.splash_fx && fx_left > 0 {
+                fx_left -= 1;
+                spray(world, [b.t.pos[0], v.surface, b.t.pos[2]], hit, half[0] + half[2], b.uid);
+            }
         }
     }
+}
+
+/// Droplets thrown up and a soft mist round a body that hit the water at `speed` (`width` metres wide): two bursts of particles that remove themselves.
+fn spray(world: &mut World, at: V3, speed: f32, width: f32, uid: u64) {
+    let seed = (uid as u32).wrapping_mul(2_654_435_761);
+    let drops = ((20.0 + speed * width * 30.0) as u32).clamp(24, 240);
+    let e = world.spawn();
+    let _ = world.insert(e, Transform { pos: at, ..Transform::default() });
+    let _ = world.insert(
+        e,
+        Particles {
+            count: drops,
+            lifetime: 1.1,
+            looping: false,
+            prewarm: false,
+            spread_time: 0.08,
+            shape: 3,
+            extent: [width * 0.4, 0.0, width * 0.4],
+            cone: 32.0,
+            speed_range: [0.8 + speed * 0.12, 1.5 + speed * 0.38],
+            gravity: [0.0, -9.8, 0.0],
+            drag: 0.2,
+            size: [0.09, 0.035],
+            size_jitter: 0.4,
+            color: [0.92, 0.97, 1.0, 0.9],
+            color_end: [0.8, 0.9, 1.0, 0.0],
+            fade_in: 0.02,
+            additive: false,
+            seed,
+            ..Particles::default()
+        },
+    );
+    let _ = world.insert(e, Lifetime { seconds: 1.6 });
+    let m = world.spawn();
+    let _ = world.insert(m, Transform { pos: at, ..Transform::default() });
+    let _ = world.insert(
+        m,
+        Particles {
+            count: (drops / 3).max(10),
+            lifetime: 1.4,
+            looping: false,
+            prewarm: false,
+            spread_time: 0.15,
+            shape: 3,
+            extent: [width * 0.3, 0.0, width * 0.3],
+            cone: 70.0,
+            speed_range: [0.3, 0.6 + speed * 0.06],
+            gravity: [0.0, 0.15, 0.0],
+            drag: 1.2,
+            size: [0.15 + width.min(2.5) * 0.12, 0.35 + width.min(2.5) * 0.3],
+            size_jitter: 0.3,
+            color: [1.0, 1.0, 1.0, 0.1],
+            color_end: [1.0, 1.0, 1.0, 0.0],
+            fade_in: 0.1,
+            additive: false,
+            seed: seed ^ 0x9e37,
+            ..Particles::default()
+        },
+    );
+    let _ = world.insert(m, Lifetime { seconds: 1.8 });
 }
 
 fn s_max(t: &Transform) -> f32 {

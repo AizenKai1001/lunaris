@@ -78,7 +78,7 @@ body([-4.0, 10.0, 1.5], [0.9, 0.9, 0.9], "sphere", [0.9, 0.9, 0.85, 1.0], 20, 60
 body([1.5, 14.0, 2.0], [0.7, 0.7, 0.7], "sphere", [0.85, 0.15, 0.15, 1.0], 10, 250, 1, 0, 0.25)
 body([-9.0, 5.0, 0.0], [0.6, 0.6, 0.6], "sphere", [0.15, 0.55, 0.2, 1.0], 6, 150, 1, 0, 0.25)
 sp({"Transform": {"pos": [-1.0, 5.2, 12.5], "rot": quat(0.0, -17.0)}, "Camera": {"fov_y": 54, "active": True}})
-for name, ticks in (("drop", 36), ("settled", 220), ("later", 160)):
+for name, ticks in (("drop", 36), ("spray", 50), ("settled", 150), ("later", 160)):
     call("step", {"ticks": ticks})
     r = call("render", {"quality": "ultra", "width": W, "height": H, "path": f"floaters_{name}.png", "image": False})
     print(name, r.get("renderer"), r.get("warnings"), (r.get("timing_ms") or {}).get("total"))

@@ -108,20 +108,29 @@ fn a_current_carries_a_floater_and_current_zero_ignores_it() {
 }
 
 #[test]
-fn a_body_that_hits_the_water_fast_reports_a_splash_once() {
+fn a_body_that_hits_the_water_fast_reports_a_splash_once_and_throws_up_spray_that_goes_away() {
     let mut s = world(FLAT);
     spawn(&mut s, 10, r#"{"Transform":{"pos":[3,6,0]},"Velocity":{},"Collider":{"shape":0,"size":[1,1,1]},"RigidBody":{"mass":1,"restitution":0},"Floater":{"density":500}}"#);
-    let mut splashes = Vec::new();
-    for _ in 0..240 {
+    let clouds = |s: &mut Sim| {
+        let mut n = 0;
+        let _ = s.world.for_each::<(&components::Particles,), _>(|_, _| n += 1);
+        n
+    };
+    let (mut splashes, mut peak) = (Vec::new(), 0);
+    for _ in 0..300 {
         s.step();
         let f = floater(&s, 10);
         if f.splash > 0.0 {
             splashes.push((f.splash, pos(&s, 10)));
         }
+        peak = peak.max(clouds(&mut s));
     }
     assert_eq!(splashes.len(), 1, "{splashes:?}");
     // 5.5 m of free fall is about 10 m/s
     assert!(splashes[0].0 > 8.0 && splashes[0].0 < 12.5, "{splashes:?}");
+    // the spray is two particle entities (droplets and mist) that are gone again a couple of seconds later
+    assert_eq!(peak, 2);
+    assert_eq!(clouds(&mut s), 0, "gone again");
 }
 
 #[test]

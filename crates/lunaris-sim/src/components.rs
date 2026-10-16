@@ -1768,7 +1768,7 @@ component! {
     /// waves** of a `Water` sheet or a `WaterBody` (the same ripples that are drawn, `waves` 0 to 1 says how much they count), **rights itself** when it is tipped (the lift of the low side is bigger), is **carried by a
     /// `WaterFlow`** (`current` 0 to 1) and slowed by the water it moves through (`drag`, `angular_drag`: per second at full depth). `density` is in kilograms per cubic metre (500 wood, 920 ice, 1000 neutral, 2500 stone).
     /// The engine writes `submerged` (0 to 1, the share of the body under the surface) and `splash` (the speed in metres per second at which the body hit the water on this tick, otherwise 0) every tick, and the event
-    /// `splash` (on the body, at the point on the surface above it) when that is faster than 1 m/s. A body is looked at only when it is near the water: a thousand crates in a desert cost a rectangle test each.
+    /// `splash` (on the body, at the point on the surface above it) when that is faster than 1 m/s; with `splash_fx` (on by default) that also throws up spray and mist, two short-lived `Particles` entities that remove themselves after a second and a half. A body is looked at only when it is near the water: a thousand crates in a desert cost a rectangle test each.
     pub struct Floater {
         pub density: f32 = 500.0,
         pub columns: u32 = 3,
@@ -1776,6 +1776,7 @@ component! {
         pub angular_drag: f32 = 3.0,
         pub waves: f32 = 1.0,
         pub current: f32 = 1.0,
+        pub splash_fx: bool = true,
         pub submerged: f32 = 0.0,
         pub splash: f32 = 0.0,
     }
