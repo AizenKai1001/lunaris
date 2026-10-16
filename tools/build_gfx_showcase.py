@@ -64,12 +64,35 @@ for uid, comps in (
     (905, {"HeightFog": {"density": 0.0007, "falloff": 0.05, "height": 6, "color": [0.8, 0.82, 0.86]}}),
 ):
     call("spawn", {"uid": uid, "components": comps})
-# pines on the plain, so that the sun has something to throw shadows with and the haze something to hide
+# trees and stones on the plain, so that the sun has something to throw shadows with and the haze something to hide: Poly Haven's CC0 models when `tools/fetch_polyhaven_model.py` and
+# `tools/prepare_polyhaven_models.py` have been run (young conifers in threes, boulders, stones, a fallen trunk), the low-poly pine of the caldera example otherwise
 ground = [e["uid"] for e in call("query", {"with": ["Terrain"], "select": []}).get("entities", [])][0]
-tree = {"MeshRenderer": {"mesh": "examples/caldera/models/pine.glb", "roughness": 0.9}, "Collider": {"shape": 1, "size": [0.7, 3.4, 0.7]}}
-for count, half, apart, seed in ((140, 120.0, 14.0, 5), (500, 900.0, 22.0, 6)):
-    r = call("scatter", {"terrain": ground, "components": tree, "count": count, "slope": [0, 25], "min_distance": apart, "scale": [1.6, 3.2], "seed": seed, "yaw": True, "sink": 0.05, "area": [-half, -half, half, half]})
-    print("trees:", r.get("placed"))
+
+
+def model(mid):
+    return f"examples/gfx_lab/models/{mid}/{mid}_lunaris.gltf"
+
+
+if os.path.exists(model("fir_sapling")):
+    layers = (
+        # model, how many, half the side of the area, least distance apart, scale, steepest slope, seed
+        ("pine_sapling_small", 26, 110.0, 12.0, (2.6, 4.2), 25, 5),
+        ("fir_sapling", 26, 110.0, 12.0, (2.6, 4.2), 25, 6),
+        ("pine_sapling_small", 110, 700.0, 18.0, (3.5, 6.5), 25, 7),
+        ("fir_sapling", 110, 700.0, 18.0, (3.5, 6.5), 25, 8),
+        ("boulder_01", 16, 140.0, 15.0, (1.2, 3.2), 35, 9),
+        ("rock_07", 60, 120.0, 5.0, (6.0, 14.0), 40, 10),
+        ("rock_09", 60, 120.0, 5.0, (8.0, 18.0), 40, 11),
+        ("dead_tree_trunk_02", 8, 110.0, 25.0, (1.0, 1.8), 20, 12),
+    )
+    for mid, count, half, apart, scale, slope, seed in layers:
+        r = call("scatter", {"terrain": ground, "components": {"MeshRenderer": {"mesh": model(mid), "roughness": 0.9}}, "count": count, "slope": [0, slope], "min_distance": apart, "scale": list(scale), "seed": seed, "yaw": True, "sink": 0.04, "area": [-half, -half, half, half]})
+        print(mid, "placed:", r.get("placed"))
+else:
+    tree = {"MeshRenderer": {"mesh": "examples/caldera/models/pine.glb", "roughness": 0.9}, "Collider": {"shape": 1, "size": [0.7, 3.4, 0.7]}}
+    for count, half, apart, seed in ((140, 120.0, 14.0, 5), (500, 900.0, 22.0, 6)):
+        r = call("scatter", {"terrain": ground, "components": tree, "count": count, "slope": [0, 25], "min_distance": apart, "scale": [1.6, 3.2], "seed": seed, "yaw": True, "sink": 0.05, "area": [-half, -half, half, half]})
+        print("trees:", r.get("placed"))
 call("step", {"ticks": 40})
 gy = call("terrain_height", {"x": 0.0, "z": 0.0}).get("height", 10.5)
 shots = (

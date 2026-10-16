@@ -771,7 +771,11 @@ fn a_water_body_follows_its_picture_in_both_renderers() {
 
 /// Not a pass/fail test: prints how fast the GPU draws a busy scene compared with the CPU reference (run with --nocapture, in release
 /// mode for honest numbers: `cargo test --release -p lunaris-gpu --test compare how_fast -- --nocapture`).
+/// A speed measurement, not a check (it asserts nothing): 30 pictures of 1600 meshes at two sizes in two qualities. A picture asked for by `render_to_image` is a still, which in the high qualities with
+/// temporal anti-aliasing is drawn eight times, so the numbers are for stills; and on a machine that draws with the CPU it takes hours, so it only runs when asked:
+/// `cargo test --release -p lunaris-gpu --test compare how_fast -- --ignored --nocapture`.
 #[test]
+#[ignore = "a speed measurement: run it with --ignored --nocapture"]
 fn how_fast_is_the_gpu() {
     let Some(mut gpu) = gpu_or_skip() else { return };
     let mut sim = Sim::new(1);
