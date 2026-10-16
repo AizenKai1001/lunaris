@@ -315,6 +315,22 @@ impl Rig {
         self.rotate_joint(j, partial(swing, goal.weight.clamp(0.0, 1.0)), tr, rot, sc);
     }
 
+    /// The model-space transform of every joint in the pose of a stack of layers with inverse kinematics on top (what `skin_matrices_ik` multiplies by the inverse bind matrices): where a thing
+    /// fixed to a joint belongs.
+    pub fn joint_worlds(&self, layers: &[PoseLayer], goals: &[IkGoal]) -> Vec<M4> {
+        let (tr, mut rot, sc) = self.layers_local(layers);
+        for g in goals {
+            if g.joint >= self.joints.len() || !g.target.iter().all(|v| v.is_finite()) || !(g.weight > 0.0) {
+                continue;
+            }
+            match g.kind {
+                IkKind::Reach => self.solve_reach(g, &tr, &mut rot, &sc),
+                IkKind::Look { axis, max_angle } => self.solve_look(g, axis, max_angle, &tr, &mut rot, &sc),
+            }
+        }
+        self.worlds(&tr, &rot, &sc)
+    }
+
     /// The skin matrices of a stack of layers with inverse kinematics on top: every goal, in order, bends the pose the layers made.
     pub fn skin_matrices_ik(&self, layers: &[PoseLayer], goals: &[IkGoal]) -> Vec<M4> {
         let (tr, mut rot, sc) = self.layers_local(layers);

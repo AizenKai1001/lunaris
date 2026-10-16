@@ -1920,3 +1920,18 @@ component! {
         pub hit_uid: Uid = Uid(0),
     }
 }
+
+component! {
+    /// Fixes an entity with a `MeshRenderer` to a **joint of an animated model**, so that a sword stays in a hand, a shield on an arm, a torch in a fist and a helmet on a head while the skeleton moves (docs/GAMEPLAY.md, "Bone
+    /// attachments"). `target` is the entity of the skinned model (a `MeshRenderer` of a rigged `.glb` with an `Animator`), `joint` the name of the joint in that model (`model_info` lists them), `pos`, `rot` (a quaternion
+    /// x y z w) and `scale` place the thing relative to the joint. Both renderers draw it at the joint's place in the pose of the picture, after the model itself: this is **presentation only**, like `Ik` (the entity's own
+    /// `Transform` is left alone and stays what the simulation says; a game that needs the hand's place in the simulation uses a `Sensor` or the `Transform` of the character). If the target is not drawn animated (or has no
+    /// such joint) the thing is drawn at its own `Transform`, and the picture says why.
+    pub struct BoneAttach {
+        pub target: Uid = Uid(0),
+        pub joint: Sym = Sym(0),
+        pub pos: [f32; 3] = [0.0, 0.0, 0.0],
+        pub rot: [f32; 4] = [0.0, 0.0, 0.0, 1.0],
+        pub scale: [f32; 3] = [1.0, 1.0, 1.0],
+    }
+}

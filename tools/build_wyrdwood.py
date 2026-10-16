@@ -84,28 +84,43 @@ def quat_y(deg):
 
 F = "f32"
 COMPONENTS = {
-    "Hero": [("state", F), ("t", F), ("cd", F), ("stamina", F), ("exhaust", F), ("regen", F), ("fx", F), ("fz", F), ("moving", F), ("sprint", F), ("air", F), ("swim", F), ("climb", F), ("rolling", F)],
+    "Hero": [("state", F), ("t", F), ("cd", F), ("stamina", F), ("exhaust", F), ("regen", F), ("fx", F), ("fz", F), ("moving", F), ("sprint", F), ("air", F), ("swim", F), ("climb", F), ("rolling", F), ("run", F), ("sneak", F), ("tool", F), ("hurt", F)],
     "Choppable": [("kind", F), ("reach", F), ("shake", F)],
-    "Pickup": [("kind", F), ("t", F)],
+    "Pickup": [("kind", F), ("n", F), ("t", F)], "InvSlot": [("n", F)], "InvIcon": [("n", F)], "InvCount": [("n", F)], "InvPanel": [], "RecipeBtn": [("n", F)], "RecipeIcon": [("n", F)], "HudFood": [("n", F)], "ToastText": [], "Workbench": [], "Campfire": [], "HeldPart": [("item", F)],
+    "Piece": [("kind", F), ("yaw", F), ("set", F)], "BuildAim": [], "BuildGhost": [], "TorchLight": [], "GhostPart": [("piece", F), ("ox", F), ("oy", F), ("oz", F), ("yaw", F)], "BuildText": [("n", F)],
     "HudHp": [], "HudSt": [], "HudItem": [], "Tree": [], "Prop": [], "SunTag": [],
 }
 LAYERS = "grass grass uv_scale=300 bump=0.02\nrock dirt uv_scale=240 tint=0.8,0.76,0.72 bump=0.06\nsand sand uv_scale=300 bump=0.01\nforest dirt uv_scale=200 tint=0.5,0.58,0.36 bump=0.03"
 INPUT_MAP = "\n".join([
     "move_x = d, a:-1, gamepad.lx, arrowright, arrowleft:-1", "move_y = w, s:-1, gamepad.ly, arrowup, arrowdown:-1", "look_x = gamepad.rx", "look_y = gamepad.ry",
-    "attack = mouse_left, j, gamepad.x, gamepad.rt", "roll = mouse_right, q, gamepad.b, gamepad.lt", "jump = space, gamepad.a", "dive = c, gamepad.rs", "sprint = shift, gamepad.ls, gamepad.lb",
-    "interact = e, gamepad.y", "pause = escape, gamepad.start", "deadzone = 0.15"])
+    "attack = mouse_left, j, gamepad.x, gamepad.rt", "roll = mouse_right, q, gamepad.b, gamepad.lt", "jump = space, gamepad.a", "dive = c, gamepad.rs", "sprint = shift, gamepad.ls, gamepad.lb", "sneak = control, gamepad.rs",
+    "inventory = tab, gamepad.back", "hot1 = 1", "hot2 = 2", "hot3 = 3", "hot4 = 4", "hot5 = 5", "hot6 = 6", "hot7 = 7", "hot8 = 8",
+    "interact = e, gamepad.y", "build_next = r, gamepad.rb", "pause = escape, gamepad.start", "deadzone = 0.15"])
 
 
 def define_all():
+    import wyrdwood_items as I
     for n, fields in COMPONENTS.items():
         call("define_component", {"name": n, "fields": [{"name": f, "type": t, "default": 0} for f, t in fields]})
-    for name, comps in {
-        "Log": {"Pickup": {"kind": 1}, "Collider": {"shape": 0, "size": [0.45, 0.45, 0.45]}, "RigidBody": {"mass": 1.0, "restitution": 0.25, "friction": 0.6}, "Velocity": {}, "AngularVelocity": {"damping": 0.5},
-                "MeshRenderer": {"mesh": "cylinder", "color": [0.42, 0.28, 0.16, 1], "roughness": 0.9}},
-        "Stone": {"Pickup": {"kind": 2}, "Collider": {"shape": 0, "size": [0.4, 0.4, 0.4]}, "RigidBody": {"mass": 1.0, "restitution": 0.2, "friction": 0.7}, "Velocity": {}, "AngularVelocity": {"damping": 0.5},
-                  "MeshRenderer": {"mesh": "sphere", "color": [0.52, 0.52, 0.5, 1], "roughness": 0.95}},
-    }.items():
-        call("define_prefab", {"name": name, "components": {**comps, "Transform": {"pos": [0, 0, 0], "scale": [0.22, 0.9, 0.22] if name == "Log" else [0.4, 0.3, 0.36]}}})
+    body = lambda key, n, extra=None: {"Pickup": {"kind": I.ID[key], "n": n}, **(extra or {})}  # noqa: E731
+    drops = {"Collider": {"shape": 0, "size": [0.45, 0.45, 0.45]}, "RigidBody": {"mass": 1.0, "restitution": 0.25, "friction": 0.6}, "Velocity": {}, "AngularVelocity": {"damping": 0.5}}
+    prefabs = {
+        # what falls when a tree or a rock breaks: bodies that bounce and lie, picked up by walking over them
+        "Log": ({**body("wood", 1), **drops, "MeshRenderer": {"mesh": "cylinder", "color": [0.42, 0.28, 0.16, 1], "roughness": 0.9}}, [0.22, 0.9, 0.22]),
+        "Stone": ({**body("stone", 1), **drops, "MeshRenderer": {"mesh": "sphere", "color": [0.52, 0.52, 0.5, 1], "roughness": 0.95}}, [0.4, 0.3, 0.36]),
+        "Flint": ({**body("flint", 1), **drops, "MeshRenderer": {"mesh": "sphere", "color": [0.25, 0.3, 0.36, 1], "roughness": 0.6}}, [0.26, 0.2, 0.3]),
+        # what lies about on the ground to begin with: branches, stones, flint, berries, mushrooms (nothing to carry them away: no bodies)
+        "Branch": (body("wood", 2, {"MeshRenderer": {"mesh": "cylinder", "color": [0.4, 0.28, 0.16, 1], "roughness": 0.95}}), [0.1, 0.7, 0.1]),
+        "GroundStone": (body("stone", 1, {"MeshRenderer": {"mesh": "sphere", "color": [0.55, 0.55, 0.54, 1], "roughness": 0.95}}), [0.4, 0.28, 0.36]),
+        "GroundFlint": (body("flint", 1, {"MeshRenderer": {"mesh": "sphere", "color": [0.27, 0.32, 0.38, 1], "roughness": 0.55}}), [0.24, 0.16, 0.28]),
+        "BerryBush": (body("berries", 3, {"MeshRenderer": {"mesh": "sphere", "color": [0.22, 0.42, 0.2, 1], "roughness": 0.9}}), [0.9, 0.7, 0.9]),
+        "MushroomPatch": (body("mushroom", 2, {"MeshRenderer": {"mesh": "sphere", "color": [0.82, 0.66, 0.5, 1], "roughness": 0.8}}), [0.3, 0.2, 0.3]),
+    }
+    for name, (comps, scale) in prefabs.items():
+        call("define_prefab", {"name": name, "components": {**comps, "Transform": {"pos": [0, 0, 0], "scale": scale}}})
+    import wyrdwood_build as B
+    for name, d in B.prefabs().items():  # what the hammer builds
+        call("define_prefab", {"name": name, **d})
 
 
 def dress_world():
@@ -221,7 +236,7 @@ def main():
           MeshRenderer={"mesh": f"{M}/hero.glb", "roughness": 0.8}, Animator={"clip": "idle", "looping": True}, StateMachine={"machine": S.HERO_MACHINE})
     hud()
     # the rules
-    res = call("define_script", {"source": S.ALL})
+    res = call("define_script", {"source": S.ALL.replace("@SEA@", f"{SEA:.3f}")})
     print("define_script:", json.dumps(res)[:400])
     call("check")
     out = call("save_scene", {"path": OUT_SCENE})

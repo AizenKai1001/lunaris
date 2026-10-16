@@ -1016,6 +1016,16 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     for goals in ik_by_skin.values_mut() {
         goals.sort_by_key(|g| g.0);
     }
+    // things fixed to a joint of a model, by the entity of the model: (the thing, what it asks for)
+    let mut attachers_by_skin: std::collections::BTreeMap<u64, Vec<(u64, lunaris_sim::components::BoneAttach)>> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&lunaris_sim::components::BoneAttach, &MeshRenderer), _>(|_, uid, (a, _)| {
+        if a.target.0 != 0 && a.target.0 != uid {
+            attachers_by_skin.entry(a.target.0).or_default().push((uid, *a));
+        }
+    })?;
+    let attached: std::collections::BTreeSet<u64> = attachers_by_skin.values().flat_map(|l| l.iter().map(|a| a.0)).collect();
+    // where each such thing is in this picture (filled while the models are posed; the things are drawn after the models)
+    let mut attach_world: std::collections::BTreeMap<u64, M4> = std::collections::BTreeMap::new();
     let mut anim_layers_raw: std::collections::BTreeMap<u64, AnimLayers> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&AnimLayers,), _>(|_, uid, (l,)| {
         if (l.weight_b > 0.0 && l.weight_b.is_finite()) || (l.weight_c > 0.0 && l.weight_c.is_finite()) {
@@ -1281,8 +1291,9 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     }
 
     let mut scene_meshes: Vec<SceneMesh> = Vec::new();
+    for pass in 0..2 {
     for (((uid, m, tr), name), hide) in meshes_raw.iter().zip(&mesh_names).zip(&hidden) {
-        if !m.visible || *hide {
+        if !m.visible || *hide || attached.contains(uid) != (pass == 1) {
             continue;
         }
         let mesh = match builtin(name) {
@@ -1320,7 +1331,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                         }
                     }
                     // extra clips laid over the base (blend trees and layers): the base (a crossfade, if one is running) first, then each extra clip
-                    let mesh = if anim_layers_raw.contains_key(uid) || !goals.is_empty() {
+                    let mesh = if anim_layers_raw.contains_key(uid) || !goals.is_empty() || attachers_by_skin.contains_key(uid) {
                         use crate::rig::PoseLayer;
                         let mut stack: Vec<PoseLayer> = Vec::new();
                         if a.blend < 1.0 {
@@ -1356,6 +1367,24 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                             }
                             let t = if sync && base_len > 0.0 { a.time / base_len * rig.clips[ci].duration } else { time };
                             stack.push(PoseLayer { clip: Some(ci), time: t, looping: a.looping, weight, root });
+                        }
+                        if let Some(list) = attachers_by_skin.get(uid) {
+                            let worlds = rig.joint_worlds(&stack, &goals);
+                            let skin_model = M4::from_trs(tr.pos, tr.rot, tr.scale);
+                            for (aid, att) in list {
+                                let joint_name = world.strings().get(att.joint.0).to_string();
+                                match rig.joint_index(&joint_name) {
+                                    Some(j) => {
+                                        attach_world.insert(*aid, skin_model.mul(&worlds[j]).mul(&M4::from_trs(att.pos, att.rot, att.scale)));
+                                    }
+                                    None => {
+                                        let msg = format!("entity {aid}: the model `{name}` has no joint called `{joint_name}` for BoneAttach (it has: {})", rig.joints.iter().map(|j| j.name.as_str()).collect::<Vec<_>>().join(", "));
+                                        if !warnings.contains(&msg) {
+                                            warnings.push(msg);
+                                        }
+                                    }
+                                }
+                            }
                         }
                         if goals.is_empty() {
                             rig.pose_layers(&shared, &stack)
@@ -1400,7 +1429,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             sway: sways_raw.get(uid).map(|w| [w.amount.clamp(-5.0, 5.0), if w.extent.is_finite() { w.extent.max(0.1) } else { 3.0 }, w.phase + w.offset]),
             uid: *uid,
             mesh,
-            model: M4::from_trs(tr.pos, tr.rot, tr.scale),
+            model: attach_world.get(uid).copied().unwrap_or_else(|| M4::from_trs(tr.pos, tr.rot, tr.scale)),
             color: [c[0], c[1], c[2]],
             shininess: shininess as u32,
             emissive: m.emissive.clamp(0.0, 16.0),
@@ -1413,6 +1442,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             uv_scale,
             splat: None,
         });
+    }
     }
     // water: a flat grid scaled to the sheet, see-through, with the wave numbers for the GPU renderer
     let mut waters: Vec<(u64, Water, Transform)> = Vec::new();

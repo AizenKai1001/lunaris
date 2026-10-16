@@ -115,3 +115,47 @@ fn an_ik_goal_entity_bends_the_model_in_the_picture_and_follows_the_goal() {
     let scene = render::gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 64, ..RenderOptions::default() }).unwrap();
     assert!(scene.warnings.iter().any(|w| w.contains("no joint called `elbow`")), "{:?}", scene.warnings);
 }
+
+#[test]
+fn a_thing_fixed_to_a_joint_is_drawn_where_the_joint_is_in_the_pose_and_otherwise_at_its_own_place() {
+    let mut s = Sim::new(1);
+    let spawn = |s: &mut Sim, uid: u64, comps: &str| {
+        let Json::Obj(components) = parse(comps).unwrap() else { panic!() };
+        s.apply(&Command::Spawn { uid: Some(uid), components }).unwrap();
+    };
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,1.5,6]},"Camera":{}}"#);
+    // the column model, bent towards x = 1 by an Ik goal, standing at x = 5; a small cube is fixed to its top joint with an offset of 0.5 up
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[5,0,0]},"MeshRenderer":{"mesh":"examples/models/swayer.glb"},"Animator":{"clip":"","playing":false}}"#);
+    spawn(&mut s, 3, r#"{"Transform":{"pos":[6.0,1.5,0]},"Ik":{"skin":2,"joint":"top"}}"#);
+    spawn(&mut s, 4, r#"{"Transform":{"pos":[-20,0,0]},"MeshRenderer":{"mesh":"cube"},"BoneAttach":{"target":2,"joint":"top","pos":[0,0.5,0]}}"#);
+    let gather = |s: &mut Sim| {
+        let mut tex = TextureCache::new(Some(repo_root()));
+        render::gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 64, height: 64, ..RenderOptions::default() }).unwrap()
+    };
+    let scene = gather(&mut s);
+    assert!(scene.warnings.is_empty(), "{:?}", scene.warnings);
+    let cube = scene.meshes.iter().find(|m| m.uid == 4).expect("the cube is drawn");
+    let (model, _c) = column();
+    let rig = model.rig.as_ref().unwrap();
+    let top = rig.joint_index("top").unwrap();
+    // the same pose by hand: the first clip at time 0 (what an empty clip name plays) and the IK goal in the model's own space
+    let goal = IkGoal { joint: top, kind: IkKind::Reach, target: [1.0, 1.5, 0.0], pole: None, weight: 1.0 };
+    let first_clip = [PoseLayer { clip: Some(0), time: 0.0, looping: true, weight: 1.0, root: None }];
+    let worlds = rig.joint_worlds(&first_clip, &[goal]);
+    let expect = M4::from_trs([5.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0]).mul(&worlds[top]).mul(&M4::from_trs([0.0, 0.5, 0.0], [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0]));
+    for k in 12..15 {
+        assert!((cube.model.0[k] - expect.0[k]).abs() < 1e-3, "element {k}: {} vs {}", cube.model.0[k], expect.0[k]);
+    }
+    assert!(cube.model.0[12] > 5.3 && cube.model.0[12] < 6.5, "near the leaning tip, not at -20: {}", cube.model.0[12]);
+    // the thing is drawn after the model, and a joint that does not exist is a warning that leaves it at its own place
+    spawn(&mut s, 5, r#"{"Transform":{"pos":[-3,0,0]},"MeshRenderer":{"mesh":"cube"},"BoneAttach":{"target":2,"joint":"elbow"}}"#);
+    let scene = gather(&mut s);
+    assert!(scene.warnings.iter().any(|w| w.contains("no joint called `elbow` for BoneAttach")), "{:?}", scene.warnings);
+    let lost = scene.meshes.iter().find(|m| m.uid == 5).expect("drawn");
+    assert!((lost.model.0[12] + 3.0).abs() < 1e-5, "{}", lost.model.0[12]);
+    // a target that is not an animated model leaves the thing where it is
+    spawn(&mut s, 6, r#"{"Transform":{"pos":[7,0,0]},"MeshRenderer":{"mesh":"cube"},"BoneAttach":{"target":1,"joint":"top"}}"#);
+    let scene = gather(&mut s);
+    let plain = scene.meshes.iter().find(|m| m.uid == 6).expect("drawn");
+    assert!((plain.model.0[12] - 7.0).abs() < 1e-5);
+}
