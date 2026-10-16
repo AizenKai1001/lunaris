@@ -690,6 +690,8 @@ pub struct SceneMesh {
     pub splat: Option<Arc<SplatLayers>>,
     /// Normal and occlusion-roughness-metallic maps (`PbrMaps`): only the GPU renderer's high-quality mode draws them.
     pub pbr: Option<MeshPbr>,
+    /// `MaterialExt`: clear coat strength and roughness, sheen, subsurface strength and colour (all 0 to 1); only the GPU renderer's high qualities use it.
+    pub ext: Option<[f32; 7]>,
 }
 
 /// The pictures of a `PbrMaps` component, loaded as data (not as colours).
@@ -1087,6 +1089,10 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         if (l.weight_b > 0.0 && l.weight_b.is_finite()) || (l.weight_c > 0.0 && l.weight_c.is_finite()) {
             anim_layers_raw.insert(uid, *l);
         }
+    })?;
+    let mut ext_raw: std::collections::BTreeMap<u64, lunaris_sim::components::MaterialExt> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&lunaris_sim::components::MaterialExt,), _>(|_, uid, (e,)| {
+        ext_raw.insert(uid, *e);
     })?;
     let mut pbr_raw: std::collections::BTreeMap<u64, lunaris_sim::components::PbrMaps> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&lunaris_sim::components::PbrMaps,), _>(|_, uid, (p,)| {
@@ -1556,6 +1562,10 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex,
             uv_scale,
             splat: None,
+            ext: ext_raw.get(uid).filter(|e| e.clearcoat > 0.0 || e.sheen > 0.0 || e.subsurface > 0.0).map(|e| {
+                let f = |v: f32, lo: f32| if v.is_finite() { v.clamp(lo, 1.0) } else { lo };
+                [f(e.clearcoat, 0.0), f(e.clearcoat_roughness, 0.02), f(e.sheen, 0.0), f(e.subsurface, 0.0), f(e.subsurface_color[0], 0.0), f(e.subsurface_color[1], 0.0), f(e.subsurface_color[2], 0.0)]
+            }),
             pbr: pbr_raw.get(uid).and_then(|p| {
                 let name_n = world.strings().get(p.normal.0).to_string();
                 let name_a = world.strings().get(p.arm.0).to_string();
@@ -1611,6 +1621,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             uv_scale: [1.0, 1.0],
             splat: None,
             pbr: None,
+            ext: None,
         });
     }
     // water that follows a heightmap: the surface of the picture, see-through and rolling with waves in the GPU renderer's high qualities like a `Water` sheet
@@ -1643,6 +1654,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             uv_scale: [1.0, 1.0],
             splat: None,
             pbr: None,
+            ext: None,
         });
     }
     // terrain: the mesh of each heightmap, drawn like any model (the ground lies flat: the entity's rotation and scale are not used)
@@ -1682,6 +1694,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             uv_scale: if g.uv_scale[0].is_finite() && g.uv_scale[1].is_finite() { g.uv_scale } else { [1.0, 1.0] },
             splat,
             pbr: None,
+            ext: None,
         });
     }
     for (uid, j, from) in &cords {
@@ -1715,6 +1728,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             uv_scale: [1.0, 1.0],
             splat: None,
             pbr: None,
+            ext: None,
         });
     }
     // grass: what grows where, found once here (the picture of the ground and the tuft model come from the caches)

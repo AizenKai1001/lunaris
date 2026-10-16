@@ -933,3 +933,77 @@ fn clouds_have_a_bright_side_and_a_shaded_underside() {
     let (lo, hi) = (lums.iter().cloned().fold(f32::MAX, f32::min), lums.iter().cloned().fold(0.0f32, f32::max));
     assert!(hi > lo + 50.0, "{lo} .. {hi}");
 }
+
+/// A ball of `material` seen from the front, nothing else in view: a flat background, no sky, a sun (`sun_rot` turns it) and the ambient light as given.
+fn ball(gpu: &mut GpuRenderer, material: &str, ext: &str, sun_rot: &str, ambient: f32) -> Frame {
+    let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":30,"clear":[0.0,0.0,0.0,1]},"Transform":{"pos":[0,0,7]}}}"#.to_string();
+    let sun = format!(r#"{{"uid":2,"components":{{"Light":{{"kind":0,"intensity":3.0}},"Transform":{{"rot":{sun_rot}}}}}}}"#);
+    let sphere = format!(r#"{{"uid":3,"components":{{"Transform":{{"scale":[3,3,3]}},"MeshRenderer":{{"mesh":"sphere",{material}}}{ext}}}}}"#);
+    let env = format!(r#"{{"uid":9,"components":{{"Environment":{{"sky":false,"ambient":{ambient},"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}}}}"#);
+    draw(gpu, &[&cam, &sun, &sphere, &env], &Quality::high(), 200, 200)
+}
+
+fn brightest(f: &Frame) -> f32 {
+    f.rgba.chunks(4).map(|p| lum([p[0], p[1], p[2]])).fold(0.0, f32::max)
+}
+
+#[test]
+fn a_clear_coat_adds_a_sharp_highlight_over_a_rough_base() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let base = r#""color":[0.6,0.05,0.05,1],"metallic":0.0,"roughness":0.85"#;
+    // the sun shines from up and a little to the right, in front: the highlight is on the upper right of the ball
+    let sun = "[-0.35,0.25,0.0,0.9]";
+    let plain = ball(&mut gpu, base, "", sun, 0.3);
+    let coated = ball(&mut gpu, base, r#","MaterialExt":{"clearcoat":1.0,"clearcoat_roughness":0.05}"#, sun, 0.3);
+    let (a, b) = (brightest(&plain), brightest(&coated));
+    assert!(b > a + 40.0, "the coat should add a bright highlight: {a} -> {b}");
+    // away from the highlight the coat only dims the base a little
+    let (p, c) = (lum(px(&plain, 60, 150)), lum(px(&coated, 60, 150)));
+    assert!(c < p * 1.15 + 6.0, "{p} vs {c}");
+}
+
+#[test]
+fn sheen_brightens_the_rim_of_cloth_and_leaves_the_middle_alone() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let base = r#""color":[0.05,0.1,0.35,1],"metallic":0.0,"roughness":0.9"#;
+    let sun = "[-0.2,0.2,0.0,0.96]";
+    let plain = ball(&mut gpu, base, "", sun, 1.0);
+    let velvet = ball(&mut gpu, base, r#","MaterialExt":{"sheen":1.0}"#, sun, 1.0);
+    // a ring of pixels near the edge of the ball, and its middle
+    let rim = |f: &Frame| (0..360).step_by(15).map(|d| { let a = (d as f32).to_radians(); lum(px(f, (100.0 + 70.0 * a.cos()) as u32, (100.0 + 70.0 * a.sin()) as u32)) }).sum::<f32>() / 24.0;
+    let (r0, r1) = (rim(&plain), rim(&velvet));
+    eprintln!("rim {r0} -> {r1}");
+    assert!(r1 > r0 * 1.15 + 3.0, "the rim should glow: {r0} -> {r1}");
+    let (m0, m1) = (lum(px(&plain, 100, 100)), lum(px(&velvet, 100, 100)));
+    assert!((m1 - m0).abs() < m0 * 0.25 + 4.0, "the middle should stay: {m0} -> {m1}");
+}
+
+#[test]
+fn subsurface_lets_light_wrap_round_the_terminator_in_its_own_colour() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let base = r#""color":[0.8,0.6,0.5,1],"metallic":0.0,"roughness":0.6"#;
+    // the sun shines across the picture: half the ball is lit, half in the dark (no ambient)
+    let sun = "[0,0.7071,0,0.7071]";
+    let plain = ball(&mut gpu, base, "", sun, 0.0);
+    let skin = ball(&mut gpu, base, r#","MaterialExt":{"subsurface":1.0,"subsurface_color":[1.0,0.2,0.1]}"#, sun, 0.0);
+    // the dark half is the one whose middle column is darker in the plain picture
+    let half = |f: &Frame, left: bool| -> [f32; 3] {
+        let (x0, x1) = if left { (80u32, 99u32) } else { (101u32, 120u32) };
+        let mut sum = [0.0f32; 3];
+        let mut n = 0.0;
+        for y in 85..115u32 {
+            for x in x0..x1 {
+                let p = px(f, x, y);
+                for k in 0..3 {
+                    sum[k] += p[k] as f32;
+                }
+                n += 1.0;
+            }
+        }
+        [sum[0] / n, sum[1] / n, sum[2] / n]
+    };
+    let left_dark = lum(half(&plain, true).map(|v| v as u8)) < lum(half(&plain, false).map(|v| v as u8));
+    let (dark_plain, dark_skin) = (half(&plain, left_dark), half(&skin, left_dark));
+    assert!(dark_skin[0] > dark_plain[0] * 1.3 + 4.0, "light should wrap round into the dark side: {dark_plain:?} -> {dark_skin:?}");
+    assert!(dark_skin[0] - dark_skin[1] > dark_plain[0] - dark_plain[1] + 3.0, "and be reddish: {dark_plain:?} -> {dark_skin:?}");
+}

@@ -1792,6 +1792,21 @@ component! {
 }
 
 component! {
+    /// More to a surface than a base colour, a metal/rough number and maps (the GPU renderer's high qualities; beside a `MeshRenderer`; the reference picture and classic mode ignore it). **`clearcoat`** (0 to 1) puts a second, smooth
+    /// lobe over the surface, as the lacquer on a car, a lacquered table or wet paint has: a sharp highlight and a mirror of the sky over a duller base that it also dims a little (`clearcoat_roughness` 0.02 to 1, 0.05 glass-smooth).
+    /// **`sheen`** (0 to 1) is the soft glow at grazing angles of velvet, felt, satin and fuzzy leaves, tinted a little by the base colour. **`subsurface`** (0 to 1) lets light wrap round the terminator and bleed through, in
+    /// `subsurface_color` (reddish for skin, wax and ears held up to the sun; yellow-green for leaves): the shaded side of a lit cheek is warm, not dead. All three are cheap (a few operations a light) and cost nothing for a surface without
+    /// the component.
+    pub struct MaterialExt {
+        pub clearcoat: f32 = 0.0,
+        pub clearcoat_roughness: f32 = 0.05,
+        pub sheen: f32 = 0.0,
+        pub subsurface: f32 = 0.0,
+        pub subsurface_color: [f32; 3] = [1.0, 0.35, 0.25],
+    }
+}
+
+component! {
     /// A current in the water of this entity (beside a `Water` sheet or a `WaterBody`): the water moves at `velocity` (metres per second in x and z). `Floater` bodies on it are carried along (and a body held still feels
     /// the push as drag); nothing else is moved by it. A river that follows a heightmap flows one way over all of it: put one `WaterFlow` on each stretch you want to run its own way.
     pub struct WaterFlow {

@@ -1316,6 +1316,12 @@ impl GpuRenderer {
                 },
             };
             let mut data = data;
+            // `MaterialExt` rides in the two spare words of the ids, a byte for each number
+            if let (Some(e), true) = (&m.ext, high) {
+                let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
+                data.ids[2] = q(e[0]) | (q(e[1]) << 8) | (q(e[2]) << 16) | (q(e[3]) << 24);
+                data.ids[3] = q(e[4]) | (q(e[5]) << 8) | (q(e[6]) << 16);
+            }
             if let (Some(wl), true) = (&m.water_look, high) {
                 data.n0[3] = wl[3];
                 data.n1[3] = wl[4];

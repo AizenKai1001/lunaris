@@ -28,6 +28,10 @@
 var<private> g_ao: f32 = 1.0;
 // How much the surface normal changes across this pixel (set by `lit_mesh`, which has the derivatives): `lit_tail` widens the highlight by it, so that a shiny surface with fine bumps or ripples shimmers less (specular anti-aliasing).
 var<private> g_nvar: f32 = 0.0;
+// `MaterialExt` of the object being shaded (set by `lit_mesh` from the two spare words of its ids): the clear coat's strength and roughness, the sheen, and the subsurface strength with its colour.
+var<private> g_coat: vec2<f32> = vec2<f32>(0.0);
+var<private> g_sheen: f32 = 0.0;
+var<private> g_sss: vec4<f32> = vec4<f32>(0.0);
 var<private> g_rough: f32 = -1.0;
 var<private> g_metal: f32 = 0.0;
 
@@ -356,6 +360,13 @@ fn d_ggx(nh: f32, a: f32) -> f32 {
     return a2 / (PI * d * d);
 }
 
+// Estevez and Kulla's Charlie distribution for the soft glow of cloth.
+fn d_charlie(nh: f32, rough: f32) -> f32 {
+    let inv_a = 1.0 / max(rough, 0.05);
+    let sin2 = max(1.0 - nh * nh, 0.0);
+    return (2.0 + inv_a) * pow(sin2, inv_a * 0.5) / (2.0 * PI);
+}
+
 fn vis_smith(nl: f32, nv: f32, a: f32) -> f32 {
     let a2 = a * a;
     let gv = nl * sqrt(nv * nv * (1.0 - a2) + a2);
@@ -380,6 +391,8 @@ fn shade_pbr(albedo: vec3<f32>, metallic: f32, rough_in: f32, world: vec3<f32>, 
     let nv = max(dot(n, v), 1e-4);
     var lo_diff = vec3<f32>(0.0);
     var lo_spec = vec3<f32>(0.0);
+    var lo_sheen = vec3<f32>(0.0);
+    var lo_coat = 0.0;
     let count = u32(frame.p2.y);
     let sun = i32(frame.p4.x);
     for (var i = 0u; i < count; i = i + 1u) {
@@ -400,10 +413,14 @@ fn shade_pbr(albedo: vec3<f32>, metallic: f32, rough_in: f32, world: vec3<f32>, 
         } else {
             ldir = l.vec.xyz;
         }
-        let nl = dot(n, ldir);
-        if (nl <= 0.0 || atten <= 0.0) {
+        let nl_raw = dot(n, ldir);
+        // with subsurface the light wraps a little way round the terminator
+        let wrap = g_sss.x * 0.6;
+        let nlw = clamp((nl_raw + wrap) / (1.0 + wrap), 0.0, 1.0);
+        if ((nl_raw <= 0.0 && nlw <= 0.0) || atten <= 0.0) {
             continue;
         }
+        let nl = max(nl_raw, 0.0);
         var radiance = l.color.rgb * atten;
         if (i32(i) == sun) {
             radiance = radiance * shadow;
@@ -420,8 +437,20 @@ fn shade_pbr(albedo: vec3<f32>, metallic: f32, rough_in: f32, world: vec3<f32>, 
         let f = fresnel(f0, vh);
         let spec = d_ggx(nh, a) * vis_smith(nl, nv, a) * f;
         // radiance counts as "irradiance / pi", so the diffuse term needs no 1 / pi and the specular one a factor pi
-        lo_diff = lo_diff + (vec3<f32>(1.0) - f) * diff_col * radiance * nl;
+        lo_diff = lo_diff + (vec3<f32>(1.0) - f) * diff_col * radiance * mix(nl, nlw, g_sss.x);
         lo_spec = lo_spec + spec * PI * radiance * nl;
+        if (g_sss.x > 0.0) {
+            // the colour the light picks up in the body shows at the terminator
+            lo_diff = lo_diff + g_sss.yzw * diff_col * radiance * (0.3 * g_sss.x * exp(-nl_raw * nl_raw * 6.0) * nlw);
+        }
+        if (g_sheen > 0.0) {
+            lo_sheen = lo_sheen + radiance * (d_charlie(nh, 0.45) / (4.0 * (nl + nv - nl * nv) + 1e-3) * PI * nl);
+        }
+        if (g_coat.x > 0.0) {
+            let ac = max(g_coat.y * g_coat.y, 0.002);
+            let fc = 0.04 + 0.96 * pow(1.0 - vh, 5.0);
+            lo_coat = lo_coat + d_ggx(nh, ac) * (0.25 / max(vh * vh, 1e-3)) * fc * PI * nl * (radiance.x + radiance.y + radiance.z) * (1.0 / 3.0);
+        }
     }
     // the sky around the surface
     let amb_diff = sky_irradiance(n) * diff_col * ao;
@@ -430,7 +459,23 @@ fn shade_pbr(albedo: vec3<f32>, metallic: f32, rough_in: f32, world: vec3<f32>, 
     // a rough surface sees a blurred sky
     env = mix(env, sky_irradiance(r), smoothstep(0.15, 0.95, rough));
     let amb_spec = env * env_brdf(f0, rough, nv) * specular_occlusion(nv, ao, rough) * frame.p0.x;
-    return Pbr(lo_diff + amb_diff, lo_spec + amb_spec);
+    var diffuse = lo_diff + amb_diff;
+    var spec = lo_spec + amb_spec;
+    if (g_sheen > 0.0) {
+        // a glow at grazing angles in a tint of the base colour: from the lights and from the sky
+        let sheen_col = mix(vec3<f32>(1.0), albedo, 0.35) * (0.7 * g_sheen);
+        // velvet is dark head-on and glows at the rim: the lights' share counts a fifth face-on and in full at grazing angles
+        let graze = 0.2 + 0.8 * pow(1.0 - nv, 2.0);
+        diffuse = diffuse + sheen_col * (lo_sheen * graze + sky_irradiance(n) * (0.35 * pow(1.0 - nv, 4.0)));
+    }
+    if (g_coat.x > 0.0) {
+        // the lacquer: it takes a share of the light (more at grazing angles) from what is below, and adds its own sharp highlight and mirror
+        let fcn = (0.04 + 0.96 * pow(1.0 - nv, 5.0)) * g_coat.x;
+        let env_coat = sky_color(r, true) * env_brdf(vec3<f32>(0.04), max(g_coat.y, 0.045), nv) * specular_occlusion(nv, ao, g_coat.y) * frame.p0.x;
+        diffuse = diffuse * (1.0 - fcn);
+        spec = spec * (1.0 - fcn) + vec3<f32>(lo_coat) * g_coat.x + env_coat * g_coat.x;
+    }
+    return Pbr(diffuse, spec);
 }
 
 // What a reflection probe changes about `shade_pbr`'s result: inside its box what it captured takes the place of the sky's reflection and of the sky's ambient light (the probe holds the light of the
@@ -498,6 +543,10 @@ fn lit_mesh(in: MeshOut) -> Lit {
         g_rough = clamp(armv.g * o.pbr.w, 0.045, 1.0);
         g_metal = armv.b;
     }
+    // `MaterialExt`: a byte for each number in the two spare words of the ids
+    g_coat = vec2<f32>(f32(o.ids.z & 255u), f32((o.ids.z >> 8u) & 255u)) / 255.0;
+    g_sheen = f32((o.ids.z >> 16u) & 255u) / 255.0;
+    g_sss = vec4<f32>(f32((o.ids.z >> 24u) & 255u), f32(o.ids.w & 255u), f32((o.ids.w >> 8u) & 255u), f32((o.ids.w >> 16u) & 255u)) / 255.0;
     // the spread of the normal over the pixel (Kaplanyan / Tokuyoshi): twice the variance of its screen-space slope, capped
     let dndx = dpdx(n);
     let dndy = dpdy(n);

@@ -128,7 +128,8 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
     let high = Quality::high();
     for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0), ("terrain_layers", 480)] {
         let mut sim = load(&root, name, ticks);
-        let opts = RenderOptions { width: 960, height: 540, ..RenderOptions::default() };
+        // small: a picture in a high quality is eight draws (its effects settle), and a machine that draws with the CPU makes each of them slowly
+        let opts = RenderOptions { width: 480, height: 270, ..RenderOptions::default() };
         let mut tex = TextureCache::new(Some(root.clone()));
         let g = gpu.render_to_image(&mut sim.world, &mut tex, &opts, &high).expect("gpu render");
         png(&out.join(format!("{name}-high.png")), g.width, g.height, &g.rgba);
@@ -144,7 +145,7 @@ fn entity_ids_agree_with_the_reference_renderer() {
     let root = repo_root();
     for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("coin_chase", 60), ("pile", 120), ("clockwork", 300), ("terrain_layers", 480)] {
         let mut sim = load(&root, name, ticks);
-        let opts = RenderOptions { width: 640, height: 360, ..RenderOptions::default() };
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
         let mut tex_cpu = TextureCache::new(Some(root.clone()));
         let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
         let mut tex_gpu = TextureCache::new(Some(root.clone()));
