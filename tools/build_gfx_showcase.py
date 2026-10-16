@@ -66,7 +66,13 @@ for uid, comps in (
     call("spawn", {"uid": uid, "components": comps})
 # a plain that looks like grass in a photograph: a deep natural green that goes to straw in patches, not the lime of the texture's own colour
 for e in call("query", {"with": ["GrassField"], "select": []}).get("entities", []):
-    call("set", {"uid": e["uid"], "component": "GrassField", "value": {"color_a": [0.5, 0.66, 0.38], "color_b": [0.95, 0.82, 0.52], "patch_size": 90.0, "density": 14.0, "size": [0.4, 0.8]}})
+    call("set", {"uid": e["uid"], "component": "GrassField", "value": {"mesh": "", "radius": 160, "density": 20.0, "height": [0.28, 0.62], "blade_width": 0.04, "color_a": [0.9, 1.0, 0.8], "color_b": [1.5, 1.2, 0.8], "patch_size": 70.0}})
+# the ground under a meadow is in the shade of the blades: the lime of the texture's own colour is far too bright between them
+for e in call("query", {"with": ["TerrainLayers"], "select": ["TerrainLayers"]}).get("entities", []):
+    tl = e["components"]["TerrainLayers"]
+    import re as _re
+    dim = lambda m: "tint=" + ",".join(f"{float(v) * 0.42:.3f}" for v in m.group(1).split(","))
+    call("set", {"uid": e["uid"], "component": "TerrainLayers", "value": {"layers": _re.sub(r"tint=([0-9.,]+)", dim, tl["layers"])}})
 # trees and stones on the plain, so that the sun has something to throw shadows with and the haze something to hide: Poly Haven's CC0 models when `tools/fetch_polyhaven_model.py` and
 # `tools/prepare_polyhaven_models.py` have been run (young conifers in threes, boulders, stones, a fallen trunk), the low-poly pine of the caldera example otherwise
 ground = [e["uid"] for e in call("query", {"with": ["Terrain"], "select": []}).get("entities", [])][0]

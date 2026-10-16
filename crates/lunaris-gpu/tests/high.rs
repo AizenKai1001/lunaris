@@ -1007,3 +1007,120 @@ fn subsurface_lets_light_wrap_round_the_terminator_in_its_own_colour() {
     assert!(dark_skin[0] > dark_plain[0] * 1.3 + 4.0, "light should wrap round into the dark side: {dark_plain:?} -> {dark_skin:?}");
     assert!(dark_skin[0] - dark_skin[1] > dark_plain[0] - dark_plain[1] + 3.0, "and be reddish: {dark_plain:?} -> {dark_skin:?}");
 }
+
+/// A grass field of single blades on a small flat terrain (a 16-bit picture the test writes), the camera low and looking out over it, the sun low behind.
+fn meadow(gpu: &mut GpuRenderer, field: &str, ground: &str, camera_y: f32) -> Frame {
+    let dir = std::env::temp_dir().join(format!("lunaris-grass-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut png = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut png, 17, 17);
+        enc.set_color(png::ColorType::Grayscale);
+        enc.set_depth(png::BitDepth::Sixteen);
+        let mut w = enc.write_header().unwrap();
+        w.write_image_data(&vec![0x80u8; 17 * 17 * 2]).unwrap();
+    }
+    std::fs::write(dir.join("flat.png"), &png).unwrap();
+    let cam = format!(r#"{{"uid":1,"components":{{"Camera":{{"fov_y":55,"clear":[0,0,0,1]}},"Transform":{{"pos":[0,{camera_y},0],"rot":[-0.12,0,0,0.9928]}}}}}}"#);
+    let sun = r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3.0},"Transform":{"rot":[-0.35,0.9,0.0,0.3]}}}"#;
+    let terrain = format!(r#"{{"uid":3,"components":{{"Transform":{{"pos":[0,0,0]}},"Terrain":{{"heightmap":"flat.png","size":[400,400],"height":1,"color":{ground}}}}}}}"#);
+    let grass = format!(r#"{{"uid":4,"components":{{"GrassField":{field}}}}}"#);
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":true,"tonemap":1}}}"#;
+    let text = format!(r#"{{"lunaris":1,"entities":[{cam},{sun},{terrain},{grass},{env}]}}"#);
+    let mut sim = Sim::new(1);
+    sim.asset_root = Some(dir.clone());
+    sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+    sim.step_n(2);
+    let mut tex = TextureCache::new(Some(dir));
+    let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+    gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")
+}
+
+#[test]
+fn a_field_of_single_blades_is_full_of_detail_and_a_bare_one_is_not() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let ground = "[0.2,0.15,0.1,1]";
+    let field = r#"{"terrain":3,"radius":120,"density":20,"height":[0.3,0.6]}"#;
+    let bare = meadow(&mut gpu, r#"{"terrain":3,"enabled":false}"#, ground, 1.4);
+    let grass = meadow(&mut gpu, field, ground, 1.4);
+    // the foreground (bottom third of the picture): bare ground is smooth, the blades make a lot of edges and a green that the brown ground does not have
+    let (g_lo, g_hi) = (120u32, 179u32);
+    let busy = |f: &Frame| -> f32 {
+        let mut sum = 0.0;
+        let mut n = 0.0;
+        for y in g_lo..g_hi {
+            for x in 1..319u32 {
+                sum += (lum(px(f, x, y)) - lum(px(f, x - 1, y))).abs();
+                n += 1.0;
+            }
+        }
+        sum / n
+    };
+    let green = |f: &Frame| -> f32 { (g_lo..g_hi).map(|y| (0..320u32).map(|x| { let p = px(f, x, y); p[1] as f32 - 0.5 * (p[0] as f32 + p[2] as f32) }).sum::<f32>()).sum::<f32>() / (59.0 * 320.0) };
+    assert!(busy(&grass) > busy(&bare) * 3.0 + 1.0, "{} vs {}", busy(&grass), busy(&bare));
+    assert!(green(&grass) > green(&bare) + 4.0, "{} vs {}", green(&grass), green(&bare));
+    // the same field twice is the same picture
+    let again = meadow(&mut gpu, field, ground, 1.4);
+    assert_eq!(grass.rgba, again.rgba);
+}
+
+#[test]
+fn untile_breaks_up_the_repetition_of_a_texture_and_leaves_it_alone_otherwise() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // a 64 x 64 picture of noise (deterministic), repeated three times over a plane seen from above
+    let dir = std::env::temp_dir().join(format!("lunaris-untile-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut state = 12345u32;
+    let mut px_rgba = Vec::new();
+    for _ in 0..64 * 64 {
+        for _ in 0..3 {
+            state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+            px_rgba.push((state >> 24) as u8);
+        }
+        px_rgba.push(255);
+    }
+    let mut data = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut data, 64, 64);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.write_header().unwrap().write_image_data(&px_rgba).unwrap();
+    }
+    std::fs::write(dir.join("noise.png"), &data).unwrap();
+    let mut scene = |maps: &str| {
+        let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":40},"Transform":{"pos":[0,10,0],"rot":[-0.7071,0,0,0.7071]}}}"#;
+        let plane = format!(r#"{{"uid":3,"components":{{"Transform":{{"scale":[10,1,10]}},"MeshRenderer":{{"mesh":"plane","color":[1,1,1,1],"texture":"noise.png","uv_scale":[3,3],"roughness":1.0}}{maps}}}}}"#);
+        let env = r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#;
+        let text = format!(r#"{{"lunaris":1,"entities":[{cam},{plane},{env}]}}"#);
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+        gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")
+    };
+    // how much the picture repeats itself: the correlation of a stretch of a row with the stretch one period further on
+    let repeat = |f: &Frame| -> f32 {
+        // the plane is 10 m wide, seen over 2 x 10 m x tan(20 deg) x (320 / 180) = 12.9 m of the picture's width: a period of 3.33 m is 82 pixels
+        let p = 82u32;
+        let (mut sab, mut saa, mut sbb) = (0.0f64, 0.0f64, 0.0f64);
+        for y in 70..110u32 {
+            for x in 42..(42 + 80) {
+                let a = lum(px(f, x, y)) as f64 - 128.0;
+                let b = lum(px(f, x + p, y)) as f64 - 128.0;
+                sab += a * b;
+                saa += a * a;
+                sbb += b * b;
+            }
+        }
+        (sab / (saa * sbb).sqrt()) as f32
+    };
+    let plain = scene("");
+    let untiled = scene(r#","PbrMaps":{"untile":true}"#);
+    let (a, b) = (repeat(&plain), repeat(&untiled));
+    assert!(a > 0.85, "a repeated texture repeats: {a}");
+    assert!(b < a - 0.3, "untiled it does not come round again: {a} -> {b}");
+    // and the picture is not flat or black
+    let distinct: std::collections::BTreeSet<[u8; 3]> = untiled.rgba.chunks(4).map(|p| [p[0], p[1], p[2]]).collect();
+    assert!(distinct.len() > 50);
+}

@@ -704,6 +704,8 @@ pub struct MeshPbr {
     pub normal_strength: f32,
     pub ao_strength: f32,
     pub roughness_scale: f32,
+    /// The texture and the maps are blended from three offset copies over a hexagonal grid (no visible repetition).
+    pub untile: bool,
 }
 
 /// A sprite or a tile map: a flat textured mesh, alpha blended, drawn after the 3D meshes, far to near.
@@ -969,8 +971,62 @@ impl EnvData {
 }
 
 /// A `GrassField`: the ground it grows on and how it looks and moves (only the GPU renderer's high qualities draw it).
+/// The numbers of a field made of single blades (`GrassField` with no mesh) and the bundles of blades its three rings draw (near, middle, far: 7, 4 and 2 pairs of vertices).
+#[derive(Clone)]
+pub struct GrassBlades {
+    pub meshes: [Arc<Mesh>; 3],
+    pub height: [f32; 2],
+    pub width: f32,
+    pub clump: f32,
+    pub clump_size: f32,
+    pub bend: f32,
+    pub base: V3,
+    pub tip: V3,
+}
+
+/// How many blades one instance of a bundle holds.
+pub const BLADES_PER_BUNDLE: u32 = 4;
+
+/// A bundle of `BLADES_PER_BUNDLE` blades, each a ribbon of `pairs` pairs of vertices and a tip: a vertex has `pos` = (side -1 or 1, or 0 at the tip; height along the blade 0 to 1; which blade of the bundle), `uv` = (side as 0..1, height).
+/// The shape is made in the vertex shader (`vs_grass`); the numbers here only say which vertex is which. The same bundle is shared by every field (made once).
+pub fn blade_bundle(pairs: u32) -> Arc<Mesh> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<HashMap<u32, Arc<Mesh>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
+    cache
+        .entry(pairs)
+        .or_insert_with(|| {
+            let (mut pos, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new());
+            for b in 0..BLADES_PER_BUNDLE {
+                let base = pos.len() as u32;
+                for p in 0..pairs {
+                    let t = p as f32 / pairs as f32;
+                    for side in [-1.0f32, 1.0] {
+                        pos.push([side, t, b as f32]);
+                        uv.push([side * 0.5 + 0.5, t]);
+                    }
+                }
+                pos.push([0.0, 1.0, b as f32]);
+                uv.push([0.5, 1.0]);
+                for p in 0..pairs - 1 {
+                    let a = base + 2 * p;
+                    idx.extend_from_slice(&[a, a + 1, a + 2, a + 1, a + 3, a + 2]);
+                }
+                let last = base + 2 * (pairs - 1);
+                idx.extend_from_slice(&[last, last + 1, last + 2]);
+            }
+            let n = pos.len();
+            Arc::new(Mesh { pos, nrm: vec![[0.0, 0.0, 1.0]; n], uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None })
+        })
+        .clone()
+}
+
 pub struct SceneGrass {
     pub uid: u64,
+    /// `Some`: the field is made of single blades and `mesh` is only a placeholder.
+    pub blades: Option<GrassBlades>,
     pub heights: Arc<lunaris_sim::terrain::Heightfield>,
     pub terrain_pos: V3,
     pub terrain_size: [f32; 2],
@@ -1570,11 +1626,11 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                 let name_n = world.strings().get(p.normal.0).to_string();
                 let name_a = world.strings().get(p.arm.0).to_string();
                 let name_h = world.strings().get(p.height.0).to_string();
-                if name_n.is_empty() && name_a.is_empty() && name_h.is_empty() {
+                if name_n.is_empty() && name_a.is_empty() && name_h.is_empty() && !p.untile {
                     return None;
                 }
                 let fin = |v: f32, hi: f32| if v.is_finite() { v.clamp(0.0, hi) } else { 1.0 };
-                Some(MeshPbr { normal: (!name_n.is_empty()).then(|| textures.get(&name_n)), arm: (!name_a.is_empty()).then(|| textures.get(&name_a)), disp: (!name_h.is_empty()).then(|| textures.get(&name_h)), height_scale: fin(p.height_scale, 0.3), normal_strength: fin(p.normal_strength, 4.0), ao_strength: fin(p.ao_strength, 1.0), roughness_scale: fin(p.roughness_scale, 4.0) })
+                Some(MeshPbr { normal: (!name_n.is_empty()).then(|| textures.get(&name_n)), arm: (!name_a.is_empty()).then(|| textures.get(&name_a)), disp: (!name_h.is_empty()).then(|| textures.get(&name_h)), height_scale: fin(p.height_scale, 0.3), normal_strength: fin(p.normal_strength, 4.0), ao_strength: fin(p.ao_strength, 1.0), roughness_scale: fin(p.roughness_scale, 4.0), untile: p.untile })
             }),
         });
     }
@@ -1749,15 +1805,38 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             let hname = world.strings().get(t.heightmap.0).to_string();
             let Some(heights) = textures.heightfield(&hname) else { continue };
             let mname = world.strings().get(g.mesh.0).to_string();
-            let Some(mesh) = textures.model(&mname) else {
-                warnings.push(format!("entity {uid}: GrassField.mesh `{mname}` could not be loaded (a .glb of a few crossed cards of grass)"));
-                continue;
+            let blades = if mname.is_empty() {
+                let lin3 = |c: [f32; 3]| [fin(c[0], 0.0, 4.0, 0.1), fin(c[1], 0.0, 4.0, 0.1), fin(c[2], 0.0, 4.0, 0.05)];
+                let (h0, h1) = (fin(g.height[0], 0.01, 5.0, 0.25), fin(g.height[1], 0.01, 5.0, 0.55));
+                Some(GrassBlades {
+                    meshes: [blade_bundle(7), blade_bundle(4), blade_bundle(2)],
+                    height: [h0.min(h1), h0.max(h1)],
+                    width: fin(g.blade_width, 0.002, 0.5, 0.035),
+                    clump: fin(g.clump, 0.0, 1.0, 0.8),
+                    clump_size: fin(g.clump_size, 0.1, 50.0, 1.1),
+                    bend: fin(g.bend, 0.0, 1.0, 0.55),
+                    base: lin3(g.base_color),
+                    tip: lin3(g.tip_color),
+                })
+            } else {
+                None
+            };
+            let mesh = match &blades {
+                Some(b) => b.meshes[0].clone(),
+                None => match textures.model(&mname) {
+                    Some(m) => m,
+                    None => {
+                        warnings.push(format!("entity {uid}: GrassField.mesh `{mname}` could not be loaded (a .glb of a few crossed cards of grass; leave it empty for single blades)"));
+                        continue;
+                    }
+                },
             };
             let tname = world.strings().get(g.texture.0).to_string();
             let tex = if tname.is_empty() { None } else { Some(textures.get(&tname)) };
             let lin = |c: [f32; 3]| [fin(c[0], 0.0, 4.0, 1.0), fin(c[1], 0.0, 4.0, 1.0), fin(c[2], 0.0, 4.0, 1.0)];
             grass.push(SceneGrass {
                 uid,
+                blades,
                 heights,
                 terrain_pos: tr.pos,
                 terrain_size: [fin(t.size[0].abs(), 0.01, 1.0e6, 1.0), fin(t.size[1].abs(), 0.01, 1.0e6, 1.0)],

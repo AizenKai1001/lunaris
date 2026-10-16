@@ -30,6 +30,8 @@ var<private> g_ao: f32 = 1.0;
 var<private> g_nvar: f32 = 0.0;
 // How much sun shines through the blade being shaded (grass sends it in the length of its normal: one plus the amount); `lit_tail` adds it where the sun reaches, so the shadow of a rock falls on the blades too.
 var<private> g_trans: f32 = 0.0;
+// Whether the object being shaded is grass (its object has kind 3): its highlights are dull (a blade is a diffuse thing; only its backlit sheen is strong, and that is the sun through it).
+var<private> g_grass: bool = false;
 // `MaterialExt` of the object being shaded (set by `lit_mesh` from the two spare words of its ids): the clear coat's strength and roughness, the sheen, and the subsurface strength with its colour.
 var<private> g_coat: vec2<f32> = vec2<f32>(0.0);
 var<private> g_sheen: f32 = 0.0;
@@ -508,6 +510,7 @@ fn lit_mesh(in: MeshOut) -> Lit {
     var n = normalize(in.nrm);
     // only grass (its object has kind 3) carries the amount in its normal's length; the normal of anything else is scaled by its transform
     g_trans = select(0.0, max(length(in.nrm) - 1.0, 0.0), o.ids.y == 3u);
+    g_grass = o.ids.y == 3u;
     if (o.ids.y == 1u) {
         // the ripples tilt the surface's own normal (flat for a sheet, leaning downstream for a river)
         n = normalize(wave_normal(in.world.xz, o.uvrect.y, o.uvrect.z, o.uvrect.w) + (n - vec3<f32>(0.0, 1.0, 0.0)));
@@ -528,17 +531,33 @@ fn lit_mesh(in: MeshOut) -> Lit {
     if (!classic && (maps & 4u) != 0u && o.uvrect.y > 0.0) {
         tuv = parallax_uv(tuv, normalize(frame.eye.xyz - in.world), normalize(in.nrm), dpx, dpy, duvx, duvy, o.uvrect.y);
     }
-    let t = textureSampleGrad(tex, tex_samp, tuv, duvx, duvy);
+    // `PbrMaps.untile`: the texture and the maps are blended from three offset copies, so no repetition shows
+    let untile = !classic && (maps & 8u) != 0u;
+    var hx: HexT;
+    var t: vec4<f32>;
+    if (untile) {
+        hx = hex_grid(tuv, 0.0);
+        t = hex_colour(tex, tex_samp, hx, duvx, duvy);
+    } else {
+        t = textureSampleGrad(tex, tex_samp, tuv, duvx, duvy);
+    }
     // the relief of the built-in materials: the height map's slope, as seen from this pixel, tilts the normal
-    let relief = textureSampleGrad(height_tex, tex_samp, tuv, duvx, duvy).r * o.uvrect.x;
+    var relief = textureSampleGrad(height_tex, tex_samp, tuv, duvx, duvy).r * o.uvrect.x;
+    if (untile) {
+        relief = hex_fetch(height_tex, tex_samp, hx, duvx, duvy).r * o.uvrect.x;
+    }
     let dhx = dpdx(relief);
     let dhy = dpdy(relief);
     if (!classic && o.uvrect.x > 0.0) {
         n = bump_normal(n, dpx, dpy, dhx, dhy);
     }
     // the maps are always sampled (derivatives need uniform control flow); whether they count is decided afterwards
-    let nmap = textureSampleGrad(normal_tex, tex_samp, tuv, duvx, duvy).xyz * 2.0 - vec3<f32>(1.0);
-    let armv = textureSampleGrad(arm_tex, tex_samp, tuv, duvx, duvy);
+    var nmap = textureSampleGrad(normal_tex, tex_samp, tuv, duvx, duvy).xyz * 2.0 - vec3<f32>(1.0);
+    var armv = textureSampleGrad(arm_tex, tex_samp, tuv, duvx, duvy);
+    if (untile) {
+        nmap = hex_fetch(normal_tex, tex_samp, hx, duvx, duvy).xyz * 2.0 - vec3<f32>(1.0);
+        armv = hex_fetch(arm_tex, tex_samp, hx, duvx, duvy);
+    }
     if (!classic && (maps & 1u) != 0u) {
         n = map_normal(n, dpx, dpy, duvx, duvy, vec3<f32>(nmap.xy * o.pbr.x, nmap.z));
     }
@@ -623,9 +642,12 @@ fn lit_tail(in: MeshOut, o: Object, base: vec3<f32>, n: vec3<f32>, classic: bool
         shadow = shadow_factor(in.world, n);
     }
     var pbr = shade_pbr(base, metal, rough, in.world, n, v, ao, shadow);
+    if (g_grass) {
+        pbr.spec = pbr.spec * 0.3;
+    }
     if (g_trans > 0.0 && i32(frame.p4.x) >= 0) {
         // the sun through the blade, in the blade's colour, where the sun reaches it
-        pbr.diffuse = pbr.diffuse + base * frame.lights[u32(frame.p4.x)].color.rgb * vec3<f32>(0.9, 0.8, 0.33) * (g_trans * shadow);
+        pbr.diffuse = pbr.diffuse + base * frame.lights[u32(frame.p4.x)].color.rgb * vec3<f32>(0.4, 0.36, 0.12) * (g_trans * shadow);
     }
     // light that bounced off the other surfaces in view (`GlobalIllumination`), in the colour of this one
     pbr.diffuse = pbr.diffuse + base * (1.0 - metal) * aot.rgb;
@@ -682,10 +704,103 @@ fn splat_weights(uv: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(1.0, 0.0, 0.0, 0.0);
 }
 
+// ---- no two places alike: texture de-tiling by hex-tiling (Morten Mikkelsen, "Practical Real-Time Hex-Tiling", JCGT 11(3), 2022; after Heitz and Neyret's stochastic texturing). The plane is cut into a hexagonal grid
+// (the triangles of a skewed grid, three corners each); every corner gives the texture its own random offset (and turn); a pixel is the blend of the three copies its triangle's corners ask for, weighted by how
+// close it is to each corner (sharpened, so the blend is narrow and the texture's contrast stays) and by the copies' brightness (so a dark patch does not wash a bright one out).
+struct HexT {
+    st1: vec2<f32>,
+    st2: vec2<f32>,
+    st3: vec2<f32>,
+    r1: mat2x2<f32>,
+    r2: mat2x2<f32>,
+    r3: mat2x2<f32>,
+    w: vec3<f32>,
+};
+
+// The weights the last `hex_colour` found: the other maps of the same surface (normal, roughness, height) are blended with the same ones, so that they stay in step with the colour.
+var<private> g_hex_w: vec3<f32> = vec3<f32>(1.0, 0.0, 0.0);
+
+fn hex_rot(h: f32, strength: f32) -> mat2x2<f32> {
+    let a = (h * 2.0 - 1.0) * 3.14159265 * strength;
+    let c = cos(a);
+    let s = sin(a);
+    return mat2x2<f32>(vec2<f32>(c, s), vec2<f32>(-s, c));
+}
+
+// `rot_strength` 0 only moves the copies about (normal maps stay right: a turned copy would need its normals turned too); 1 turns them by up to half a turn either way.
+fn hex_grid(st: vec2<f32>, rot_strength: f32) -> HexT {
+    let g = st * 3.4641016;
+    let skewed = vec2<f32>(g.x - 0.57735027 * g.y, 1.15470054 * g.y);
+    let base = vec2<i32>(floor(skewed));
+    let f = fract(skewed);
+    let z = 1.0 - f.x - f.y;
+    let s = step(0.0, -z);
+    let s2 = 2.0 * s - 1.0;
+    let i_s = i32(s);
+    let v1 = base + vec2<i32>(i_s, i_s);
+    let v2 = base + vec2<i32>(i_s, 1 - i_s);
+    let v3 = base + vec2<i32>(1 - i_s, i_s);
+    let h1 = hash3(v1.x, v1.y, 17.0);
+    let h2 = hash3(v2.x, v2.y, 17.0);
+    let h3 = hash3(v3.x, v3.y, 17.0);
+    var t: HexT;
+    t.r1 = hex_rot(h1.z, rot_strength);
+    t.r2 = hex_rot(h2.z, rot_strength);
+    t.r3 = hex_rot(h3.z, rot_strength);
+    let c1 = vec2<f32>(f32(v1.x) + 0.5 * f32(v1.y), f32(v1.y) / 1.15470054) / 3.4641016;
+    let c2 = vec2<f32>(f32(v2.x) + 0.5 * f32(v2.y), f32(v2.y) / 1.15470054) / 3.4641016;
+    let c3 = vec2<f32>(f32(v3.x) + 0.5 * f32(v3.y), f32(v3.y) / 1.15470054) / 3.4641016;
+    t.st1 = t.r1 * (st - c1) + c1 + h1.xy;
+    t.st2 = t.r2 * (st - c2) + c2 + h2.xy;
+    t.st3 = t.r3 * (st - c3) + c3 + h3.xy;
+    t.w = vec3<f32>(-z * s2, s - f.y * s2, s - f.x * s2);
+    return t;
+}
+
+fn hex_gain(x: vec3<f32>, r: f32) -> vec3<f32> {
+    let k = log(1.0 - r) / log(0.5);
+    let s = 2.0 * step(vec3<f32>(0.5), x);
+    let m = 2.0 * (1.0 - s);
+    let res = 0.5 * s + 0.25 * m * pow(max(vec3<f32>(0.0), s + x * m), vec3<f32>(k));
+    return res / (res.x + res.y + res.z);
+}
+
+// The colour: three copies, weighted by their corners' closeness and brightness; the weights are kept for the maps that go with it.
+fn hex_colour(tex: texture_2d<f32>, samp: sampler, t: HexT, dx: vec2<f32>, dy: vec2<f32>) -> vec4<f32> {
+    let c1 = textureSampleGrad(tex, samp, t.st1, t.r1 * dx, t.r1 * dy);
+    let c2 = textureSampleGrad(tex, samp, t.st2, t.r2 * dx, t.r2 * dy);
+    let c3 = textureSampleGrad(tex, samp, t.st3, t.r3 * dx, t.r3 * dy);
+    let lw = vec3<f32>(0.299, 0.587, 0.114);
+    var dw = vec3<f32>(dot(c1.rgb, lw), dot(c2.rgb, lw), dot(c3.rgb, lw));
+    dw = mix(vec3<f32>(1.0), dw, 0.6);
+    var w = dw * pow(t.w, vec3<f32>(7.0));
+    w = w / (w.x + w.y + w.z);
+    w = hex_gain(w, 0.75);
+    g_hex_w = w;
+    return w.x * c1 + w.y * c2 + w.z * c3;
+}
+
+// Another map of the same surface, blended with the weights `hex_colour` found.
+fn hex_fetch(tex: texture_2d<f32>, samp: sampler, t: HexT, dx: vec2<f32>, dy: vec2<f32>) -> vec4<f32> {
+    let c1 = textureSampleGrad(tex, samp, t.st1, t.r1 * dx, t.r1 * dy);
+    let c2 = textureSampleGrad(tex, samp, t.st2, t.r2 * dx, t.r2 * dy);
+    let c3 = textureSampleGrad(tex, samp, t.st3, t.r3 * dx, t.r3 * dy);
+    return g_hex_w.x * c1 + g_hex_w.y * c2 + g_hex_w.z * c3;
+}
+
 // One layer at this place: its colour (in the working space) and the height of its relief, 0 to 1.
 fn splat_layer(tex: texture_2d<f32>, hgt: texture_2d<f32>, uv: vec2<f32>, scale: vec2<f32>, classic: bool) -> vec4<f32> {
     let s = uv * scale;
     let tuv = vec2<f32>(s.x, 1.0 - s.y);
+    if (!classic) {
+        // a ground of 8 km repeating a photograph a thousand times: every layer is hex-tiled (the turn too: the height of a layer is a number, not a direction)
+        let dx = dpdx(tuv);
+        let dy = dpdy(tuv);
+        let ht = hex_grid(tuv, 0.6);
+        let tc = hex_colour(tex, layer_samp, ht, dx, dy);
+        let hh = hex_fetch(hgt, layer_samp, ht, dx, dy).r;
+        return vec4<f32>(tc.rgb, hh);
+    }
     let t = textureSample(tex, layer_samp, tuv);
     let h = textureSample(hgt, layer_samp, tuv).r;
     return vec4<f32>(select(t.rgb, t.rgb * t.rgb, classic), h);
@@ -931,6 +1046,12 @@ struct GrassU {
     cb: vec4<f32>,
     // the camera's place
     eye: vec4<f32>,
+    // single blades: least and greatest height, width at the foot, how much the blades of a clump share
+    blade: vec4<f32>,
+    // the bend, the size of a clump, the blades in a bundle, 1 when the ring is made of blades
+    blade2: vec4<f32>,
+    cbase: vec4<f32>,
+    ctip: vec4<f32>,
 };
 
 @group(2) @binding(12) var<uniform> gu: GrassU;
@@ -970,6 +1091,128 @@ fn grass_ground(x: f32, z: f32) -> f32 {
     return gu.tpos.y + mix(mix(h00, h10, tx), mix(h01, h11, tx), tz) * gu.tpos.w;
 }
 
+// The clump a place belongs to (the nearest of the jittered points of a lattice of `size` metres, looked for in the nine cells round it): x, y, z are the clump's three hashes, w the distance to its middle in clumps.
+fn clump_at(p: vec2<f32>, size: f32, seed: f32) -> vec4<f32> {
+    let g = p / size;
+    let c0 = vec2<i32>(floor(g));
+    var best = 1.0e9;
+    var hc = vec3<f32>(0.0);
+    for (var j = -1; j <= 1; j = j + 1) {
+        for (var i = -1; i <= 1; i = i + 1) {
+            let cc = c0 + vec2<i32>(i, j);
+            let h = hash3(cc.x, cc.y, seed);
+            let d = distance(g, vec2<f32>(f32(cc.x), f32(cc.y)) + h.xy);
+            if (d < best) {
+                best = d;
+                hc = h;
+            }
+        }
+    }
+    return vec4<f32>(hc, best);
+}
+
+// Single blades (`GrassField` with no mesh): every vertex of a bundle works out its own blade (a hash of the cell and the blade's number), its clump, the cubic curve of the blade and its place along it. See docs/GPU.md, "Grass made of blades".
+fn blade_vertex(in: VsIn, out_in: MeshOut) -> MeshOut {
+    var out = out_in;
+    let m = u32(gu.ring.w);
+    let ix = i32(gu.orig.x) + i32(in.inst % m);
+    let iz = i32(gu.orig.y) + i32(in.inst / m);
+    let blade = u32(in.pos.z + 0.5);
+    let side = in.pos.x;
+    let t = in.pos.y;
+    let cell = gu.ring.x;
+    let seed = gu.tuft.w;
+    let bid = i32(blade);
+    let r = hash3(ix * 4 + bid, iz * 4 + bid * 3 + 1, seed);
+    let px = (f32(ix) + r.x) * cell;
+    let pz = (f32(iz) + r.y) * cell;
+    let d = distance(vec2<f32>(px, pz), gu.eye.xz);
+    var fade = smoothstep(gu.ring.z, gu.ring.z - gu.orig.w, d);
+    if (gu.ring.y > 0.0) {
+        fade = fade * smoothstep(gu.ring.y, gu.ring.y + gu.orig.w, d);
+    }
+    if (fade <= 0.01) {
+        return out;
+    }
+    let ground = grass_ground(px, pz);
+    // the clump: its hashes set the shape and colour the blades of it share (Ghost of Tsushima's Voronoi clumps); a blade is the mix of its own randomness and its clump's
+    let cl = clump_at(vec2<f32>(px, pz), gu.blade2.y, seed + 41.0);
+    let rp = hash3(ix * 5 + bid + 11, iz * 3 + bid * 7 + 2, seed + 7.0);
+    let xp = rp.x;
+    let xc = cl.x;
+    let c = gu.blade.w;
+    let x = (1.0 - c) * xp + c * xc;
+    // a few tall stems among the rest, and the edges of a clump a little shorter
+    let tall = select(1.0, 1.6, rp.z > 0.93);
+    let h = mix(gu.blade.x, gu.blade.y, x) * tall * fade * (1.0 - 0.25 * smoothstep(0.6, 1.0, cl.w));
+    let widen = gu.tuft.x;
+    let w0 = gu.blade.z * mix(0.8, 1.3, xp) * widen;
+    // which way it faces: the clump has a heading, the blade strays from it
+    let yaw = (xc * 0.33 + mix(-0.15, 0.15, xp) + select(0.0, 0.5, rp.y > 0.7)) * 6.2831853;
+    let cy = cos(yaw);
+    let sy = sin(yaw);
+    let fwd = vec3<f32>(-sy, 0.0, cy);
+    let right = vec3<f32>(cy, 0.0, sy);
+    // how far it leans over: the clump's tendency and the blade's own (a cubic curve: nearly upright at the foot, bent over at the tip)
+    let lean = gu.blade2.x * mix(0.25, 1.0, mix(xp, xc, 0.6));
+    let p0 = vec3<f32>(0.0);
+    let p1 = vec3<f32>(0.0, 0.45 * h, 0.05 * h * lean);
+    let p2 = vec3<f32>(0.0, 0.82 * h * (1.0 - 0.3 * lean), 0.45 * h * lean);
+    let p3 = vec3<f32>(0.0, h * (1.0 - 0.5 * lean), 0.82 * h * lean);
+    let u = 1.0 - t;
+    let curve = p0 * (u * u * u) + p1 * (3.0 * u * u * t) + p2 * (3.0 * u * t * t) + p3 * (t * t * t);
+    let tan_l = normalize(3.0 * u * u * (p1 - p0) + 6.0 * u * t * (p2 - p1) + 3.0 * t * t * (p3 - p2) + vec3<f32>(0.0, 1.0e-4, 0.0));
+    // the wind: a gust that travels across the field and a flutter of the blade's own; the foot stays, the top leans (the square of the height along the blade)
+    let dir = vec2<f32>(cos(gu.wind.z), sin(gu.wind.z));
+    let sdir = vec2<f32>(-dir.y, dir.x);
+    let k = 6.2831853 / gu.wind.y;
+    let clock = gu.wind.w;
+    let along = dot(vec2<f32>(px, pz), dir);
+    let across = dot(vec2<f32>(px, pz), sdir);
+    let gust = 0.5 + 0.5 * sin(along * k - clock + 0.8 * sin(across * k * 0.6 + clock * 0.2));
+    let flutter = 0.22 * sin(clock * 4.1 + along * 0.9 + xp * 6.28) + 0.12 * sin(clock * 6.3 + rp.z * 6.28);
+    let sway = t * t * gu.wind.x * h * (0.35 + 0.65 * gust);
+    let shake = t * t * gu.wind.x * h * flutter * 0.4;
+    // the ribbon: tapering from the foot to the tip
+    let half = w0 * select(1.0 - 0.75 * t * t, 0.0, side == 0.0) * 0.5;
+    var local = curve + right * (side * half);
+    var wp = vec3<f32>(px, ground - 0.02, pz) + right * local.x + vec3<f32>(0.0, local.y, 0.0) + fwd * local.z;
+    wp.x = wp.x + dir.x * sway + sdir.x * shake;
+    wp.z = wp.z + dir.y * sway + sdir.y * shake;
+    // a blade seen edge-on is widened a little in the screen's direction so it does not vanish (Ghost of Tsushima does the same)
+    let view = normalize(wp - gu.eye.xyz);
+    let face = normalize(cross(vec3<f32>(right.x, 0.0, right.z), tan_l));
+    let edge_on = 1.0 - abs(dot(view, face));
+    wp = wp + right * (side * w0 * 0.5 * edge_on * edge_on * 0.8);
+    out.world = wp;
+    out.clip = frame.view_proj * vec4<f32>(wp, 1.0);
+    out.uv = in.uv;
+    // normals: the face of the ribbon, bent outward across its width so that it is round, tilted a little towards the sky, and turned to face the eye (a blade is lit from both sides)
+    var n = normalize(cross(right, tan_l));
+    n = normalize(n + right * (side * 0.55));
+    n = normalize(mix(n, vec3<f32>(0.0, 1.0, 0.0), 0.25));
+    n = select(-n, n, dot(n, -view) > 0.0);
+    // the colour: a gradient from the foot to the tip, darker at the foot (the ambient occlusion of a dense field: the root is shaded by the blades around it), the patches of lush and dry grass of the field and a share of the clump's own tint
+    let ps = max(gu.tuft.z, 5.0);
+    let n1 = 0.5 + 0.5 * sin(px / ps + sin(pz / (1.37 * ps)) * 2.0);
+    let n2 = 0.5 + 0.5 * sin(pz / (0.83 * ps) - px / (1.9 * ps) + 1.3);
+    let dry = smoothstep(0.45, 0.9, n1 * 0.65 + n2 * 0.35);
+    let patch_tint = mix(gu.ca.rgb, gu.cb.rgb, clamp(cl.y * 0.35 + dry * 0.75, 0.0, 1.0));
+    let ao = mix(0.22, 1.0, pow(t, 1.4));
+    let body = mix(gu.cbase.rgb, gu.ctip.rgb, pow(t, 1.3));
+    out.col = body * patch_tint * ao * mix(0.8, 1.2, xc);
+    // the sun through the blade is added where the sun reaches it (`lit_tail`), in the length of the normal
+    var back = 0.0;
+    let sun = i32(frame.p4.x);
+    if (sun >= 0) {
+        let toward_sun = frame.lights[u32(sun)].vec.xyz;
+        back = pow(clamp(dot(view, toward_sun), 0.0, 1.0), 3.0);
+    }
+    out.nrm = n * (1.0 + back * t);
+    out.tw = 1.0;
+    return out;
+}
+
 @vertex
 fn vs_grass(in: VsIn) -> MeshOut {
     var out: MeshOut;
@@ -980,6 +1223,9 @@ fn vs_grass(in: VsIn) -> MeshOut {
     out.col = vec3<f32>(1.0);
     out.world = vec3<f32>(0.0);
     out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0);
+    if (gu.blade2.w > 0.5) {
+        return blade_vertex(in, out);
+    }
     let m = u32(gu.ring.w);
     let ix = i32(gu.orig.x) + i32(in.inst % m);
     let iz = i32(gu.orig.y) + i32(in.inst / m);

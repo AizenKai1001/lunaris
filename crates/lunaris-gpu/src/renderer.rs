@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use lunaris_ecs::World;
 use lunaris_render::math::{length, sub, V3};
 use lunaris_render::mesh::Mesh;
-use lunaris_render::render::{gather_scene, ExplicitCamera, MeshPbr, MeshRef, RenderOptions, Scene, SceneParticles, SceneProbe, View};
+use lunaris_render::render::{gather_scene, ExplicitCamera, MeshPbr, MeshRef, RenderOptions, Scene, SceneParticles, SceneProbe, View, BLADES_PER_BUNDLE};
 use lunaris_render::terrain_layers::{Splat, SplatLayers};
 use lunaris_render::Frame;
 use lunaris_render::texture::Texture;
@@ -213,6 +213,12 @@ struct GrassU {
     ca: [f32; 4],
     cb: [f32; 4],
     eye: [f32; 4],
+    /// Single blades: the least and the greatest height (m), the width at the foot (m), how much the blades of a clump share.
+    blade: [f32; 4],
+    /// Single blades: the bend, the size of a clump (m), the number of blades in a bundle, 1 when the ring is made of blades.
+    blade2: [f32; 4],
+    cbase: [f32; 4],
+    ctip: [f32; 4],
 }
 
 /// A texture bind group's key: the colour texture, the quality, the sampler, and the addresses of the normal and occlusion-roughness-metallic maps (0 for none).
@@ -1311,7 +1317,7 @@ impl GpuRenderer {
                 ids: [slots.len() as u32, if !high { 0 } else if waterish.is_some() { 1 } else if m.sway.is_some() { 2 } else { 0 }, 0, 0],
                 pbr: match (&m.water_look, &m.pbr) {
                     (Some(wl), _) if high => [wl[0], wl[1], wl[2], 1.0],
-                    (_, Some(p)) if high && (p.normal.is_some() || p.arm.is_some() || p.disp.is_some()) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32 + 4.0 * p.disp.is_some() as u32 as f32, p.roughness_scale],
+                    (_, Some(p)) if high && (p.normal.is_some() || p.arm.is_some() || p.disp.is_some() || p.untile) => [p.normal_strength, p.ao_strength, p.normal.is_some() as u32 as f32 + 2.0 * p.arm.is_some() as u32 as f32 + 4.0 * p.disp.is_some() as u32 as f32 + 8.0 * p.untile as u32 as f32, p.roughness_scale],
                     _ => [0.0; 4],
                 },
             };
@@ -1466,7 +1472,7 @@ impl GpuRenderer {
                 if count == 0 {
                     continue;
                 }
-                let tex = g.tex.clone().or(mesh_tex);
+                let tex = if g.blades.is_some() { None } else { g.tex.clone().or(mesh_tex) };
                 let tkey = self.texture_group(tex.as_ref(), None, true, SamplerKind::Aniso, frame_no);
                 let hkey = self.ensure_grass_heights(&g.heights, frame_no);
                 objects.push(ObjectData {
@@ -1483,13 +1489,22 @@ impl GpuRenderer {
                 });
                 let slot = (objects.len() - 1) as f32;
                 let near_cell = 1.0 / g.density.sqrt();
-                let edges = [0.0, g.radius * 0.26, g.radius * 0.62, g.radius];
+                // single blades: three rings of 7, 4 and 2 pairs of vertices, the near one short (the blades are small), the far ones wider (a thinner field is as full)
+                let edges = if g.blades.is_some() { [0.0, g.radius * 0.14, g.radius * 0.4, g.radius] } else { [0.0, g.radius * 0.26, g.radius * 0.62, g.radius] };
                 for k in 0..3usize {
                     let cell = near_cell * 2.4f32.powi(k as i32);
                     let outer = edges[k + 1];
                     let inner = if k == 0 { 0.0 } else { edges[k] * 0.8 };
                     let cells = ((2.0 * outer / cell).ceil() as u32 + 2).min(640);
-                    let mult = 2.4f32.powf(0.85 * k as f32);
+                    let mult = if g.blades.is_some() { 2.4f32.powf(1.2 * k as f32) } else { 2.4f32.powf(0.85 * k as f32) };
+                    let ring_mesh = match &g.blades {
+                        Some(b) => self.ensure_mesh(&MeshRef::Shared(b.meshes[k].clone()), frame_no),
+                        None => id,
+                    };
+                    let (bl, bl2, cb0, ct0) = match &g.blades {
+                        Some(b) => ([b.height[0], b.height[1], b.width, b.clump], [b.bend, b.clump_size, BLADES_PER_BUNDLE as f32, 1.0], [b.base[0], b.base[1], b.base[2], 0.0], [b.tip[0], b.tip[1], b.tip[2], 0.0]),
+                        None => ([0.0; 4], [0.0; 4], [0.0; 4], [0.0; 4]),
+                    };
                     let ox = (eye[0] / cell).floor() - (cells / 2) as f32;
                     let oz = (eye[2] / cell).floor() - (cells / 2) as f32;
                     grass_us.push(GrassU {
@@ -1502,8 +1517,12 @@ impl GpuRenderer {
                         ca: [g.color_a[0], g.color_a[1], g.color_a[2], 0.0],
                         cb: [g.color_b[0], g.color_b[1], g.color_b[2], 0.0],
                         eye: [eye[0], eye[1], eye[2], 0.0],
+                        blade: bl,
+                        blade2: bl2,
+                        cbase: cb0,
+                        ctip: ct0,
                     });
-                    grass_draws.push(GrassDraw { mesh: id, tex: tkey, hkey, ubuf: grass_us.len() - 1, instances: cells * cells });
+                    grass_draws.push(GrassDraw { mesh: ring_mesh, tex: tkey, hkey, ubuf: grass_us.len() - 1, instances: cells * cells });
                 }
             }
         }

@@ -127,6 +127,7 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
     std::fs::create_dir_all(&out).unwrap();
     let high = Quality::high();
     for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0), ("terrain_layers", 480)] {
+        eprintln!("high quality picture of {name}");
         let mut sim = load(&root, name, ticks);
         // small: a picture in a high quality is eight draws (its effects settle), and a machine that draws with the CPU makes each of them slowly
         let opts = RenderOptions { width: 480, height: 270, ..RenderOptions::default() };

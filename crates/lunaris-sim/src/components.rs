@@ -1995,7 +1995,8 @@ component! {
     /// scales the bumps (1 as authored, 0 flat), `ao_strength` how much the occlusion map darkens the ambient light (0 to 1), `roughness_scale` multiplies the map's roughness. A name left empty is not used: the mesh's own
     /// roughness and metallic count and the surface's own normal stays. `height` is a height map (white = high; Poly Haven's `disp`): the surface is given real depth by parallax occlusion mapping, a cheap ray march through the
     /// picture that shifts what you see by how high it is, so a carpet, a tile floor or a brick wall has relief that changes as you move. `height_scale` is how deep it goes, as a share of one repeat of the picture (0.03 is a
-    /// good start). New in the engine's standard set; a world without it is what it was.
+    /// good start). `untile` (also on its own, with no maps) breaks up the repetition of the texture and the maps: each point of the surface is a blend of three copies of them at random offsets over a hexagonal grid (Mikkelsen's
+    /// hex-tiling, docs/GPU.md, "No two places alike"), so a floor or a wall of `uv_scale` 20 shows no pattern that comes round again; leave it off for a pattern that is meant to repeat (bricks laid in rows). New in the engine's standard set; a world without it is what it was.
     pub struct PbrMaps {
         pub normal: Sym = Sym(0),
         pub arm: Sym = Sym(0),
@@ -2004,6 +2005,7 @@ component! {
         pub normal_strength: f32 = 1.0,
         pub ao_strength: f32 = 1.0,
         pub roughness_scale: f32 = 1.0,
+        pub untile: bool = false,
     }
 }
 
@@ -2030,6 +2032,12 @@ component! {
     /// `wind_amount` metres of lean at the top, `wind_wavelength` metres between the crests, `wind_speed` crests a second, going the way `wind_dir` says (radians about up, 0 = +x). `phase` is the engine's clock
     /// (it runs in the simulation, so replays are the same). The field is patchy: over stretches of about `patch_size` metres it turns from lush to dry (towards `color_b`), the way the grass of a real plain does, and the sun shining
     /// through the blades lights them up when you look towards it. `texture` replaces the model's picture. One field costs a few hundred thousand tufts' vertices a picture and no entities, no scene file, no CPU.
+    /// **Blades.** With `mesh` empty (the default) the field is made of single blades, as in the shipped games' grass (docs/GPU.md, "Grass made of blades"): each blade is a curved ribbon (a cubic curve, a taper to a point, 15 vertices
+    /// near the camera and 5 far) placed, sized, coloured and bent by hashes, with the shape and the colour shared by the blades of a clump (`clump` 0 to 1 how much, `clump_size` metres across) so that the field has tall and short, dark and pale
+    /// patches and a lean in a common direction, not noise. `height` is the range of the blades' heights in metres, `blade_width` their width at the foot, `bend` how far they lean over (0 stiff, 1 drooping), `base_color` and `tip_color`
+    /// their colours at the foot and the tip (linear light; the foot is darker than its colour by the ambient occlusion of a dense field), `density` how many clumps of four blades per square metre near the camera. Normals are bent
+    /// across the width so the blades look round, blades seen edge-on are widened a little, the sun shines through them (and is shadowed where something stands in its way) and the far blades are wider, so that a distant
+    /// field is as full as a near one. Give `mesh` a model and the old way is used: that model is the tuft.
     pub struct GrassField {
         pub terrain: Uid = Uid(0),
         pub mesh: Sym = Sym(0),
@@ -2047,6 +2055,13 @@ component! {
         pub seed: f32 = 1.0,
         pub phase: f32 = 0.0,
         pub enabled: bool = true,
+        pub height: [f32; 2] = [0.25, 0.55],
+        pub blade_width: f32 = 0.035,
+        pub clump: f32 = 0.8,
+        pub clump_size: f32 = 1.1,
+        pub bend: f32 = 0.55,
+        pub base_color: [f32; 3] = [0.03, 0.07, 0.012],
+        pub tip_color: [f32; 3] = [0.2, 0.32, 0.07],
     }
 }
 
