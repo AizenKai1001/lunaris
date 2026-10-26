@@ -37,8 +37,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # The runner has no graphics card: wgpu draws with Windows' software adapter (WARP), slowly, so these tests are separate steps with their own time limits (the run says which part is
-      # slow) and a job of their own (the other tests do not wait for them). A step writes what failed as an annotation (ci_step.sh). On Linux the runner has no adapter at all and the tests skip themselves.
+      # The runner has no graphics card: wgpu draws with Windows' software adapter (WARP). The classic-quality tests (the GPU renderer against the reference renderer, pixel by pixel) run here, each as its
+      # own step with a time limit, and write what failed as an annotation (ci_step.sh). The HIGH-quality tests are not run here: on this runner one high-quality picture takes minutes (the same tests take
+      # 1 to 2 minutes on a four-core Windows 11 machine and seconds on a card; four scenes of the look test ran past 20 minutes), so they run on machines with a card: `cargo test -p lunaris-gpu
+      # --test compare --test high`. On Linux the runner has no adapter at all and the graphics tests skip themselves.
       - name: graphics, unit tests
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --lib
@@ -46,14 +48,6 @@ jobs:
       - name: graphics, classic pictures match the reference renderer
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact classic_pictures_match_the_reference_renderer --nocapture
-        timeout-minutes: 20
-      - name: graphics, high quality pictures are drawn and written for a look
-        if: always()
-        run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact high_quality_pictures_are_drawn_and_written_for_a_look --nocapture
-        timeout-minutes: 20
-      - name: graphics, entity ids agree with the reference renderer
-        if: always()
-        run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact entity_ids_agree_with_the_reference_renderer --nocapture
         timeout-minutes: 20
       - name: graphics, draw layers put sprites tile maps and particles in the same 
         if: always()
@@ -74,22 +68,6 @@ jobs:
       - name: graphics, the ui kit3 widgets are drawn the same in both renderers in 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact the_ui_kit3_widgets_are_drawn_the_same_in_both_renderers_in_every_state --nocapture
-        timeout-minutes: 20
-      - name: graphics, a painted terrain is blended the same way in both renderers
-        if: always()
-        run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact a_painted_terrain_is_blended_the_same_way_in_both_renderers --nocapture
-        timeout-minutes: 20
-      - name: graphics, each layer is where the splat map puts it in every quality
-        if: always()
-        run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact each_layer_is_where_the_splat_map_puts_it_in_every_quality --nocapture
-        timeout-minutes: 20
-      - name: graphics, a water body follows its picture in both renderers
-        if: always()
-        run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact a_water_body_follows_its_picture_in_both_renderers --nocapture
-        timeout-minutes: 20
-      - name: graphics, the high-quality effects
-        if: always()
-        run: bash tools/ci_step.sh -p lunaris-gpu --test high
         timeout-minutes: 20
 
   golden:
