@@ -209,9 +209,73 @@ pub struct RayWorld {
     dynamic: Vec<Solid>,
     grounds: Vec<(Filter, Ground)>,
     level: Vec<(Filter, Instance)>,
+    /// With many mesh levels (a streamed city's shells, a few hundred): a grid over their boxes, so that a ray asks only the meshes in the cells it passes through and not every one (it was three quarters of the time of a ray in a city).
+    level_grid: Option<std::sync::Arc<SolidGrid>>,
     hulls: Vec<(Filter, HullInstance)>,
     /// With many solids: a grid over them (x and z), so that a ray looks only at the solids in the cells it passes through (and at the big ones, which are in none).
     grid: Option<std::sync::Arc<SolidGrid>>,
+}
+
+thread_local! {
+    /// While a profile runs: whether `RayWorld::cast` times its parts, and what it added up since the profile took it: the solids' grid, the flying solids, terrain, mesh levels, hulls, all of the casts, and how many there were.
+    static CAST_TIMING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static CAST_MS: std::cell::RefCell<[f64; 17]> = const { std::cell::RefCell::new([0.0; 17]) };
+}
+
+/// What `CAST_MS` counts, in the order it holds them (the last is a count).
+pub(crate) const CAST_PARTS: [&str; 17] = ["solids", "flying solids", "terrain", "mesh levels", "hulls", "all casts", "casts (a count)", "gathers", "gathers: mesh levels", "gathers (a count)", "gathers: layers and sets", "gathers: key of the solids", "gathers: kept solids", "gathers: terrain", "gathers: solids of a small box", "gathers: static solids made again", "gathers: static solids made again (a count)"];
+
+/// Which of `CAST_PARTS` are counts and not milliseconds.
+pub(crate) fn cast_part_is_count(k: usize) -> bool {
+    k == 6 || k == 9 || k == 16
+}
+
+pub(crate) fn set_cast_timing(on: bool) {
+    CAST_TIMING.with(|t| t.set(on));
+    CAST_MS.with(|m| *m.borrow_mut() = [0.0; 17]);
+}
+
+pub(crate) fn take_cast_ms() -> [f64; 17] {
+    CAST_MS.with(|m| std::mem::take(&mut *m.borrow_mut()))
+}
+
+thread_local! {
+    /// The grids over the mesh levels of the last gatherings on this thread, by what they were made from (two hashes of the boxes and uids in order): the systems that cast each gather the same levels again and again.
+    static LEVEL_GRIDS: std::cell::RefCell<Vec<([u64; 2], std::sync::Arc<SolidGrid>)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The most grids over mesh levels that are kept on a thread.
+const LEVEL_GRIDS_KEPT: usize = 4;
+
+/// A grid over the boxes of these mesh levels, or none when there are too few for it to pay (the order of the list is the order a ray looks at them in).
+fn level_grid_for(level: &[(Filter, Instance)]) -> Option<std::sync::Arc<SolidGrid>> {
+    if level.len() < GRID_FROM {
+        return None;
+    }
+    let mut key = [0xcbf2_9ce4_8422_2325u64, 0x9E37_79B9_7F4A_7C15u64];
+    for (_, m) in level {
+        let b = &m.placed.bounds;
+        let mut h = m.uid;
+        for v in b.lo.iter().chain(b.hi.iter()) {
+            h = (h ^ v.to_bits() as u64).wrapping_mul(0x0000_0100_0000_01b3);
+            h ^= h >> 29;
+        }
+        key[0] = (key[0] ^ h).wrapping_mul(0x0000_0100_0000_01b3);
+        key[1] = key[1].rotate_left(17) ^ h.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
+    }
+    if let Some(g) = LEVEL_GRIDS.with(|c| c.borrow().iter().find(|e| e.0 == key).map(|e| e.1.clone())) {
+        return Some(g);
+    }
+    let boxes: Vec<Bx> = level.iter().map(|(_, m)| Bx { lo: m.placed.bounds.lo, hi: m.placed.bounds.hi }).collect();
+    let g = std::sync::Arc::new(SolidGrid::build_boxes(&boxes)?);
+    LEVEL_GRIDS.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() >= LEVEL_GRIDS_KEPT {
+            c.remove(0);
+        }
+        c.push((key, g.clone()));
+    });
+    Some(g)
 }
 
 /// The static solids of the last gathering of a wide box on this thread and what they were made from: a gathering asks for the same thing again (the whole world, or a big part of it) several times a step, from the
@@ -223,8 +287,16 @@ struct StaticSolids {
     grid: Option<std::sync::Arc<SolidGrid>>,
 }
 
+/// The static solids without the entities that were excepted, as the last gathering that excepted some made them (see `StaticSolids`: the key is that of the static solids and a hash of the excepted ones that are among them).
+struct DroppedSolids {
+    key: [u64; 5],
+    solids: std::sync::Arc<Vec<Solid>>,
+    grid: Option<std::sync::Arc<SolidGrid>>,
+}
+
 thread_local! {
     static STATIC_SOLIDS: std::cell::RefCell<Option<StaticSolids>> = const { std::cell::RefCell::new(None) };
+    static DROPPED_SOLIDS: std::cell::RefCell<Option<DroppedSolids>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Two hashes of a collider's uid, place, turn, scale, size and shape (added up over all of them, so that the order does not matter).
@@ -298,6 +370,13 @@ fn remember(recent: &mut [u32; 4], place_plus_one: u32) {
 /// The fewest solids that a grid is made for: with fewer, looking at every one is as quick.
 const GRID_FROM: usize = 48;
 
+/// The two corners of something that a `SolidGrid` is made over.
+#[derive(Clone, Copy)]
+struct Bx {
+    lo: V3,
+    hi: V3,
+}
+
 /// A uniform grid over the footprints (x and z) of the solids that are small beside its cells; each cell lists, in order, the solids that touch it.
 struct SolidGrid {
     cell: f64,
@@ -314,11 +393,21 @@ struct SolidGrid {
 }
 
 impl SolidGrid {
+    /// A grid over the footprints of these solids (none when there are too few for it to pay).
     fn build(solids: &[Solid]) -> Option<SolidGrid> {
         if solids.len() < GRID_FROM {
             return None;
         }
-        let finite = |s: &Solid| (0..3).all(|a| s.lo[a].is_finite() && s.hi[a].is_finite());
+        let boxes: Vec<Bx> = solids.iter().map(|s| Bx { lo: s.lo, hi: s.hi }).collect();
+        SolidGrid::build_boxes(&boxes)
+    }
+
+    /// A grid over the footprints of boxes (the solids' or the mesh levels': what a ray has to look at is whatever is in the cells it passes through).
+    fn build_boxes(solids: &[Bx]) -> Option<SolidGrid> {
+        if solids.len() < GRID_FROM {
+            return None;
+        }
+        let finite = |s: &Bx| (0..3).all(|a| s.lo[a].is_finite() && s.hi[a].is_finite());
         let mut ext: Vec<f32> = solids.iter().filter(|s| finite(s)).map(|s| (s.hi[0] - s.lo[0]).max(s.hi[2] - s.lo[2])).collect();
         if ext.len() < GRID_FROM {
             return None;
@@ -329,7 +418,7 @@ impl SolidGrid {
         let mut cell = ((median as f64) * 2.0).clamp(2.0, 64.0);
         let pad = 0.05f64;
         for _ in 0..8 {
-            let small = |s: &Solid| finite(s) && ((s.hi[0] - s.lo[0]).max(s.hi[2] - s.lo[2]) as f64) <= cell * 8.0;
+            let small = |s: &Bx| finite(s) && ((s.hi[0] - s.lo[0]).max(s.hi[2] - s.lo[2]) as f64) <= cell * 8.0;
             let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
             let mut count = 0;
             for s in solids.iter().filter(|s| small(s)) {
@@ -621,6 +710,29 @@ impl RayWorld {
     /// is most of what a gathering costs, and the answer is the same unless something static moved or a layer changed (found out by one pass over the colliders that adds up a hash of each). What flies on its own (a drone) is
     /// gathered afresh every time, apart from them.
     pub fn gather_except(world: &mut World, fields: &Terrains, meshes: &MeshStore, reach: Option<(V3, V3)>, except: &BTreeSet<u64>) -> RayWorld {
+        if !CAST_TIMING.with(|t| t.get()) {
+            return RayWorld::gather_untimed(world, fields, meshes, reach, except);
+        }
+        let t0 = std::time::Instant::now();
+        let rw = RayWorld::gather_untimed(world, fields, meshes, reach, except);
+        CAST_MS.with(|m| {
+            let mut m = m.borrow_mut();
+            m[7] += t0.elapsed().as_secs_f64() * 1e3;
+            m[9] += 1.0;
+        });
+        rw
+    }
+
+    fn gather_untimed(world: &mut World, fields: &Terrains, meshes: &MeshStore, reach: Option<(V3, V3)>, except: &BTreeSet<u64>) -> RayWorld {
+        let timed = CAST_TIMING.with(|t| t.get());
+        let mut clock = timed.then(std::time::Instant::now);
+        let lap = |part: usize, since: &mut Option<std::time::Instant>| {
+            if let Some(t) = since {
+                let now = std::time::Instant::now();
+                CAST_MS.with(|m| m.borrow_mut()[part] += now.duration_since(*t).as_secs_f64() * 1e3);
+                *t = now;
+            }
+        };
         let layers = Layers::gather(world);
         // what moves is not ground
         let mut bodies = UidSet::default();
@@ -645,6 +757,7 @@ impl RayWorld {
                 fliers.insert(uid);
             }
         });
+        lap(10, &mut clock);
         let near = |lo: V3, hi: V3| reach.is_none_or(|(rl, rh)| (0..3).all(|a| lo[a] <= rh[a] && hi[a] >= rl[a]));
         let wall = |t: &Transform, c: &Collider| !c.trigger && t.pos.iter().all(|v| v.is_finite());
         // a box that is wide is asked for often and from most of the world; a small one (a car's, a gun's) is cheaper to gather afresh than to hold the whole world for
@@ -667,10 +780,12 @@ impl RayWorld {
                 n += 1;
             });
             let key = [a, b, n, layers.digest()];
+            lap(11, &mut clock);
             let kept = STATIC_SOLIDS.with(|c| c.borrow().as_ref().filter(|s| s.key == key).map(|s| (s.solids.clone(), s.grid.clone())));
             let (all, all_grid) = match kept {
                 Some(k) => k,
                 None => {
+                    let t_made = timed.then(std::time::Instant::now);
                     let mut raw: Vec<(u64, Transform, Collider)> = Vec::with_capacity(n as usize);
                     let _ = world.for_each_uid::<(&Transform, &Collider), _>(|_, uid, (t, c)| {
                         if wall(t, c) && !bodies.contains(&uid) && !fliers.contains(&uid) {
@@ -680,18 +795,40 @@ impl RayWorld {
                     let all = std::sync::Arc::new(solids_of(&raw, &layers, |_| true));
                     let grid = SolidGrid::build(&all).map(std::sync::Arc::new);
                     STATIC_SOLIDS.with(|c| *c.borrow_mut() = Some(StaticSolids { key, solids: all.clone(), grid: grid.clone() }));
+                    if let Some(t) = t_made {
+                        CAST_MS.with(|m| {
+                            let mut m = m.borrow_mut();
+                            m[15] += t.elapsed().as_secs_f64() * 1e3;
+                            m[16] += 1.0;
+                        });
+                    }
                     (all, grid)
                 }
             };
-            // (all of it, shared, unless an entity that is excepted is one of the solids: a ray that is asked inside the box has the same answer with the others there, and a part of it would need a grid of its own, which
-            // costs what the kept one saves)
-            let dropped = except.iter().any(|u| all.binary_search_by_key(u, |s| s.uid).is_ok());
-            if !dropped {
+            // (all of it, shared, unless an entity that is excepted is one of the solids (a door that can be shot has hit points, and the targets are what perception excepts): then all of it but those, which is the same
+            // for every gathering while the same ones are excepted, so it is kept as the solids are (making it, a copy of a few thousand solids and a grid over them, was half of what a gathering cost in the city);
+            // it holds the solids outside the box too: a ray that is asked inside the box has the same answer)
+            let ex: Vec<u64> = except.iter().copied().filter(|u| all.binary_search_by_key(u, |s| s.uid).is_ok()).collect();
+            if ex.is_empty() {
                 (all, all_grid)
             } else {
-                let part: Vec<Solid> = all.iter().filter(|s| near(s.lo, s.hi) && !except.contains(&s.uid)).cloned().collect();
-                let grid = SolidGrid::build(&part).map(std::sync::Arc::new);
-                (std::sync::Arc::new(part), grid)
+                let mut h = 0xcbf2_9ce4_8422_2325u64 ^ ex.len() as u64;
+                for u in &ex {
+                    h = (h ^ u).wrapping_mul(0x0000_0100_0000_01b3);
+                    h ^= h >> 29;
+                }
+                let dkey = [key[0], key[1], key[2], key[3], h];
+                let kept = DROPPED_SOLIDS.with(|c| c.borrow().as_ref().filter(|d| d.key == dkey).map(|d| (d.solids.clone(), d.grid.clone())));
+                match kept {
+                    Some(k) => k,
+                    None => {
+                        let part: Vec<Solid> = all.iter().filter(|s| ex.binary_search(&s.uid).is_err()).cloned().collect();
+                        let part = std::sync::Arc::new(part);
+                        let grid = SolidGrid::build(&part).map(std::sync::Arc::new);
+                        DROPPED_SOLIDS.with(|c| *c.borrow_mut() = Some(DroppedSolids { key: dkey, solids: part.clone(), grid: grid.clone() }));
+                        (part, grid)
+                    }
+                }
             }
         } else {
             // (with a reach, what is farther from it than the biggest the collider can be is left out before anything is worked out for it: a gather for a car or a drone looks at a few dozen of a few thousand
@@ -718,6 +855,7 @@ impl RayWorld {
             let grid = SolidGrid::build(&part).map(std::sync::Arc::new);
             (std::sync::Arc::new(part), grid)
         };
+        lap(if wide { 12 } else { 14 }, &mut clock);
         let dynamic = solids_of(&fly_raw, &layers, |s| near(s.lo, s.hi) && !except.contains(&s.uid));
         let mut rw = RayWorld { solids, dynamic, grid, ..RayWorld::default() };
         for g in grounds(world, fields) {
@@ -729,12 +867,18 @@ impl RayWorld {
                 rw.grounds.push((f, g));
             }
         }
+        lap(13, &mut clock);
+        let t_levels = CAST_TIMING.with(|t| t.get()).then(std::time::Instant::now);
         for inst in meshes.instances(world) {
             let b = inst.placed.bounds;
             if near(b.lo, b.hi) {
                 let f = layers.of(inst.uid);
                 rw.level.push((f, inst));
             }
+        }
+        rw.level_grid = level_grid_for(&rw.level);
+        if let Some(t) = t_levels {
+            CAST_MS.with(|m| m.borrow_mut()[8] += t.elapsed().as_secs_f64() * 1e3);
         }
         if !meshes.is_empty() {
             let mut any = false;
@@ -976,6 +1120,22 @@ impl RayWorld {
         self.solids.len() + self.dynamic.len() + self.grounds.len() + self.level.len() + self.hulls.len()
     }
 
+    /// Does the segment meet a mesh level that `who` collides with? (Through the grid over the levels when there is one.)
+    fn level_hit(&self, o: V3, d: V3, max: f32, who: Filter) -> bool {
+        match &self.level_grid {
+            Some(g) => RAY_SCRATCH.with(|scratch| {
+                let cells = &mut scratch.borrow_mut().cells;
+                cells.clear();
+                g.collect(o, d, max, cells);
+                cells.iter().any(|&i| {
+                    let (f, m) = &self.level[i as usize];
+                    who.collides(*f) && m.placed.ray(o, d, max).is_some()
+                })
+            }),
+            None => self.level.iter().any(|(f, m)| who.collides(*f) && m.placed.ray(o, d, max).is_some()),
+        }
+    }
+
     /// Is anything that `who` collides with on the segment `o + t d` (`d` a unit vector), `0 <= t <= max`? The same answer as `cast(..).is_some()`, but it stops at the first thing it finds and tries the
     /// solids that blocked the last few questions first, so a run of lines of sight that go through the same wall costs one search.
     pub fn occluded(&self, o: V3, d: V3, max: f32, who: Filter) -> bool {
@@ -1013,12 +1173,57 @@ impl RayWorld {
         solved
             || self.dynamic.iter().any(blocks)
             || self.grounds.iter().any(|(f, g)| who.collides(*f) && g.placed().ray(o, d, max).is_some())
-            || self.level.iter().any(|(f, m)| who.collides(*f) && m.placed.ray(o, d, max).is_some())
+            || self.level_hit(o, d, max, who)
             || self.hulls.iter().any(|(f, h)| who.collides(*f) && h.ray(o, d, max).is_some())
+    }
+
+    /// Tests: this world without its grid over the mesh levels (every ray then asks every level, as it always did).
+    #[cfg(test)]
+    pub(crate) fn without_level_grid(mut self) -> RayWorld {
+        self.level_grid = None;
+        self
+    }
+
+    /// Tests: how many mesh levels this world has and whether it made a grid over them.
+    #[cfg(test)]
+    pub(crate) fn levels(&self) -> (usize, bool) {
+        (self.level.len(), self.level_grid.is_some())
     }
 
     /// The nearest hit of the ray `o + t d` (`d` a unit vector), `0 <= t <= max`, among what `who` collides with. `skip` is an entity to ignore.
     pub fn cast(&self, o: V3, d: V3, max: f32, who: Filter, skip: u64) -> Option<Hit> {
+        if CAST_TIMING.with(|t| t.get()) {
+            return self.cast_timed(o, d, max, who, skip);
+        }
+        self.cast_untimed(o, d, max, who, skip)
+    }
+
+    /// `cast`, with the time of its parts added to `CAST_MS` (while a profile is running).
+    fn cast_timed(&self, o: V3, d: V3, max: f32, who: Filter, skip: u64) -> Option<Hit> {
+        let t0 = std::time::Instant::now();
+        let r = self.cast_parts(o, d, max, who, skip, true);
+        CAST_MS.with(|m| {
+            let mut m = m.borrow_mut();
+            m[5] += t0.elapsed().as_secs_f64() * 1e3;
+            m[6] += 1.0;
+        });
+        r
+    }
+
+    fn cast_untimed(&self, o: V3, d: V3, max: f32, who: Filter, skip: u64) -> Option<Hit> {
+        self.cast_parts(o, d, max, who, skip, false)
+    }
+
+    #[inline(always)]
+    fn cast_parts(&self, o: V3, d: V3, max: f32, who: Filter, skip: u64, timed: bool) -> Option<Hit> {
+        let lap = |part: usize, since: &mut Option<std::time::Instant>| {
+            if let Some(t) = since {
+                let now = std::time::Instant::now();
+                CAST_MS.with(|m| m.borrow_mut()[part] += now.duration_since(*t).as_secs_f64() * 1e3);
+                *t = now;
+            }
+        };
+        let mut clock = timed.then(std::time::Instant::now);
         let mut best: Option<Hit> = None;
         let mut take = |t: f32, normal: V3, uid: u64| {
             if best.is_none_or(|b| t < b.t) {
@@ -1053,9 +1258,11 @@ impl RayWorld {
                 }
             }
         }
+        lap(0, &mut clock);
         for s in &self.dynamic {
             test(s);
         }
+        lap(1, &mut clock);
         for (f, g) in &self.grounds {
             if g.uid != skip && who.collides(*f) {
                 if let Some((t, n)) = g.placed().ray(o, d, max) {
@@ -1063,13 +1270,37 @@ impl RayWorld {
                 }
             }
         }
-        for (f, m) in &self.level {
-            if m.uid != skip && who.collides(*f) {
-                if let Some(h) = m.placed.ray(o, d, max) {
-                    take(h.t, h.normal, m.uid);
+        lap(2, &mut clock);
+        match &self.level_grid {
+            Some(g) => {
+                // (the levels the ray may touch, in the order of the list: the same ones in the same order as asking them all, so that the nearest of two equally near is the same)
+                RAY_SCRATCH.with(|scratch| {
+                    let found = &mut scratch.borrow_mut().cells;
+                    found.clear();
+                    g.collect(o, d, max, found);
+                    found.sort_unstable();
+                    found.dedup();
+                    for &i in found.iter() {
+                        let (f, m) = &self.level[i as usize];
+                        if m.uid != skip && who.collides(*f) {
+                            if let Some(h) = m.placed.ray(o, d, max) {
+                                take(h.t, h.normal, m.uid);
+                            }
+                        }
+                    }
+                });
+            }
+            None => {
+                for (f, m) in &self.level {
+                    if m.uid != skip && who.collides(*f) {
+                        if let Some(h) = m.placed.ray(o, d, max) {
+                            take(h.t, h.normal, m.uid);
+                        }
+                    }
                 }
             }
         }
+        lap(3, &mut clock);
         for (f, h) in &self.hulls {
             if h.uid != skip && who.collides(*f) {
                 if let Some((t, n)) = h.ray(o, d, max) {
@@ -1077,6 +1308,7 @@ impl RayWorld {
                 }
             }
         }
+        lap(4, &mut clock);
         best
     }
 
@@ -1348,6 +1580,21 @@ mod tests {
         let gone = RayWorld::gather_except(&mut s.world, &s.heightfields, &s.meshes, None, &without);
         assert_eq!(gone.solids.len(), 198);
         assert!(gone.solids.iter().all(|x| x.uid != 1 && x.uid != 2));
+        // the same entities left out again: the same solids, kept (not made again); other ones: others; a box with the exceptions answers as the world without them
+        let again = RayWorld::gather_except(&mut s.world, &s.heightfields, &s.meshes, Some(([-500.0, -5.0, -500.0], [500.0, 20.0, 500.0])), &without);
+        assert!(std::sync::Arc::ptr_eq(&gone.solids, &again.solids), "the same exceptions of the same static world are made once");
+        let other: std::collections::BTreeSet<u64> = [3u64].into_iter().collect();
+        let third = RayWorld::gather_except(&mut s.world, &s.heightfields, &s.meshes, None, &other);
+        assert!(!std::sync::Arc::ptr_eq(&gone.solids, &third.solids) && third.solids.len() == 199);
+        for k in 0..400 {
+            let f = k as f32 * 0.713;
+            let o = [(f.sin() * 0.5 + 0.5) * 100.0, 8.0, (f.cos() * 0.5 + 0.5) * 100.0];
+            let v = [f.cos() * 0.4, -1.0, f.sin() * 0.4];
+            let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+            let dir = [v[0] / l, v[1] / l, v[2] / l];
+            let by_hand = RayWorld { solids: std::sync::Arc::new(d.solids.iter().filter(|x| x.uid != 1 && x.uid != 2).cloned().collect()), ..RayWorld::default() };
+            assert_eq!(again.cast(o, dir, 30.0, Filter::DEFAULT, 0).map(|h| (h.uid, h.t.to_bits())), by_hand.cast(o, dir, 30.0, Filter::DEFAULT, 0).map(|h| (h.uid, h.t.to_bits())), "ray {k} with entities left out");
+        }
     }
 
     #[test]

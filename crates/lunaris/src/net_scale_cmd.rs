@@ -434,7 +434,7 @@ fn game_server(kv: &HashMap<String, String>, seed: u64, root: PathBuf, scene: &s
         let mut rows: Vec<_> = p.stages.iter().filter(|(n, _)| !n.contains("(all)")).collect();
         rows.sort_by(|a, b| b.1.total_ms.total_cmp(&a.1.total_ms));
         println!("simulation: {} steps, {:.3} ms a step on average, {:.2} ms the slowest; the stages (ms a step: average, slowest):", p.ticks, p.total_ms / p.ticks.max(1) as f64, p.max_ms);
-        for (n, t) in rows.iter().take(25) {
+        for (n, t) in rows.iter().take(45) {
             println!("    {:7.4} {:7.3}  {}", t.total_ms / p.ticks.max(1) as f64, t.max_ms, n);
         }
         println!("steps over {} ms: {} of {}", lunaris_sim::sim::STEP_LIMITS_MS.iter().map(|l| format!("{l}")).collect::<Vec<_>>().join(" / "), p.over.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(" / "), p.ticks);

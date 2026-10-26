@@ -188,6 +188,8 @@ mod meshcol_tests;
 #[cfg(test)]
 mod nav_tests;
 #[cfg(test)]
+mod ray_level_tests;
+#[cfg(test)]
 mod particles_tests;
 #[cfg(test)]
 mod physics_tests;

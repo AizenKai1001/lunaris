@@ -2499,7 +2499,15 @@ pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fi
     part!("health", health(world, dt, &mut flow_events));
     part!("stealth::update", crate::stealth::update(world, dt));
     part!("perception::update", crate::perception::update(world, dt, fields, meshes, &mut flow_events));
+    crate::flyagent::set_timing(prof.is_some());
     part!("flyagent::update", crate::flyagent::update(world, dt, fields, meshes));
+    if let Some(p) = prof.as_deref_mut() {
+        for (k, ms) in crate::flyagent::take_ms().iter().enumerate() {
+            if *ms > 0.0 {
+                p.add(&format!("flyagent: {}", crate::flyagent::FLY_PARTS[k]), *ms);
+            }
+        }
+    }
     part!("hacking::update", crate::hacking::update(world, dt, fields, meshes, &mut flow_events));
     part!("stomp::update", crate::stomp::update(world, dt, &mut flow_events));
     part!("walker::update", crate::walker::update(world, dt, &mut flow_events));

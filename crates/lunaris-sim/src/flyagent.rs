@@ -106,10 +106,39 @@ struct Plan {
     waiting: bool,
 }
 
+thread_local! {
+    /// While a profile is running: whether `update` times its parts, and the milliseconds it spent in each of `FLY_PARTS` in its last call (`take_ms`).
+    static FLY_TIMING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FLY_MS: std::cell::RefCell<[f64; 5]> = const { std::cell::RefCell::new([0.0; 5]) };
+}
+
+/// What `FLY_MS` counts: finding the agents, gathering the world the rays meet, choosing what each wants (`decide`), the rays, and everything one agent costs (which holds the two before it).
+pub(crate) const FLY_PARTS: [&str; 5] = ["agents", "world", "decide", "rays", "agent loop"];
+
+/// Switch the timing of the parts on or off (a profile does: a step that is not profiled reads no clock).
+pub(crate) fn set_timing(on: bool) {
+    FLY_TIMING.with(|t| t.set(on));
+    FLY_MS.with(|m| *m.borrow_mut() = [0.0; 5]);
+}
+
+/// The milliseconds of the parts of the last calls since `set_timing`.
+pub(crate) fn take_ms() -> [f64; 5] {
+    FLY_MS.with(|m| std::mem::take(&mut *m.borrow_mut()))
+}
+
+fn fly_time(part: usize, since: Option<std::time::Instant>) {
+    if let Some(t) = since {
+        FLY_MS.with(|m| m.borrow_mut()[part] += t.elapsed().as_secs_f64() * 1e3);
+    }
+}
+
 pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore) {
     if !dt.is_finite() || dt <= 0.0 {
         return;
     }
+    let timing = FLY_TIMING.with(|t| t.get());
+    let now = || timing.then(std::time::Instant::now);
+    let t_agents = now();
     let mut list: Vec<(u64, Entity, FlyAgent)> = Vec::new();
     let _ = world.for_each_uid::<(&FlyAgent,), _>(|e, uid, (a,)| {
         if a.active {
@@ -131,6 +160,8 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
     if rigs.is_empty() {
         return;
     }
+    fly_time(0, t_agents);
+    let t_world = now();
     // the world the rays meet (all the agents together)
     let (mut lo, mut hi) = ([f32::INFINITY; 3], [f32::NEG_INFINITY; 3]);
     for r in &rigs {
@@ -152,8 +183,10 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
         grid.entry(cell_of(o.1)).or_default().push(i as u32);
     }
     let mut near: Vec<u32> = Vec::new();
+    fly_time(1, t_world);
 
     for r in rigs {
+        let t_agent = now();
         let mut a = r.a;
         let who = layers.of(r.uid);
         let speed = finite(a.speed, 12.0).max(0.0);
@@ -161,7 +194,9 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
         let climb = finite(a.climb, 6.0).max(0.0);
 
         // what it means to do
+        let t_decide = now();
         let plan = decide(world, &mut a, &r, dt);
+        fly_time(2, t_decide);
 
         // desired velocity on the ground plane
         let mut want = [0.0f32; 3];
@@ -227,7 +262,9 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
             let dir = [want[0] / heading, 0.0, want[2] / heading];
             let look = avoid + r.vel[0].hypot(r.vel[2]) * 0.4;
             let ray = |d: V3| rw.cast(r.pos, d, look, who, r.uid).map(|h| (h.t, h.normal));
+            let t_rays = now();
             let (c, l, rr) = (ray(dir), ray(turn(dir, 35.0)), ray(turn(dir, -35.0)));
+            fly_time(3, t_rays);
             if let Some((t, n)) = c {
                 a.blocked = true;
                 let free_l = l.map_or(look, |h| h.0);
@@ -262,7 +299,9 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
         }
 
         // the height: what is under it, and the hover above that
+        let t_down = now();
         let down = rw.cast([r.pos[0], r.pos[1] + 0.5, r.pos[2]], [0.0, -1.0, 0.0], GROUND_REACH, who, r.uid);
+        fly_time(3, t_down);
         a.altitude = down.map_or(-1.0, |h| (h.t - 0.5).max(0.0));
         if let Some(h) = down {
             let ground = r.pos[1] + 0.5 - h.t;
@@ -276,9 +315,11 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
         }
         // (a ceiling or a roof just above it: the rays look up as well)
         if want[1] > 0.0 {
+            let t_up = now();
             if let Some(h) = rw.cast(r.pos, [0.0, 1.0, 0.0], 3.0, who, r.uid) {
                 want[1] = want[1].min(((h.t - 1.0) * 2.0).max(0.0));
             }
+            fly_time(3, t_up);
         }
 
         // the velocity follows, no faster than the machine can change it
@@ -318,6 +359,7 @@ pub fn update(world: &mut World, dt: f32, fields: &Terrains, meshes: &MeshStore)
         if let Some(w) = world.get_mut::<FlyAgent>(r.e) {
             *w = a;
         }
+        fly_time(4, t_agent);
     }
 }
 

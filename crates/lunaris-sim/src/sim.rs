@@ -502,6 +502,7 @@ impl Sim {
             p.step_stages.clear();
         }
         let tick_started = prof.is_some().then(std::time::Instant::now);
+        crate::vehicle_ray::set_cast_timing(prof.is_some());
         // `stage!("name", work)` runs the work and, while profiling, adds its time under that name
         macro_rules! stage {
             ($name:expr, $body:expr) => {{
@@ -611,6 +612,16 @@ impl Sim {
         stage!("scene requests", self.scene_requests());
         if let (Some(mut p), Some(t0)) = (prof, tick_started) {
             let ms = t0.elapsed().as_secs_f64() * 1e3;
+            // (the rays of the step, by what they looked at: every system that casts is in it)
+            for (k, v) in crate::vehicle_ray::take_cast_ms().iter().enumerate() {
+                if *v > 0.0 {
+                    if crate::vehicle_ray::cast_part_is_count(k) {
+                        p.add_count(&format!("ray casts: {}", crate::vehicle_ray::CAST_PARTS[k]), *v);
+                    } else {
+                        p.add_count(&format!("ray casts: {} (ms)", crate::vehicle_ray::CAST_PARTS[k]), *v);
+                    }
+                }
+            }
             p.ticks += 1;
             p.total_ms += ms;
             p.max_ms = p.max_ms.max(ms);
