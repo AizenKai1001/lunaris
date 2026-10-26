@@ -402,7 +402,7 @@ fn mesh_hash(m: &crate::mesh::Mesh) -> u64 {
     h
 }
 
-/// The clouds of a game's city's AI tower (the dearest effects of its client: 9 800 particles every picture) and a few others that use the other shapes, an alpha cloud that has to be sorted, a sheet and a trail.
+/// The clouds of a game city's AI tower (the dearest effects of its client: 9 800 particles every picture) and a few others that use the other shapes, an alpha cloud that has to be sorted, a sheet and a trail.
 fn recorded_clouds() -> Vec<(Particles, &'static str)> {
     let base = Particles { playing: true, time: 1.6666658, looping: true, prewarm: true, ..Default::default() };
     vec![

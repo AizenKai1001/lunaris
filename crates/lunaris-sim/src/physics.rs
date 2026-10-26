@@ -865,7 +865,7 @@ fn step_reference_once(world: &mut World, gravity: [f32; 3], dt: f32, terrains: 
     lap!(2);
     // ---- broad phase: the pairs of bodies whose boxes overlap, at least one of the two a body that can move (or a trigger): two static colliders never need resolving. The set of pairs does not
     // depend on how they are looked for, and `found` is sorted by uid below. Few movers among many statics (a city: thousands of walls, a few cars): the movers sweep among themselves and each
-    // looks up the statics round it in a grid made for this step (`StaticGrid`), where sorting and sweeping every body, statics included, was most of what a step cost (1 ms of 4.9 in the a game
+    // looks up the statics round it in a grid made for this step (`StaticGrid`), where sorting and sweeping every body, statics included, was most of what a step cost (1 ms of 4.9 in a game's
     // city server). Every candidate goes through the same tests whichever way it came, the sweep's own first, so the pairs are exactly the ones the sweep of all bodies found.
     let sweep = sweep_axis(&bodies);
     let mut found: Vec<(usize, usize, [f32; 3], f32)> = Vec::new();
