@@ -56,6 +56,6 @@ examples/terrain_layers.lunaris.json     state 3ec698e2be8e1a59  frame 30439aaac
 examples/ui_kit3.lunaris.json            state a7e369605364aca1  frame 15b049380decf92f
 examples/ui_showcase.lunaris.json        state 61032ff25625c455  frame b1388cb44e3fce44
 examples/views.lunaris.json              state e128c3158e3a0419  frame 919018096fc2ff19
-examples/village.lunaris.json            state c458a14bee28f121  frame 822a6083c3ce9c15
+examples/village.lunaris.json            state c458a14bee28f121  frame ec0d3ec33cdb55df
 examples/vista.lunaris.json              state 1a69531c3b39fc62  frame 804e2e2f0b6d57c2
 examples/walker.lunaris.json             state 4f93767973697fd7  frame a605db1ac4219c5d
