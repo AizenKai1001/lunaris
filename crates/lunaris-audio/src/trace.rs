@@ -59,6 +59,8 @@ fn cross(a: V3, b: V3) -> V3 {
 pub enum Shape {
     /// An axis-aligned box.
     Box { center: V3, half: V3 },
+    /// A box turned about its middle: `axes` are its three edge directions in the world (unit, at right angles to each other), `half` its half sizes along them. A building's walls in a round city are this.
+    Obb { center: V3, half: V3, axes: [V3; 3] },
     Sphere { center: V3, radius: f32 },
 }
 
@@ -71,10 +73,48 @@ pub struct Occluder {
     pub transmission: f32,
 }
 
+/// Where a ray (origin `rel` from the middle of a box with the half sizes `half`, unit direction `d`, all along the box's own axes) is inside it: (enter, leave, outward normal where it enters). `enter` is negative when the ray starts inside.
+fn slab(rel: V3, d: V3, half: V3) -> Option<(f32, f32, V3)> {
+    let (mut t0, mut t1) = (f32::NEG_INFINITY, f32::INFINITY);
+    let mut n0 = [0.0; 3];
+    for a in 0..3 {
+        if d[a].abs() < 1e-9 {
+            if rel[a].abs() > half[a] {
+                return None;
+            }
+            continue;
+        }
+        let (mut ta, mut tb) = ((-half[a] - rel[a]) / d[a], (half[a] - rel[a]) / d[a]);
+        let mut na = [0.0; 3];
+        na[a] = -1.0;
+        if ta > tb {
+            std::mem::swap(&mut ta, &mut tb);
+            na[a] = 1.0;
+        }
+        if ta > t0 {
+            t0 = ta;
+            n0 = na;
+        }
+        t1 = t1.min(tb);
+        if t0 > t1 {
+            return None;
+        }
+    }
+    if t1 < 0.0 || !t0.is_finite() {
+        return None;
+    }
+    Some((t0, t1, n0))
+}
+
 impl Shape {
     fn bounds(&self) -> (V3, V3) {
         match *self {
             Shape::Box { center, half } => (sub(center, half), add(center, half)),
+            Shape::Obb { center, half, axes } => {
+                // (the box that holds the turned one: along each world axis the sum of what every edge reaches)
+                let e = [0, 1, 2].map(|i| axes[0][i].abs() * half[0] + axes[1][i].abs() * half[1] + axes[2][i].abs() * half[2]);
+                (sub(center, e), add(center, e))
+            }
             Shape::Sphere { center, radius } => (sub(center, [radius; 3]), add(center, [radius; 3])),
         }
     }
@@ -82,37 +122,12 @@ impl Shape {
     /// Where a ray (unit `d`) is inside the shape: (enter, leave, outward normal where it enters). `enter` is negative when the ray starts inside.
     fn interval(&self, o: V3, d: V3) -> Option<(f32, f32, V3)> {
         match *self {
-            Shape::Box { center, half } => {
-                let (mut t0, mut t1) = (f32::NEG_INFINITY, f32::INFINITY);
-                let mut n0 = [0.0; 3];
-                for a in 0..3 {
-                    let rel = o[a] - center[a];
-                    if d[a].abs() < 1e-9 {
-                        if rel.abs() > half[a] {
-                            return None;
-                        }
-                        continue;
-                    }
-                    let (mut ta, mut tb) = ((-half[a] - rel) / d[a], (half[a] - rel) / d[a]);
-                    let mut na = [0.0; 3];
-                    na[a] = -1.0;
-                    if ta > tb {
-                        std::mem::swap(&mut ta, &mut tb);
-                        na[a] = 1.0;
-                    }
-                    if ta > t0 {
-                        t0 = ta;
-                        n0 = na;
-                    }
-                    t1 = t1.min(tb);
-                    if t0 > t1 {
-                        return None;
-                    }
-                }
-                if t1 < 0.0 || !t0.is_finite() {
-                    return None;
-                }
-                Some((t0, t1, n0))
+            Shape::Box { center, half } => slab(sub(o, center), d, half),
+            Shape::Obb { center, half, axes } => {
+                let rel = sub(o, center);
+                let lo = [dot(rel, axes[0]), dot(rel, axes[1]), dot(rel, axes[2])];
+                let ld = [dot(d, axes[0]), dot(d, axes[1]), dot(d, axes[2])];
+                slab(lo, ld, half).map(|(t0, t1, n)| (t0, t1, add(add(mul(axes[0], n[0]), mul(axes[1], n[1])), mul(axes[2], n[2]))))
             }
             Shape::Sphere { center, radius } => {
                 let m = sub(o, center);
@@ -684,5 +699,59 @@ mod tests {
         assert!(first.delay < 0.05, "{first:?}");
         let total: f32 = t.reflections.iter().map(|r| r.gain * r.gain).sum();
         assert!(total > 0.0);
+    }
+
+    /// A box turned by `deg` degrees about the vertical, as an occluder.
+    fn turned(center: V3, half: V3, deg: f32) -> Occluder {
+        let (sn, cs) = deg.to_radians().sin_cos();
+        Occluder { shape: Shape::Obb { center, half, axes: [[cs, 0.0, -sn], [0.0, 1.0, 0.0], [sn, 0.0, cs]] }, absorption: 0.05, transmission: 0.1 }
+    }
+
+    #[test]
+    fn a_wall_turned_forty_five_degrees_is_crossed_at_the_slant() {
+        let s = Scene::new(vec![turned([5.0, 0.0, 0.0], [3.0, 2.0, 0.1], 45.0)]);
+        // along +x through the middle: the 0.2 m slab is crossed at 45 degrees, so over 0.2 / cos 45 = 0.2828 m, entered 0.1414 m before its middle
+        let h = s.nearest([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], 100.0).expect("the wall is hit");
+        assert!((h.t - (5.0 - 0.1414)).abs() < 1e-3, "enters at {}", h.t);
+        // its normal is the slab's own axis (the side the ray came from): (-sin, 0, -cos) turned 45 degrees: pointing back towards the origin and a little to the side
+        assert!(h.normal[0] < -0.69 && h.normal[0] > -0.72 && h.normal[2].abs() > 0.69, "{:?}", h.normal);
+        // a ray that passes beside the wall's end (the wall is 6 m long along its own axis) misses it
+        assert!(s.nearest([0.0, 0.0, 9.0], [1.0, 0.0, 0.0], 100.0).is_none());
+        // it is thinner than an axis-aligned box of the same sizes would be at that angle: an axis-aligned box of 6 x 0.2 would be hit from the side
+        let flat = Scene::new(vec![wall([5.0, 0.0, 0.0], [3.0, 2.0, 0.1], 0.05, 0.1)]);
+        assert!(flat.nearest([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], 100.0).is_some_and(|h| (h.t - 2.0).abs() < 1e-3), "the axis-aligned wall lies along x");
+    }
+
+    #[test]
+    fn a_turned_box_with_no_turn_is_the_axis_aligned_box_and_a_quarter_turn_swaps_its_sides() {
+        let a = Scene::new(vec![wall([3.0, 1.0, -2.0], [2.0, 1.0, 0.5], 0.1, 0.1)]);
+        let id = Scene::new(vec![turned([3.0, 1.0, -2.0], [2.0, 1.0, 0.5], 0.0)]);
+        let quarter = Scene::new(vec![turned([3.0, 1.0, -2.0], [0.5, 1.0, 2.0], 90.0)]);
+        for k in 0..200 {
+            let u = |n: u64| unit_random(k * 7 + n) * 2.0 - 1.0;
+            let d = unit([u(1), u(2) * 0.3, u(3)]);
+            let o = [u(4) * 8.0, u(5) * 2.0, u(6) * 8.0];
+            let (ha, hi, hq) = (a.nearest(o, d, 80.0), id.nearest(o, d, 80.0), quarter.nearest(o, d, 80.0));
+            match (ha, hi, hq) {
+                (Some(x), Some(y), Some(z)) => assert!((x.t - y.t).abs() < 1e-3 && (x.t - z.t).abs() < 1e-3, "ray {k}: {} {} {}", x.t, y.t, z.t),
+                (None, None, None) => {}
+                other => panic!("ray {k}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_ring_of_turned_walls_makes_a_room_that_rings() {
+        // four turned walls (a square room turned 30 degrees) with a floor and a roof: the room analysis finds it closed and reverberant, as it does for the axis-aligned one
+        let r = 5.0;
+        let mut occ = vec![wall([0.0, -2.1, 0.0], [9.0, 0.1, 9.0], 0.05, 0.02), wall([0.0, 2.1, 0.0], [9.0, 0.1, 9.0], 0.05, 0.02)];
+        for k in 0..4 {
+            let a = 30.0 + 90.0 * k as f32;
+            let (s2, c2) = a.to_radians().sin_cos();
+            // (the wall's thin axis points along the radius: its own z axis (sin d, 0, cos d) is (cos a, 0, -sin a) for d = a + 90)
+            occ.push(turned([c2 * (r + 0.1), 0.0, -s2 * (r + 0.1)], [r + 0.3, 2.0, 0.1], a + 90.0));
+        }
+        let room = analyse_room(&Scene::new(occ), [0.0, 0.0, 0.0], 192, 4);
+        assert!(room.closedness > 0.9 && room.rt60 > 0.3, "closedness {} rt60 {}", room.closedness, room.rt60);
     }
 }

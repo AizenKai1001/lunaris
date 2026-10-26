@@ -1,0 +1,32 @@
+[package]
+name = "ecs_compare"
+description = "Lunaris ECS against other Rust ECS crates on the benchmarks of the public ecs_bench_suite (same workloads, current crate versions). Not part of the engine workspace."
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Its own workspace: the other ECS crates and their dependency trees must never end up in the engine's Cargo.lock.
+[workspace]
+
+[features]
+default = []
+hecs = ["dep:hecs"]
+bevy = ["dep:bevy_ecs"]
+legion = ["dep:legion"]
+shipyard = ["dep:shipyard"]
+specs = ["dep:specs"]
+all = ["hecs", "bevy", "legion", "shipyard", "specs"]
+
+[dependencies]
+lunaris-ecs = { path = "../../../crates/lunaris-ecs" }
+hecs = { version = "0.10", optional = true }
+bevy_ecs = { version = "0.15", optional = true }
+legion = { version = "0.4", optional = true }
+shipyard = { version = "0.7", optional = true }
+specs = { version = "0.20", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false

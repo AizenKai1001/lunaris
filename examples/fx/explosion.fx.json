@@ -1,0 +1,68 @@
+{
+  "name": "explosion",
+  "bounds": 30,
+  "budget": 600,
+  "emitters": [
+    {
+      "name": "fireball",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": 36 }], "shape": { "type": "sphere", "radius": 0.5 } },
+      "init": { "life": [0.4, 0.9], "speed": [2, 7], "spread": 180, "radial": 0.8, "size": [0.8, 1.5], "rotation": [0, 360], "spin": [-90, 90], "color": [1, 0.7, 0.3, 1] },
+      "update": { "drag": 2.2, "gravity": [0, 1.5, 0], "noise": { "strength": 5, "scale": 1.3, "speed": 1.2 } },
+      "curves": {
+        "size": [[0, 0.5], [0.3, 1], [1, 1.4]],
+        "alpha": [[0, 1], [0.5, 0.7], [1, 0]],
+        "color": [[0, [1, 1, 0.85, 1]], [0.3, [1, 0.6, 0.2, 1]], [1, [0.35, 0.1, 0.05, 1]]]
+      },
+      "render": { "texture": "soft", "blend": "add", "soft": 0.6, "light": { "intensity": 40, "range": 28, "max": 2 } }
+    },
+    {
+      "name": "shockwave",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": 1 }] },
+      "init": { "life": 0.45, "size": 1, "color": [1, 0.85, 0.6, 1] },
+      "curves": { "size": [[0, 0.5], [1, 22]], "alpha": [[0, 0.8], [1, 0]] },
+      "render": { "texture": "ring", "blend": "add", "facing": "axis", "axis": [0, 1, 0] }
+    },
+    {
+      "name": "sparks",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": 70 }], "shape": { "type": "sphere", "radius": 0.3 } },
+      "init": { "life": [0.5, 1.4], "speed": [6, 22], "spread": 180, "radial": 1, "size": [0.02, 0.05], "color": [1, 0.75, 0.35, 1] },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "drag": 0.5,
+        "collide": { "mode": "bounce", "world": true, "bounce": 0.4, "friction": 0.3, "planes": [{ "normal": [0, 1, 0], "d": 0, "relative": true }] }
+      },
+      "curves": { "alpha": [[0, 1], [0.7, 1], [1, 0]] },
+      "render": { "texture": "circle", "blend": "add", "facing": "velocity", "stretch": 0.04 }
+    },
+    {
+      "name": "debris",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": 28 }], "shape": { "type": "sphere", "radius": 0.4 } },
+      "init": { "life": [1.5, 2.8], "speed": [5, 14], "spread": 180, "radial": 1, "size": [0.06, 0.18], "spin": [-540, 540], "color": [0.28, 0.26, 0.24, 1] },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "drag": 0.15,
+        "collide": { "mode": "bounce", "world": true, "bounce": 0.35, "friction": 0.45, "planes": [{ "normal": [0, 1, 0], "d": 0, "relative": true }] }
+      },
+      "curves": { "alpha": [[0, 1], [0.85, 1], [1, 0]] },
+      "render": { "type": "solid", "solid": "cube" }
+    },
+    {
+      "name": "smoke",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0.1, "count": 26 }], "shape": { "type": "sphere", "radius": 0.8 } },
+      "init": { "life": [3, 6], "speed": [1, 4], "spread": 180, "radial": 0.6, "size": [1.2, 2.2], "spin": [-25, 25], "color": [0.14, 0.14, 0.15, 0.7] },
+      "update": { "gravity": [0, 1.1, 0], "drag": 1, "noise": { "strength": 1.4, "scale": 2, "speed": 0.3 } },
+      "curves": { "size": [[0, 0.5], [1, 2.4]], "alpha": [[0, 0], [0.08, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "alpha", "soft": 1, "sort": true }
+    }
+  ]
+}

@@ -18,7 +18,7 @@ fn texture_of(rgba: &[u8], width: u32, height: u32) -> Texture {
         let c = |v: u8| (v as f32 / 255.0) * (v as f32 / 255.0);
         [c(p[0]), c(p[1]), c(p[2]), 1.0]
     });
-    Texture { width, height, texels: texels.collect(), heights: None }
+    Texture { width, height, texels: crate::texture::Texels::F32(texels.collect()), heights: None }
 }
 
 /// Draw the views that are due. Called at the start of every main picture.

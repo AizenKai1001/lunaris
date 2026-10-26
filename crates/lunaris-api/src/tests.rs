@@ -538,6 +538,24 @@ fn events_reach_the_outside_through_step_and_the_events_tool() {
 }
 
 #[test]
+fn the_schema_of_one_component_says_what_a_new_one_starts_with() {
+    let mut e = engine();
+    let s = call(&mut e, "schema", r#"{"component":"Transform"}"#);
+    let d = s.get("defaults").expect("defaults");
+    let nums = |k: &str| d.get(k).unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect::<Vec<_>>();
+    assert_eq!(nums("pos"), vec![0.0, 0.0, 0.0]);
+    assert_eq!(nums("rot"), vec![0.0, 0.0, 0.0, 1.0]);
+    assert_eq!(nums("scale"), vec![1.0, 1.0, 1.0]);
+    // a component the game defines: its own defaults (a string starts empty: string defaults are not supported)
+    call(&mut e, "define_component", r#"{"name":"Quest","fields":[{"name":"title","type":"str"},{"name":"reward","type":"f32","default":0.1},{"name":"done","type":"bool"}]}"#);
+    let q = call(&mut e, "schema", r#"{"component":"Quest"}"#);
+    let d = q.get("defaults").unwrap();
+    assert_eq!(d.get("title").and_then(|v| v.as_str()), Some(""));
+    assert_eq!(d.get("reward").and_then(|v| v.as_f64()), Some(0.1), "an f32 default reads as the number that was typed");
+    assert_eq!(d.get("done").and_then(|v| v.as_bool()), Some(false));
+}
+
+#[test]
 fn edits_with_the_same_undo_group_are_one_undo_step() {
     let mut e = engine();
     call(&mut e, "spawn", r#"{"uid":1,"components":{"Transform":{"pos":[0,0,0]}}}"#);

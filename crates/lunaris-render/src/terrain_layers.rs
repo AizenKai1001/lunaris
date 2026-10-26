@@ -138,10 +138,12 @@ pub struct LayerSpec {
     pub bump: f32,
     /// A display colour the texture is multiplied by.
     pub tint: [f32; 3],
+    /// The layer that steep ground (a cliff) shows, laid on from the sides (the GPU renderer's high qualities).
+    pub cliff: bool,
 }
 
 /// The syntax in one line, for messages.
-pub const LAYER_SYNTAX: &str = "NAME [TEXTURE] [uv_scale=N] [bump=D] [tint=R,G,B]";
+pub const LAYER_SYNTAX: &str = "NAME [TEXTURE] [uv_scale=N] [bump=D] [tint=R,G,B] [cliff=1]";
 
 fn numbers(text: &str, want: &[usize], what: &str, example: &str, line: usize) -> Result<Vec<f32>, String> {
     let v: Vec<f32> = text.split(',').map(|p| p.parse::<f32>().map_err(|_| format!("line {line}: `{what}` needs numbers, `{text}` is not"))).collect::<Result<_, _>>()?;
@@ -167,7 +169,7 @@ pub fn parse_layers(text: &str) -> Result<Vec<LayerSpec>, String> {
         if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') || name.contains('=') {
             return Err(format!("line {line}: `{name}` is not a layer name (letters, digits, `_` and `-`); a line is `{LAYER_SYNTAX}`"));
         }
-        let mut spec = LayerSpec { name: name.to_string(), texture: name.to_string(), uv_scale: None, bump: 0.03, tint: [1.0; 3] };
+        let mut spec = LayerSpec { name: name.to_string(), texture: name.to_string(), uv_scale: None, bump: 0.03, tint: [1.0; 3], cliff: false };
         let mut named_texture = false;
         for w in words {
             match w.split_once('=') {
@@ -193,7 +195,11 @@ pub fn parse_layers(text: &str) -> Result<Vec<LayerSpec>, String> {
                     }
                     spec.tint = [n[0], n[1], n[2]];
                 }
-                Some((key, _)) => return Err(format!("line {line}: `{key}` is not an option of a layer (they are `uv_scale`, `bump` and `tint`); a line is `{LAYER_SYNTAX}`")),
+                Some(("cliff", v)) => {
+                    let n = numbers(v, &[1], "cliff", "1", line)?;
+                    spec.cliff = n[0] != 0.0;
+                }
+                Some((key, _)) => return Err(format!("line {line}: `{key}` is not an option of a layer (they are `uv_scale`, `bump`, `tint` and `cliff`); a line is `{LAYER_SYNTAX}`")),
                 None if !named_texture => {
                     spec.texture = w.to_string();
                     named_texture = true;
@@ -206,6 +212,9 @@ pub fn parse_layers(text: &str) -> Result<Vec<LayerSpec>, String> {
         }
         if out.len() == MAX_LAYERS {
             return Err(format!("line {line}: at most {MAX_LAYERS} layers (the red, green, blue and alpha channels of the splat map)"));
+        }
+        if spec.cliff && out.iter().any(|l| l.cliff) {
+            return Err(format!("line {line}: only one layer can be the `cliff` layer"));
         }
         out.push(spec);
     }
@@ -225,12 +234,18 @@ pub struct SplatLayer {
     pub bump: f32,
     /// The colour the texture is multiplied by, in the renderer's gamma-2 working space.
     pub tint: [f32; 3],
+    /// Steep ground shows this layer, laid on from the sides.
+    pub cliff: bool,
 }
 
 /// What the renderers need to draw a painted terrain: the splat map and one to four layers.
 pub struct SplatLayers {
     pub splat: Arc<Splat>,
     pub layers: Vec<SplatLayer>,
+    /// The size of the ground in metres (x, z): what the layers' repeats are measured against.
+    pub ground: [f32; 2],
+    /// How much of the ground's colour is the terrain's own photograph where it has one (`TerrainLayers.photo`).
+    pub photo: f32,
 }
 
 impl SplatLayers {
@@ -257,7 +272,7 @@ impl SplatLayers {
 
 /// Make the layers of one terrain from the two texts of its `TerrainLayers`. A problem (an empty or unreadable splat map, a mistake in the text) comes back as a
 /// warning in `warnings` and `None`: the terrain is then drawn with its own texture, as without the component.
-pub fn gather(textures: &mut TextureCache, uid: u64, terrain_uv_scale: [f32; 2], splat: &str, layers: &str, warnings: &mut Vec<String>) -> Option<Arc<SplatLayers>> {
+pub fn gather(textures: &mut TextureCache, uid: u64, terrain_uv_scale: [f32; 2], ground: [f32; 2], photo: f32, splat: &str, layers: &str, warnings: &mut Vec<String>) -> Option<Arc<SplatLayers>> {
     let specs = match parse_layers(layers) {
         Ok(s) => s,
         Err(e) => {
@@ -281,10 +296,11 @@ pub fn gather(textures: &mut TextureCache, uid: u64, terrain_uv_scale: [f32; 2],
             uv_scale: s.uv_scale.unwrap_or(default_scale),
             bump: s.bump,
             tint: [s.tint[0] * s.tint[0], s.tint[1] * s.tint[1], s.tint[2] * s.tint[2]],
+            cliff: s.cliff,
             name: s.name,
         })
         .collect();
-    Some(Arc::new(SplatLayers { splat: map, layers }))
+    Some(Arc::new(SplatLayers { splat: map, layers, ground, photo: if photo.is_finite() { photo.clamp(0.0, 1.0) } else { 0.85 } }))
 }
 
 #[cfg(test)]
@@ -293,6 +309,18 @@ mod tests {
 
     fn splat_2x2(texels: [[u8; 4]; 4]) -> Splat {
         Splat::new(2, 2, 4, texels.to_vec()).unwrap()
+    }
+
+    #[test]
+    fn one_layer_can_be_the_cliff_layer() {
+        let specs = parse_layers("grass grass
+rock stone cliff=1
+sand sand cliff=0").unwrap();
+        assert_eq!(specs.iter().map(|s| s.cliff).collect::<Vec<_>>(), [false, true, false]);
+        let e = parse_layers("a grass cliff=1
+b stone cliff=1").unwrap_err();
+        assert!(e.contains("only one layer"), "{e}");
+        assert!(parse_layers("a grass cliff=yes").is_err());
     }
 
     #[test]

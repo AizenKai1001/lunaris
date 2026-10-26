@@ -1,0 +1,42 @@
+{
+  "name": "toxic dust (voxel)",
+  "bounds": 20,
+  "budget": 600,
+  "lod": {"near": 30, "far": 90},
+  "emitters": [
+    {
+      "name": "haze",
+      "space": "world",
+      "max": 400,
+      "spawn": {
+        "rate": 40,
+        "shape": {"type": "box", "half": [14, 2.5, 14]}
+      },
+      "init": {"life": [6, 11], "speed": [0, 0.15], "spread": 180, "size": [1.2, 2.4], "color": [0.55, 0.62, 0.3, 0.1]},
+      "update": {
+        "wind": [0.25, 0, 0.08],
+        "drag": 0.5,
+        "noise": {"strength": 0.3, "scale": 5, "speed": 0.05}
+      },
+      "curves": {"alpha": [[0, 0], [0.2, 1], [0.8, 1], [1, 0]]},
+      "render": {"texture": "square", "filter": "nearest", "blend": "alpha", "soft": 1.0, "sort": false}
+    },
+    {
+      "name": "motes",
+      "space": "world",
+      "max": 150,
+      "spawn": {
+        "rate": 18,
+        "shape": {"type": "box", "half": [12, 2, 12]}
+      },
+      "init": {"life": [4, 9], "speed": [0, 0.3], "spread": 180, "size": [0.025, 0.05], "color": [0.8, 0.9, 0.45, 0.8]},
+      "update": {
+        "wind": [0.3, 0.02, 0.1],
+        "drag": 0.3,
+        "noise": {"strength": 1.0, "scale": 1.5, "speed": 0.2}
+      },
+      "curves": {"alpha": [[0, 0], [0.15, 1], [0.85, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "add"}
+    }
+  ]
+}

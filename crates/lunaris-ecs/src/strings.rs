@@ -27,6 +27,11 @@ impl StringTable {
         i
     }
 
+    /// The id of a string that is in the table already (the table is not changed).
+    pub fn find(&self, s: &str) -> Option<u32> {
+        self.index.get(s).copied()
+    }
+
     pub fn get(&self, id: u32) -> &str {
         self.strings.get(id as usize).map(|s| s.as_str()).unwrap_or("")
     }

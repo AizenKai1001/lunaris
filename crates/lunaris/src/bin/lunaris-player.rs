@@ -9,6 +9,15 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 #[cfg(windows)]
+#[path = "../interp.rs"]
+mod interp;
+
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../liveapi.rs"]
+mod liveapi;
+
+#[cfg(windows)]
 #[path = "../play.rs"]
 mod play;
 
@@ -87,9 +96,12 @@ fn main() -> std::process::ExitCode {
         presses: flag("--press").map(|p| play::parse_presses(&p)).unwrap_or_default(),
         save_frame: None,
         report: has("--report"),
+        vsync: !has("--novsync"),
+        perf: has("--perf"),
         cpu: has("--cpu"),
         quality: flag("--quality").or_else(|| get("quality")).unwrap_or_else(|| "high".to_string()),
         join,
+        driver: None,
     };
     let seed = config.as_ref().and_then(|c| c.get("seed")).and_then(|s| s.as_u64()).unwrap_or(1);
     play::run(opts, root, seed, None)

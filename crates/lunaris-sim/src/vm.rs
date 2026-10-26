@@ -142,6 +142,8 @@ impl Lower {
     /// Lower an expression. Returns (register, type, whether the register is a temporary the caller must release).
     fn expr(&mut self, e: &Expr, ops: &mut Vec<Op>, want: Option<Reg>) -> Option<(Reg, Ty, bool)> {
         Some(match e {
+            // a tag only matters to the interpreter in a trace; the program has no use for it
+            Expr::Tag(inner, _) => return self.expr(inner, ops, want),
             Expr::Const(v) => {
                 let (d, tmp) = self.dest(want);
                 let (x, ty) = match v {
@@ -490,6 +492,8 @@ impl Lower {
                     all_held.into_iter().for_each(|r| self.release(r, true));
                 }
                 Stmt::Remove(name) => ops.push(Op::Remove { name: name.clone() }),
+                // only in a traced system, which has no program
+                Stmt::Tag(_) => {}
                 Stmt::Emit(name) => ops.push(Op::Emit { name: name.clone() }),
             }
         }

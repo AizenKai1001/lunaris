@@ -1,0 +1,94 @@
+{
+  "name": "fire barrel (voxel)",
+  "bounds": 6,
+  "budget": 700,
+  "lod": {"near": 30, "far": 80},
+  "emitters": [
+    {
+      "name": "flames",
+      "space": "local",
+      "max": 160,
+      "spawn": {
+        "rate": 34,
+        "shape": {"type": "box", "half": [0.2, 0.02, 0.2]}
+      },
+      "init": {
+        "life": [0.5, 0.9],
+        "speed": [0.7, 1.4],
+        "direction": [0, 1, 0],
+        "spread": 8,
+        "size": [0.1, 0.16],
+        "spin": [-40, 40],
+        "color": [1, 0.62, 0.15, 1],
+        "color_jitter": 0.12
+      },
+      "update": {
+        "gravity": [0, 0.8, 0],
+        "drag": 0.6,
+        "noise": {"strength": 1.2, "scale": 0.35, "speed": 0.8}
+      },
+      "curves": {
+        "size": [[0, 0.7], [0.3, 1], [1, 0.3]],
+        "alpha": [[0, 0], [0.1, 1], [0.7, 0.8], [1, 0]],
+        "color": [[0, [1, 0.95, 0.5, 1]], [0.35, [1, 0.6, 0.1, 1]], [1, [0.55, 0.1, 0.03, 1]]]
+      },
+      "render": {
+        "type": "solid",
+        "solid": "cube",
+        "blend": "add",
+        "light": {"intensity": 4, "range": 10, "max": 2, "color": [1, 0.6, 0.25]}
+      }
+    },
+    {
+      "name": "embers",
+      "space": "world",
+      "max": 80,
+      "spawn": {
+        "rate": 7,
+        "shape": {"type": "box", "half": [0.2, 0.02, 0.2]}
+      },
+      "init": {
+        "life": [1.0, 2.2],
+        "speed": [0.6, 1.6],
+        "spread": 30,
+        "size": [0.02, 0.035],
+        "color": [1, 0.7, 0.2, 1],
+        "inherit_velocity": 0.3
+      },
+      "update": {
+        "gravity": [0, 0.6, 0],
+        "drag": 0.2,
+        "noise": {"strength": 2, "scale": 0.6, "speed": 0.6}
+      },
+      "curves": {"alpha": [[0, 1], [0.7, 0.9], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "add"}
+    },
+    {
+      "name": "smoke",
+      "space": "world",
+      "max": 90,
+      "spawn": {
+        "rate": 8,
+        "shape": {"type": "box", "half": [0.18, 0.02, 0.18]}
+      },
+      "init": {
+        "life": [2.2, 3.6],
+        "speed": [0.5, 0.9],
+        "spread": 10,
+        "size": [0.18, 0.26],
+        "spin": [-25, 25],
+        "color": [0.28, 0.28, 0.3, 0.8],
+        "color_jitter": 0.15,
+        "inherit_velocity": 0.5
+      },
+      "update": {
+        "gravity": [0, 0.5, 0],
+        "drag": 0.4,
+        "wind": [0.15, 0, 0.05],
+        "noise": {"strength": 0.8, "scale": 1.0, "speed": 0.3}
+      },
+      "curves": {"size": [[0, 0.6], [1, 3.2]], "alpha": [[0, 0], [0.12, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "alpha", "sort": true}
+    }
+  ]
+}

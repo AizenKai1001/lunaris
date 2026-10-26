@@ -36,6 +36,12 @@ impl Filter {
         Filter::new(c.layer, c.mask)
     }
 
+    /// A number for the layer and the mask.
+    #[inline]
+    pub(crate) fn digest(self) -> u64 {
+        ((self.layer as u64) << 32) | self.mask as u64
+    }
+
     /// The bit of this filter's layer in a mask.
     #[inline]
     pub fn bit(self) -> u32 {
@@ -67,6 +73,17 @@ impl Layers {
         let _ = world.for_each_uid::<(&CollisionLayer,), _>(|_, uid, (c,)| list.push((uid, Filter::of(c))));
         list.sort_by_key(|l| l.0);
         Layers { list }
+    }
+
+    /// A number that is the same for two worlds with the same layers and different when one entity's layers differ (a gathering of the static world that is kept between steps asks whether it is still the same).
+    pub(crate) fn digest(&self) -> u64 {
+        let mut h = 0xcbf2_9ce4_8422_2325u64;
+        for (uid, f) in &self.list {
+            h = (h ^ uid).wrapping_mul(0x0000_0100_0000_01b3);
+            h = (h ^ f.digest()).wrapping_mul(0x0000_0100_0000_01b3);
+            h ^= h >> 29;
+        }
+        h
     }
 
     /// No entity has a `CollisionLayer`: nothing is filtered anywhere.

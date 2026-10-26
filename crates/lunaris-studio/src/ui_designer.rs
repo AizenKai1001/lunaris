@@ -471,7 +471,8 @@ impl UiDesigner {
             }
         }
         // ---- keys
-        if hovered || resp.has_focus() {
+        // keys belong to the designer only while nothing else has the keyboard (typing in Details must not delete the widget)
+        if hovered && ctx.memory(|m| m.focused().is_none()) {
             let step_px = if mods.shift { 8.0 } else { 1.0 };
             let (l, r, u, d, del, dup, undo, redo, esc) = ctx.input_mut(|i| {
                 (

@@ -4,7 +4,7 @@ Lunaris plays sound the way it does everything else: as data an agent can create
 
 | Component | What it is |
 |---|---|
-| `SoundFile` | `{name, file}`: when something `emit`s the event `name`, the player plays the WAV `file`. With `spatial` (the default) it is placed where the emitting entity was. A `SoundFile` with an empty `file` makes the built-in voice of that name spatial too. |
+| `SoundFile` | `{name, file}`: when something `emit`s the event `name`, the player plays the WAV `file`. With `spatial` (the default) it is placed where the emitting entity was. A `SoundFile` with an empty `file` makes the built-in voice of that name spatial too. `file` can list several files (one a line, or separated by `|`): one is played each time, never the same twice in a row; `pitch_var` and `volume_var` (0 to 1) vary every play (the pitch is multiplied by a random number in 1 +- `pitch_var`, the volume by one in 1 +- `volume_var`); `volume` 0 means the event sounds like nothing (no voice is taken, not even the built-in one). |
 | `AudioSource` | A sound that plays by itself from its entity's place (a campfire, a machine, music from a radio): `file` (or a built-in `voice`), `looped`, `playing`, `volume`, `pitch`. It follows its entity. |
 | `AcousticMaterial` | `{absorption, transmission}` for a surface (an entity with a `Collider`): how much of a reflection's energy it loses (0.02 tile, 0.12 a furnished room, 0.5 thick curtains) and how much of the sound gets through a 0.2 m slab of it (0.03 a wall, 0.3 a wooden door). Without it a collider is a plain wall. |
 
@@ -49,6 +49,8 @@ A **route** sends a sound to the first bus whose pattern fits its file path (`so
 `duck=music:0.6` on the `voice` bus turns `music` down by 60 percent (quickly in, slowly out) while any sound on `voice` is heard. A settings menu sets the resources `bus.NAME.volume` (a `UiSlider` writes it with one graph statement)
 and `bus.NAME.mute` (1 mutes). Looping `AudioSource`s follow the bus as it changes; a one-shot takes the volume it starts with. A mixer text with a mistake is a warning and the sounds play unrouted.
 
+**Variety, silence and loading.** A footstep or a gunshot that is the same file every time is heard as a machine: give the event several files and a little `pitch_var` / `volume_var` (the choice and the variation are made by the sound director with its own small random generator; they are output, never part of the simulation, and so never change a state hash or a replay). An event that a game forwards only for its effects (`shot`, whose sound depends on the gun) gets a `SoundFile` with `volume` 0 so that the built-in voice is not played for it. The files that the `SoundFile`s name are decoded ahead, two a frame, from the first frame on, so that the first gunshot of a session does not wait for its file.
+
 Sound files: WAV (8, 16, 24 or 32 bit PCM or 32/64 bit float), **Ogg Vorbis** (`.ogg`) and **MP3**, mono or stereo (more channels keep the first two), any sample rate; they are told apart by their first bytes, not by the name; paths are relative to the project folder (and cannot leave it). A file that is missing or damaged is a *warning* (the sound is skipped, the report says why), never a crash. `tools/make_sounds.py` makes the three small files the examples use from nothing but arithmetic.
 
 ## Where a sound is, and how it reaches you
@@ -58,7 +60,7 @@ A positioned sound is mixed like this (all in `crates/lunaris-audio`):
 * **Distance**: full loudness inside `near` metres, `near / distance` beyond that (the inverse-distance law, 6 dB per doubling), the last quarter of `range` fading to nothing.
 * **Left and right**: equal-power panning by the direction of the listener's right ear, so turning the camera moves the sound across the picture. Gains glide over each block of samples, so nothing clicks when a source moves.
 * **Pitch and rate**: any file rate is resampled with linear interpolation; `pitch` plays it faster or slower.
-* **32 voices at once**; a new one replaces the quietest voice that is not a loop.
+* **48 voices at once**; a new one replaces the quietest voice that is not a loop.
 
 ## What the room does to it: tracing sound with rays
 
@@ -81,7 +83,7 @@ How close is it to the textbook? `cargo run --release -p lunaris-audio --example
 
 **The first echoes** of the source: from the listener, 96 rays go out and bounce up to twice; at each hit the source is looked at again (visibility through other walls counts), and the loudness of that echo follows from the geometry of a matte patch (the patch a ray stands for, the angles, the distance to the source, what the surface absorbs). The echoes are merged into at most eleven taps, one per delay bucket from 5 ms to 250 ms, each with a delay, a level and a direction, so the first reflection off a wall to your right comes from your right.
 
-Not modelled: sound bending around corners except through the echoes that happen to see both ends, moving sources' Doppler shift, the travel time of the direct sound, meshes without colliders (they do not stop sound), the triangles of a `MeshCollider` and the shape of a `ConvexCollider` (a level made of a model file muffles nothing yet: put plain `Collider` boxes in its walls for sound), non-box colliders' rotation (colliders are boxes that ignore rotation, as in physics), and one listener only.
+Not modelled: sound bending around corners except through the echoes that happen to see both ends, moving sources' Doppler shift, the travel time of the direct sound, meshes without colliders (they do not stop sound), the triangles of a `MeshCollider` and the shape of a `ConvexCollider` (a level made of a model file muffles nothing yet: put plain `Collider` boxes in its walls for sound), and one listener only. A box `Collider` whose `Transform.rot` is turned is traced as the turned (oriented) box it is (`Shape::Obb`: the walls of the buildings of a round city stand at every angle; the engine's city gives a client such boxes for its buildings' walls and roofs, `lunaris-citygen`'s `shell::acoustic_boxes`, because a client has no collision shell and a mesh stops no sound).
 
 ## Hearing without ears
 

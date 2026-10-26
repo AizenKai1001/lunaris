@@ -119,6 +119,80 @@ fn classic_pictures_match_the_reference_renderer() {
     }
 }
 
+/// Eight animated models in a row at different times of a clip, lit by a sun, seen from the front.
+fn crowd_sim(root: &std::path::Path) -> Sim {
+    let mut ents = vec![
+        r#"{"uid":1,"components":{"Transform":{"pos":[0,1.2,16]},"Camera":{"fov_y":55,"clear":[0.1,0.12,0.18,1]}}}"#.to_string(),
+        r#"{"uid":2,"components":{"Transform":{"rot":[-0.45,0.25,0.12,0.85]},"Light":{"kind":0,"intensity":1.2}}}"#.to_string(),
+    ];
+    for k in 0..8u64 {
+        let x = (k as f32 - 3.5) * 1.6;
+        let t = 0.08 * k as f32;
+        ents.push(format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{x},0,0]}},"MeshRenderer":{{"mesh":"examples/models/swayer.glb","color":[1,1,1,1]}},"Animator":{{"clip":"sway","time":{t},"speed":0.0}}}}}}"#, 10 + k));
+    }
+    let text = format!(r#"{{"lunaris":1,"entities":[{}]}}"#, ents.join(","));
+    let mut sim = Sim::new(1);
+    sim.asset_root = Some(root.to_path_buf());
+    sim.load_scene(&lunaris_json::parse(&text).unwrap()).unwrap();
+    sim
+}
+
+#[test]
+fn skinning_on_the_card_draws_the_same_as_skinning_on_the_processor() {
+    // the vertices of the animated models are moved by a compute pass (`skin.rs`) or on the processor (`set_gpu_skinning`): the colour pass, the shadows and the depth pass draw them either way, so the pictures agree
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let mut sim = crowd_sim(&root);
+    let opts = RenderOptions { width: 480, height: 270, ..RenderOptions::default() };
+    for quality in [Quality::classic(), Quality::high()] {
+        let mut tex = TextureCache::new(Some(root.clone()));
+        gpu.set_gpu_skinning(false);
+        let on_cpu = gpu.render_to_image(&mut sim.world, &mut tex, &opts, &quality).expect("gpu render, skinned on the processor");
+        let mut tex = TextureCache::new(Some(root.clone()));
+        gpu.set_gpu_skinning(true);
+        let on_card = gpu.render_to_image(&mut sim.world, &mut tex, &opts, &quality).expect("gpu render, skinned on the card");
+        let (d, _) = compare(&on_cpu.rgba, &on_card.rgba);
+        println!("skinning on the card against on the processor ({:?}): mean abs error {:.4} / 255, {:.3}% of pixels differ by more than 40, worst {}", quality.mode, d.mean, d.outliers * 100.0, d.worst);
+        assert!(d.mean <= 0.1, "mean error {}", d.mean);
+        assert!(d.outliers <= 0.001, "{:.3}% of pixels differ a lot", d.outliers * 100.0);
+        // (and something is drawn: the models are not both missing)
+        let distinct: std::collections::BTreeSet<[u8; 3]> = on_card.rgba.chunks(4).map(|p| [p[0], p[1], p[2]]).collect();
+        assert!(distinct.len() > 8, "the picture is flat");
+    }
+    gpu.set_gpu_skinning(true);
+}
+
+#[test]
+fn a_crowd_of_posed_models_is_drawn_the_same_in_both_renderers() {
+    // eight animated models at different times of a clip: the GPU renderer lays their vertices out for the card on several threads before it uploads them (`prepare_dynamic_vertices`),
+    // and the gather stage poses them on several threads (`pose_models`); the picture must still be the reference renderer's
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = repo_root();
+    let mut ents = vec![
+        r#"{"uid":1,"components":{"Transform":{"pos":[0,1.2,16]},"Camera":{"fov_y":55,"clear":[0.1,0.12,0.18,1]}}}"#.to_string(),
+        r#"{"uid":2,"components":{"Transform":{"rot":[-0.45,0.25,0.12,0.85]},"Light":{"kind":0,"intensity":1.2}}}"#.to_string(),
+    ];
+    for k in 0..8u64 {
+        let x = (k as f32 - 3.5) * 1.6;
+        let t = 0.08 * k as f32;
+        ents.push(format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{x},0,0]}},"MeshRenderer":{{"mesh":"examples/models/swayer.glb","color":[1,1,1,1]}},"Animator":{{"clip":"sway","time":{t},"speed":0.0}}}}}}"#, 10 + k));
+    }
+    let text = format!(r#"{{"lunaris":1,"entities":[{}]}}"#, ents.join(","));
+    let mut sim = Sim::new(1);
+    sim.asset_root = Some(root.clone());
+    sim.load_scene(&lunaris_json::parse(&text).unwrap()).unwrap();
+    let opts = RenderOptions { width: 480, height: 270, ..RenderOptions::default() };
+    let mut tex_cpu = TextureCache::new(Some(root.clone()));
+    let cpu = render(&mut sim.world, &mut tex_cpu, &opts).expect("cpu render");
+    let mut tex_gpu = TextureCache::new(Some(root.clone()));
+    let g = gpu.render_to_image(&mut sim.world, &mut tex_gpu, &opts, &Quality::classic()).expect("gpu render");
+    let (d, _) = compare(&cpu.rgba, &g.rgba);
+    println!("crowd: mean abs error {:.3} / 255, {:.2}% of pixels differ by more than 40, worst {}", d.mean, d.outliers * 100.0, d.worst);
+    assert!(d.mean <= 1.0, "mean error {}", d.mean);
+    assert!(d.outliers <= 0.01, "{:.2}% of pixels differ a lot", d.outliers * 100.0);
+    assert_eq!(cpu.warnings, g.warnings);
+}
+
 #[test]
 fn high_quality_pictures_are_drawn_and_written_for_a_look() {
     let Some(mut gpu) = gpu_or_skip() else { return };

@@ -184,7 +184,7 @@ pub fn generate(name: &str) -> Option<Texture> {
             heights.push(h.clamp(0.0, 1.0));
         }
     }
-    Some(Texture { width: SIZE, height: SIZE, texels, heights: Some(heights) })
+    Some(Texture { width: SIZE, height: SIZE, texels: crate::texture::Texels::F32(texels), heights: Some(heights) })
 }
 
 #[cfg(test)]
@@ -211,8 +211,8 @@ mod tests {
             let w = SIZE as usize;
             let (mut seam, mut inner) = (0.0f32, 0.0f32);
             for y in 0..w {
-                seam += (t.texels[y * w + w - 1][0] - t.texels[y * w][0]).abs();
-                inner += (t.texels[y * w + w / 2][0] - t.texels[y * w + w / 2 + 1][0]).abs();
+                seam += (t.texels.get(y * w + w - 1)[0] - t.texels.get(y * w)[0]).abs();
+                inner += (t.texels.get(y * w + w / 2)[0] - t.texels.get(y * w + w / 2 + 1)[0]).abs();
             }
             assert!(seam <= inner * 4.0 + 0.5, "{name}: the seam ({seam}) is much rougher than the inside ({inner})");
         }

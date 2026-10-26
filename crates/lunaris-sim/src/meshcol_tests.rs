@@ -456,3 +456,41 @@ fn contacts_do_not_depend_on_the_order_the_triangles_were_listed_in() {
     }
     assert!(found > 20, "the test should touch something: {found}");
 }
+
+#[test]
+fn the_pruned_search_for_the_nearest_point_of_a_capsule_axis_gives_exactly_the_answer_of_measuring_every_triangle() {
+    // meshes: a rough soup of triangles, a flat floor, a tall thin soup (a wall of poles), and the soup far from the origin (the margin for rounding grows with the distance)
+    let meshes: Vec<(PlacedMesh, V3)> = {
+        let mut v = Vec::new();
+        let (a, b) = soup(300, 7);
+        v.push((placed(a, b), [0.0, 0.0, 0.0]));
+        let (a, b) = floor_tris(24, 0.5, 0.0);
+        v.push((placed(a, b), [0.0, 0.0, 0.0]));
+        let (a, b) = soup(120, 99);
+        let squeezed: Vec<V3> = a.iter().map(|p| [p[0] * 0.15, p[1] * 2.0, p[2] * 0.15]).collect();
+        v.push((placed(squeezed, b), [0.0, 0.0, 0.0]));
+        let (a, b) = soup(200, 3);
+        let far: Vec<V3> = a.iter().map(|p| [p[0] + 3000.0, p[1], p[2] - 2000.0]).collect();
+        v.push((placed(far, b), [3000.0, 0.0, -2000.0]));
+        v
+    };
+    let mut rng = Lcg(0xC0FFEE);
+    let (mut some, mut total, mut mid) = (0usize, 0usize, 0usize);
+    for (mesh, base) in &meshes {
+        for i in 0..25_000 {
+            let p0 = [base[0] + rng.range(-9.0, 9.0), base[1] + rng.range(-1.0, 6.0), base[2] + rng.range(-9.0, 9.0)];
+            // vertical capsules (a character) most of the time, any slant for the rest
+            let p1 = if i % 4 != 0 { [p0[0], p0[1] + rng.range(0.1, 1.6), p0[2]] } else { [p0[0] + rng.range(-1.5, 1.5), p0[1] + rng.range(-1.5, 1.5), p0[2] + rng.range(-1.5, 1.5)] };
+            let r = rng.range(0.15, 0.9);
+            let fast = mesh.nearest_on_axis(p0, p1, r);
+            let slow = mesh.nearest_on_axis_reference(p0, p1, r);
+            assert_eq!(fast.map(f32::to_bits), slow.map(f32::to_bits), "capsule {p0:?} {p1:?} r {r}");
+            total += 1;
+            some += fast.is_some() as usize;
+            mid += fast.is_some_and(|s| s > 0.02 && s < 0.98) as usize;
+        }
+    }
+    // the test means something only if the answer is often a point of the axis and often nothing
+    assert!(some > total / 50 && some < total - total / 50, "{some} of {total} capsules have a nearest point");
+    assert!(mid > 200, "{mid} of them in the middle of the axis");
+}

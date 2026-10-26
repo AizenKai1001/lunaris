@@ -1065,6 +1065,84 @@ fn a_field_of_single_blades_is_full_of_detail_and_a_bare_one_is_not() {
 }
 
 #[test]
+fn macro_vary_breaks_up_a_flat_colour_in_big_patches_and_leaves_a_surface_without_it_alone() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // a flat grey ground 40 m across seen from straight above, lit evenly: with nothing on it every block of the picture is as bright as every other
+    let scene = |gpu: &mut GpuRenderer, vary: &str| {
+        let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":40},"Transform":{"pos":[0,25,0],"rot":[-0.7071,0,0,0.7071]}}}"#;
+        let plane = format!(r#"{{"uid":3,"components":{{"Transform":{{"scale":[40,1,40]}},"MeshRenderer":{{"mesh":"plane","color":[0.5,0.5,0.5,1],"roughness":1.0}}{vary}}}}}"#);
+        let env = r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#;
+        draw(gpu, &[cam, &plane, env], &Quality::high(), 320, 180)
+    };
+    // how much the brightness differs from one 20 x 20 pixel block to the next, as a share of the mean
+    let spread = |f: &Frame| -> f32 {
+        let mut means = Vec::new();
+        for by in 1..8u32 {
+            for bx in 1..15u32 {
+                let mut s = 0.0;
+                for y in 0..20 {
+                    for x in 0..20 {
+                        s += lum(px(f, bx * 20 + x, by * 20 + y));
+                    }
+                }
+                means.push(s / 400.0);
+            }
+        }
+        let mean = means.iter().sum::<f32>() / means.len() as f32;
+        (means.iter().map(|m| (m - mean) * (m - mean)).sum::<f32>() / means.len() as f32).sqrt() / mean
+    };
+    let plain = scene(&mut gpu, "");
+    let varied = scene(&mut gpu, r#","MacroVary":{"strength":0.5,"scale":8,"tint":0.0,"rough":0.0}"#);
+    let (a, b) = (spread(&plain), spread(&varied));
+    assert!(a < 0.02, "a flat ground is flat: {a}");
+    assert!(b > 0.08 && b > a * 4.0, "with macro variation the ground has patches: {a} -> {b}");
+    // all three numbers at 0 draw the surface exactly as it was, and the noise is still: the same picture twice
+    let zero = scene(&mut gpu, r#","MacroVary":{"strength":0,"tint":0,"rough":0}"#);
+    assert_eq!(zero.rgba, plain.rgba, "a MacroVary with nothing in it changes nothing");
+    assert_eq!(scene(&mut gpu, r#","MacroVary":{"strength":0.5,"scale":8,"tint":0.0,"rough":0.0}"#).rgba, varied.rgba, "the patches do not move");
+    // the colour lean makes some places warmer and some cooler (red against blue differs from block to block)
+    let leaned = scene(&mut gpu, r#","MacroVary":{"strength":0,"scale":8,"tint":1.0,"rough":0.0}"#);
+    let ratio = |f: &Frame, bx: u32, by: u32| {
+        let (mut r, mut bl) = (0.0f32, 0.0f32);
+        for y in 0..20 {
+            for x in 0..20 {
+                let c = px(f, bx * 20 + x, by * 20 + y);
+                r += c[0] as f32;
+                bl += c[2] as f32;
+            }
+        }
+        r / bl
+    };
+    let ratios: Vec<f32> = (1..8).flat_map(|by| (1..15).map(move |bx| (bx, by))).map(|(bx, by)| ratio(&leaned, bx, by)).collect();
+    let (lo, hi) = (ratios.iter().cloned().fold(f32::MAX, f32::min), ratios.iter().cloned().fold(f32::MIN, f32::max));
+    assert!(hi - lo > 0.1, "some blocks lean warm and some cool: {lo} .. {hi}");
+    // (LUNARIS_TEST_DUMP=dir: a street of repeated textures with and without it, for looking at)
+    if let Ok(dir) = std::env::var("LUNARIS_TEST_DUMP") {
+        for (name, vary) in [("macro_plain", ""), ("macro_varied", r#","MacroVary":{"strength":0.35,"scale":18,"tint":0.35,"rough":0.3}"#)] {
+            let mut ents: Vec<String> = vec![
+                r#"{"uid":1,"components":{"Camera":{"fov_y":55},"Transform":{"pos":[0,3,28],"rot":[-0.05,0,0,0.9987]}}}"#.to_string(),
+                r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":2.2},"Transform":{"rot":[-0.45,0.35,0,0.82]}}}"#.to_string(),
+                format!(r#"{{"uid":3,"components":{{"Transform":{{"scale":[200,1,200]}},"MeshRenderer":{{"mesh":"plane","color":[1,1,1,1],"texture":"concrete","uv_scale":[160,160],"roughness":0.9}}{vary}}}}}"#),
+                r#"{"uid":9,"components":{"Environment":{"sky":true,"ambient":0.5,"ssao":1,"bloom":0,"vignette":0,"shadows":true,"tonemap":1}}}"#.to_string(),
+            ];
+            for i in 0..8u32 {
+                for (k, x) in [-13.0f32, 13.0].iter().enumerate() {
+                    let z = -4.0 - 16.0 * i as f32;
+                    ents.push(format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{x},12,{z}],"scale":[10,24,12]}},"MeshRenderer":{{"mesh":"cube","color":[1,1,1,1],"texture":"concrete","uv_scale":[3,6],"roughness":0.85}}{vary}}}}}"#, 20 + i * 2 + k as u32));
+                }
+            }
+            let refs: Vec<&str> = ents.iter().map(|s| s.as_str()).collect();
+            let f = draw(&mut gpu, &refs, &Quality::high(), 1280, 720);
+            let file = std::fs::File::create(std::path::Path::new(&dir).join(format!("{name}.png"))).expect("dump file");
+            let mut enc = png::Encoder::new(std::io::BufWriter::new(file), f.width, f.height);
+            enc.set_color(png::ColorType::Rgba);
+            enc.set_depth(png::BitDepth::Eight);
+            enc.write_header().expect("png header").write_image_data(&f.rgba).expect("png data");
+        }
+    }
+}
+
+#[test]
 fn untile_breaks_up_the_repetition_of_a_texture_and_leaves_it_alone_otherwise() {
     let Some(mut gpu) = gpu_or_skip() else { return };
     // a 64 x 64 picture of noise (deterministic), repeated three times over a plane seen from above
@@ -1123,4 +1201,770 @@ fn untile_breaks_up_the_repetition_of_a_texture_and_leaves_it_alone_otherwise() 
     // and the picture is not flat or black
     let distinct: std::collections::BTreeSet<[u8; 3]> = untiled.rgba.chunks(4).map(|p| [p[0], p[1], p[2]]).collect();
     assert!(distinct.len() > 50);
+}
+
+#[test]
+fn grass_grows_only_on_the_layer_it_is_masked_to() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let dir = std::env::temp_dir().join(format!("lunaris-grassmask-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let write_png = |name: &str, w: u32, h: u32, color: png::ColorType, depth: png::BitDepth, data: &[u8]| {
+        let mut out = Vec::new();
+        {
+            let mut enc = png::Encoder::new(&mut out, w, h);
+            enc.set_color(color);
+            enc.set_depth(depth);
+            enc.write_header().unwrap().write_image_data(data).unwrap();
+        }
+        std::fs::write(dir.join(name), out).unwrap();
+    };
+    write_png("flat.png", 17, 17, png::ColorType::Grayscale, png::BitDepth::Sixteen, &vec![0x80u8; 17 * 17 * 2]);
+    // the west half of the ground is painted with layer 1, the east half with layer 2
+    let mut splat = Vec::new();
+    for _ in 0..17 {
+        for x in 0..17 {
+            splat.extend_from_slice(if x < 8 { &[255u8, 0, 0, 0] } else if x > 8 { &[0u8, 255, 0, 0] } else { &[128u8, 128, 0, 0] });
+        }
+    }
+    write_png("splat.png", 17, 17, png::ColorType::Rgba, png::BitDepth::Eight, &splat);
+    let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":60,"clear":[0,0,0,1]},"Transform":{"pos":[0,1.4,6],"rot":[-0.1,0,0,0.995]}}}"#;
+    let sun = r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3.0},"Transform":{"rot":[-0.35,0.9,0.0,0.3]}}}"#;
+    let terrain = r#"{"uid":3,"components":{"Transform":{"pos":[0,0,0]},"Terrain":{"heightmap":"flat.png","size":[40,40],"height":1},"TerrainLayers":{"splat":"splat.png","layers":"a dirt\nb dirt"}}}"#;
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":true,"tonemap":1}}}"#;
+    let mut photo = |grass: &str| -> Frame {
+        let text = format!(r#"{{"lunaris":1,"entities":[{cam},{sun},{terrain},{{"uid":4,"components":{{"GrassField":{grass}}}}},{env}]}}"#);
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+        gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")
+    };
+    let masked = photo(r#"{"terrain":3,"radius":30,"density":25,"height":[0.4,0.7],"mask_layer":1}"#);
+    // the foreground band of the picture, the west half and the east half: how many pixels are the saturated green of a blade (the dirt under them is brown)
+    let blades = |f: &Frame, x0: u32, x1: u32| -> usize {
+        (100..175u32).map(|y| (x0..x1).filter(|&x| { let p = px(f, x, y); p[1] as i32 > p[0] as i32 + 12 && p[1] as i32 > p[2] as i32 + 12 }).count()).sum()
+    };
+    let (west, east) = (blades(&masked, 0, 150), blades(&masked, 170, 320));
+    // (the splat map is bilinear: the grass thins out over a cell or two into the other layer, so some of it stands on the east side of the border)
+    assert!(west > east * 2 + 100, "the grass is on the painted layer, not on the other: west {west}, east {east}");
+}
+
+#[test]
+fn grass_stays_on_its_own_terrain_and_does_not_hang_in_the_air_over_the_next_one() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let dir = std::env::temp_dir().join(format!("lunaris-grassedge-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let write_png = |name: &str, data: &[u8]| {
+        let mut out = Vec::new();
+        {
+            let mut enc = png::Encoder::new(&mut out, 17, 17);
+            enc.set_color(png::ColorType::Grayscale);
+            enc.set_depth(png::BitDepth::Sixteen);
+            enc.write_header().unwrap().write_image_data(data).unwrap();
+        }
+        std::fs::write(dir.join(name), out).unwrap();
+    };
+    write_png("low.png", &vec![0u8; 17 * 17 * 2]);
+    write_png("high.png", &vec![0xffu8; 17 * 17 * 2]);
+    std::fs::copy(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hollowlight/hills/grass.glb"), dir.join("grass.glb")).unwrap();
+    // the camera stands on the low west terrain; the grass grows on the high east one next to it (its heights, read beyond its edge, would put grass 6 m up over the camera)
+    let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":60,"clear":[0,0,0,1]},"Transform":{"pos":[-10,1.4,6],"rot":[-0.1,0,0,0.995]}}}"#;
+    let sun = r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3.0},"Transform":{"rot":[-0.35,0.9,0.0,0.3]}}}"#;
+    let west = r#"{"uid":3,"components":{"Transform":{"pos":[-20,0,0]},"Terrain":{"heightmap":"low.png","size":[40,40],"height":6}}}"#;
+    let east = r#"{"uid":5,"components":{"Transform":{"pos":[20,0,0]},"Terrain":{"heightmap":"high.png","size":[40,40],"height":6}}}"#;
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#;
+    for grass in [r#"{"terrain":5,"mesh":"grass.glb","radius":30,"density":25}"#, r#"{"terrain":5,"radius":30,"density":25}"#] {
+        let text = format!(r#"{{"lunaris":1,"entities":[{cam},{sun},{west},{east},{{"uid":4,"components":{{"GrassField":{grass}}}}},{env}]}}"#);
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+        let f = gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render");
+        // the top of the picture is sky (the horizon is below row 70): any green there is grass hanging in the air
+        let green = (0..60u32).map(|y| (0..320u32).filter(|&x| { let p = px(&f, x, y); p[1] as i32 > p[0] as i32 + 12 && p[1] as i32 > p[2] as i32 + 12 }).count()).sum::<usize>();
+        assert!(green < 20, "grass hangs in the air over the other terrain: {green} green pixels in the sky ({grass})");
+    }
+}
+
+#[test]
+fn a_cliff_layer_replaces_the_stretched_ground_texture_on_a_steep_wall() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let dir = std::env::temp_dir().join(format!("lunaris-cliff-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let write_png = |name: &str, color: png::ColorType, depth: png::BitDepth, data: &[u8]| {
+        let mut out = Vec::new();
+        {
+            let mut enc = png::Encoder::new(&mut out, 17, 17);
+            enc.set_color(color);
+            enc.set_depth(depth);
+            enc.write_header().unwrap().write_image_data(data).unwrap();
+        }
+        std::fs::write(dir.join(name), out).unwrap();
+    };
+    // a plain at 0 and a plateau at 20 m with a wall between them in one cell (a cliff facing -x)
+    let mut h = Vec::new();
+    for _ in 0..17 {
+        for x in 0..17 {
+            h.extend_from_slice(&(if x < 8 { 0u16 } else { 65535u16 }).to_be_bytes());
+        }
+    }
+    write_png("wall.png", png::ColorType::Grayscale, png::BitDepth::Sixteen, &h);
+    write_png("splat.png", png::ColorType::Rgba, png::BitDepth::Eight, &vec![255u8, 0, 0, 0].repeat(17 * 17));
+    let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0,0,0,1]},"Transform":{"pos":[-14,9,0],"rot":[0,-0.7071,0,0.7071]}}}"#;
+    let sun = r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3.0},"Transform":{"rot":[-0.3,0.4,0.0,0.85]}}}"#;
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#;
+    let mut photo = |layers: &str| -> Frame {
+        let terrain = format!(r#"{{"uid":3,"components":{{"Transform":{{"pos":[0,0,0]}},"Terrain":{{"heightmap":"wall.png","size":[40,40],"height":20,"color":[1,1,1,1]}},"TerrainLayers":{{"splat":"splat.png","layers":"{layers}"}}}}}}"#);
+        let text = format!(r#"{{"lunaris":1,"entities":[{cam},{sun},{terrain},{env}]}}"#);
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+        gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")
+    };
+    // the wall fills the middle of the picture; how green it is (the ground layer is grass, the cliff layer is concrete)
+    let greenness = |f: &Frame| -> f32 {
+        let mut sum = 0.0;
+        for y in 70..110u32 {
+            for x in 130..190u32 {
+                let p = px(f, x, y);
+                sum += p[1] as f32 - (p[0] as f32 + p[2] as f32) * 0.5;
+            }
+        }
+        sum / (40.0 * 60.0)
+    };
+    let plain = photo("grass grass\\nstone concrete");
+    let cliffs = photo("grass grass\\nstone concrete cliff=1");
+    let (a, b) = (greenness(&plain), greenness(&cliffs));
+    assert!(a > b + 8.0, "the wall shows the grass layer stretched down it without a cliff layer ({a:.1}) and the concrete with one ({b:.1})");
+}
+
+#[test]
+fn culling_leaves_the_picture_exactly_as_it_was_and_leaves_out_what_the_view_cannot_see() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // 100 cubes on a grid 180 m across; the camera stands on the south edge looking north, so the rows behind it and the ones far to the sides are out of the view; the sun casts their shadows
+    let cubes: Vec<String> = (0..100)
+        .map(|i| format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{},1,{}],"scale":[2,2,2]}},"MeshRenderer":{{"mesh":"cube","color":[0.9,{},0.2,1]}}}}}}"#, 10 + i, (i % 10) as f32 * 20.0 - 90.0, (i / 10) as f32 * 20.0 - 90.0, 0.2 + 0.07 * (i % 7) as f32))
+        .collect();
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":1.0,"bloom":0,"vignette":0,"shadows":true,"tonemap":1,"shadow_distance":250}}}"#;
+    let mut list: Vec<&str> = vec![CAMERA_3D, SUN, FLOOR, env];
+    list.extend(cubes.iter().map(|s| s.as_str()));
+    gpu.culling = false;
+    let all = draw(&mut gpu, &list, &Quality::high(), 320, 180);
+    let uncut = gpu.last_cull;
+    gpu.culling = true;
+    let seen = draw(&mut gpu, &list, &Quality::high(), 320, 180);
+    let cut = gpu.last_cull;
+    assert_eq!(uncut.1, 0, "nothing is left out with culling off");
+    assert!(cut.0 == uncut.0 && cut.1 >= 40, "most of the cubes are out of the view: {cut:?}");
+    assert!(all.rgba == seen.rgba, "the picture is the same with and without culling ({} of {} bytes differ)", all.rgba.iter().zip(&seen.rgba).filter(|(a, b)| a != b).count(), all.rgba.len());
+}
+
+#[test]
+fn a_cut_out_material_is_cut_out_of_the_picture_the_shadow_and_the_depth_where_its_texture_is_clear() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let dir = std::env::temp_dir().join(format!("lunaris-cutout-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let write_png = |name: &str, rgba: [u8; 4]| {
+        let mut out = Vec::new();
+        {
+            let mut enc = png::Encoder::new(&mut out, 2, 2);
+            enc.set_color(png::ColorType::Rgba);
+            enc.set_depth(png::BitDepth::Eight);
+            enc.write_header().unwrap().write_image_data(&rgba.repeat(4)).unwrap();
+        }
+        std::fs::write(dir.join(name), out).unwrap();
+    };
+    write_png("clear.png", [255, 0, 0, 0]);
+    write_png("solid.png", [255, 0, 0, 255]);
+    // a 4 m square lying flat, with one material that is cut out where its picture's alpha is under a half and drawn from both sides
+    let floats = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+    let mut bin = floats(&[-2.0, 0.0, -2.0, 2.0, 0.0, -2.0, 2.0, 0.0, 2.0, -2.0, 0.0, 2.0]);
+    bin.extend(floats(&[0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]));
+    bin.extend(floats(&[0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]));
+    bin.extend([0u8, 0, 1, 0, 2, 0, 0, 0, 2, 0, 3, 0]);
+    std::fs::write(dir.join("quad.bin"), &bin).unwrap();
+    for (name, picture) in [("quad_clear.gltf", "clear.png"), ("quad_solid.gltf", "solid.png")] {
+        let json = format!(
+            r#"{{"asset":{{"version":"2.0"}},"scene":0,"scenes":[{{"nodes":[0]}}],"nodes":[{{"mesh":0}}],
+            "meshes":[{{"primitives":[{{"attributes":{{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2}},"indices":3,"material":0}}]}}],
+            "materials":[{{"pbrMetallicRoughness":{{"baseColorTexture":{{"index":0}}}},"alphaMode":"MASK","alphaCutoff":0.5,"doubleSided":true}}],
+            "textures":[{{"source":0}}],"images":[{{"uri":"{picture}"}}],
+            "buffers":[{{"byteLength":{},"uri":"quad.bin"}}],
+            "bufferViews":[{{"buffer":0,"byteOffset":0,"byteLength":48}},{{"buffer":0,"byteOffset":48,"byteLength":48}},{{"buffer":0,"byteOffset":96,"byteLength":32}},{{"buffer":0,"byteOffset":128,"byteLength":12}}],
+            "accessors":[{{"bufferView":0,"componentType":5126,"count":4,"type":"VEC3"}},{{"bufferView":1,"componentType":5126,"count":4,"type":"VEC3"}},{{"bufferView":2,"componentType":5126,"count":4,"type":"VEC2"}},{{"bufferView":3,"componentType":5123,"count":6,"type":"SCALAR"}}]}}"#,
+            bin.len()
+        );
+        std::fs::write(dir.join(name), json).unwrap();
+    }
+    let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0.1,0.1,0.15,1]},"Transform":{"pos":[0,14,8],"rot":[-0.55,0,0,0.84]}}}"#;
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":1.0,"bloom":0,"vignette":0,"shadows":true,"tonemap":1,"shadow_distance":60}}}"#;
+    let mut photo = |model: Option<&str>| -> Frame {
+        let quad = model.map(|m| format!(r#",{{"uid":5,"components":{{"Transform":{{"pos":[0,2.5,0]}},"MeshRenderer":{{"mesh":"{m}"}}}}}}"#)).unwrap_or_default();
+        let text = format!(r#"{{"lunaris":1,"entities":[{cam},{SUN},{FLOOR},{env}{quad}]}}"#);
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+        gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")
+    };
+    let (none, clear, solid) = (photo(None), photo(Some("quad_clear.gltf")), photo(Some("quad_solid.gltf")));
+    let diff = |a: &Frame, b: &Frame| a.rgba.iter().zip(&b.rgba).map(|(x, y)| (*x as f32 - *y as f32).abs()).sum::<f32>() / a.rgba.len() as f32;
+    let (d_clear, d_solid) = (diff(&clear, &none), diff(&solid, &none));
+    assert!(d_clear < 0.5, "a square whose picture is clear is not there at all (the same picture as without it: {d_clear} levels off)");
+    assert!(d_solid > 6.0 * d_clear.max(0.1), "a solid one is there, with its shadow ({d_solid} levels off against {d_clear})");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn levels_of_detail_change_a_far_picture_by_less_than_a_pixel_and_a_near_one_not_at_all() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let dir = std::env::temp_dir().join(format!("lunaris-lod-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // a hill of 150 x 150 samples (45,000 triangles: enough for levels of detail and for clusters)
+    let n = 150usize;
+    let mut samples = Vec::with_capacity(n * n * 2);
+    for j in 0..n {
+        for i in 0..n {
+            let (x, z) = (i as f32 / n as f32 * 6.0, j as f32 / n as f32 * 6.0);
+            let v = (0.5 + 0.25 * x.sin() * z.cos() + 0.2 * (x * 0.4 + z * 0.7).sin()).clamp(0.0, 1.0);
+            samples.extend_from_slice(&((v * 65535.0) as u16).to_be_bytes());
+        }
+    }
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, n as u32, n as u32);
+        enc.set_color(png::ColorType::Grayscale);
+        enc.set_depth(png::BitDepth::Sixteen);
+        enc.write_header().unwrap().write_image_data(&samples).unwrap();
+    }
+    std::fs::write(dir.join("hill.png"), out).unwrap();
+    let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"clouds":0,"ambient":1.0,"ssao":1.0,"bloom":0,"vignette":0,"shadows":true,"tonemap":1,"shadow_distance":400}}}"#;
+    let photo = |gpu: &mut GpuRenderer, z: f32| -> Frame {
+        let hill = format!(r#"{{"uid":4,"components":{{"Transform":{{"pos":[-20,0,{z}]}},"Terrain":{{"heightmap":"hill.png","size":[40,40],"height":8,"color":[0.5,0.6,0.4,1]}}}}}}"#);
+        let text = format!(r#"{{"lunaris":1,"entities":[{CAMERA_3D},{SUN},{env},{hill}]}}"#).replace(r#""pos":[0,3,9]"#, r#""pos":[0,3,0]"#).replace(r#""rot":[-0.2,0,0,0.98]"#, r#""rot":[0,0,0,1]"#);
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
+        gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")
+    };
+    // (only the error counts here: the rule that gives a triangle a few pixels would take levels off a hill that fills a picture of 320 x 180 pixels with 45,000 of them)
+    gpu.lod_tri_pixels = 0.0;
+    for (z, label) in [(-10.0f32, "near"), (-420.0, "far")] {
+        gpu.lod = false;
+        let full = photo(&mut gpu, z);
+        let full_tris = gpu.last_triangles;
+        gpu.lod = true;
+        let coarse = photo(&mut gpu, z);
+        let coarse_tris = gpu.last_triangles;
+        let mean = full.rgba.iter().zip(&coarse.rgba).map(|(a, b)| (*a as f32 - *b as f32).abs()).sum::<f32>() / full.rgba.len() as f32;
+        if label == "near" {
+            assert_eq!(full_tris, coarse_tris, "a near mesh keeps all of its triangles");
+            assert!(full.rgba == coarse.rgba, "and so the picture is the same");
+        } else {
+            assert!(coarse_tris * 2 < full_tris, "far off, fewer than half the triangles: {coarse_tris} of {full_tris}");
+            assert!(mean < 1.0, "the picture of the coarser levels is within a level of the full one: {mean}");
+        }
+    }
+    gpu.lod = true;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_picture_with_few_pixels_gets_a_coarser_mesh_than_the_same_scene_in_many() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let dir = std::env::temp_dir().join(format!("lunaris-lodpix-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let n = 150usize;
+    let mut samples = Vec::with_capacity(n * n * 2);
+    for j in 0..n {
+        for i in 0..n {
+            let v = (0.5 + 0.2 * ((i as f32) * 0.2).sin() * ((j as f32) * 0.2).cos()).clamp(0.0, 1.0);
+            samples.extend_from_slice(&((v * 65535.0) as u16).to_be_bytes());
+        }
+    }
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, n as u32, n as u32);
+        enc.set_color(png::ColorType::Grayscale);
+        enc.set_depth(png::BitDepth::Sixteen);
+        enc.write_header().unwrap().write_image_data(&samples).unwrap();
+    }
+    std::fs::write(dir.join("hill.png"), out).unwrap();
+    let hill = r#"{"uid":4,"components":{"Transform":{"pos":[-20,0,-10]},"Terrain":{"heightmap":"hill.png","size":[40,40],"height":8,"color":[0.5,0.6,0.4,1]}}}"#;
+    let text = format!(r#"{{"lunaris":1,"entities":[{CAMERA_3D},{SUN},{hill}]}}"#).replace(r#""pos":[0,3,9]"#, r#""pos":[0,3,0]"#).replace(r#""rot":[-0.2,0,0,0.98]"#, r#""rot":[0,0,0,1]"#);
+    let mut tris = |w: u32, h: u32, rule: f32| -> u64 {
+        gpu.lod_tri_pixels = rule;
+        let mut sim = Sim::new(1);
+        sim.asset_root = Some(dir.clone());
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut tex = TextureCache::new(Some(dir.clone()));
+        gpu.render_to_image(&mut sim.world, &mut tex, &RenderOptions { width: w, height: h, ..RenderOptions::default() }, &Quality::high()).expect("render");
+        gpu.last_triangles
+    };
+    let (small_off, small_on) = (tris(160, 90, 0.0), tris(160, 90, 3.0));
+    let (big_off, big_on) = (tris(1280, 720, 0.0), tris(1280, 720, 3.0));
+    assert_eq!(small_off, big_off, "without the rule the same level is drawn at both sizes");
+    assert!(small_on * 2 < small_off, "in a picture of 160 x 90 pixels a triangle of a pixel is not worth drawing: {small_on} of {small_off}");
+    assert!(big_on > small_on * 2, "in a large picture the same hill keeps far more: {big_on} against {small_on}");
+    gpu.lod_tri_pixels = lod_tri_default();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn lod_tri_default() -> f32 {
+    3.0
+}
+
+/// Linear luminance of a display pixel (the high-quality picture is sRGB encoded).
+fn lin_lum(c: [u8; 3]) -> f32 {
+    let d = |v: u8| {
+        let x = v as f32 / 255.0;
+        if x <= 0.04045 {
+            x / 12.92
+        } else {
+            ((x + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * d(c[0]) + 0.7152 * d(c[1]) + 0.0722 * d(c[2])
+}
+
+#[test]
+fn lighting_fills_the_shade_bounces_the_sun_and_gives_lamps_a_real_falloff_and_a_world_without_it_is_unchanged() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let q = Quality::high();
+    let (w, h) = (480u32, 270u32);
+    // a black sky and no ambient of its own; the sun straight down; a slab over the floor throws a shadow no light reaches
+    let shade_scene = |extra: &str| -> Vec<String> {
+        let mut v: Vec<String> = [
+            r#"{"uid":1,"components":{"Camera":{"fov_y":55,"clear":[0,0,0,1]},"Transform":{"pos":[0,5,9],"rot":[-0.3,0,0,0.954]}}}"#,
+            r#"{"uid":2,"components":{"Light":{"kind":0,"intensity":3.0},"Transform":{"rot":[-0.7071,0,0,0.7071]}}}"#,
+            r#"{"uid":3,"components":{"Transform":{"scale":[40,1,40]},"MeshRenderer":{"mesh":"plane","color":[0.8,0.8,0.8,1],"roughness":0.9}}}"#,
+            r#"{"uid":4,"components":{"Transform":{"pos":[0,3,0],"scale":[5,0.2,5]},"MeshRenderer":{"mesh":"cube","color":[0.5,0.5,0.5,1]}}}"#,
+            r#"{"uid":9,"components":{"Environment":{"sky":false,"sky_top":[0,0,0],"sky_horizon":[0,0,0],"ground":[0,0,0],"ambient":1.0,"bloom":0,"ssao":0,"shadows":true,"tonemap":3,"exposure":1.0}}}"#,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        if !extra.is_empty() {
+            v.push(format!(r#"{{"uid":10,"components":{{"Lighting":{extra}}}}}"#));
+        }
+        v
+    };
+    let draw_scene = |gpu: &mut GpuRenderer, v: &[String], w: u32, h: u32| -> Frame {
+        let refs: Vec<&str> = v.iter().map(|s| s.as_str()).collect();
+        draw(gpu, &refs, &q, w, h)
+    };
+    // the darkest hundredth of the floor: the shadow of the slab
+    let shadow_level = |f: &Frame| -> f32 {
+        let mut l: Vec<f32> = (0..f.ids.len()).filter(|&i| f.ids[i] == 3).map(|i| lin_lum(px(f, i as u32 % f.width, i as u32 / f.width))).collect();
+        assert!(l.len() > 2000, "{} floor pixels", l.len());
+        l.sort_by(|a, b| a.total_cmp(b));
+        l[..l.len() / 100].iter().sum::<f32>() / (l.len() / 100) as f32
+    };
+    let plain = draw_scene(&mut gpu, &shade_scene(""), w, h);
+    let off = draw_scene(&mut gpu, &shade_scene(r#"{"enabled":false}"#), w, h);
+    assert_eq!(plain.rgba, off.rgba, "a disabled Lighting changes nothing");
+    let base = shadow_level(&plain);
+    assert!(base < 0.004, "with no sky the shadow is black: {base}");
+    // fill: the shade is no longer black
+    let filled = shadow_level(&draw_scene(&mut gpu, &shade_scene(r#"{"fill":[0.05,0.05,0.05],"bounce":0,"lamp_falloff":0,"shadow_distance":0,"softness":0}"#), w, h));
+    eprintln!("shadow: plain {base}, with fill {filled}");
+    assert!(filled > base + 0.02, "fill lifts the shade: {base} -> {filled}");
+    // bounce: the sun's light comes back as ambient light and lifts the shade too (nothing without a sun above the horizon)
+    let bounced = shadow_level(&draw_scene(&mut gpu, &shade_scene(r#"{"fill":[0,0,0],"bounce":0.3,"lamp_falloff":0,"shadow_distance":0,"softness":0}"#), w, h));
+    eprintln!("shadow with bounce {bounced}");
+    assert!(bounced > base + 0.02, "bounce lifts the shade: {base} -> {bounced}");
+    // the lit floor is not changed by fill alone by more than the fill itself
+    let lamp_scene = |extra: &str| -> Vec<String> {
+        let mut v: Vec<String> = [
+            r#"{"uid":1,"components":{"Camera":{"fov_y":60,"clear":[0,0,0,1]},"Transform":{"pos":[0,12,0],"rot":[-0.7071,0,0,0.7071]}}}"#,
+            r#"{"uid":3,"components":{"Transform":{"scale":[60,1,60]},"MeshRenderer":{"mesh":"plane","color":[0.8,0.8,0.8,1],"roughness":0.9}}}"#,
+            r#"{"uid":6,"components":{"Transform":{"pos":[0,3,0]},"Light":{"kind":1,"intensity":0.4,"range":10,"color":[1,1,1]}}}"#,
+            r#"{"uid":9,"components":{"Environment":{"sky":false,"sky_top":[0,0,0],"sky_horizon":[0,0,0],"ground":[0,0,0],"ambient":1.0,"bloom":0,"ssao":0,"shadows":false,"tonemap":3,"exposure":1.0}}}"#,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        if !extra.is_empty() {
+            v.push(format!(r#"{{"uid":10,"components":{{"Lighting":{extra}}}}}"#));
+        }
+        v
+    };
+    // the floor under the lamp (3 m away) and 5.2 m to the side (6 m away: 60% of the range); the camera looks straight down from 12 m, 60 degrees wide
+    let at = |f: &Frame, offset: f32| -> f32 {
+        let y = (h as f32 * 0.5 + offset / (12.0 * 30f32.to_radians().tan()) * h as f32 * 0.5) as u32;
+        let x = w / 2;
+        let mut s = 0.0;
+        for dx in 0..5 {
+            s += lin_lum(px(f, x - 2 + dx, y.min(h - 1)));
+        }
+        s / 5.0
+    };
+    let old = draw_scene(&mut gpu, &lamp_scene(r#"{"fill":[0,0,0],"bounce":0,"lamp_falloff":0,"shadow_distance":0,"softness":0}"#), w, h);
+    let real = draw_scene(&mut gpu, &lamp_scene(r#"{"fill":[0,0,0],"bounce":0,"lamp_falloff":1,"shadow_distance":0,"softness":0}"#), w, h);
+    let (old_c, old_e, new_c, new_e) = (at(&old, 0.0), at(&old, 5.2), at(&real, 0.0), at(&real, 5.2));
+    eprintln!("lamp pool: old centre {old_c} edge {old_e}; real centre {new_c} edge {new_e}");
+    assert!(old_c > 0.05 && new_c > 0.05, "the pool is lit");
+    assert!(((new_e - old_e) / old_e).abs() < 0.25, "the two curves meet at 60% of the range: {old_e} vs {new_e}");
+    assert!(new_c / new_e > 1.4 * (old_c / old_e), "a real lamp is brighter at the core compared with its tail: {} vs {}", new_c / new_e, old_c / old_e);
+    // no component: the legacy falloff exactly
+    let none = draw_scene(&mut gpu, &lamp_scene(""), w, h);
+    assert_eq!(none.rgba, old.rgba, "lamp_falloff 0 is the old curve to the bit");
+}
+
+#[test]
+fn a_big_bright_light_over_a_far_wall_is_kept_among_many_small_lamps_nearer_the_camera() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let q = Quality::high();
+    let (w, h) = (320u32, 180u32);
+    // a white wall 340 m from the camera, lit by a big light 60 m in front of it (range 200: it does not reach the camera); `lamps` tiny lamps stand by the camera
+    let scene = |lamps: usize| -> Vec<String> {
+        let mut v: Vec<String> = vec![
+            r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0,0,0,1]},"Transform":{"pos":[400,100,0],"rot":[0,0.7071,0,0.7071]}}}"#.to_string(),
+            r#"{"uid":3,"components":{"Transform":{"pos":[0,100,0],"scale":[2,200,200]},"MeshRenderer":{"mesh":"cube","color":[0.8,0.8,0.8,1],"roughness":0.9}}}"#.to_string(),
+            r#"{"uid":5,"components":{"Transform":{"pos":[60,100,0]},"Light":{"kind":1,"intensity":0.5,"range":200,"color":[1,1,1]}}}"#.to_string(),
+            r#"{"uid":9,"components":{"Environment":{"sky":false,"sky_top":[0,0,0],"sky_horizon":[0,0,0],"ground":[0,0,0],"ambient":0.0,"bloom":0,"ssao":0,"shadows":false,"tonemap":3,"exposure":1.0}}}"#.to_string(),
+        ];
+        for i in 0..lamps {
+            v.push(format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{},100,3]}},"Light":{{"kind":1,"intensity":0.0001,"range":3,"color":[1,1,1]}}}}}}"#, 20 + i, 399.0 + i as f32 * 0.1));
+        }
+        v
+    };
+    let wall = |gpu: &mut GpuRenderer, lamps: usize| -> f32 {
+        let s = scene(lamps);
+        let refs: Vec<&str> = s.iter().map(|x| x.as_str()).collect();
+        let f = draw(gpu, &refs, &q, w, h);
+        let (mut n, mut sum) = (0.0f32, 0.0f32);
+        for i in 0..f.ids.len() {
+            if f.ids[i] == 3 {
+                n += 1.0;
+                sum += lin_lum(px(&f, i as u32 % f.width, i as u32 / f.width));
+            }
+        }
+        assert!(n > 1000.0, "{n} wall pixels");
+        sum / n
+    };
+    let few = wall(&mut gpu, 10);
+    let many = wall(&mut gpu, 40);
+    eprintln!("wall: with 11 lights {few}, with 41 lights {many}");
+    assert!(few > 0.03, "the big light lights the wall: {few}");
+    assert!(many > 0.8 * few, "the big light is still one of the sixteen when there are many lamps: {few} vs {many}");
+}
+
+#[test]
+fn lighting_can_let_four_lamps_cast_shadows_where_two_do_by_default() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let q = Quality::high();
+    let (w, h) = (640u32, 360u32);
+    // three lamps 12 m apart, each with a cube beside it that throws a shadow on the floor; the camera looks straight down from 18 m
+    let scene = |points: &str| -> Vec<String> {
+        let mut v: Vec<String> = vec![
+            r#"{"uid":1,"components":{"Camera":{"fov_y":60,"clear":[0,0,0,1]},"Transform":{"pos":[0,18,0],"rot":[-0.7071,0,0,0.7071]}}}"#.to_string(),
+            r#"{"uid":3,"components":{"Transform":{"scale":[80,1,80]},"MeshRenderer":{"mesh":"plane","color":[0.8,0.8,0.8,1],"roughness":0.9}}}"#.to_string(),
+            r#"{"uid":9,"components":{"Environment":{"sky":false,"sky_top":[0,0,0],"sky_horizon":[0,0,0],"ground":[0,0,0],"ambient":0.0,"bloom":0,"ssao":0,"shadows":true,"tonemap":3,"exposure":1.0}}}"#.to_string(),
+        ];
+        for (i, x) in [-12.0f32, 0.0, 12.0].iter().enumerate() {
+            v.push(format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{},4,0]}},"Light":{{"kind":1,"intensity":0.5,"range":9,"color":[1,1,1]}}}}}}"#, 20 + i, x));
+            v.push(format!(r#"{{"uid":{},"components":{{"Transform":{{"pos":[{},1.2,2.0],"scale":[1.4,1.4,1.4]}},"MeshRenderer":{{"mesh":"cube","color":[0.5,0.5,0.5,1]}}}}}}"#, 30 + i, x));
+        }
+        if !points.is_empty() {
+            v.push(format!(r#"{{"uid":10,"components":{{"Lighting":{{"fill":[0,0,0],"bounce":0,"lamp_falloff":0,"shadow_distance":0,"softness":0,"point_shadows":{points}}}}}}}"#));
+        }
+        v
+    };
+    // the floor in the shadow of each lamp's cube (the cube stands 2 m to the side of the lamp, the shadow falls further out) against the floor at the same distance on the other side of the lamp
+    let ratios = |gpu: &mut GpuRenderer, points: &str| -> Vec<f32> {
+        let s = scene(points);
+        let refs: Vec<&str> = s.iter().map(|x| x.as_str()).collect();
+        let f = draw(gpu, &refs, &q, w, h);
+        if let Ok(dir) = std::env::var("LUNARIS_TEST_DUMP") {
+            let file = std::fs::File::create(std::path::Path::new(&dir).join(format!("psh_{}.png", if points.is_empty() { "two" } else { points }))).expect("dump file");
+            let mut enc = png::Encoder::new(std::io::BufWriter::new(file), f.width, f.height);
+            enc.set_color(png::ColorType::Rgba);
+            enc.set_depth(png::BitDepth::Eight);
+            enc.write_header().expect("png header").write_image_data(&f.rgba).expect("png data");
+        }
+        let half = 18.0 * 30f32.to_radians().tan();
+        let at = |x: f32, z: f32| -> f32 {
+            let (px_, py_) = ((w as f32 * 0.5 + x / (half * w as f32 / h as f32) * w as f32 * 0.5) as u32, (h as f32 * 0.5 + z / half * h as f32 * 0.5) as u32);
+            let mut s = 0.0;
+            for dy in 0..3 {
+                for dx in 0..3 {
+                    s += lin_lum(px(&f, px_ - 1 + dx, py_ - 1 + dy));
+                }
+            }
+            s / 9.0
+        };
+        [-12.0f32, 0.0, 12.0].iter().map(|&x| at(x, 3.6) / at(x, -3.6).max(1e-4)).collect()
+    };
+    let four = ratios(&mut gpu, "4");
+    let two = ratios(&mut gpu, "");
+    eprintln!("shadow ratios, two shadowed lamps {two:?}, four {four:?}");
+    assert!(four.iter().all(|r| *r < 0.6), "with four, every lamp's cube throws a shadow: {four:?}");
+    assert!(two.iter().any(|r| *r > 0.8), "with two, one lamp throws none: {two:?}");
+}
+
+/// A `ParticleSystem` entity at `pos` whose effect is `effect` (the JSON, put in the component as text).
+fn fx_entity(uid: u32, pos: [f32; 3], effect: &str) -> String {
+    let text = lunaris_json::Json::str(effect).to_string_compact().expect("text");
+    format!(r#"{{"uid":{uid},"components":{{"Transform":{{"pos":[{},{},{}]}},"ParticleSystem":{{"effect":{text}}}}}}}"#, pos[0], pos[1], pos[2])
+}
+
+#[test]
+fn soft_particles_fade_out_where_they_meet_a_surface_and_hard_ones_cut_a_line() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    // a big opaque disc of a particle standing across a floor, seen from the side and a little above: a hard picture is cut by the floor in a straight line, a soft one thins out to nothing as it nears the floor
+    let scene = |gpu: &mut GpuRenderer, soft: f32| {
+        let effect = format!(
+            r#"{{"emitters":[{{"loop":false,"spawn":{{"bursts":[{{"time":0,"count":1}}]}},"init":{{"life":100,"speed":0,"size":5,"color":[1,1,1,1]}},"render":{{"texture":"circle","blend":"alpha","soft":{soft}}}}}]}}"#
+        );
+        let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":40,"clear":[0,0,0,1]},"Transform":{"pos":[0,2.2,9],"rot":[-0.12,0,0,0.9928]}}}"#;
+        let floor = r#"{"uid":3,"components":{"Transform":{"scale":[40,1,40]},"MeshRenderer":{"mesh":"plane","color":[0.05,0.05,0.05,1],"roughness":1.0}}}"#;
+        let env = r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":0.4,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#;
+        let fx = fx_entity(4, [0.0, 1.5, 0.0], &effect);
+        draw(gpu, &[cam, floor, env, &fx], &Quality::high(), 320, 180)
+    };
+    let hard = scene(&mut gpu, 0.0);
+    let soft = scene(&mut gpu, 1.5);
+    // down the middle column: where the white disc stops and the dark floor shows
+    let column = |f: &Frame| -> Vec<f32> { (0..180).map(|y| lum(px(f, 160, y))).collect() };
+    let (h, s) = (column(&hard), column(&soft));
+    let edge = (0..180usize).rev().find(|&y| h[y] > 120.0).expect("the disc is in the picture");
+    assert!(edge > 20 && edge < 175, "the cut is somewhere in the picture: row {edge}");
+    // right above the cut the hard picture is still white and the soft one has faded; far above it they agree
+    let band = |v: &[f32], a: usize, b: usize| v[a..=b].iter().sum::<f32>() / (b - a + 1) as f32;
+    let (near_h, near_s) = (band(&h, edge - 4, edge - 1), band(&s, edge - 4, edge - 1));
+    let top = edge.saturating_sub(60);
+    let (far_h, far_s) = (band(&h, top, top + 3), band(&s, top, top + 3));
+    eprintln!("cut at row {edge}: hard {near_h:.0} soft {near_s:.0}; {} rows up: hard {far_h:.0} soft {far_s:.0}; soft at the cut {:.0}", edge - top, band(&s, edge - 1, edge));
+    assert!(near_h > 150.0 && near_s < near_h * 0.8, "at the cut: hard {near_h:.0}, soft {near_s:.0}");
+    assert!(far_s > far_h * 0.85, "away from the floor the picture is whole: hard {far_h:.0}, soft {far_s:.0}");
+    assert!(band(&s, edge - 1, edge) < far_s * 0.7, "it thins out towards the floor: {:.0} against {far_s:.0}", band(&s, edge - 1, edge));
+    // a soft distance of 0 is exactly what a picture without the field is
+    assert_eq!(scene(&mut gpu, 0.0).rgba, hard.rgba);
+}
+
+#[test]
+fn the_light_of_a_particle_lights_the_floor_round_it() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let scene = |gpu: &mut GpuRenderer, light: &str| {
+        let effect = format!(
+            r#"{{"emitters":[{{"loop":false,"spawn":{{"bursts":[{{"time":0,"count":1}}]}},"init":{{"life":100,"speed":0,"size":0.3,"color":[1,0.5,0.2,1]}},"render":{{"texture":"soft","blend":"add"{light}}}}}]}}"#
+        );
+        let cam = r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0,0,0,1]},"Transform":{"pos":[0,6,8],"rot":[-0.38,0,0,0.925]}}}"#;
+        let floor = r#"{"uid":3,"components":{"Transform":{"scale":[40,1,40]},"MeshRenderer":{"mesh":"plane","color":[0.6,0.6,0.6,1],"roughness":1.0}}}"#;
+        let env = r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":0.05,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#;
+        let fx = fx_entity(4, [0.0, 1.2, 0.0], &effect);
+        draw(gpu, &[cam, floor, env, &fx], &Quality::high(), 320, 180)
+    };
+    let dark = scene(&mut gpu, "");
+    let lit = scene(&mut gpu, r#","light":{"intensity":30,"range":5,"max":1}"#);
+    // the floor a metre or two from the spark is brighter and warmer; far away it is as it was
+    let patch = |f: &Frame, x: u32, y: u32| -> [f32; 3] {
+        let mut s = [0.0f32; 3];
+        for dy in 0..6 {
+            for dx in 0..6 {
+                let c = px(f, x + dx, y + dy);
+                for k in 0..3 {
+                    s[k] += c[k] as f32 / 36.0;
+                }
+            }
+        }
+        s
+    };
+    let (a, b) = (patch(&dark, 168, 64), patch(&lit, 168, 64));
+    assert!(lum([b[0] as u8, b[1] as u8, b[2] as u8]) > lum([a[0] as u8, a[1] as u8, a[2] as u8]) + 8.0, "near: {a:?} -> {b:?}");
+    assert!(b[0] > b[2] + 3.0, "warm: {b:?}");
+    let (c, d) = (patch(&dark, 300, 8), patch(&lit, 300, 8));
+    assert!((d[0] - c[0]).abs() < 3.0, "far: {c:?} -> {d:?}");
+}
+
+/// Every ready-made effect of `examples/fx` on the card at a few clocks, as pictures (`LUNARIS_TEST_DUMP=dir` writes them; without it the test only checks that each effect puts something in the picture and that it is the same picture twice).
+#[test]
+fn the_example_effects_draw_and_play_on_the_card() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    // (file, camera distance, camera height, height looked at, clocks)
+    let table: [(&str, f32, f32, f32, &[f32]); 18] = [
+        ("campfire", 5.0, 1.6, 0.8, &[0.5, 2.0, 5.0]),
+        ("burning_wreck", 12.0, 3.5, 1.8, &[1.0, 3.0, 6.0]),
+        ("muzzle_flash", 2.5, 1.4, 1.2, &[0.02, 0.06, 0.25]),
+        ("bullet_impact", 3.0, 1.4, 0.5, &[0.05, 0.2, 0.6]),
+        ("explosion", 26.0, 7.0, 4.0, &[0.1, 0.4, 1.0, 3.0]),
+        ("tracer", 10.0, 1.6, 1.2, &[0.05, 0.15]),
+        ("toxic_dust", 14.0, 1.8, 1.5, &[3.0, 6.0]),
+        ("rain_splash", 12.0, 5.0, 0.0, &[1.0, 1.4]),
+        ("mind_motes", 40.0, 4.0, 3.0, &[2.0, 6.0, 12.0]),
+        ("voxel/fire_barrel", 4.0, 1.8, 1.0, &[1.0, 3.0]),
+        ("voxel/muzzle_flash", 2.0, 1.2, 1.2, &[0.03, 0.08, 0.5]),
+        ("voxel/impact_concrete", 2.0, 1.2, 0.3, &[0.1, 0.3, 0.8]),
+        ("voxel/tracer", 8.0, 1.5, 1.3, &[0.05, 0.1]),
+        ("voxel/explosion", 22.0, 6.0, 3.5, &[0.1, 0.4, 1.2, 3.0]),
+        ("voxel/toxic_dust", 12.0, 1.8, 1.5, &[4.0]),
+        ("voxel/rain_splash", 9.0, 4.0, 0.0, &[1.0]),
+        ("voxel/machine_death", 3.5, 1.5, 0.8, &[0.1, 0.4, 1.0]),
+        ("voxel/dust_puff", 3.5, 1.2, 0.6, &[0.2, 0.8]),
+    ];
+    for (name, dist, height, ty, clocks) in table {
+        let a = (height - ty).atan2(dist);
+        let cam = format!(r#"{{"uid":1,"components":{{"Camera":{{"fov_y":55,"clear":[0.02,0.03,0.07,1]}},"Transform":{{"pos":[0,{height},{dist}],"rot":[{},0,0,{}]}}}}}}"#, -(a / 2.0).sin(), (a / 2.0).cos());
+        let floor = r#"{"uid":3,"components":{"Transform":{"scale":[200,1,200]},"MeshRenderer":{"mesh":"plane","texture":"stone","uv_scale":[80,80],"color":[0.4,0.42,0.46,1],"roughness":0.95}}}"#;
+        let moon = r#"{"uid":2,"components":{"Light":{"kind":0,"color":[0.5,0.6,0.95],"intensity":0.9},"Transform":{"rot":[-0.55,0.3,0.1,0.77]}}}"#;
+        let env = r#"{"uid":9,"components":{"Environment":{"sky":true,"sky_top":[0.03,0.05,0.12],"sky_horizon":[0.12,0.16,0.26],"ambient":0.4,"bloom":0.5,"bloom_threshold":0.8,"fog":0.003,"fog_color":[0.1,0.13,0.2]}}}"#;
+        let fx = format!(r#"{{"uid":4,"components":{{"Transform":{{"pos":[0,0.05,0]}},"ParticleSystem":{{"effect":"examples/fx/{name}.fx.json","playing":false,"time":0}}}}}}"#);
+        let text = format!(r#"{{"lunaris":1,"entities":[{cam},{floor},{moon},{env},{fx}]}}"#);
+        let mut tex = TextureCache::new(Some(root.clone()));
+        let mut sim = Sim::new(1);
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        let mut frames = Vec::new();
+        for &c in clocks {
+            sim.apply(&lunaris_sim::Command::Set { uid: 4, component: "ParticleSystem".into(), value: lunaris_json::parse(&format!(r#"{{"time":{c}}}"#)).unwrap() }).unwrap();
+            let opts = RenderOptions { width: 640, height: 360, ..RenderOptions::default() };
+            frames.push((c, gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render")));
+        }
+        assert!(tex.warnings.is_empty(), "{name}: {:?}", tex.warnings);
+        // each effect shows up: some picture of it differs from the bare floor (an empty system at the first clock)
+        let busiest = frames.iter().map(|(_, f)| f.rgba.chunks(4).filter(|p| p[0] as u32 + p[1] as u32 + p[2] as u32 > 220).count()).max().unwrap();
+        assert!(busiest > 20, "{name}: nothing in the picture ({busiest})");
+        if let Ok(dir) = std::env::var("LUNARIS_TEST_DUMP") {
+            for (c, f) in &frames {
+                let file = std::fs::File::create(std::path::Path::new(&dir).join(format!("fx_{}_{c}.png", name.replace('/', "_")))).expect("dump file");
+                let mut enc = png::Encoder::new(std::io::BufWriter::new(file), f.width, f.height);
+                enc.set_color(png::ColorType::Rgba);
+                enc.set_depth(png::BitDepth::Eight);
+                enc.write_header().expect("png header").write_image_data(&f.rgba).expect("png data");
+            }
+        }
+    }
+}
+
+/// A `ParticleSystem` entity as `fx_entity` makes it, with its clock set (the picture is then the first the system is in, stepped up to that clock).
+fn fx_entity_at(uid: u32, pos: [f32; 3], effect: &str, time: f32) -> String {
+    let text = lunaris_json::Json::str(effect).to_string_compact().expect("text");
+    format!(r#"{{"uid":{uid},"components":{{"Transform":{{"pos":[{},{},{}]}},"ParticleSystem":{{"effect":{text},"time":{time},"playing":false}}}}}}"#, pos[0], pos[1], pos[2])
+}
+
+/// The middle of what is lit in a picture (pixels, x then y) and how much light there is.
+fn lit_centre(f: &Frame, floor: f32) -> Option<(f32, f32, f32)> {
+    let (mut sx, mut sy, mut sw) = (0.0f64, 0.0f64, 0.0f64);
+    for y in 0..f.height {
+        for x in 0..f.width {
+            let w = (lum(px(f, x, y)) - floor).max(0.0) as f64;
+            sx += x as f64 * w;
+            sy += y as f64 * w;
+            sw += w;
+        }
+    }
+    (sw > 0.0).then(|| ((sx / sw) as f32, (sy / sw) as f32, sw as f32))
+}
+
+fn fx_scene(effect: &str, time: f32) -> Vec<String> {
+    vec![
+        r#"{"uid":1,"components":{"Camera":{"fov_y":40,"clear":[0,0,0,1]},"Transform":{"pos":[0,0,10]}}}"#.to_string(),
+        r#"{"uid":9,"components":{"Environment":{"sky":false,"ambient":1.0,"ssao":0,"bloom":0,"vignette":0,"shadows":false,"tonemap":1}}}"#.to_string(),
+        fx_entity_at(4, [0.0, 0.0, 0.0], effect, time),
+    ]
+}
+
+#[test]
+fn an_emitter_the_card_simulates_flies_where_the_steps_say() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let (w, h) = (320u32, 180u32);
+    // one white disc of a particle thrown along +x at 4 m/s; a camera 10 m away with a 40 degree view sees 24.7 pixels to the metre
+    let flight = |gpu: &mut GpuRenderer, update: &str, time: f32| {
+        let effect = format!(
+            r#"{{"emitters":[{{"simulate":"gpu","space":"world","loop":false,"spawn":{{"bursts":[{{"time":0,"count":1}}]}},"init":{{"life":100,"speed":4,"direction":[1,0,0],"size":0.5,"color":[1,1,1,1]}},"update":{update},"render":{{"texture":"circle","blend":"add"}}}}]}}"#
+        );
+        let ents = fx_scene(&effect, time);
+        let refs: Vec<&str> = ents.iter().map(|s| s.as_str()).collect();
+        draw(gpu, &refs, &Quality::classic(), w, h)
+    };
+    let (a, b) = (flight(&mut gpu, "{}", 0.25), flight(&mut gpu, "{}", 0.75));
+    let (ca, cb) = (lit_centre(&a, 8.0).expect("lit at 0.25"), lit_centre(&b, 8.0).expect("lit at 0.75"));
+    // half a second at 4 m/s is 2 m: about 49 pixels to the right, and no move up or down
+    let dx = cb.0 - ca.0;
+    assert!((dx - 49.4).abs() < 4.0, "moved {dx} pixels: {ca:?} -> {cb:?}");
+    assert!((cb.1 - ca.1).abs() < 1.5, "level: {ca:?} -> {cb:?}");
+    // the size is the particle's: 0.5 m is about 12 pixels across
+    let area = a.rgba.chunks(4).filter(|p| p[0] > 100).count();
+    assert!((60..220).contains(&area), "{area} pixels");
+    // gravity bends the flight down (the picture's y grows downwards): 0.5 g t^2 at 0.75 s is 1.4 m, about 35 pixels
+    let g = flight(&mut gpu, r#"{"gravity":[0,-5,0]}"#, 0.75);
+    let cg = lit_centre(&g, 8.0).expect("lit with gravity");
+    assert!((cg.1 - cb.1 - 0.5 * 5.0 * 0.75 * 0.75 * 24.7).abs() < 5.0, "fell {} pixels", cg.1 - cb.1);
+    // the same history is the same picture
+    assert_eq!(flight(&mut gpu, "{}", 0.75).rgba, b.rgba);
+    // a plane stops it: a floor at y = -1 (24.7 pixels below the middle) that bounces nothing back, so it ends on the floor line however long it falls
+    let floor = flight(&mut gpu, r#"{"gravity":[0,-30,0],"collide":{"bounce":0,"friction":1,"planes":[{"normal":[0,1,0],"d":-1}]}}"#, 1.5);
+    let cf = lit_centre(&floor, 8.0).expect("lit on the floor");
+    assert!(cf.1 > 90.0 + 24.7 - 3.0 && cf.1 < 90.0 + 24.7 + 3.0, "on the floor line: {cf:?}");
+}
+
+#[test]
+fn the_card_and_the_processor_make_clouds_of_the_same_kind() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let effect = r#"{"emitters":[{"simulate":"gpu","space":"world","spawn":{"rate":600,"shape":{"type":"sphere","radius":0.6}},"init":{"life":[1.0,2.0],"speed":[0.5,2.5],"spread":180,"size":[0.08,0.16],"color":[1,0.6,0.3,1]},"update":{"gravity":[0,-1,0],"drag":0.4,"noise":{"strength":1.5,"scale":1.2,"speed":0.3}},"curves":{"alpha":[[0,0],[0.15,1],[1,0]]},"render":{"texture":"soft","blend":"add"}}]}"#;
+    let ents = fx_scene(effect, 4.0);
+    let on_the_card = {
+        let refs: Vec<&str> = ents.iter().map(|s| s.as_str()).collect();
+        draw(&mut gpu, &refs, &Quality::classic(), 320, 180)
+    };
+    // the reference renderer steps the same emitter on the processor (it is drawn there as any other)
+    let on_the_cpu = {
+        let text = format!(r#"{{"lunaris":1,"entities":[{}]}}"#, ents.join(","));
+        let mut sim = Sim::new(1);
+        sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+        lunaris_render::render(&mut sim.world, &mut TextureCache::new(None), &RenderOptions { width: 320, height: 180, ..RenderOptions::default() }).expect("render")
+    };
+    let (g, c) = (lit_centre(&on_the_card, 4.0).expect("the card's cloud is in the picture"), lit_centre(&on_the_cpu, 4.0).expect("the processor's cloud is in the picture"));
+    // the same amount of light, about the same middle, and the same width (the particles are not the same ones: other random numbers)
+    assert!((g.2 / c.2 - 1.0).abs() < 0.35, "light: card {} against processor {}", g.2, c.2);
+    assert!((g.0 - c.0).abs() < 12.0 && (g.1 - c.1).abs() < 12.0, "middle: card {g:?} against processor {c:?}");
+    let spread = |f: &Frame, mid: (f32, f32, f32)| -> f32 {
+        let (mut s, mut n) = (0.0f64, 0.0f64);
+        for y in 0..f.height {
+            for x in 0..f.width {
+                let w = (lum(px(f, x, y)) - 4.0).max(0.0) as f64;
+                s += w * (((x as f32 - mid.0).powi(2) + (y as f32 - mid.1).powi(2)) as f64);
+                n += w;
+            }
+        }
+        (s / n).sqrt() as f32
+    };
+    let (sg, sc) = (spread(&on_the_card, g), spread(&on_the_cpu, c));
+    assert!((sg / sc - 1.0).abs() < 0.3, "width: card {sg} against processor {sc}");
+}
+
+#[test]
+fn ten_thousand_motes_on_the_card_cost_the_processor_nothing_it_can_measure() {
+    let Some(mut gpu) = gpu_or_skip() else { return };
+    let effect = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/fx/mind_motes.fx.json")).expect("the example effect");
+    let mut ents = fx_scene(&effect, 14.0);
+    ents[0] = r#"{"uid":1,"components":{"Camera":{"fov_y":50,"clear":[0,0,0,1]},"Transform":{"pos":[0,3,32]}}}"#.to_string();
+    let text = format!(r#"{{"lunaris":1,"entities":[{}]}}"#, ents.join(","));
+    let mut sim = Sim::new(1);
+    sim.load_scene(&lunaris_json::parse(&text).expect("scene JSON")).expect("scene loads");
+    let mut tex = TextureCache::new(None);
+    let opts = RenderOptions { width: 640, height: 360, ..RenderOptions::default() };
+    let first = gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render");
+    let busy = |f: &Frame| f.rgba.chunks(4).filter(|p| p[0] as u32 + p[1] as u32 + p[2] as u32 > 60).count();
+    assert!(busy(&first) > 1500, "the motes are in the picture: {}", busy(&first));
+    // the processor holds none of the motes: only the glow's few particles live there
+    assert!(tex.fx.stats.particles < 20, "{} particles on the processor", tex.fx.stats.particles);
+    // a second of pictures with the clock running: the processor's share is the schedule of the births
+    let t0 = std::time::Instant::now();
+    let mut last = first.clone();
+    for k in 0..60 {
+        sim.apply(&lunaris_sim::Command::Set { uid: 4, component: "ParticleSystem".into(), value: lunaris_json::parse(&format!(r#"{{"time":{}}}"#, 14.0 + (k + 1) as f32 / 60.0)).unwrap() }).unwrap();
+        last = gpu.render_to_image(&mut sim.world, &mut tex, &opts, &Quality::high()).expect("render");
+    }
+    eprintln!("60 pictures of the mind on the card: {:.2} ms each (a whole picture, read back to the processor)", t0.elapsed().as_secs_f64() * 1000.0 / 60.0);
+    assert_ne!(last.rgba, first.rgba, "it moved");
+    assert!(busy(&last) > 1500);
 }

@@ -63,7 +63,7 @@ fn layout(world: &mut World) {
         ui.insert(uid, *u);
     });
     // what a `UiGroup` hides takes no room either
-    let hidden = crate::ui_kit3::hidden_set(world);
+    let hidden = crate::ui_kit3::hidden_set_shared(world);
     let _ = world.for_each_uid::<(&Parent,), _>(|e, uid, (p,)| {
         parent_of.insert(uid, p.target.0);
         if ui.get(&uid).is_some_and(|u| u.visible) && !hidden.contains(&uid) {
@@ -122,7 +122,7 @@ fn nav(world: &mut World) {
     let _ = world.for_each_uid::<(&UiNav,), _>(|e, uid, (n,)| navs.push((uid, e, *n)));
     let Some((_, ne, nav)) = navs.into_iter().min_by_key(|n| n.0) else { return };
     let mut cands: Vec<(u64, Entity, [f32; 2])> = Vec::new();
-    let hidden = crate::ui_kit3::hidden_set(world);
+    let hidden = crate::ui_kit3::hidden_set_shared(world);
     let _ = world.for_each_uid::<(&Ui,), _>(|e, uid, (u,)| {
         if u.button && u.visible && !hidden.contains(&uid) {
             cands.push((uid, e, [u.pos[0] + u.size[0] * 0.5, u.pos[1] + u.size[1] * 0.5]));
@@ -242,6 +242,96 @@ fn toggles(world: &mut World) {
     }
 }
 
+/// What a text field shows of `text`: all of it, or with `show_last` above 0 and a longer text `...` and the last `show_last` characters.
+fn tail_of(text: &str, show_last: u32) -> String {
+    let n = text.chars().count();
+    if show_last == 0 || n <= show_last as usize {
+        return text.to_string();
+    }
+    let skip = n - show_last as usize;
+    format!("...{}", text.chars().skip(skip).collect::<String>())
+}
+
+/// The uid and entity of the text field that has the focus (the lowest uid when a scene has two, which a click cannot do).
+fn focused_input(world: &mut World) -> Option<(u64, Entity)> {
+    let mut best: Option<(u64, Entity)> = None;
+    let _ = world.for_each_uid::<(&UiInput,), _>(|e, uid, (t,)| {
+        if t.focused && best.is_none_or(|b| uid < b.0) {
+            best = Some((uid, e));
+        }
+    });
+    best
+}
+
+/// The text fields that the native player keeps between runs (`UiInput.remember`): (name, uid, text), by name then uid.
+pub fn remembered_texts(world: &mut World) -> Vec<(String, u64, String)> {
+    let mut found: Vec<(u64, u32, u32)> = Vec::new();
+    let _ = world.for_each_uid::<(&UiInput,), _>(|_, uid, (t,)| {
+        if t.remember.0 != 0 {
+            found.push((uid, t.remember.0, t.text.0));
+        }
+    });
+    let mut out: Vec<(String, u64, String)> = found.into_iter().map(|(uid, name, text)| (world.strings().get(name).to_string(), uid, world.strings().get(text).to_string())).collect();
+    out.sort();
+    out
+}
+
+/// Put a remembered text back into every field that remembers under `name`. Returns how many fields took it.
+pub fn restore_remembered(world: &mut World, name: &str, text: &str) -> usize {
+    let mut mine: Vec<Entity> = Vec::new();
+    let _ = world.for_each_uid::<(&UiInput,), _>(|e, _, _| mine.push(e));
+    let mut count = 0;
+    let sym = world.strings_mut().intern(text);
+    for e in mine {
+        let Some(t) = world.get::<UiInput>(e).copied() else { continue };
+        if t.remember.0 != 0 && world.strings().get(t.remember.0) == name {
+            if let Some(w) = world.get_mut::<UiInput>(e) {
+                w.text.0 = sym;
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+/// Is a text field waiting for typing? (a window that has text to type asks first, so that a key pressed with nothing to type into is left to the game)
+pub fn has_focused_input(world: &mut World) -> bool {
+    focused_input(world).is_some()
+}
+
+/// Typed or pasted text goes into the focused field, all of it now (the host of a window calls this, between two ticks, instead of one `input.char` a tick: a pasted
+/// connect token is hundreds of characters). Control characters are left out and the field's `max_len` is kept. Returns how many characters were taken.
+pub fn type_into_focused(world: &mut World, text: &str) -> usize {
+    let Some((_, e)) = focused_input(world) else { return 0 };
+    let Some(field) = world.get::<UiInput>(e).copied() else { return 0 };
+    let mut now = world.strings().get(field.text.0).to_string();
+    let mut taken = 0;
+    for c in text.chars().filter(|c| !c.is_control()) {
+        if now.chars().count() >= field.max_len as usize {
+            break;
+        }
+        now.push(c);
+        taken += 1;
+    }
+    if taken > 0 {
+        let sym = world.strings_mut().intern(&now);
+        if let Some(w) = world.get_mut::<UiInput>(e) {
+            w.text.0 = sym;
+        }
+    }
+    taken
+}
+
+/// Empty the focused field (Ctrl+Backspace in a window). True when there was a field to empty.
+pub fn clear_focused(world: &mut World) -> bool {
+    let Some((_, e)) = focused_input(world) else { return false };
+    let sym = world.strings_mut().intern("");
+    if let Some(w) = world.get_mut::<UiInput>(e) {
+        w.text.0 = sym;
+    }
+    true
+}
+
 fn inputs(world: &mut World, tick: u64) {
     let mut list: Vec<(u64, Entity, UiInput, Ui)> = Vec::new();
     let _ = world.for_each_uid::<(&UiInput, &Ui), _>(|e, uid, (t, u)| list.push((uid, e, *t, *u)));
@@ -283,7 +373,9 @@ fn inputs(world: &mut World, tick: u64) {
         }
         let value_sym = world.strings_mut().intern(&text);
         t.text.0 = value_sym;
-        let shown = if text.is_empty() && !t.focused { world.strings().get(t.placeholder.0).to_string() } else if t.focused && (tick / 30) % 2 == 0 { format!("{text}|") } else { text };
+        t.number = if !text.is_empty() && text.len() <= 9 && text.bytes().all(|b| b.is_ascii_digit()) { text.parse::<i32>().unwrap_or(-1) } else { -1 };
+        let tail = tail_of(&text, t.show_last);
+        let shown = if text.is_empty() && !t.focused { world.strings().get(t.placeholder.0).to_string() } else if t.focused && (tick / 30) % 2 == 0 { format!("{tail}|") } else { tail };
         let shown_sym = world.strings_mut().intern(&shown);
         if let Some(w) = world.get_mut::<UiInput>(e) {
             *w = t;
@@ -318,6 +410,8 @@ pub fn update(world: &mut World, tick: u64, dt: f32) {
     crate::ui_kit3::scroll_apply(world);
     // things in slots are placed last, where the slots (and the scroll views they are in) have ended up this tick
     crate::ui_drag::update(world);
+    // live graphs take a sample and move their bars after everything above has placed the rectangles
+    crate::ui_plot::update(world);
     // and the tooltip last, so that it sees where everything is: `dt` is the unscaled step, so a tooltip is shown while the game is paused too
     crate::ui_tip::update(world, dt);
 }

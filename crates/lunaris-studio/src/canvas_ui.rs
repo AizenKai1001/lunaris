@@ -879,7 +879,7 @@ mod tests {
     fn links_headings_and_bold_become_text_runs() {
         assert_eq!(unlink("see [[Note|shown]] and [[plain]] end"), "see shown and plain end");
         let job = md_job("# Title\n- one\n**bold** and `code`", 13.0, 300.0, Color32::GRAY);
-        let text: String = job.sections.iter().map(|s| &job.text[s.byte_range.clone()]).collect();
+        let text: String = job.sections.iter().map(|s| &job.text[s.byte_range.start.0..s.byte_range.end.0]).collect();
         assert_eq!(text, "Title\n• one\nbold and code");
         assert!(job.sections.iter().any(|s| s.format.font_id.size > 13.0), "the heading is bigger");
     }

@@ -260,6 +260,32 @@ fn check_reads_particle_modules() {
 }
 
 #[test]
+fn check_reads_particle_systems() {
+    let mut e = engine();
+    let effect = |text: &str| Json::obj([("uid", Json::from(1i64)), ("components", Json::obj([("ParticleSystem", Json::obj([("effect", Json::str(text))]))]))]);
+    // a good effect: no complaint
+    e.call("spawn", &effect(r#"{"emitters":[{"spawn":{"rate":10},"init":{"life":1}}]}"#)).unwrap();
+    assert!(problems(&mut e).iter().all(|m| !m.contains("ParticleSystem")), "{:?}", problems(&mut e));
+    // a mistake says where it is
+    e.call("set", &j(r#"{"uid":1,"component":"ParticleSystem","value":{"effect":"{\"emitters\":[{\"update\":{\"noise\":{\"scale\":0}}}]}"}}"#)).unwrap();
+    assert!(problems(&mut e).iter().any(|m| m.contains("ParticleSystem.effect: emitters[0].update.noise.scale")), "{:?}", problems(&mut e));
+    // an odd key is a warning with the nearest one; a picture that is not there is named
+    e.call("set", &j(r#"{"uid":1,"component":"ParticleSystem","value":{"effect":"{\"emitters\":[{\"spwan\":{},\"spawn\":{\"rate\":3},\"render\":{\"texture\":\"fx/none.png\"}}]}"}}"#)).unwrap();
+    let p = problems(&mut e);
+    assert!(p.iter().any(|m| m.contains("did you mean `spawn`")) && p.iter().any(|m| m.contains("`fx/none.png`") && m.contains("not in the workspace")), "{p:?}");
+    // a file that is not there, an empty field
+    e.call("set", &j(r#"{"uid":1,"component":"ParticleSystem","value":{"effect":"fx/missing.fx.json"}}"#)).unwrap();
+    assert!(problems(&mut e).iter().any(|m| m.contains("the effect file `fx/missing.fx.json` is not in the workspace")), "{:?}", problems(&mut e));
+    e.call("set", &j(r#"{"uid":1,"component":"ParticleSystem","value":{"effect":""}}"#)).unwrap();
+    assert!(problems(&mut e).iter().any(|m| m.contains("ParticleSystem.effect is empty")), "{:?}", problems(&mut e));
+    // an effect file of the workspace is read, and an emitter count far past the budget is warned of
+    std::fs::create_dir_all(e.root.join("fx")).unwrap();
+    std::fs::write(e.root.join("fx/big.fx.json"), r#"{"budget":100,"emitters":[{"max":50000,"spawn":{"rate":20000},"init":{"life":5}}]}"#).unwrap();
+    e.call("set", &j(r#"{"uid":1,"component":"ParticleSystem","value":{"effect":"fx/big.fx.json"}}"#)).unwrap();
+    assert!(problems(&mut e).iter().any(|m| m.contains("can hold") && m.contains("the budget is 100")), "{:?}", problems(&mut e));
+}
+
+#[test]
 fn check_warns_about_2d_bodies_at_different_z() {
     let mut e = engine();
     e.call("spawn", &j(r#"{"uid":1,"components":{"Camera":{"ortho":true},"Transform":{}}}"#)).unwrap();
@@ -284,3 +310,24 @@ fn check_warns_when_a_2d_follow_camera_would_tilt_the_picture() {
     e.call("set", &j(r#"{"uid":3,"component":"CameraRig","value":{"look_at":true,"look_offset":[0,0,0]}}"#)).unwrap();
     assert!(problems(&mut e).iter().all(|m| !m.contains("tilts the 2D picture")), "looking straight at the target is fine: {:?}", problems(&mut e));
 }
+
+#[test]
+fn set_resource_takes_many_values_in_one_undoable_step_and_a_bad_one_changes_nothing() {
+    let mut e = engine();
+    let r = e.call("set_resource", &j(r#"{"values":{"cpu.percent":12.5,"net.rx":2500,"flag":true}}"#)).unwrap();
+    assert_eq!(r.get("applied").unwrap().as_u64(), Some(3));
+    assert_eq!(e.sim.world.resource("cpu.percent"), Some(12.5));
+    assert_eq!(e.sim.world.resource("flag"), Some(1.0));
+    // one undo takes all three back
+    e.call("undo", &Json::Null).unwrap();
+    assert_eq!(e.sim.world.resource("cpu.percent"), None);
+    assert_eq!(e.sim.world.resource("net.rx"), None);
+    // a value that is not a number: an error, and nothing was set
+    assert!(e.call("set_resource", &j(r#"{"values":{"a":1,"b":"high"}}"#)).is_err());
+    assert_eq!(e.sim.world.resource("a"), None);
+    assert!(e.call("set_resource", &j(r#"{"values":{}}"#)).is_err());
+    // the old form still works
+    e.call("set_resource", &j(r#"{"name":"score","value":3}"#)).unwrap();
+    assert_eq!(e.sim.world.resource("score"), Some(3.0));
+}
+

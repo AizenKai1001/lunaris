@@ -1,5 +1,7 @@
 # Multiplayer: lockstep or rollback, with nothing but the standard library
 
+(For a hundred players and more, a survival server or a battle royale, this input-relay design is not the one: see [NETWORK_SCALE.md](NETWORK_SCALE.md), an authoritative server tested with 200 clients over real UDP.)
+
 Lunaris promises that the same scene, seed and commands give the same state, bit for bit, on any machine and any thread count. That makes multiplayer cheap and exact: **nobody sends the world, everybody sends inputs**. Each player runs their own copy of the game, a small relay (the **host**) passes the players' inputs around, and every copy plays the same inputs in the same order. A game of 49 entities costs a few hundred bytes a second; a game of a million entities costs the same.
 
 There are two ways to play it, and you choose when you start the host:

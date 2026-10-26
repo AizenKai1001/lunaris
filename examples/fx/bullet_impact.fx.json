@@ -1,0 +1,44 @@
+{
+  "name": "bullet impact",
+  "bounds": 4,
+  "budget": 150,
+  "emitters": [
+    {
+      "name": "dust",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": [4, 7] }] },
+      "init": { "life": [0.5, 0.9], "speed": [0.6, 2.2], "spread": 55, "size": [0.12, 0.2], "spin": [-60, 60], "color": [0.5, 0.46, 0.4, 0.55] },
+      "update": { "gravity": [0, -0.6, 0], "drag": 2.2 },
+      "curves": { "size": [[0, 0.6], [1, 2.4]], "alpha": [[0, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "alpha", "soft": 0.2 }
+    },
+    {
+      "name": "sparks",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": [6, 11] }] },
+      "init": { "life": [0.25, 0.6], "speed": [3, 9], "spread": 70, "size": [0.012, 0.025], "color": [1, 0.8, 0.4, 1] },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "drag": 0.4,
+        "collide": { "mode": "bounce", "world": true, "bounce": 0.35, "friction": 0.3, "planes": [{ "normal": [0, 1, 0], "d": 0, "relative": true }] }
+      },
+      "curves": { "alpha": [[0, 1], [0.7, 1], [1, 0]] },
+      "render": { "texture": "circle", "blend": "add", "facing": "velocity", "stretch": 0.025 }
+    },
+    {
+      "name": "chips",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": [3, 6] }] },
+      "init": { "life": [0.6, 1.2], "speed": [2, 6], "spread": 65, "size": [0.015, 0.035], "spin": [-720, 720], "color": [0.45, 0.42, 0.38, 1] },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "collide": { "mode": "bounce", "world": true, "bounce": 0.3, "friction": 0.5, "planes": [{ "normal": [0, 1, 0], "d": 0, "relative": true }] }
+      },
+      "curves": { "alpha": [[0, 1], [0.8, 1], [1, 0]] },
+      "render": { "type": "solid", "solid": "tetra" }
+    }
+  ]
+}

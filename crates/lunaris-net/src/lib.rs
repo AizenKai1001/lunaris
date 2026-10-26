@@ -48,6 +48,7 @@
 //! and so on, so a two-player scene reads `input.w` for the first and `input.p2.w` for the second.
 mod book;
 mod client;
+pub mod scale;
 mod host;
 mod hostv2;
 mod latency;

@@ -14,7 +14,7 @@ Panels, bars, buttons and menus are entities with a `Ui` component. They are dra
 | `color` | the fill colour (display colour, RGBA; alpha blends over what is behind). |
 | `fill`, `back_color` | `fill` below 1 draws only the left part of the rectangle in `color` and the rest in `back_color`: a bar. Set `fill` from a graph system (`{"set": "Ui.fill", "to": {"div": [{"res": "hp"}, 100]}}`). |
 | `border`, `border_color` | an edge, `border` as a fraction of the picture's height (at least one pixel when above 0). |
-| `text`, `text_size`, `text_color` | a label centred in the rectangle, with `{resource}` placeholders like `Text`. |
+| `text`, `text_size`, `text_color` | a label centred in the rectangle, with `{resource}` placeholders like `Text` (and `{key:ACTION}`, the key the `InputMap` has for an action now, `docs/KEYBINDS.md`). |
 | `layer` | drawing order: higher on top, equal layers by uid. |
 | `visible` | false hides it (and a hidden button does not react). |
 | `button`, `hover`, `pressed`, `clicked` | a button reacts to `input.mouse_x`, `input.mouse_y` (0..1 across the picture, y down) and `input.mouse_left`. The engine sets `hover` while the pointer is over it, `pressed` while the left button is down over it, and `clicked` for exactly **one tick** when the button is released over it after being pressed over it (press, drag away and release does nothing). It is drawn lighter under the pointer and darker while pressed. |
@@ -39,7 +39,7 @@ These are components on top of `Ui` rectangles (`crates/lunaris-sim/src/ui_kit.r
 | `UiLayout` | a container | `kind` 0 column, 1 row, 2 grid (`columns`); puts the `Ui` entities whose `Parent` is the container in uid order inside its rectangle, `padding` and `spacing` as fractions of the picture's height (set the resource `screen.aspect` = width / height so they are equal in pixels). Containers nest. A hidden child takes no room. |
 | `UiSlider` | a `button` | `value` between `min` and `max` (`step`) follows the pointer while the button is held, even outside the rectangle; the arrow actions change it while focused; `Ui.fill` shows it; `changed` is true on a tick it moved. |
 | `UiToggle` | a `button` | each click flips `on` (`changed` for a tick) and switches the colour between `on_color` and `off_color`. |
-| `UiInput` | a `button` | a click focuses it; characters typed (the resource `input.char` holds the code point for one tick, plus `input.backspace`, `input.enter`, `input.escape`; the `type_text` tool does it for an agent) go into `text`; `submitted` is true the tick after Enter; `placeholder` shows while empty; `max_len` characters. |
+| `UiInput` | a `button` | a click focuses it; characters typed (the resource `input.char` holds the code point for one tick, plus `input.backspace`, `input.enter`, `input.escape`; the `type_text` tool does it for an agent) go into `text`; `submitted` is true the tick after Enter; `placeholder` shows while empty; `max_len` characters; `number` is the text as a number when it is one to nine digits and -1 when it is not (a graph system cannot read text: a code typed into a keypad is sent as `number`, `docs/RAIDING.md`); `show_last` above 0 shows only the last that many characters after `...`; `remember` NAME keeps the text between runs (below, "Settings are kept between runs"). In a window the keyboard, Ctrl+V and Backspace work ("Typing", below). |
 | `UiNav` | (one entity) | focus for keyboard and gamepad menus: the actions `ui_up`, `ui_down`, `ui_left`, `ui_right` move `current` to the nearest button that way and `ui_accept` clicks it (bind them in an `InputMap`: `ui_accept = enter, gamepad.a`). The focused button shows as hovered. Alone it focuses nothing until a direction is pressed (the first press focuses the first button); add a **`UiNavAuto`** beside it for a menu that takes the focus by itself: whenever no button is focused (at the start, or because the focused one was hidden) the visible button with the lowest uid is, so `ui_accept` works on a pause menu the moment it appears. |
 
 ## Rounded corners, gradients, pictures, shadows: `UiStyle`
@@ -220,6 +220,29 @@ The sector is drawn in `Ui.color` (a button's hover and press shading applies) a
 * **`UiRadial`**: a scrubber for `value`, handles on the picture for `start` and the ring's hole, a shape switch, and the track and fill colours; drive `value` from a resource in the play view.
 * **All of them**: show the new `check` rules in the problem list (each message says what the widget does not do), accept the mouse wheel in the play view (`input.mouse_wheel`, in notches), and map the pointer with `pointer_to_ui` there (the play view still does not, see "Other screens").
 
+## Settings menus and going online from a menu
+
+A game's **settings screen** and **main menu** are made of the widgets above (`UiTabs`, `UiSlider`, `UiToggle`, `UiDropdown`, `UiInput`, buttons) and a few resources the native player (`lunaris play`, an exported game) understands:
+
+| Resource | Effect |
+|---|---|
+| `display.quality` | 0 classic, 1 low, 2 medium, 3 high, 4 ultra: the GPU quality, applied when it changes |
+| `display.fullscreen` | 1 borderless full screen, 0 a window |
+| `display.volume` | the master volume of the sound, 0 to 4 (1 = as mixed), applied when it changes |
+| `display.fps` | the most pictures a second (0 = no limit; `--fps` on the command line wins; with vsync a cap above the screen's refresh does nothing) |
+| `display.vsync` | 1 wait for the display's refresh before showing a picture (the default of a window), 0 show each picture at once; applied when it changes (a V-sync switch); `--novsync` and `--fps` on the command line win |
+| `perf.want` / `perf.fps`, `perf.ms` | a game that shows a frame counter sets `perf.want` above 0.5; the player then writes `perf.fps` (pictures a second, over half a second) and `perf.ms` (milliseconds a picture) twice a second, and nothing otherwise (a resource written in every game would change every game's state); not in a lockstep game. Show it with a `Text` of `{perf.fps} FPS` |
+| `cursor.hide` / `cursor.lock` | a menu that draws its own pointer hides the system one / a first-person game holds it |
+| `settings.save` | the game sets it above 0.5 (an APPLY button) and the player writes the **settings** to `settings.json` in the game's folder and sets it back to 0 |
+
+**Settings are kept between runs:** every resource whose name starts with `opt.` (the game's own: `opt.fov`, `opt.sens`, `opt.invert_y`, ...) or `display.` is written to `settings.json` by `settings.save` and read back into the resources when the game starts, before its first tick. A game gives its resources defaults in the scene file, and the saved ones replace them. **Text fields remember too (2026-10-23):** a `UiInput` with `remember` `NAME` (an address, a player's name; never a secret) has its text kept in the same file as `text.NAME`: it is written when the text has changed and no field is being typed in any more (a click elsewhere, Enter), and put back before the first tick of the next start (the scene's own text is the default). Two fields with the same name share the text. **Keys the player chose (2026-10-23)** are kept the same way, as `bind.ACTION.N` (`KeyBind`, `docs/KEYBINDS.md`; only what differs from the scene). A settings screen is then: a `UiSlider` per number whose value a graph system copies to `opt.*` (and, for the engine's own, to `display.*`); other graph systems apply the game's own choices (`Camera.fov_y` from `opt.fov`, `MouseLook.sensitivity` from `opt.sens`, `Environment.exposure` from `opt.brightness`); and an APPLY button that sets `settings.save`. Reading the saved values into the widgets at start is the same copy the other way for one tick (the graph system sets `UiSlider.value` from the resource while a resource `ui.settings_open` just went on).
+
+**Going online from a menu (`NetConnect`).** `lunaris play SCENE --connect HOST:PORT` connects at start. A game that wants a **menu first** puts one entity with a `NetConnect` in its scene instead (docs/GAME_SERVER.md has the server side). `address_input` and `name_input` are the uids of two `UiInput` text fields (the address as `host:port`, the player's name); a CONNECT button's graph system sets `NetConnect.go`; the player starts the connection, `NetConnect.status` says how it goes (0 nothing, 1 connecting, 2 in, 3 the server said no, 4 lost, 5 no answer within `timeout` seconds or a bad address) and `NetConnect.message` says it in words ("The server is full", "No answer from the server", ...), and `NetPlayer.connected` is on while status is 2. After 3, 4 and 5 the attempt is spent: the menu stays, `go` tries again. `leave` (a LEAVE button) tells the server, takes the other players away and sets the status to 0. `check` warns about a `NetConnect` whose inputs are not `UiInput`s. Code: `crates/lunaris/src/net_scale_cmd.rs` (`menu_driver`), `NetDriver::link` in `crates/lunaris-net/src/scale/play.rs`.
+
+**Typing (a window, `lunaris play`, 2026-10-23).** Before this a text field could only be typed into through the API (`type_text`: one `input.char` a tick): a player at a real keyboard had no way to type an address or a name, because the window only turned keys into `input.<name>` (`a`, `space`, `enter`, ...), never into characters. Now a key that makes text (what the keyboard layout says, so Shift, AltGr and other layouts work) is typed into the field that has the focus; Ctrl+V pastes the clipboard's text (Windows; trimmed; control characters left out; at most `max_len`); Ctrl+Backspace empties the field; holding Backspace repeats. Typed and pasted text goes in **at once, between two ticks** (`ui_kit::type_into_focused`, `clear_focused`, `has_focused_input`): a pasted connect token is hundreds of characters and `input.char` takes one a tick. The keys still reach the game as `input.<name>` too, and nothing is typed when no field has the focus. **While a field has the focus every action of the `InputMap` reads 0** (`gameplay::actions`; the ones that were held are released), so a letter typed into a chat box does not walk, reload, drop or build; the raw `input.<key>` resources are still there for a game that wants them. Not in a lockstep game (`--join`/`--host`: a typed character is not an input every copy gets; menus there are the game's own). Not recorded by `record_start` (typing is the player's interface state, like a settings change, and is not part of the replayed inputs; use `type_text` in a test that must replay). `show_last` keeps a long text inside its box: a token field shows `...` and its last 20 characters while `UiInput.text` holds all of it.
+
+**A secure server (`NetConnect.token_input`, `token`).** A server run with `--secure` (docs/SECURE.md) lets in only players with a connect token: `token_input` is the uid of a `UiInput` where the player pastes the token (or `token` holds the text), and `lunaris play SCENE --connect-token TOKEN` (no `--connect`) hands the menu a token at start. A typed token wins; with a token the player is whoever it names (the name field is ignored), and a text that is no token is `status` 5 with the reason.
+
 ## Where the mouse comes from
 
 `lunaris play` sets the three resources from the window; the Lunaris Editor does while it plays (the pointer over the view); a test or an agent sets them with the `input` tool: `{"values": {"mouse_x": 0.5, "mouse_y": 0.6, "mouse_left": true}}`, then steps, then `{"mouse_left": false}`. In a lockstep game (`docs/NETWORK.md`) they travel like any other input. `examples/tests/menu.test.json` clicks the buttons of `examples/menu.lunaris.json` this way and checks the health, the bar and a drag-away release.
@@ -227,3 +250,26 @@ The sector is drawn in `Ui.color` (a button's hover and press shading applies) a
 ## Limits
 
 Rectangles are placed by fractions of the picture (of the safe area with a `UiScale`), or by a `UiLayout` container for rows, columns and grids. No right-to-left or shaped text (Arabic, Indic scripts), no rich text (bold and colours inside one string), no nine-slice pictures. A picture is drawn without mip maps, so shrinking it a lot looks harsh; ship it near the size it is shown. Both renderers draw plain rectangles as whole pixels, so the GPU picture matches the reference renderer's (the comparison test includes the menu and `ui_showcase` scenes). The kit's own limits: the bitmap font is always over every rectangle (so use a `TextFont` where a popup must cover text); a scroll view clips the content of **any depth** but moves it by shifting `pos` (see "Scroll views"); one open drop-down at a time is the usual case (several work, each closes on a press outside); drag and drop is for the mouse (a keyboard or pad cannot pick a thing up yet); a tooltip is for the mouse (nothing shows one for the `UiNav` focus yet); a sector of a `UiRadial` is flat-coloured (no gradient or picture).
+
+## Live graphs: `UiPlot`
+
+A `UiPlot` on an entity with a `Ui` draws a scrolling bar graph of a resource: a CPU load, a frame time, a population. The `Ui` is the frame and background (its colour, border, layer); the plot makes its own bars the first tick (ordinary `Ui` rectangles, so both renderers draw it and nothing else changes), takes a sample every few ticks and scrolls the graph to the left, newest on the right.
+
+```json
+{ "Name": {"value": "CPU graph"},
+  "Ui": { "pos": [0.05, 0.6], "size": [0.4, 0.2], "color": [0.05, 0.06, 0.1, 0.9], "border": 0.002, "border_color": [0.3, 0.4, 0.6, 1] },
+  "UiPlot": { "source": "cpu.percent", "every": 6, "samples": 80, "min": 0, "max": 100, "bar_color": [0.4, 0.8, 1, 1] } }
+```
+
+| Field | Meaning |
+|---|---|
+| `source` | the name of the resource to plot. A resource that is not set counts as 0. |
+| `every` | ticks between samples (6 at 60 ticks a second is ten samples a second). |
+| `samples` | bars shown, 1 to 128 (the last that many samples). |
+| `min`, `max` | the vertical scale. When `max` is not above `min` the scale is automatic: from zero (from the lowest sample when `log` is on) to the largest sample shown. |
+| `log` | plot the base-10 logarithm of the value: for something that grows by factors, such as a population that doubles every half hour. |
+| `gap`, `bar_color` | the space between bars as a share of a bar's slot, and the bars' colour. |
+| `scale_lo`, `scale_hi` | the engine writes the scale in use (read them from a graph system to label the axis); `data`, `head`, `count`, `timer` and `built` are the engine's too. |
+
+A plot inside a `UiLayout` container follows the container; hiding the plot (`Ui.visible` false) hides its bars. The bars are entities with `UiPlotBar` (`plot`, `index`); an entity with no `UiPlot` costs nothing.
+

@@ -161,3 +161,24 @@ fn type_text_types_into_a_focused_text_field_and_enter_submits_it() {
     assert_eq!(field.get("submitted").unwrap().as_bool(), Some(true));
     assert!(e.call("type_text", &j(&format!(r#"{{"text":"{}"}}"#, "x".repeat(201)))).is_err());
 }
+
+#[test]
+fn type_text_with_paste_puts_a_long_text_in_at_once_without_stepping() {
+    let mut e = engine();
+    e.call("spawn", &j(r#"{"uid":1,"components":{"Ui":{"pos":[0.1,0.1],"size":[0.4,0.1],"button":true},"UiInput":{"max_len":1000}}}"#)).unwrap();
+    let paste = |e: &mut crate::Engine, text: &str| e.call("type_text", &j(&format!(r#"{{"text":"{text}","paste":true}}"#)));
+    assert_eq!(paste(&mut e, "ab").unwrap().get("typed").unwrap().as_u64(), Some(0), "no field has the focus yet");
+    for (k, v) in [("input.mouse_x", 0.3), ("input.mouse_y", 0.15), ("input.mouse_left", 1.0)] {
+        e.call("set_resource", &j(&format!(r#"{{"name":"{k}","value":{v}}}"#))).unwrap();
+    }
+    e.call("step", &Json::Null).unwrap();
+    e.call("set_resource", &j(r#"{"name":"input.mouse_left","value":0}"#)).unwrap();
+    e.call("step", &Json::Null).unwrap();
+    let long = "0123456789abcdef".repeat(40);
+    let r = paste(&mut e, &long).unwrap();
+    assert_eq!(r.get("typed").unwrap().as_u64(), Some(640));
+    assert_eq!(r.get("ticks").unwrap().as_u64(), Some(0), "no tick was spent");
+    let f = e.call("get", &j(r#"{"uid":1,"components":["UiInput"]}"#)).unwrap();
+    assert_eq!(f.get("components").unwrap().get("UiInput").unwrap().get("text").unwrap().as_str(), Some(long.as_str()));
+    assert!(paste(&mut e, &"x".repeat(4097)).is_err());
+}

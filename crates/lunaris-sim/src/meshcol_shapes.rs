@@ -125,6 +125,30 @@ pub(crate) fn side_of(s: f32, s_prev: f32) -> f32 {
     }
 }
 
+/// How much farther (squared metres) than the nearest triangle found so far the box round another triangle must be before that triangle is left unmeasured: the distances are worked
+/// out in `f32` from the same coordinates as the boxes and differ from them by rounding (about 1e-4 of a square metre a few hundred metres from the origin; the margin also grows with the
+/// distance from the origin).
+const BOX_SLACK2: f32 = 2.0e-3;
+
+/// The box round a triangle.
+fn tri_box(tv: &[V3; 3]) -> Aabb {
+    let mut b = Aabb::EMPTY;
+    for p in tv {
+        b.grow(*p);
+    }
+    b
+}
+
+/// The squared distance between two boxes (0 when they touch): never more than that between anything inside one and anything inside the other.
+fn box_dist2(a: &Aabb, b: &Aabb) -> f32 {
+    let mut d2 = 0.0;
+    for k in 0..3 {
+        let d = (a.lo[k] - b.hi[k]).max(b.lo[k] - a.hi[k]).max(0.0);
+        d2 += d * d;
+    }
+    d2
+}
+
 struct Cand {
     tri: u32,
     q: V3,
@@ -313,7 +337,42 @@ impl PlacedMesh {
 
     /// The point of the axis `p0`-`p1` of a capsule of radius `r` that comes nearest to the mesh, as a fraction of the way along it, when
     /// it is clearly nearer than both ends are (a pole across a ledge; not a pole lying flat on a floor, where every point is as near).
-    fn nearest_on_axis(&self, p0: V3, p1: V3, r: f32) -> Option<f32> {
+    ///
+    /// Only the triangles that can still change the answer are measured: the box round a triangle is never farther from the axis (or from either end) than the triangle is, so a
+    /// triangle whose box is farther than the nearest one found so far (with a margin for rounding, `BOX_SLACK2`) cannot be the nearest and is not looked at. The answer is the very
+    /// same as measuring every triangle, bit for bit (`nearest_on_axis_reference` keeps the plain loop; a test compares them on a hundred thousand capsules); a capsule standing
+    /// against a facade of a hundred triangles measures a handful.
+    pub(crate) fn nearest_on_axis(&self, p0: V3, p1: V3, r: f32) -> Option<f32> {
+        let mut axis = Aabb::EMPTY;
+        axis.grow(p0);
+        axis.grow(p1);
+        let seg = axis.grown(r);
+        let reach = (0..3).fold(0.0f32, |m, k| m.max(axis.lo[k].abs()).max(axis.hi[k].abs()));
+        let slack = BOX_SLACK2 + reach * 4.0e-7;
+        let r2 = r * r;
+        let mut best: Option<(f32, f32)> = None;
+        let mut ends = f32::INFINITY;
+        for t in self.triangles_near(&seg) {
+            let tv = self.tri(t);
+            let tb = tri_box(&tv);
+            // (a comparison with a number that is not a number is false: such a triangle is measured)
+            let limit = best.map_or(r2, |b| b.1.min(r2));
+            if !(box_dist2(&axis, &tb) > limit + slack) {
+                let (s, d2) = segment_triangle(p0, p1, &tv);
+                if d2 < r * r && best.is_none_or(|b| d2 < b.1) {
+                    best = Some((s, d2));
+                }
+            }
+            if !(tb.dist2(p0).min(tb.dist2(p1)) > ends + slack) {
+                ends = ends.min(point_triangle_d2(p0, &tv)).min(point_triangle_d2(p1, &tv));
+            }
+        }
+        best.filter(|b| b.1 < ends - 1.0e-5 * (1.0 + ends)).map(|b| b.0)
+    }
+
+    /// `nearest_on_axis` by measuring every triangle (what it was before it skipped the ones that cannot matter): the reference its test compares with.
+    #[cfg(test)]
+    pub(crate) fn nearest_on_axis_reference(&self, p0: V3, p1: V3, r: f32) -> Option<f32> {
         let mut seg = Aabb::EMPTY;
         seg.grow(p0);
         seg.grow(p1);

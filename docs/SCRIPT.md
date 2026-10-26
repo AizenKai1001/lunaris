@@ -48,7 +48,7 @@ Comments are `// ...` and `/* ... */`; `///` lines in front of `system` are its 
 | `emit "thud";` | `{"emit": "thud"}` |
 | `$score = expr;` `$score += expr;` `$score -= expr;` | `res_set`, `res_add` (and `res_add` of `neg`) |
 | `spawn { Transform { pos: 0 }, Velocity {} };` | `{"spawn": {"Transform": {"pos": 0}, "Velocity": {}}}` |
-| `spawn_prefab "Bullet" at (x, y, z) velocity (x, y, z) with { Tag { n: 4 } };` | `{"spawn_prefab": "Bullet", "at": [...], "velocity": [...], "with": {...}}` |
+| `spawn_prefab "Bullet" at (x, y, z) velocity (x, y, z) with { Tag { n: 4 } };` | `{"spawn_prefab": "Bullet", "at": [...], "velocity": [...], "with": {...}}` (an array field is written in square brackets: `with { Decal { normal: [0, 1, 0] } }`) |
 | `add Frozen;` `add Health { hp: 10 } on a;` | `{"add": "Health", "values": {"hp": 10}, "on": "a"}` |
 | `remove Frozen;` `remove Frozen on b;` | `{"remove": "Frozen", "on": "b"}` |
 | `json({"future": ...});` | the JSON as it is: an escape for what the language has no words for yet |

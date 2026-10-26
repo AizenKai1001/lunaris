@@ -35,6 +35,16 @@ fn main() {
     println!("{count} meshes loaded in {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
     let mut tex = TextureCache::new(None);
     let opts = RenderOptions { width: w, height: h, threads: 1, ..RenderOptions::default() };
+    // `LUNARIS_MANY_GATHER=<n>`: only gather the scene n times (for a profiler to look at the CPU part alone)
+    if let Some(n) = std::env::var("LUNARIS_MANY_GATHER").ok().and_then(|v| v.parse::<usize>().ok()) {
+        let t = std::time::Instant::now();
+        for _ in 0..n {
+            let scene = gather_scene(&mut sim.world, &mut tex, &opts).expect("gather");
+            std::hint::black_box(scene.meshes.len());
+        }
+        println!("gather_scene: {:.1} ms", t.elapsed().as_secs_f64() * 1000.0 / n as f64);
+        return;
+    }
     let t = std::time::Instant::now();
     let n = 3;
     for _ in 0..n {
@@ -48,9 +58,18 @@ fn main() {
     println!("first frame (uploads, pipelines): {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
     let t = std::time::Instant::now();
     let n = 10;
+    let mut last = None;
     for _ in 0..n {
-        gpu.render_to_image(&mut sim.world, &mut tex, &opts, &quality).expect("render");
+        last = Some(gpu.render_to_image(&mut sim.world, &mut tex, &opts, &quality).expect("render"));
     }
     let ms = t.elapsed().as_secs_f64() * 1000.0 / n as f64;
+    // with LUNARIS_GPU_PROFILE=1: where the last frame spent its time
+    if let Some(f) = &last {
+        for (name, v) in &f.info {
+            if name.starts_with("cpu_ms.") || name.starts_with("gpu_ms.") {
+                println!("  {name:<28}{v:8.2} ms");
+            }
+        }
+    }
     println!("{w}x{h} {} on {}: {ms:.2} ms per frame with read-back = {:.0} meshes per millisecond", args.get(3).map(String::as_str).unwrap_or("high"), gpu.adapter_name(), count as f64 / ms);
 }

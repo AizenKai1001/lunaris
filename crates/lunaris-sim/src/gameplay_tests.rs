@@ -160,6 +160,141 @@ fn forward(q: [f32; 4]) -> [f32; 3] {
 }
 
 #[test]
+fn a_camera_rigs_roll_leans_the_picture_about_the_way_it_looks() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,0]}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[0,0,5]},"Camera":{},"CameraRig":{"target":1,"follow_speed":0,"offset":[0,0,5],"look_offset":[0,0,0],"roll":0.3}}"#);
+    s.step();
+    let q = s.world.get::<Transform>(s.world.entity(2).unwrap()).unwrap().rot;
+    // (looking straight at the target, down -z: the picture's up vector leans to the right by the roll)
+    let (sx, cx) = (0.15f32.sin(), 0.15f32.cos());
+    assert!((q[2] + sx).abs() < 1e-4 && (q[3] - cx).abs() < 1e-4 && q[0].abs() < 1e-4 && q[1].abs() < 1e-4, "{q:?}");
+    let f = forward(q);
+    assert!(f[0].abs() < 1e-4 && f[1].abs() < 1e-4 && (f[2] + 1.0).abs() < 1e-4, "the way it looks is the same: {f:?}");
+}
+
+fn orbit_rig(extra: &str) -> Sim {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,0]}}"#);
+    spawn(&mut s, 2, &format!(r#"{{"Transform":{{"pos":[0,0,5]}},"Camera":{{}},"CameraRig":{{"target":1,"mode":1,"yaw":0,"pitch":0,"distance":5,"follow_speed":0,"look_offset":[0,0,0],{extra}}}}}"#));
+    s
+}
+
+fn set_pos(s: &mut Sim, uid: u64, p: [f32; 3]) {
+    s.world.get_mut::<Transform>(s.world.entity(uid).unwrap()).unwrap().pos = p;
+}
+
+fn rig(s: &Sim) -> CameraRig {
+    *s.world.get::<CameraRig>(s.world.entity(2).unwrap()).unwrap()
+}
+
+/// Moves the target `v` m/s along `axis` for `ticks` ticks, returning the pivot's trail (target minus pivot) on that axis.
+fn drive_target(s: &mut Sim, axis: usize, v: f32, ticks: u32) -> f32 {
+    for _ in 0..ticks {
+        let mut p = pos(s, 1);
+        p[axis] += v / 60.0;
+        set_pos(s, 1, p);
+        s.step();
+    }
+    pos(s, 1)[axis] - rig(s).pivot[axis]
+}
+
+#[test]
+fn a_rigs_pivot_spring_trails_a_target_at_two_over_the_frequency_and_settles_without_overshoot() {
+    let mut s = orbit_rig(r#""lag":12"#);
+    s.step();
+    assert_eq!(rig(&s).pivot, [0.0, 0.0, 0.0], "the pivot starts on the target");
+    // a target at a steady 6 m/s is trailed by 2 v / w = 1 m
+    let trail = drive_target(&mut s, 0, 6.0, 120);
+    assert!((trail - 1.0).abs() < 0.07, "steady trail {trail} (a tick short of 1 m: the spring sees the target after it has moved)");
+    // the camera orbits the pivot, not the target: 5 m behind it
+    let c = pos(&s, 2);
+    let p = rig(&s).pivot;
+    assert!((c[0] - p[0]).abs() < 1e-4 && (c[2] - p[2] - 5.0).abs() < 1e-4, "{c:?} {p:?}");
+    // when the target stops the pivot comes to it from behind and never passes it
+    let mut worst = 0.0f32;
+    for _ in 0..150 {
+        s.step();
+        worst = worst.min(pos(&s, 1)[0] - rig(&s).pivot[0]);
+    }
+    assert!(worst > -1e-3, "no overshoot: {worst}");
+    assert!((pos(&s, 1)[0] - rig(&s).pivot[0]).abs() < 1e-3, "settled");
+}
+
+#[test]
+fn a_rigs_lead_aims_ahead_of_a_moving_target_and_the_spring_goes_up_more_softly() {
+    // lead 2 / w keeps up: no trail at a steady speed; more runs ahead
+    let mut s = orbit_rig(r#""lag":12,"lead":0.1667"#);
+    s.step();
+    let trail = drive_target(&mut s, 0, 6.0, 150);
+    assert!(trail.abs() < 0.08, "keeps up: {trail}");
+    let mut s = orbit_rig(r#""lag":12,"lead":0.3"#);
+    s.step();
+    let trail = drive_target(&mut s, 0, 6.0, 150);
+    assert!(trail < -0.7 && trail > -0.95, "runs ahead by about v (lead - 2/w) = 0.8 m: {trail}");
+    // up it is softer (`lag_up`) and the lead does not apply to it
+    let mut s = orbit_rig(r#""lag":12,"lag_up":4,"lead":0.3"#);
+    s.step();
+    let up = drive_target(&mut s, 1, 2.0, 200);
+    assert!((up - 1.0).abs() < 0.03, "2 v / 4 = 1 m up: {up}");
+}
+
+#[test]
+fn a_rigs_lag_max_keeps_the_pivot_within_reach_of_a_fast_target() {
+    let mut s = orbit_rig(r#""lag":3,"lag_max":1.5,"lag_max_up":0.5"#);
+    s.step();
+    let trail = drive_target(&mut s, 0, 10.0, 180);
+    assert!((trail - 1.5).abs() < 1e-3, "sideways {trail}");
+    let up = drive_target(&mut s, 1, 8.0, 120);
+    assert!((up - 0.5).abs() < 1e-3, "up {up}");
+    // and a fall: the pivot trails below by at most the same
+    let down = drive_target(&mut s, 1, -20.0, 60);
+    assert!((down + 0.5).abs() < 1e-3, "down {down}");
+}
+
+#[test]
+fn a_target_that_is_put_somewhere_else_takes_the_pivot_with_it() {
+    let mut s = orbit_rig(r#""lag":8"#);
+    s.step();
+    drive_target(&mut s, 0, 4.0, 30);
+    set_pos(&mut s, 1, [200.0, 30.0, -80.0]);
+    s.step();
+    assert_eq!(rig(&s).pivot, [200.0, 30.0, -80.0]);
+    let c = pos(&s, 2);
+    assert!((c[0] - 200.0).abs() < 1e-3 && (c[1] - 30.0).abs() < 1e-3 && (c[2] + 75.0).abs() < 1e-3, "{c:?}");
+}
+
+#[test]
+fn a_rigs_spring_follows_the_target_but_never_the_mouse() {
+    let mut s = orbit_rig(r#""lag":6,"lag_up":3"#);
+    s.step();
+    drive_target(&mut s, 0, 8.0, 60);
+    // the mouse turns the yaw a quarter turn in one tick: the camera is round the pivot at once, looking at it
+    let e = s.world.entity(2).unwrap();
+    s.world.get_mut::<CameraRig>(e).unwrap().yaw = std::f32::consts::FRAC_PI_2;
+    drive_target(&mut s, 0, 8.0, 1);
+    let (c, p) = (pos(&s, 2), rig(&s).pivot);
+    assert!((c[0] - p[0] - 5.0).abs() < 1e-3 && (c[2] - p[2]).abs() < 1e-3, "{c:?} {p:?}");
+    let q = s.world.get::<Transform>(e).unwrap().rot;
+    let f = forward(q);
+    assert!((f[0] + 1.0).abs() < 1e-3 && f[2].abs() < 1e-3, "{f:?}");
+}
+
+#[test]
+fn a_rigs_spring_is_deterministic() {
+    let run = || {
+        let mut s = orbit_rig(r#""lag":9,"lag_up":5,"lead":0.2,"lag_max":2"#);
+        s.step();
+        for i in 0..200u32 {
+            let v = if i % 50 < 25 { 7.0 } else { -3.0 };
+            drive_target(&mut s, if i % 3 == 0 { 1 } else { 0 }, v, 1);
+        }
+        (pos(&s, 2).map(f32::to_bits), rig(&s).pivot.map(f32::to_bits), s.state_hash())
+    };
+    assert_eq!(run(), run());
+}
+
+#[test]
 fn a_camera_rig_follows_looks_orbits_and_shakes_then_settles() {
     let mut s = Sim::new(1);
     spawn(&mut s, 1, r#"{"Transform":{"pos":[10,0,0]}}"#);
@@ -285,6 +420,45 @@ fn a_timeline_fires_steps_in_time_ramps_values_and_ends() {
     assert_eq!(res(&s, "finished"), 1.0);
     let tl = *s.world.get::<Timeline>(s.world.entity(1).unwrap()).unwrap();
     assert!(tl.done && !tl.playing && (tl.time - 3.0).abs() < 1e-4, "{tl:?}");
+}
+
+#[test]
+fn seeking_a_timeline_puts_its_numbers_where_they_would_be_at_that_time_and_runs_nothing_else() {
+    let mut s = timeline_world("");
+    let e = s.world.entity(1).unwrap();
+    let lin = |s: &Sim| s.world.get::<Velocity>(s.world.entity(1).unwrap()).unwrap().lin;
+    // 1.0 s: the ramp (0 -> 6 over 2 s) is half way, the `set` at 0 and at 0.5 have both happened, and the event at 1 did not run
+    let (written, length) = gameplay::seek_timeline(&mut s.world, e, 1.0).unwrap();
+    assert_eq!((written, length), (3, 3.0));
+    assert!((pos(&s, 1)[2] - 3.0).abs() < 1e-5, "{:?}", pos(&s, 1));
+    assert_eq!((lin(&s)[0], lin(&s)[1]), (1.0, 2.0));
+    assert_eq!(booms(&s), 0, "events are not fired by a seek");
+    assert!(res(&s, "finished").is_nan(), "neither are resources: it was never set");
+    assert!((s.world.get::<Timeline>(e).unwrap().time - 1.0).abs() < 1e-6);
+    // back to 0.25 s: the ramp's value then; the set at 0.5 has not happened, but a `set` has no earlier value to return to, so it keeps what it had
+    gameplay::seek_timeline(&mut s.world, e, 0.25).unwrap();
+    assert!((pos(&s, 1)[2] - 0.75).abs() < 1e-5, "0.25 / 2 of 6");
+    assert_eq!(lin(&s)[0], 1.0);
+    // before the start of a ramp that begins later: its starting value
+    let mut late = Sim::new(1);
+    spawn(&mut late, 1, r#"{"Transform":{"pos":[0,9,0]},"Timeline":{"script":"at 2 ramp Transform.pos[1] 4 -> 8 over 2"}}"#);
+    let le = late.world.entity(1).unwrap();
+    gameplay::seek_timeline(&mut late.world, le, 0.0).unwrap();
+    assert_eq!(pos(&late, 1)[1], 4.0, "the ramp has not begun: the number is at its `from`");
+    // beyond the end: clamped, and every ramp at its last value
+    let (_, len) = gameplay::seek_timeline(&mut late.world, le, 99.0).unwrap();
+    assert_eq!(len, 4.0);
+    assert_eq!(pos(&late, 1)[1], 8.0);
+    assert_eq!(late.world.get::<Timeline>(le).unwrap().time, 4.0);
+    // `+=` steps are left out (they cannot be undone by going back); an entity without a timeline is refused
+    let mut adds = Sim::new(1);
+    spawn(&mut adds, 1, r#"{"Transform":{},"Timeline":{"script":"at 1 set Transform.pos[0] += 5\nat 2 end"}}"#);
+    let ae = adds.world.entity(1).unwrap();
+    assert_eq!(gameplay::seek_timeline(&mut adds.world, ae, 1.5).unwrap().0, 0);
+    assert_eq!(pos(&adds, 1)[0], 0.0);
+    spawn(&mut adds, 2, r#"{"Transform":{}}"#);
+    let bare = adds.world.entity(2).unwrap();
+    assert!(gameplay::seek_timeline(&mut adds.world, bare, 1.0).is_err());
 }
 
 #[test]
@@ -485,6 +659,268 @@ fn a_stream_zone_loads_its_prefab_near_the_target_and_unloads_it_far_away() {
     spawn(&mut c, 2, r#"{"Transform":{"pos":[5,0,0]},"Camera":{}}"#);
     c.step();
     assert!(c.world.get::<components::StreamZone>(c.world.entity(1).unwrap()).unwrap().loaded);
+}
+
+#[test]
+fn a_stream_zone_with_a_vertical_limit_is_the_floor_of_a_building_loaded_only_while_the_target_is_at_its_height() {
+    let mut s = Sim::new(1);
+    s.apply(&Command::DefinePrefab { name: "Floor".into(), def: parse(r#"{"components":{"Name":{"value":"Floor"},"Transform":{}}}"#).unwrap() }).unwrap();
+    // the floor at 30 m, within 4 m of height (and 2 m of margin), anywhere within 50 m across
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,30,0]},"StreamZone":{"prefab":"Floor","radius":50,"hysteresis":2,"vertical":4,"target":2}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[0,0,0]}}"#);
+    let zone = |s: &Sim| s.world.get::<components::StreamZone>(s.world.entity(1).unwrap()).unwrap().loaded;
+    let set_y = |s: &mut Sim, y: f32| s.world.get_mut::<Transform>(s.world.entity(2).unwrap()).unwrap().pos = [0.0, y, 0.0];
+    s.step();
+    assert!(!zone(&s), "at street level the floor 30 m up is not there");
+    set_y(&mut s, 27.0);
+    s.step();
+    assert!(zone(&s), "within 4 m of its height it is");
+    set_y(&mut s, 25.0);
+    s.step();
+    assert!(zone(&s), "5 m below: still inside the margin of 2 m");
+    set_y(&mut s, 20.0);
+    s.step();
+    assert!(!zone(&s), "10 m below: gone");
+}
+
+#[test]
+fn a_proc_grid_keeps_the_zones_a_provider_makes_for_the_cells_near_the_camera_and_what_they_load() {
+    use crate::procgen::{self, Provider, ZoneDef};
+    use std::sync::Arc;
+    struct Cells;
+    impl Provider for Cells {
+        fn claims(&self, _: &str) -> bool {
+            false
+        }
+        fn file(&self, _: &str) -> Option<Result<Vec<u8>, String>> {
+            None
+        }
+        fn file_ready(&self, _: &str) -> bool {
+            true
+        }
+        fn prefetch_file(&self, _: &str) {}
+        fn prefab(&self, name: &str) -> Option<String> {
+            name.starts_with("gen:rock").then(|| r#"{"components":{"Name":{"value":"Rock"},"Transform":{}}}"#.to_string())
+        }
+        fn zones(&self, _: &str, i: i32, j: i32) -> Vec<ZoneDef> {
+            // one zone in the middle of each cell that loads a rock when the camera is within 60 m of it
+            vec![ZoneDef { name: format!("cell {i} {j}"), pos: [(i as f32 + 0.5) * 100.0, 0.0, (j as f32 + 0.5) * 100.0], prefab: format!("gen:rock:{i}:{j}"), radius: 60.0, hysteresis: 10.0, ..Default::default() }]
+        }
+    }
+    let _g = procgen::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    procgen::set_provider(Some(Arc::new(Cells)));
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[50,1,50]},"Camera":{}}"#);
+    spawn(&mut s, 2, r#"{"ProcGrid":{"grid":"test","cell":100,"radius":150,"hysteresis":50,"per_tick":50}}"#);
+    let zones = |s: &Sim| {
+        let mut n = 0;
+        let _ = s.world.clone().for_each_uid::<(&components::GridZone,), _>(|_, _, _| n += 1);
+        n
+    };
+    let rocks = |s: &Sim| {
+        let mut n = 0;
+        let _ = s.world.clone().for_each_uid::<(&components::SpawnedBy,), _>(|_, _, _| n += 1);
+        n
+    };
+    s.step_n(3);
+    // cells whose middle is within 150 m of (50, 50): the 3 x 3 around it, minus none: the corners are at 141 m
+    assert_eq!(zones(&s), 9, "nine cells, one zone each");
+    assert_eq!(rocks(&s), 1, "only the rock of the cell the camera is in is within 60 m of its zone");
+    // the camera drives a long way east: the cells behind it go (with their rocks), new ones come
+    s.world.get_mut::<Transform>(s.world.entity(1).unwrap()).unwrap().pos = [1050.0, 1.0, 50.0];
+    s.step_n(3);
+    assert_eq!(zones(&s), 9);
+    assert_eq!(rocks(&s), 1);
+    assert!(s.world.len() < 40, "nothing piles up: {} entities", s.world.len());
+    // a server: no active camera, a `StreamAnchor` on each of two players far apart: the cells round both, none round the camera's last place
+    s.world.get_mut::<components::Camera>(s.world.entity(1).unwrap()).unwrap().active = false;
+    spawn(&mut s, 3, r#"{"Transform":{"pos":[50,1,50]},"StreamAnchor":{}}"#);
+    spawn(&mut s, 4, r#"{"Transform":{"pos":[2050,1,50]},"StreamAnchor":{}}"#);
+    s.step_n(6);
+    assert_eq!(zones(&s), 18, "nine cells round each anchor");
+    assert_eq!(rocks(&s), 2, "and the rock of the cell each stands in");
+    // the second walks to the first: the cells of the two overlap and are not made twice
+    s.world.get_mut::<Transform>(s.world.entity(4).unwrap()).unwrap().pos = [150.0, 1.0, 50.0];
+    s.step_n(6);
+    assert_eq!(zones(&s), 12, "the union of the two 3 x 3 squares: 3 x 4 cells");
+    procgen::set_provider(None);
+}
+
+#[test]
+fn the_zones_of_all_the_cells_made_in_a_tick_are_spawned_in_one_batch_with_the_uids_they_would_get_one_by_one() {
+    use crate::procgen::{self, Provider, ZoneDef};
+    use std::sync::Arc;
+    // cells with 3, 0, 2, 1 and 0 zones (the cells with none are remembered by a marker entity)
+    struct Mixed;
+    impl Provider for Mixed {
+        fn claims(&self, _: &str) -> bool {
+            false
+        }
+        fn file(&self, _: &str) -> Option<Result<Vec<u8>, String>> {
+            None
+        }
+        fn file_ready(&self, _: &str) -> bool {
+            true
+        }
+        fn prefetch_file(&self, _: &str) {}
+        fn prefab(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn zones(&self, _: &str, i: i32, j: i32) -> Vec<ZoneDef> {
+            let count = match (i, j) {
+                (0, 0) => 3,
+                (-1, 0) => 2,
+                (0, 1) => 1,
+                _ => 0,
+            };
+            (0..count).map(|k| ZoneDef { name: format!("z {i} {j} {k}"), pos: [(i as f32 + 0.5) * 100.0, 0.0, (j as f32 + 0.5) * 100.0], prefab: "nothing".to_string(), radius: 5.0, hysteresis: 1.0, ..Default::default() }).collect()
+        }
+    }
+    let _g = procgen::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    procgen::set_provider(Some(Arc::new(Mixed)));
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[50,1,50]},"Camera":{}}"#);
+    spawn(&mut s, 2, r#"{"ProcGrid":{"grid":"mixed","cell":100,"radius":120,"hysteresis":10,"per_tick":50}}"#);
+    let next = s.world.next_uid();
+    s.step_n(1);
+    // nearest first (the camera's own cell, then the four at 100 m by their numbers): (0,0) 3 zones, (-1,0) 2, (0,-1) a marker, (0,1) 1, (1,0) a marker
+    let expect: [(i32, i32); 8] = [(0, 0), (0, 0), (0, 0), (-1, 0), (-1, 0), (0, -1), (0, 1), (1, 0)];
+    for (k, (i, j)) in expect.iter().enumerate() {
+        let e = s.world.entity(next + k as u64).unwrap_or_else(|| panic!("uid {} exists", next + k as u64));
+        let z = s.world.get::<components::GridZone>(e).expect("a GridZone marks it");
+        assert_eq!((z.i as i32, z.j as i32, z.grid.0), (*i, *j, 2), "entity {k}");
+    }
+    assert!(s.world.entity(next + 8).is_none(), "and nothing more");
+    let (len, uid_after) = (s.world.len(), s.world.next_uid());
+    assert_eq!(uid_after, next + 8);
+    // nothing is made twice, and the cells that are left behind go with their zones and markers
+    s.step_n(3);
+    assert_eq!((s.world.len(), s.world.next_uid()), (len, uid_after));
+    s.world.get_mut::<Transform>(s.world.entity(1).unwrap()).unwrap().pos = [5050.0, 1.0, 50.0];
+    s.step_n(3);
+    assert!(s.world.entity(next).is_none() && s.world.entity(next + 7).is_none(), "the old cells and their markers are gone");
+    procgen::set_provider(None);
+}
+
+#[test]
+fn stream_zones_follow_every_anchor_and_a_zone_goes_only_when_all_have_left() {
+    // a server has no camera and many players: every `StreamAnchor` keeps the zones round it (the zones that name no target), a zone is loaded while any anchor is near and let go when all are far
+    let mut s = Sim::new(1);
+    s.apply(&Command::DefinePrefab { name: "House".into(), def: parse(r#"{"components":{"Name":{"value":"House"},"Transform":{}}}"#).unwrap() }).unwrap();
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,0]},"StreamZone":{"prefab":"House","radius":50,"hysteresis":10}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[1000,0,0]},"StreamZone":{"prefab":"House","radius":50,"hysteresis":10}}"#);
+    spawn(&mut s, 3, r#"{"Transform":{"pos":[20,0,0]},"StreamAnchor":{}}"#);
+    spawn(&mut s, 4, r#"{"Transform":{"pos":[1010,0,0]},"StreamAnchor":{}}"#);
+    let loaded = |s: &Sim, u: u64| s.world.get::<components::StreamZone>(s.world.entity(u).unwrap()).unwrap().loaded;
+    s.step();s.step();
+    assert!(loaded(&s, 1) && loaded(&s, 2), "each zone is loaded by the anchor near it");
+    // one anchor walks away from the first zone: it goes (no other anchor is near it), the second stays
+    s.world.get_mut::<Transform>(s.world.entity(3).unwrap()).unwrap().pos = [500.0, 0.0, 0.0];
+    s.step();s.step();
+    assert!(!loaded(&s, 1), "the zone goes when its only anchor has left");
+    assert!(loaded(&s, 2));
+    // two anchors near the same zone: it stays while either is
+    s.world.get_mut::<Transform>(s.world.entity(3).unwrap()).unwrap().pos = [1020.0, 0.0, 0.0];
+    s.step();s.step();
+    s.world.get_mut::<Transform>(s.world.entity(4).unwrap()).unwrap().pos = [-900.0, 0.0, 0.0];
+    s.step();s.step();
+    assert!(loaded(&s, 2), "the zone stays: an anchor is still near it");
+    s.world.get_mut::<Transform>(s.world.entity(3).unwrap()).unwrap().pos = [-500.0, 0.0, 500.0];
+    s.step();s.step();
+    assert!(!loaded(&s, 2), "and goes when the last has left");
+    // an anchor that is switched off is no anchor
+    s.world.get_mut::<Transform>(s.world.entity(4).unwrap()).unwrap().pos = [0.0, 0.0, 0.0];
+    s.step();s.step();
+    assert!(loaded(&s, 1));
+    s.world.get_mut::<components::StreamAnchor>(s.world.entity(4).unwrap()).unwrap().on = false;
+    s.step();s.step();
+    assert!(!loaded(&s, 1));
+}
+
+#[test]
+fn a_stream_zone_with_a_min_radius_is_a_ring_that_is_loaded_only_far_enough_away() {
+    let mut s = Sim::new(1);
+    s.apply(&Command::DefinePrefab { name: "Far".into(), def: parse(r#"{"components":{"Name":{"value":"Far"},"Transform":{}}}"#).unwrap() }).unwrap();
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,0]},"StreamZone":{"prefab":"Far","radius":1000,"min_radius":300,"hysteresis":50,"target":2}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[100,0,0]}}"#);
+    let at = |s: &mut Sim, x: f32| {
+        s.world.get_mut::<Transform>(s.world.entity(2).unwrap()).unwrap().pos = [x, 0.0, 0.0];
+        s.step();
+        s.world.get::<components::StreamZone>(s.world.entity(1).unwrap()).unwrap().loaded
+    };
+    assert!(!at(&mut s, 100.0), "nearer than the ring: not loaded");
+    assert!(at(&mut s, 400.0), "inside the ring");
+    assert!(at(&mut s, 280.0), "a little nearer than the ring, inside the margin: it stays");
+    assert!(!at(&mut s, 200.0), "nearer than min_radius minus the margin: gone");
+    assert!(!at(&mut s, 280.0), "and it does not come back until the target is out in the ring again");
+    assert!(at(&mut s, 350.0));
+    assert!(at(&mut s, 1040.0), "beyond the outer edge but inside the margin: it stays");
+    assert!(!at(&mut s, 1100.0), "beyond radius plus the margin: gone");
+}
+
+#[test]
+fn a_stream_zone_that_requires_another_loads_after_it_and_leaves_with_it() {
+    let mut s = Sim::new(1);
+    s.apply(&Command::DefinePrefab { name: "Flag".into(), def: parse(r#"{"components":{"Name":{"value":"Flag"},"Transform":{}}}"#).unwrap() }).unwrap();
+    s.apply(&Command::DefinePrefab { name: "Tile".into(), def: parse(r#"{"components":{"Name":{"value":"Tile"},"Transform":{}}}"#).unwrap() }).unwrap();
+    // the near ring: a flag that is loaded within 50 m; a coarse tile in the ring beyond; a fine tile that is there only while the flag is
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,0]},"StreamZone":{"prefab":"Flag","radius":50,"hysteresis":10,"target":9}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"pos":[0,0,0]},"StreamZone":{"prefab":"Tile","radius":1000,"min_radius":60,"hysteresis":10,"target":9}}"#);
+    spawn(&mut s, 3, r#"{"Transform":{"pos":[0,0,0]},"StreamZone":{"prefab":"Tile","radius":1000,"hysteresis":10,"target":9,"requires":1}}"#);
+    spawn(&mut s, 9, r#"{"Transform":{"pos":[500,0,0]}}"#);
+    let loaded = |s: &Sim| -> Vec<bool> { (1..=3).map(|u| s.world.get::<components::StreamZone>(s.world.entity(u).unwrap()).unwrap().loaded).collect() };
+    let at = |s: &mut Sim, x: f32| {
+        s.world.get_mut::<Transform>(s.world.entity(9).unwrap()).unwrap().pos = [x, 0.0, 0.0];
+        s.step();
+        s.step();
+        loaded(s)
+    };
+    assert_eq!(at(&mut s, 500.0), [false, true, false], "far: the coarse tile only");
+    assert_eq!(at(&mut s, 40.0), [true, false, true], "near: the flag, and the fine tile that needs it; the coarse one is gone");
+    assert_eq!(at(&mut s, 500.0), [false, true, false], "and back");
+    // a zone that requires one that does not exist never loads
+    spawn(&mut s, 4, r#"{"Transform":{"pos":[0,0,0]},"StreamZone":{"prefab":"Tile","radius":1000,"target":9,"requires":77}}"#);
+    s.step_n(3);
+    assert!(!s.world.get::<components::StreamZone>(s.world.entity(4).unwrap()).unwrap().loaded);
+}
+
+#[test]
+fn stream_zones_load_one_a_tick_nearest_first_when_the_world_says_so() {
+    let mk = |limit: Option<u32>| {
+        let mut s = Sim::new(1);
+        s.apply(&Command::DefinePrefab { name: "Rock".into(), def: parse(r#"{"components":{"Name":{"value":"Rock"},"Transform":{}}}"#).unwrap() }).unwrap();
+        // three zones at 10, 30 and 20 metres from the target, in this uid order
+        spawn(&mut s, 1, r#"{"Transform":{"pos":[10,0,0]},"StreamZone":{"prefab":"Rock","radius":100,"target":4}}"#);
+        spawn(&mut s, 2, r#"{"Transform":{"pos":[30,0,0]},"StreamZone":{"prefab":"Rock","radius":100,"target":4}}"#);
+        spawn(&mut s, 3, r#"{"Transform":{"pos":[20,0,0]},"StreamZone":{"prefab":"Rock","radius":100,"target":4}}"#);
+        spawn(&mut s, 4, r#"{"Transform":{"pos":[0,0,0]}}"#);
+        if let Some(l) = limit {
+            s.world.set_resource("stream.loads_per_tick", Some(l as f64)).unwrap();
+        }
+        s
+    };
+    let loaded = |s: &Sim| -> Vec<bool> { (1..=3).map(|u| s.world.get::<components::StreamZone>(s.world.entity(u).unwrap()).unwrap().loaded).collect() };
+    let mut free = mk(None);
+    free.step();
+    assert_eq!(loaded(&free), [true, true, true], "no limit: all at once");
+    let mut one = mk(Some(1));
+    one.step();
+    assert_eq!(loaded(&one), [true, false, false], "the nearest first");
+    one.step();
+    assert_eq!(loaded(&one), [true, false, true], "then the next nearest");
+    one.step();
+    assert_eq!(loaded(&one), [true, true, true]);
+    let before = one.world.len();
+    one.step_n(5);
+    assert_eq!(one.world.len(), before, "nothing loads twice");
+    let mut two = mk(Some(2));
+    two.step();
+    assert_eq!(loaded(&two), [true, false, true], "two a tick");
+    // the same world played twice is the same world
+    let (mut a, mut b) = (mk(Some(1)), mk(Some(1)));
+    a.step_n(4);
+    b.step_n(4);
+    assert_eq!(a.state_hash(), b.state_hash());
 }
 
 #[test]
@@ -741,3 +1177,268 @@ fn watched_events_become_resources_for_the_tick_after_they_happen() {
     assert!(t.world.resource("event.ping").is_none());
 }
 
+
+#[test]
+fn several_events_of_a_name_are_told_apart_in_slots_and_the_first_is_still_where_it_was() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"EventWatch":{"names":"ping"}}"#);
+    for uid in 2..=7u64 {
+        spawn(&mut s, uid, &format!(r#"{{"Transform":{{"pos":[{},{},{}]}}}}"#, uid * 10, uid, -(uid as i64)));
+    }
+    s.apply(&Command::DefineSystem { def: parse(r#"{"name":"pinger","each":["Transform"],"do":[{"if":{"eq":[{"tick":true},3]},"then":[{"emit":"ping"}]}]}"#).unwrap() }).unwrap();
+    s.step_n(3);
+    assert!(s.world.resource("event.ping.n").is_none(), "no event yet: the slot resources do not exist");
+    s.step(); // tick 3: six pings
+    s.step(); // tick 4: told
+    assert_eq!(res(&s, "event.ping"), 6.0, "all of them are counted");
+    assert_eq!(res(&s, "event.ping.n"), 4.0, "four slots are filled");
+    let slot = |k: usize| (res(&s, &format!("event.ping.{k}.uid")), res(&s, &format!("event.ping.{k}.x")), res(&s, &format!("event.ping.{k}.y")), res(&s, &format!("event.ping.{k}.z")));
+    let uids: Vec<f64> = (0..4).map(|k| slot(k).0).collect();
+    assert!(uids.windows(2).all(|w| w[0] < w[1]) && uids.iter().all(|u| (2.0..=7.0).contains(u)), "four different emitters, in uid order: {uids:?}");
+    for k in 0..4 {
+        let (u, x, y, z) = slot(k);
+        assert_eq!((x, y, z), (u * 10.0, u, -u), "slot {k} is where its own emitter was");
+    }
+    assert_eq!(slot(0), (res(&s, "event.ping.uid"), res(&s, "event.ping.x"), res(&s, "event.ping.y"), res(&s, "event.ping.z")), "slot 0 is the first event: `.x .y .z .uid` as before");
+    assert!(s.world.resource("event.ping.4.x").is_none(), "there are only four slots");
+    // the next tick has none: n goes back to 0 (once it exists) and the count too
+    s.step();
+    assert_eq!((res(&s, "event.ping"), res(&s, "event.ping.n")), (0.0, 0.0));
+    // fewer than four fill fewer slots
+    let mut t = Sim::new(1);
+    spawn(&mut t, 1, r#"{"EventWatch":{"names":"ping"}}"#);
+    spawn(&mut t, 2, r#"{"Transform":{"pos":[5,0,0]}}"#);
+    spawn(&mut t, 3, r#"{"Transform":{"pos":[6,0,0]}}"#);
+    t.apply(&Command::DefineSystem { def: parse(r#"{"name":"pinger","each":["Transform"],"do":[{"if":{"eq":[{"tick":true},1]},"then":[{"emit":"ping"}]}]}"#).unwrap() }).unwrap();
+    t.step_n(3);
+    assert_eq!((res(&t, "event.ping.n"), res(&t, "event.ping.1.x")), (2.0, 6.0), "two events fill two slots");
+    assert!(t.world.resource("event.ping.2.x").is_none());
+}
+
+#[test]
+fn while_a_text_field_has_the_focus_the_actions_read_zero_and_come_back_with_it() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"InputMap":{"bindings":"reload = r\nmove_y = w, s:-1"}}"#);
+    spawn(&mut s, 2, r#"{"Ui":{"pos":[0.1,0.1],"size":[0.4,0.1],"button":true},"UiInput":{"max_len":20}}"#);
+    s.step();
+    setr(&mut s, "input.w", 1.0);
+    s.step();
+    assert_eq!(res(&s, "action.move_y"), 1.0, "no field has the focus: the key is an action");
+    // the field takes the focus (a game's own system does that when the chat key is pressed)
+    let e = s.world.entity(2).unwrap();
+    s.world.get_mut::<components::UiInput>(e).unwrap().focused = true;
+    s.step();
+    assert_eq!((res(&s, "action.move_y"), res(&s, "action.move_y.released")), (0.0, 1.0), "typing: the held key is released and reads 0");
+    setr(&mut s, "input.r", 1.0);
+    s.step();
+    assert_eq!((res(&s, "action.reload"), res(&s, "action.reload.pressed")), (0.0, 0.0), "a key pressed while typing is no action");
+    // the focus goes: what is still held is an action again
+    s.world.get_mut::<components::UiInput>(e).unwrap().focused = false;
+    s.step();
+    assert_eq!((res(&s, "action.move_y"), res(&s, "action.reload")), (1.0, 1.0));
+}
+
+#[test]
+fn a_crowd_of_anchors_loads_and_drops_exactly_the_zones_and_cells_that_measuring_every_anchor_would() {
+    // the server's way of working: sixty players spread over three kilometres, two hundred loose zones and a grid of cells; after every step the zones that are loaded and the cells that exist are what a plain measurement of every
+    // anchor against every zone (with the margin that keeps a loaded one) gives, as the players move about
+    use crate::procgen::{self, Provider, ZoneDef};
+    use std::sync::Arc;
+    struct Cells;
+    impl Provider for Cells {
+        fn claims(&self, _: &str) -> bool {
+            false
+        }
+        fn file(&self, _: &str) -> Option<Result<Vec<u8>, String>> {
+            None
+        }
+        fn file_ready(&self, _: &str) -> bool {
+            true
+        }
+        fn prefetch_file(&self, _: &str) {}
+        fn prefab(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn zones(&self, _: &str, i: i32, j: i32) -> Vec<ZoneDef> {
+            vec![ZoneDef { name: format!("cell {i} {j}"), pos: [(i as f32 + 0.5) * 100.0, 0.0, (j as f32 + 0.5) * 100.0], prefab: "gen:none".into(), radius: 60.0, hysteresis: 10.0, ..Default::default() }]
+        }
+    }
+    let _g = procgen::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    procgen::set_provider(Some(Arc::new(Cells)));
+    let mut s = Sim::new(1);
+    s.apply(&Command::DefinePrefab { name: "House".into(), def: parse(r#"{"components":{"Name":{"value":"House"},"Transform":{}}}"#).unwrap() }).unwrap();
+    let mut seed = 12345u64;
+    let mut rnd = |m: f32| {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (((seed >> 33) as f32 / (1u64 << 31) as f32) * m).floor()
+    };
+    let mut anchors: Vec<[f32; 2]> = (0..60).map(|_| [rnd(3000.0), rnd(3000.0)]).collect();
+    for (k, p) in anchors.iter().enumerate() {
+        spawn(&mut s, 10 + k as u64, &format!(r#"{{"Transform":{{"pos":[{},1,{}]}},"StreamAnchor":{{}}}}"#, p[0], p[1]));
+    }
+    let zones: Vec<([f32; 2], f32)> = (0..200).map(|_| ([rnd(3000.0), rnd(3000.0)], if rnd(2.0) < 1.0 { 50.0 } else { 150.0 })).collect();
+    for (k, (p, r)) in zones.iter().enumerate() {
+        spawn(&mut s, 1000 + k as u64, &format!(r#"{{"Transform":{{"pos":[{},0,{}]}},"StreamZone":{{"prefab":"House","radius":{r},"hysteresis":20}}}}"#, p[0], p[1]));
+    }
+    spawn(&mut s, 2, r#"{"ProcGrid":{"grid":"test","cell":100,"radius":250,"hysteresis":60,"per_tick":100000}}"#);
+    let dist = |a: &[f32; 2], p: [f32; 2]| ((a[0] - p[0]).powi(2) + (a[1] - p[1]).powi(2)).sqrt();
+    let mut loaded = vec![false; zones.len()];
+    let mut cells: std::collections::BTreeSet<(i32, i32)> = std::collections::BTreeSet::new();
+    let (mut ever_loaded, mut ever_gone) = (0, 0);
+    for round in 0..6 {
+        s.step();
+        for (k, (p, r)) in zones.iter().enumerate() {
+            let near = |lim: f32| anchors.iter().any(|a| dist(a, *p) <= lim);
+            let was = loaded[k];
+            loaded[k] = if was { near(r + 20.0) } else { near(*r) };
+            ever_loaded += (!was && loaded[k]) as u32;
+            ever_gone += (was && !loaded[k]) as u32;
+            let actual = s.world.get::<components::StreamZone>(s.world.entity(1000 + k as u64).unwrap()).unwrap().loaded;
+            assert_eq!(actual, loaded[k], "round {round}: the zone {k} at {p:?} radius {r}");
+        }
+        // the cells: those that no anchor is within 310 m of are dropped, those within 250 m of an anchor are made (all at once: `per_tick` is large)
+        cells.retain(|&(i, j)| anchors.iter().any(|a| dist(a, [(i as f32 + 0.5) * 100.0, (j as f32 + 0.5) * 100.0]) <= 310.0));
+        for j in -6..40 {
+            for i in -6..40 {
+                if anchors.iter().any(|a| dist(a, [(i as f32 + 0.5) * 100.0, (j as f32 + 0.5) * 100.0]) <= 250.0) {
+                    cells.insert((i, j));
+                }
+            }
+        }
+        let mut actual: std::collections::BTreeSet<(i32, i32)> = std::collections::BTreeSet::new();
+        let _ = s.world.clone().for_each_uid::<(&components::GridZone,), _>(|_, _, (z,)| {
+            actual.insert((z.i as i32, z.j as i32));
+        });
+        assert_eq!(actual, cells, "round {round}: the cells of the grid");
+        // everybody walks up to 600 m; some far enough to leave the zones they were in
+        for (k, a) in anchors.iter_mut().enumerate() {
+            a[0] = (a[0] + rnd(1200.0) - 600.0).clamp(0.0, 3000.0);
+            a[1] = (a[1] + rnd(1200.0) - 600.0).clamp(0.0, 3000.0);
+            s.world.get_mut::<Transform>(s.world.entity(10 + k as u64).unwrap()).unwrap().pos = [a[0], 1.0, a[1]];
+        }
+    }
+    assert!(ever_loaded > 20 && ever_gone > 20, "the test moved zones in and out: {ever_loaded} loaded, {ever_gone} dropped");
+    procgen::set_provider(None);
+}
+
+#[test]
+fn a_proc_grid_can_look_at_its_cells_only_every_few_steps() {
+    use crate::procgen::{self, Provider, ZoneDef};
+    use std::sync::Arc;
+    struct Cells;
+    impl Provider for Cells {
+        fn claims(&self, _: &str) -> bool {
+            false
+        }
+        fn file(&self, _: &str) -> Option<Result<Vec<u8>, String>> {
+            None
+        }
+        fn file_ready(&self, _: &str) -> bool {
+            true
+        }
+        fn prefetch_file(&self, _: &str) {}
+        fn prefab(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn zones(&self, _: &str, i: i32, j: i32) -> Vec<ZoneDef> {
+            vec![ZoneDef { name: format!("cell {i} {j}"), pos: [(i as f32 + 0.5) * 100.0, 0.0, (j as f32 + 0.5) * 100.0], prefab: "gen:none".into(), radius: 60.0, hysteresis: 10.0, ..Default::default() }]
+        }
+    }
+    let _g = procgen::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    procgen::set_provider(Some(Arc::new(Cells)));
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[50,1,50]},"StreamAnchor":{}}"#);
+    spawn(&mut s, 2, r#"{"ProcGrid":{"grid":"test","cell":100,"radius":150,"hysteresis":50,"per_tick":50}}"#);
+    s.world.set_resource("procgrid.every", Some(4.0)).unwrap();
+    let cells = |s: &Sim| {
+        let mut n = 0;
+        let _ = s.world.clone().for_each_uid::<(&components::GridZone,), _>(|_, _, _| n += 1);
+        n
+    };
+    // the first step is a step to look in (tick 0), the next three are not
+    s.step();
+    assert_eq!(cells(&s), 9);
+    s.world.get_mut::<Transform>(s.world.entity(1).unwrap()).unwrap().pos = [5050.0, 1.0, 50.0];
+    s.step_n(3);
+    assert_eq!(s.world.resource("procgrid.every"), Some(4.0));
+    let mid = cells(&s);
+    s.step_n(4);
+    assert_eq!(cells(&s), 9, "after a step that looks, the nine cells round the anchor's new place (those it left are gone) ({mid} between)");
+    procgen::set_provider(None);
+}
+
+/// The way `despawn_trees` found a tree before: a map of every child of every parent in the world, and a walk of it.
+fn doomed_reference(world: &mut lunaris_ecs::World, roots: Vec<u64>) -> Vec<u64> {
+    let mut children: std::collections::BTreeMap<u64, Vec<u64>> = std::collections::BTreeMap::new();
+    let _ = world.for_each_uid::<(&components::Parent,), _>(|_, uid, (p,)| children.entry(p.target.0).or_default().push(uid));
+    let mut doomed: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+    let mut stack = roots;
+    while let Some(u) = stack.pop() {
+        if !doomed.insert(u) {
+            continue;
+        }
+        if let Some(kids) = children.get(&u) {
+            stack.extend(kids.iter().copied());
+        }
+    }
+    doomed.into_iter().collect()
+}
+
+#[test]
+fn the_tree_found_for_a_despawn_is_the_one_a_map_of_all_children_finds_and_costs_less() {
+    let mut s = Sim::new(1);
+    // 400 buildings, each with 20 parts, some of the parts with parts of their own, and 30 000 loose entities with no parent
+    let mut next = 1u64;
+    let mut roots = Vec::new();
+    for b in 0..400u64 {
+        let root = next;
+        next += 1;
+        spawn(&mut s, root, r#"{"Transform":{}}"#);
+        if b % 20 == 3 {
+            roots.push(root);
+        }
+        for k in 0..20u64 {
+            let part = next;
+            next += 1;
+            spawn(&mut s, part, &format!(r#"{{"Transform":{{}},"Parent":{{"target":{root}}}}}"#));
+            if k % 5 == 0 {
+                let sub = next;
+                next += 1;
+                spawn(&mut s, sub, &format!(r#"{{"Transform":{{}},"Parent":{{"target":{part}}}}}"#));
+            }
+        }
+    }
+    for _ in 0..30_000 {
+        spawn(&mut s, next, r#"{"Transform":{}}"#);
+        next += 1;
+    }
+    // a part of one building as a root too (its own subtree is inside another root's), a root that does not exist, and a repeated one
+    roots.push(8);
+    roots.push(9_999_999);
+    roots.push(roots[0]);
+    let a = crate::gameplay::doomed_trees(&mut s.world, roots.clone());
+    let b = doomed_reference(&mut s.world, roots.clone());
+    assert_eq!(a, b);
+    assert!(a.len() > 20 * 20 && a.windows(2).all(|w| w[0] < w[1]), "{}", a.len());
+    // the same in a world with no parents, and with no roots
+    assert_eq!(crate::gameplay::doomed_trees(&mut s.world, Vec::new()), Vec::<u64>::new());
+    // the cost (printed; run with --nocapture)
+    let time = |f: &mut dyn FnMut()| {
+        let t = std::time::Instant::now();
+        for _ in 0..20 {
+            f();
+        }
+        t.elapsed().as_secs_f64() * 1000.0 / 20.0
+    };
+    let new_ms = time(&mut || {
+        crate::gameplay::doomed_trees(&mut s.world, roots.clone());
+    });
+    let old_ms = time(&mut || {
+        doomed_reference(&mut s.world, roots.clone());
+    });
+    eprintln!("finding the tree of {} roots among {} parents: {new_ms:.3} ms now, {old_ms:.3} ms with a map of all children", roots.len(), 400 * 20 + 400 * 4);
+    // and despawning really removes them all and nothing else
+    let before = s.world.len();
+    crate::gameplay::despawn_trees(&mut s.world, roots);
+    assert_eq!(s.world.len(), before - a.iter().filter(|u| **u < next).count());
+}

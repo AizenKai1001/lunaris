@@ -308,3 +308,43 @@ fn a_layout_container_pads_in_the_shape_of_the_scale_whatever_screen_aspect_says
     assert!(close(plain.pos[0], 0.1) && close(scaled.pos[0], 0.05), "{plain:?} {scaled:?}");
     assert!(close(plain.pos[1], 0.1) && close(scaled.pos[1], 0.1));
 }
+
+#[test]
+fn text_typed_by_a_window_goes_into_the_focused_field_at_once() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Ui":{"pos":[0.1,0.1],"size":[0.4,0.1],"button":true},"UiInput":{"max_len":600,"show_last":6}}"#);
+    spawn(&mut s, 2, r#"{"Ui":{"pos":[0.1,0.3],"size":[0.4,0.1],"button":true},"UiInput":{"max_len":4}}"#);
+    let text = |s: &mut Sim, uid: u64| {
+        let e = s.world.entity(uid).unwrap();
+        let t = s.world.get::<UiInput>(e).unwrap().text.0;
+        s.world.strings().get(t).to_string()
+    };
+    let shown = |s: &Sim, uid: u64| s.world.strings().get(ui(s, uid).text.0).to_string();
+    s.step();
+    assert_eq!(super::ui_kit::type_into_focused(&mut s.world, "abc"), 0, "no field has the focus: nothing is taken");
+    assert!(!super::ui_kit::has_focused_input(&mut s.world));
+    pointer(&mut s, 0.3, 0.15, true);
+    s.step();
+    pointer(&mut s, 0.3, 0.15, false);
+    s.step();
+    assert!(super::ui_kit::has_focused_input(&mut s.world));
+    let token: String = (0..400).map(|i| char::from(b"0123456789abcdef"[i % 16])).collect();
+    assert_eq!(super::ui_kit::type_into_focused(&mut s.world, &token), 400, "a pasted token is taken whole, not a character a tick");
+    assert_eq!(super::ui_kit::type_into_focused(&mut s.world, "x\ny\tz"), 3, "control characters are left out");
+    s.step();
+    assert_eq!(text(&mut s, 1).chars().count(), 403);
+    assert!(text(&mut s, 1).ends_with("xyz"));
+    let on_screen = shown(&s, 1);
+    assert!(on_screen.starts_with("...") && on_screen.contains("def") && on_screen.trim_end_matches('|').chars().count() == 9, "only the last 6 are shown after the dots: {on_screen}");
+    assert!(super::ui_kit::clear_focused(&mut s.world));
+    s.step();
+    assert_eq!(text(&mut s, 1), "");
+    // the field's own limit holds for typed text too
+    pointer(&mut s, 0.3, 0.35, true);
+    s.step();
+    pointer(&mut s, 0.3, 0.35, false);
+    s.step();
+    assert_eq!(super::ui_kit::type_into_focused(&mut s.world, "hello"), 4);
+    assert_eq!(text(&mut s, 2), "hell");
+    assert_eq!(text(&mut s, 1), "", "the other field got nothing");
+}

@@ -1,0 +1,16 @@
+{
+  "name": "tracer",
+  "bounds": 120,
+  "budget": 40,
+  "emitters": [
+    {
+      "name": "round",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": 1 }] },
+      "init": { "life": 0.5, "speed": 160, "direction": [0, 0, -1], "size": 0.06, "color": [1, 0.85, 0.5, 1] },
+      "curves": { "alpha": [[0, 1], [0.85, 1], [1, 0]] },
+      "render": { "type": "ribbon", "texture": "soft", "blend": "add", "ribbon": { "points": 10, "interval": 0.008, "width": 1 } }
+    }
+  ]
+}

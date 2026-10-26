@@ -13,7 +13,7 @@ use std::process::ExitCode;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-fn number<T: std::str::FromStr>(kv: &HashMap<String, String>, key: &str, default: T) -> Result<T, String> {
+pub(crate) fn number<T: std::str::FromStr>(kv: &HashMap<String, String>, key: &str, default: T) -> Result<T, String> {
     match kv.get(key) {
         None => Ok(default),
         Some(v) => v.parse().map_err(|_| format!("--{key} needs a number")),

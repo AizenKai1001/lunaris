@@ -184,7 +184,31 @@ fn integrate(m: &Modules, start: V3, v0: V3, g: V3, k: f32, clock: f32, age: f32
     Some((pos, vel, samples.iter().map(|a| at(*a)).collect()))
 }
 
-fn particle(p: &Particles, m: &Modules, i: u32, count: u32, time: f32) -> Option<State> {
+/// What every particle of a cloud shares and `particle` used to work out again for each: the axis of the cone the particles fly in, the cosine of its opening and the two directions across the axis.
+#[derive(Clone, Copy)]
+struct Prep {
+    axis: V3,
+    cos_cone: f32,
+    t1: V3,
+    t2: V3,
+}
+
+fn prep(p: &Particles) -> Prep {
+    let axis = {
+        let d = [finite(p.direction[0], 0.0), finite(p.direction[1], 1.0), finite(p.direction[2], 0.0)];
+        if length(d) < 1e-6 { [0.0, 1.0, 0.0] } else { normalize(d) }
+    };
+    let cone = (finite(p.cone, 25.0).clamp(0.0, 180.0) as f64).to_radians();
+    let cos_cone = detmath::cos(cone) as f32;
+    let t1 = {
+        let h = if axis[0].abs() < 0.6 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
+        normalize(cross(axis, h))
+    };
+    let t2 = cross(axis, t1);
+    Prep { axis, cos_cone, t1, t2 }
+}
+
+fn particle(p: &Particles, m: &Modules, pre: &Prep, i: u32, count: u32, time: f32) -> Option<State> {
     let life = finite(p.lifetime, 2.0).clamp(0.05, 600.0);
     let phase = i as f32 / count as f32;
     let (age, cycle) = if p.looping {
@@ -223,20 +247,10 @@ fn particle(p: &Particles, m: &Modules, i: u32, count: u32, time: f32) -> Option
         _ => [0.0; 3],
     };
     // which way and how fast: a direction inside a cone round `direction`
-    let axis = {
-        let d = [finite(p.direction[0], 0.0), finite(p.direction[1], 1.0), finite(p.direction[2], 0.0)];
-        if length(d) < 1e-6 { [0.0, 1.0, 0.0] } else { normalize(d) }
-    };
-    let cone = (finite(p.cone, 25.0).clamp(0.0, 180.0) as f64).to_radians();
-    let cos_cone = detmath::cos(cone) as f32;
+    let Prep { axis, cos_cone, t1, t2 } = *pre;
     let c = 1.0 - r(4) * (1.0 - cos_cone);
     let s = (1.0 - c * c).max(0.0).sqrt();
     let phi = r(5) * std::f32::consts::TAU;
-    let t1 = {
-        let h = if axis[0].abs() < 0.6 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
-        normalize(cross(axis, h))
-    };
-    let t2 = cross(axis, t1);
     let dir = add(scale(axis, c), scale(add(scale(t1, cos32(phi)), scale(t2, sin32(phi))), s));
     let speed = lerp(finite(p.speed_range[0], 1.0), finite(p.speed_range[1], 3.0), r(6));
     let v0 = scale(dir, speed);
@@ -294,7 +308,7 @@ fn particle(p: &Particles, m: &Modules, i: u32, count: u32, time: f32) -> Option
 }
 
 /// The faces of a solid of half size 1: triangles with their corners and the face's normal.
-fn solid_faces(kind: Solid) -> Vec<([V3; 3], V3)> {
+pub(crate) fn solid_faces(kind: Solid) -> Vec<([V3; 3], V3)> {
     let tri = |a: V3, b: V3, c: V3| -> ([V3; 3], V3) { ([a, b, c], normalize(cross(sub(b, a), sub(c, a)))) };
     match kind {
         Solid::Cube => {
@@ -321,7 +335,7 @@ fn solid_faces(kind: Solid) -> Vec<([V3; 3], V3)> {
 }
 
 /// `v` turned by `angle` about the unit axis `k` (Rodrigues' formula).
-fn rotate(v: V3, k: V3, cos: f32, sin: f32) -> V3 {
+pub(crate) fn rotate(v: V3, k: V3, cos: f32, sin: f32) -> V3 {
     add(add(scale(v, cos), scale(cross(k, v), sin)), scale(k, dot(k, v) * (1.0 - cos)))
 }
 
@@ -332,34 +346,128 @@ fn rotate(v: V3, k: V3, cos: f32, sin: f32) -> V3 {
 ///
 /// With `threads` above 1 the particles are worked out in that many slices at once and joined in order, so the mesh is the same whatever the number.
 pub fn build_with(p: &Particles, m: &Modules, tr: &Transform, cam: &CameraBasis, threads: usize) -> Mesh {
+    build_many(&[Job { p, m, tr }], cam, threads).pop().expect("one job, one mesh")
+}
+
+/// A sphere (centre in the world, radius) that holds every particle of a cloud, its pictures, ribbons and solids included, whatever the clock says: how far the particles can start from the middle, how far they can
+/// travel in their lives (speed and gravity; drag only shortens it), how far turbulence can push them (a noise of at most 1 in each of three directions) and how big a picture can be. `None` when that cannot be said without
+/// building the cloud (forces and colliders move the particles step by step; a size gradient can make them bigger than the cloud's numbers say).
+pub fn bound(p: &Particles, m: &Modules, tr: &Transform) -> Option<(V3, f32)> {
+    if m.dynamic() || m.size.is_some() {
+        return None;
+    }
+    let life = finite(p.lifetime, 2.0).clamp(0.05, 600.0);
+    let ext = [finite(p.extent[0], 0.5).abs(), finite(p.extent[1], 0.5).abs(), finite(p.extent[2], 0.5).abs()];
+    let start = match p.shape {
+        1 | 3 | 4 => ext[0],
+        2 => length(ext),
+        _ => 0.0,
+    };
+    let speed = finite(p.speed_range[0], 1.0).abs().max(finite(p.speed_range[1], 3.0).abs());
+    let g = length([finite(p.gravity[0], 0.0), finite(p.gravity[1], 0.0), finite(p.gravity[2], 0.0)]);
+    let travel = speed * life + 0.5 * g * life * life;
+    let turbulence = 1.7321 * finite(p.turbulence, 0.0).abs();
+    let jitter = finite(p.size_jitter, 0.0).clamp(0.0, 1.0);
+    let size = finite(p.size[0], 0.2).abs().max(finite(p.size[1], 0.05).abs()) * (1.0 + jitter);
+    let stretch = finite(p.stretch, 0.0).max(0.0);
+    let picture = size * m.trail.map_or(1.0, |t| t.width.abs().max(1.0)) + (speed + g * life) * stretch * 0.5;
+    let scale = tr.scale.iter().fold(0.0f32, |a, s| a.max(s.abs()));
+    let radius = (scale * (start + travel + turbulence) + picture) * 1.05 + 0.01;
+    (radius.is_finite() && tr.pos.iter().all(|v| v.is_finite())).then_some((tr.pos, radius))
+}
+
+/// Whether a sphere is wholly outside the picture of `view_proj` (the four sides and the near plane; the far plane is not looked at): a cloud inside such a sphere has nothing to show.
+pub fn outside(view_proj: &M4, centre: V3, radius: f32) -> bool {
+    let m = &view_proj.0;
+    let row = |i: usize| [m[i], m[4 + i], m[8 + i], m[12 + i]];
+    let (r0, r1, r2, r3) = (row(0), row(1), row(2), row(3));
+    let plus = |a: [f32; 4], b: [f32; 4]| [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]];
+    let minus = |a: [f32; 4], b: [f32; 4]| [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]];
+    [plus(r3, r0), minus(r3, r0), plus(r3, r1), minus(r3, r1), plus(r3, r2)].iter().any(|pl| {
+        let n = [pl[0], pl[1], pl[2]];
+        let len = length(n);
+        len > 1e-12 && (dot(n, centre) + pl[3]) / len < -radius
+    })
+}
+
+/// One cloud to build: its numbers, its modules and where it stands.
+pub struct Job<'a> {
+    pub p: &'a Particles,
+    pub m: &'a Modules,
+    pub tr: &'a Transform,
+}
+
+/// The particles of `range` of one cloud that are alive and in front of the camera, with their depth, in the world's space.
+fn evaluate(job: &Job, pre: &Prep, model: &M4, cam: &CameraBasis, range: std::ops::Range<u32>) -> Vec<(f32, State)> {
+    let (p, m) = (job.p, job.m);
     let count = p.count.clamp(1, MAX_PARTICLES);
-    let model = M4::from_trs(tr.pos, tr.rot, tr.scale);
     let time = finite(p.time, 0.0);
-    let slice = |range: std::ops::Range<u32>| -> Vec<(f32, State)> {
-        let mut out = Vec::new();
-        for i in range {
-            if let Some(s) = particle(p, m, i, count, time) {
-                let world = model.transform_point(s.pos);
-                let depth = dot(sub(world, cam.pos), cam.forward);
-                if depth > 0.01 && s.color[3] > 0.0 && s.size.abs() > 1e-6 {
-                    let trail = s.trail.iter().map(|q| model.transform_point(*q)).collect();
-                    out.push((depth, State { pos: world, vel: model.transform_dir(s.vel), trail, ..s }));
-                }
+    let mut out = Vec::new();
+    for i in range {
+        if let Some(s) = particle(p, m, pre, i, count, time) {
+            let world = model.transform_point(s.pos);
+            let depth = dot(sub(world, cam.pos), cam.forward);
+            if depth > 0.01 && s.color[3] > 0.0 && s.size.abs() > 1e-6 {
+                let trail = s.trail.iter().map(|q| model.transform_point(*q)).collect();
+                out.push((depth, State { pos: world, vel: model.transform_dir(s.vel), trail, ..s }));
             }
         }
-        out
-    };
-    let parts = threads.clamp(1, 16).min((count / 4096).max(1) as usize) as u32;
-    let mut alive: Vec<(f32, State)> = if parts <= 1 {
-        slice(0..count)
+    }
+    out
+}
+
+/// The meshes of several clouds: the particles of all of them are worked out together, in pieces of 1 024 that `threads` workers take as they come (one start of threads for the whole picture, not one for each cloud;
+/// the dearest effects of a city, a cloud of six thousand particles with turbulence, took two milliseconds of one thread), and each cloud's pieces are joined in order, so every mesh is the same whatever the number of
+/// threads and the same as when the clouds were built one at a time.
+pub fn build_many(jobs: &[Job], cam: &CameraBasis, threads: usize) -> Vec<Mesh> {
+    const CHUNK: u32 = 1024;
+    let pres: Vec<Prep> = jobs.iter().map(|j| prep(j.p)).collect();
+    let models: Vec<M4> = jobs.iter().map(|j| M4::from_trs(j.tr.pos, j.tr.rot, j.tr.scale)).collect();
+    let mut slices: Vec<(usize, std::ops::Range<u32>)> = Vec::new();
+    let mut total = 0u32;
+    for (j, job) in jobs.iter().enumerate() {
+        let count = job.p.count.clamp(1, MAX_PARTICLES);
+        total += count;
+        let mut start = 0;
+        while start < count {
+            let end = (start + CHUNK).min(count);
+            slices.push((j, start..end));
+            start = end;
+        }
+    }
+    let workers = threads.clamp(1, 16).min((total / 1500).max(1) as usize);
+    let work = |k: usize| evaluate(&jobs[slices[k].0], &pres[slices[k].0], &models[slices[k].0], cam, slices[k].1.clone());
+    let results: Vec<Vec<(f32, State)>> = if workers <= 1 {
+        (0..slices.len()).map(work).collect()
     } else {
-        let per = count.div_ceil(parts);
-        let slice = &slice;
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let slots: Vec<std::sync::Mutex<Vec<(f32, State)>>> = (0..slices.len()).map(|_| std::sync::Mutex::new(Vec::new())).collect();
+        let run = || loop {
+            let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if k >= slices.len() {
+                break;
+            }
+            let v = work(k);
+            *slots[k].lock().unwrap_or_else(|e| e.into_inner()) = v;
+        };
         std::thread::scope(|s| {
-            let handles: Vec<_> = (0..parts).map(|k| s.spawn(move || slice(k * per..((k + 1) * per).min(count)))).collect();
-            handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect()
-        })
+            for _ in 1..workers {
+                s.spawn(run);
+            }
+            run();
+        });
+        slots.into_iter().map(|m| m.into_inner().unwrap_or_default()).collect()
     };
+    let mut alive: Vec<Vec<(f32, State)>> = (0..jobs.len()).map(|_| Vec::new()).collect();
+    for ((j, _), v) in slices.iter().zip(results) {
+        alive[*j].extend(v);
+    }
+    jobs.iter().zip(alive).map(|(job, alive)| finish(job, alive, cam, threads)).collect()
+}
+
+/// A cloud's mesh from its living particles: sorted far to near unless it is additive, then pictures, ribbons or solids.
+fn finish(job: &Job, mut alive: Vec<(f32, State)>, cam: &CameraBasis, threads: usize) -> Mesh {
+    let (p, m) = (job.p, job.m);
     if !p.additive {
         alive.sort_by(|a, b| b.0.total_cmp(&a.0));
     }
@@ -369,7 +477,7 @@ pub fn build_with(p: &Particles, m: &Modules, tr: &Transform, cam: &CameraBasis,
         // the common case: plain pictures, filled in parallel
         return quads(&alive, cam, cols, rows, stretch, threads);
     }
-    let mut mesh = Mesh { pos: Vec::with_capacity(alive.len() * 4), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::with_capacity(alive.len() * 6), tex: None, rig: None };
+    let mut mesh = Mesh { pos: Vec::with_capacity(alive.len() * 4), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::with_capacity(alive.len() * 6), tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Full, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 };
     let faces = m.solid.map(solid_faces);
     if faces.is_some() {
         alive.truncate(MAX_SOLIDS);
@@ -464,7 +572,7 @@ fn billboard(s: &State, cam: &CameraBasis, stretch: f32) -> [V3; 4] {
 }
 
 /// The texture coordinates of the four corners of the frame whose bottom left is `(u0, v1 - dv)`.
-fn quad_uv(u0: f32, v1: f32, du: f32, dv: f32) -> [(f32, f32); 4] {
+pub(crate) fn quad_uv(u0: f32, v1: f32, du: f32, dv: f32) -> [(f32, f32); 4] {
     [(u0, v1 - dv), (u0 + du, v1 - dv), (u0 + du, v1), (u0, v1)]
 }
 
@@ -472,7 +580,7 @@ fn quad_uv(u0: f32, v1: f32, du: f32, dv: f32) -> [(f32, f32); 4] {
 /// place that only its position in the list decides, so the result is the same whatever the number of threads.
 fn quads(alive: &[(f32, State)], cam: &CameraBasis, cols: u32, rows: u32, stretch: f32, threads: usize) -> Mesh {
     let n = alive.len();
-    let mut mesh = Mesh { pos: vec![[0.0; 3]; n * 4], nrm: vec![scale(cam.forward, -1.0); n * 4], uv: vec![[0.0; 2]; n * 4], col: vec![[0.0; 3]; n * 4], texw: vec![0.0; n * 4], idx: vec![0; n * 6], tex: None, rig: None };
+    let mut mesh = Mesh { pos: vec![[0.0; 3]; n * 4], nrm: vec![scale(cam.forward, -1.0); n * 4], uv: vec![[0.0; 2]; n * 4], col: vec![[0.0; 3]; n * 4], texw: vec![0.0; n * 4], idx: vec![0; n * 6], tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Full, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 };
     let per = n.div_ceil(threads.clamp(1, 16).min((n / 4096).max(1))).max(1);
     let (du, dv) = (1.0 / cols as f32, 1.0 / rows as f32);
     let fill = |first: usize, items: &[(f32, State)], pos: &mut [V3], uv: &mut [[f32; 2]], col: &mut [V3], texw: &mut [f32], idx: &mut [u32]| {

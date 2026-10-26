@@ -30,6 +30,8 @@ pub enum PipeId {
     /// Particle clouds: alpha-blended and added.
     Particle,
     ParticleAdd,
+    /// Rain: instanced streaks made by the vertex shader (`Weather.rain`), alpha-blended, depth tested and not written.
+    Rain,
     IdMesh,
     IdSprite,
     Sky,
@@ -43,7 +45,14 @@ pub enum PipeId {
     UiInPass,
     UiOut,
     DepthPre,
+    /// The opaque meshes' depth into the main pass's own depth image (at its sample count), before the main pass: the main pass then shades each pixel once (`MeshEarly`).
+    DepthEarly,
+    /// The mesh pipeline for what the early depth pass drew: the same shaders, depth only tested (not written), equal depth passes.
+    MeshEarly,
     DepthShadow,
+    /// The same two for meshes cut out by their texture's alpha.
+    DepthPreCut,
+    DepthShadowCut,
     Resolve,
     Ssao,
     /// Temporal anti-aliasing: the picture blended with the last ones, drawn to the output and to the history.
@@ -80,6 +89,11 @@ pub struct Shaders {
     pub text: ShaderModule,
     /// The compute shader of the eye adaptation.
     pub exposure: ShaderModule,
+    pub sky_lut: ShaderModule,
+    /// The compute shader that skins a model's vertices on the card (`skin.wgsl`).
+    pub skin: ShaderModule,
+    /// The compute shader that steps and draws particle emitters on the card (`fx.wgsl`).
+    pub fx: ShaderModule,
 }
 
 pub struct Layouts {
@@ -91,6 +105,12 @@ pub struct Layouts {
     pub grass2: BindGroupLayout,
     pub splat2: BindGroupLayout,
     pub depth0: BindGroupLayout,
+    /// The compute pass that integrates the sky (`skylut.wgsl`): the frame's numbers, and the table it writes.
+    pub sky_lut0: BindGroupLayout,
+    /// The compute pass that skins a model (`skin.wgsl`): its rest vertices, its joints and weights, the picture's joint matrices, the vertices it writes, and its numbers (a dynamic offset into a table of them).
+    pub skin0: BindGroupLayout,
+    /// The compute passes of a particle emitter (`fx.wgsl`): its numbers (a dynamic offset into a table of them), its particles, its curve tables and the vertices it writes.
+    pub fx0: BindGroupLayout,
     pub text0: BindGroupLayout,
     pub resolve: BindGroupLayout,
     pub ssao: BindGroupLayout,
@@ -130,6 +150,9 @@ impl Shaders {
             post_ms: module(device, "post-ms", &with_sky(include_str!("shaders/post.wgsl"))),
             text: module(device, "text", include_str!("shaders/text.wgsl")),
             exposure: module(device, "exposure", &with_common(include_str!("shaders/exposure.wgsl"))),
+            sky_lut: module(device, "sky-lut", &with_sky(include_str!("shaders/skylut.wgsl"))),
+            skin: module(device, "skin", include_str!("shaders/skin.wgsl")),
+            fx: module(device, "fx", include_str!("shaders/fx.wgsl")),
         }
     }
 }
@@ -144,6 +167,10 @@ fn uniform() -> BindingType {
 
 fn storage_ro() -> BindingType {
     BindingType::Buffer { ty: BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None }
+}
+
+fn compute_storage(binding: u32, read_only: bool) -> BindGroupLayoutEntry {
+    BindGroupLayoutEntry { binding, visibility: ShaderStages::COMPUTE, ty: BindingType::Buffer { ty: BufferBindingType::Storage { read_only }, has_dynamic_offset: false, min_binding_size: None }, count: None }
 }
 
 fn tex_float() -> BindingType {
@@ -182,12 +209,15 @@ impl Layouts {
     pub fn new(device: &Device) -> Layouts {
         let make = |label: &str, entries: &[BindGroupLayoutEntry]| device.create_bind_group_layout(&BindGroupLayoutDescriptor { label: Some(label), entries });
         Layouts {
-            scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering()), entry(9, tex_depth())]),
+            scene0: make("scene0", &[entry(0, uniform()), entry(1, storage_ro()), entry(2, tex_depth_array()), entry(3, sampler_compare()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(6, tex_depth_array()), entry(7, tex_float_array()), entry(8, sampler_filtering()), entry(9, tex_depth()), entry(15, storage_ro())]),
             tex1: make("tex1", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float()), entry(3, tex_float()), entry(4, tex_float()), entry(5, tex_float())]),
             tex1_small: make("tex1-small", &[entry(0, tex_float()), entry(1, sampler_filtering()), entry(2, tex_float())]),
-            grass2: make("grass2", &[entry(12, uniform()), entry(13, tex_unfiltered())]),
+            grass2: make("grass2", &[entry(12, uniform()), entry(13, tex_unfiltered()), entry(14, tex_unfiltered())]),
             // a painted terrain: its numbers, the splat map and its sampler, the layers' sampler, four colour textures and four relief maps
             splat2: make("splat2", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering()), entry(3, sampler_filtering()), entry(4, tex_float()), entry(5, tex_float()), entry(6, tex_float()), entry(7, tex_float()), entry(8, tex_float()), entry(9, tex_float()), entry(10, tex_float()), entry(11, tex_float())]),
+            sky_lut0: make("sky-lut0", &[BindGroupLayoutEntry { binding: 0, visibility: ShaderStages::COMPUTE, ty: uniform(), count: None }, BindGroupLayoutEntry { binding: 14, visibility: ShaderStages::COMPUTE, ty: BindingType::Buffer { ty: BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None }]),
+            skin0: make("skin0", &[compute_storage(0, true), compute_storage(1, true), compute_storage(2, true), compute_storage(3, false), BindGroupLayoutEntry { binding: 4, visibility: ShaderStages::COMPUTE, ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None }, count: None }]),
+            fx0: make("fx0", &[BindGroupLayoutEntry { binding: 0, visibility: ShaderStages::COMPUTE, ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None }, count: None }, compute_storage(1, false), compute_storage(2, true), compute_storage(3, false)]),
             depth0: make("depth0", &[entry(0, uniform()), entry(1, storage_ro())]),
             text0: make("text0", &[entry(0, uniform()), entry(1, tex_float()), entry(2, sampler_filtering())]),
             resolve: make("resolve", &[entry(2, tex_float())]),
@@ -199,7 +229,7 @@ impl Layouts {
             bloom_chain: make("bloom-chain", &[entry(4, tex_float()), entry(5, sampler_filtering())]),
             composite: make("composite", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(7, tex_float()), entry(8, storage_ro())]),
             composite_ms: make("composite-ms", &[entry(0, uniform()), entry(1, tex_depth()), entry(3, tex_ms()), entry(4, tex_float()), entry(5, sampler_filtering()), entry(7, tex_float()), entry(8, storage_ro())]),
-            ssr: make("ssr", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(9, tex_depth()), entry(10, tex_float()), entry(11, tex_float()), entry(12, tex_float_array()), entry(13, sampler_filtering())]),
+            ssr: make("ssr", &[entry(0, uniform()), entry(1, tex_depth()), entry(2, tex_float()), entry(5, sampler_filtering()), entry(9, tex_depth()), entry(10, tex_float()), entry(11, tex_float()), entry(12, tex_float_array()), entry(13, sampler_filtering()), entry(15, storage_ro())]),
             probe_resolve: make("probe-resolve", &[entry(0, uniform()), entry(2, tex_float())]),
             ae0: make(
                 "ae0",
@@ -270,6 +300,25 @@ pub fn build_exposure(device: &Device, sh: &Shaders, ly: &Layouts) -> ComputePip
     device.create_compute_pipeline(&ComputePipelineDescriptor { label: Some("eye-adaptation"), layout: Some(&pl), module: &sh.exposure, entry_point: Some("cs_adapt"), compilation_options: Default::default(), cache: None })
 }
 
+/// The compute pipeline that integrates the atmosphere into the table the sky shader looks up.
+pub fn build_sky_lut(device: &Device, sh: &Shaders, ly: &Layouts) -> ComputePipeline {
+    let pl = device.create_pipeline_layout(&PipelineLayoutDescriptor { label: Some("sky-lut"), bind_group_layouts: &[Some(&ly.sky_lut0)], immediate_size: 0 });
+    device.create_compute_pipeline(&ComputePipelineDescriptor { label: Some("sky-lut"), layout: Some(&pl), module: &sh.sky_lut, entry_point: Some("cs_sky_lut"), compilation_options: Default::default(), cache: None })
+}
+
+/// The compute pipeline that skins the vertices of the picture's animated models.
+pub fn build_skin(device: &Device, sh: &Shaders, ly: &Layouts) -> ComputePipeline {
+    let pl = device.create_pipeline_layout(&PipelineLayoutDescriptor { label: Some("skin"), bind_group_layouts: &[Some(&ly.skin0)], immediate_size: 0 });
+    device.create_compute_pipeline(&ComputePipelineDescriptor { label: Some("skin"), layout: Some(&pl), module: &sh.skin, entry_point: Some("cs_skin"), compilation_options: Default::default(), cache: None })
+}
+
+/// The compute pipelines of a particle emitter on the card: one step, and the picture's drawing of the particles.
+pub fn build_fx(device: &Device, sh: &Shaders, ly: &Layouts) -> (ComputePipeline, ComputePipeline) {
+    let pl = device.create_pipeline_layout(&PipelineLayoutDescriptor { label: Some("fx"), bind_group_layouts: &[Some(&ly.fx0)], immediate_size: 0 });
+    let make = |entry: &str| device.create_compute_pipeline(&ComputePipelineDescriptor { label: Some(entry), layout: Some(&pl), module: &sh.fx, entry_point: Some(entry), compilation_options: Default::default(), cache: None });
+    (make("cs_step"), make("cs_emit"))
+}
+
 /// Build the pipeline for `key`.
 pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> RenderPipeline {
     let layout = |label: &str, groups: &[&BindGroupLayout]| {
@@ -282,14 +331,15 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
     let target = |format: TextureFormat, blend: Option<BlendState>| Some(ColorTargetState { format, blend, write_mask: ColorWrites::ALL });
     let no_bias = DepthBiasState::default();
     match key.id {
-        PipeId::Mesh => {
+        PipeId::Mesh | PipeId::MeshEarly => {
             let pl = layout("mesh", &[&ly.scene0, &ly.tex1]);
+            let early = key.id == PipeId::MeshEarly;
             device.create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("mesh"),
+                label: Some(if early { "mesh-early" } else { "mesh" }),
                 layout: Some(&pl),
                 vertex: VertexState { module: &sh.scene, entry_point: Some("vs_mesh"), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
                 primitive: tri(Some(Face::Back)),
-                depth_stencil: Some(depth_state(true, CompareFunction::Greater, no_bias)),
+                depth_stencil: Some(if early { depth_state(false, CompareFunction::GreaterEqual, no_bias) } else { depth_state(true, CompareFunction::Greater, no_bias) }),
                 multisample: ms,
                 fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_mesh"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),
                 multiview_mask: None,
@@ -381,6 +431,20 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 cache: None,
             })
         }
+        PipeId::Rain => {
+            let pl = layout("rain", &[&ly.scene0]);
+            device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("rain"),
+                layout: Some(&pl),
+                vertex: VertexState { module: &sh.scene, entry_point: Some("vs_rain"), compilation_options: Default::default(), buffers: &[] },
+                primitive: tri(None),
+                depth_stencil: Some(depth_state(false, CompareFunction::Greater, no_bias)),
+                multisample: ms,
+                fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_rain"), compilation_options: Default::default(), targets: &[target(HDR, Some(ALPHA_BLEND))] }),
+                multiview_mask: None,
+                cache: None,
+            })
+        }
         PipeId::IdMesh | PipeId::IdSprite => {
             let mesh = key.id == PipeId::IdMesh;
             let pl = layout("ids", &[&ly.scene0, &ly.tex1]);
@@ -403,7 +467,8 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 layout: Some(&pl),
                 vertex: VertexState { module: &sh.scene, entry_point: Some("vs_sky"), compilation_options: Default::default(), buffers: &[] },
                 primitive: tri(None),
-                depth_stencil: Some(depth_state(false, CompareFunction::Always, no_bias)),
+                // drawn after the solid things, only where none of them is (the depth is still the cleared 0, which is also the sky's own): the atmosphere is worked out for the pixels that show it
+                depth_stencil: Some(depth_state(false, CompareFunction::Equal, no_bias)),
                 multisample: ms,
                 fragment: Some(FragmentState { module: &sh.scene, entry_point: Some("fs_sky"), compilation_options: Default::default(), targets: &[target(HDR, None)] }),
                 multiview_mask: None,
@@ -483,19 +548,20 @@ pub fn build(device: &Device, sh: &Shaders, ly: &Layouts, key: PipeKey) -> Rende
                 cache: None,
             })
         }
-        PipeId::DepthPre | PipeId::DepthShadow => {
-            let shadow = key.id == PipeId::DepthShadow;
-            let pl = layout("depth", &[&ly.depth0]);
+        PipeId::DepthPre | PipeId::DepthShadow | PipeId::DepthPreCut | PipeId::DepthShadowCut | PipeId::DepthEarly => {
+            let shadow = matches!(key.id, PipeId::DepthShadow | PipeId::DepthShadowCut);
+            let cut = matches!(key.id, PipeId::DepthPreCut | PipeId::DepthShadowCut);
+            let pl = if cut { layout("depth-cut", &[&ly.depth0, &ly.tex1]) } else { layout("depth", &[&ly.depth0]) };
             let (compare, bias) = if shadow { (CompareFunction::Less, DepthBiasState { constant: 2, slope_scale: 2.0, clamp: 0.0 }) } else { (CompareFunction::Greater, no_bias) };
             device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: Some(if shadow { "shadow" } else { "prepass" }),
                 layout: Some(&pl),
-                vertex: VertexState { module: &sh.depth, entry_point: Some("vs_depth"), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
+                vertex: VertexState { module: &sh.depth, entry_point: Some(if cut { "vs_depth_cut" } else { "vs_depth" }), compilation_options: Default::default(), buffers: &[Some(mesh_vertex_layout())] },
                 // shadow maps draw back faces too (thin walls still shadow); the prepass matches the main pass
                 primitive: tri(if shadow { None } else { Some(Face::Back) }),
                 depth_stencil: Some(depth_state(true, compare, bias)),
-                multisample: none,
-                fragment: None,
+                multisample: if key.id == PipeId::DepthEarly { ms } else { none },
+                fragment: if cut { Some(FragmentState { module: &sh.depth, entry_point: Some("fs_depth_cut"), compilation_options: Default::default(), targets: &[] }) } else { None },
                 multiview_mask: None,
                 cache: None,
             })

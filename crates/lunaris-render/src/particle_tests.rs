@@ -379,3 +379,140 @@ fn particle_module_cost() {
         }
     }
 }
+
+/// A hash over everything a cloud's mesh holds (the bits of every number, in order).
+fn mesh_hash(m: &crate::mesh::Mesh) -> u64 {
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    let mut eat = |v: u64| {
+        h = (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
+        h ^= h >> 29;
+    };
+    for p in &m.pos {
+        p.iter().for_each(|v| eat(v.to_bits() as u64));
+    }
+    for p in &m.uv {
+        p.iter().for_each(|v| eat(v.to_bits() as u64));
+    }
+    for p in &m.col {
+        p.iter().for_each(|v| eat(v.to_bits() as u64));
+    }
+    m.texw.iter().for_each(|v| eat(v.to_bits() as u64));
+    m.idx.iter().for_each(|v| eat(*v as u64));
+    eat(m.pos.len() as u64);
+    h
+}
+
+/// The clouds of a game's city's AI tower (the dearest effects of its client: 9 800 particles every picture) and a few others that use the other shapes, an alpha cloud that has to be sorted, a sheet and a trail.
+fn recorded_clouds() -> Vec<(Particles, &'static str)> {
+    let base = Particles { playing: true, time: 1.6666658, looping: true, prewarm: true, ..Default::default() };
+    vec![
+        (Particles { count: 6000, lifetime: 8.0, shape: 1, extent: [105.0, 105.0, 105.0], direction: [0.0, 1.0, 0.0], cone: 180.0, speed_range: [2.0, 9.0], drag: 0.4, turbulence: 22.0, turbulence_scale: 70.0, size: [11.0, 3.5], size_jitter: 0.5, color: [0.5, 0.85, 1.0, 0.5], color_end: [0.225, 0.425, 1.0, 0.0], fade_in: 0.15, additive: true, seed: 7, ..base }, ""),
+        (Particles { count: 2400, lifetime: 7.0, shape: 4, extent: [190.0, 1.0, 190.0], direction: [0.0, 0.08, 0.0], cone: 25.0, speed_range: [1.0, 4.5], drag: 0.2, turbulence: 8.0, turbulence_scale: 35.0, size: [7.0, 2.4], size_jitter: 0.4, color: [0.5, 0.85, 1.0, 0.7], color_end: [0.225, 0.425, 1.0, 0.0], fade_in: 0.1, additive: true, seed: 11, ..base }, ""),
+        (Particles { count: 1400, lifetime: 1.5, shape: 3, extent: [46.0, 1.0, 46.0], direction: [0.0, -1.0, 0.0], cone: 3.0, speed_range: [45.0, 70.0], turbulence: 1.0, turbulence_scale: 12.0, size: [2.0, 0.9], size_jitter: 0.4, color: [0.5, 0.85, 1.0, 0.8], color_end: [0.225, 0.425, 1.0, 0.0], fade_in: 0.05, stretch: 3.0, additive: true, seed: 13, ..base }, ""),
+        (Particles { count: 900, lifetime: 5.0, shape: 2, extent: [20.0, 4.0, 20.0], direction: [0.3, 1.0, 0.1], cone: 40.0, speed_range: [1.0, 3.0], gravity: [0.2, -0.5, 0.0], drag: 0.1, turbulence: 2.0, turbulence_scale: 3.0, size: [1.5, 3.0], size_jitter: 0.3, spin: 1.5, sheet: [4, 2], color: [0.6, 0.6, 0.6, 0.8], color_end: [0.3, 0.3, 0.3, 0.0], fade_in: 0.2, additive: false, seed: 3, ..base }, ""),
+        (Particles { count: 300, lifetime: 2.0, shape: 0, direction: [0.0, 1.0, 0.0], cone: 60.0, speed_range: [2.0, 6.0], gravity: [0.0, -9.8, 0.0], size: [0.3, 0.1], additive: false, looping: false, prewarm: false, spread_time: 1.0, seed: 5, ..base }, ""),
+    ]
+}
+
+#[test]
+fn clouds_are_exactly_the_meshes_that_were_recorded() {
+    // the numbers were recorded from the code before the particles of all the clouds of a picture were worked out together on a pool of threads and before the numbers that every particle of a cloud shares were worked out
+    // once: the same meshes, bit for bit, for any number of threads and either way of building them
+    const EXPECT: [u64; 10] = [0x131be9b4a3057bf4, 0x888c241d1d7015e3, 0x1e67e0142750730c, 0xb6c0e212b2d91764, 0x9c21c72126a3ef0f, 0x03c488a07242120f, 0xed41324a7cb225ea, 0xa954b0e864378c30, 0x490c18d8fbab409b, 0x560da4dc4f3a170e];
+    let cams = [camera(), CameraBasis { pos: [30.0, 12.0, -40.0], forward: normalize([-0.4, -0.1, 0.9]), right: normalize(cross([-0.4, -0.1, 0.9], [0.0, 1.0, 0.0])), up: [0.0, 1.0, 0.0] }];
+    let tr = Transform { pos: [3.0, 40.0, -8.0], scale: [1.0, 1.0, 1.0], ..Transform::default() };
+    let mut got = Vec::new();
+    for cam in &cams {
+        for (p, _) in recorded_clouds() {
+            got.push(mesh_hash(&build(&p, &tr, cam, 1)));
+        }
+    }
+    assert_eq!(got.as_slice(), EXPECT.as_slice(), "recorded: {got:x?}");
+    for threads in [2, 5, 8] {
+        let again: Vec<u64> = cams.iter().flat_map(|cam| recorded_clouds().into_iter().map(move |(p, _)| mesh_hash(&build(&p, &tr, cam, threads)))).collect();
+        assert_eq!(again, got, "{threads} threads");
+    }
+}
+
+#[test]
+fn a_cloud_with_any_particle_in_the_picture_is_never_called_outside_it() {
+    use crate::particles::{bound, outside};
+    use lunaris_sim::particle_modules::Modules;
+    let mut state = 0x2545_F491_4F6C_DD1Du64;
+    let mut rnd = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        ((state >> 40) as f32) / 16_777_216.0
+    };
+    let quat = |rnd: &mut dyn FnMut() -> f32| {
+        let (ax, a) = (normalize([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5 + 1e-3]), rnd() * std::f32::consts::TAU);
+        quat_normalize([ax[0] * (a * 0.5).sin(), ax[1] * (a * 0.5).sin(), ax[2] * (a * 0.5).sin(), (a * 0.5).cos()])
+    };
+    let (mut culled, mut inside) = (0, 0);
+    for _ in 0..400 {
+        let p = Particles {
+            count: 150 + (rnd() * 400.0) as u32,
+            lifetime: 0.5 + rnd() * 8.0,
+            shape: (rnd() * 5.0) as u32,
+            extent: [rnd() * 40.0 + 0.5, rnd() * 20.0 + 0.5, rnd() * 40.0 + 0.5],
+            direction: [rnd() - 0.5, rnd() - 0.2, rnd() - 0.5],
+            cone: rnd() * 180.0,
+            speed_range: [rnd() * 3.0, 3.0 + rnd() * 30.0],
+            gravity: [(rnd() - 0.5) * 4.0, -rnd() * 10.0, (rnd() - 0.5) * 4.0],
+            drag: if rnd() < 0.5 { 0.0 } else { rnd() * 0.8 },
+            turbulence: if rnd() < 0.5 { 0.0 } else { rnd() * 20.0 },
+            turbulence_scale: 1.0 + rnd() * 30.0,
+            size: [0.1 + rnd() * 6.0, rnd() * 3.0],
+            size_jitter: rnd(),
+            stretch: if rnd() < 0.3 { rnd() * 3.0 } else { 0.0 },
+            additive: rnd() < 0.5,
+            looping: true,
+            prewarm: true,
+            time: rnd() * 20.0,
+            seed: (rnd() * 100.0) as u32,
+            ..Default::default()
+        };
+        let tr = Transform { pos: [(rnd() - 0.5) * 300.0, (rnd() - 0.5) * 80.0, (rnd() - 0.5) * 300.0], rot: quat(&mut rnd), scale: [0.5 + rnd() * 2.0, 0.5 + rnd() * 2.0, 0.5 + rnd() * 2.0] };
+        let (cam_pos, cam_rot) = ([(rnd() - 0.5) * 300.0, (rnd() - 0.5) * 60.0, (rnd() - 0.5) * 300.0], quat(&mut rnd));
+        let view = M4::from_trs(cam_pos, cam_rot, [1.0, 1.0, 1.0]).inverse_affine();
+        let vp = M4::perspective(40.0 + rnd() * 50.0, 1.0 + rnd(), 0.1, 2000.0).mul(&view);
+        let inv = view.inverse_affine();
+        let basis = CameraBasis { pos: cam_pos, forward: normalize(inv.transform_dir([0.0, 0.0, -1.0])), right: normalize(inv.transform_dir([1.0, 0.0, 0.0])), up: normalize(inv.transform_dir([0.0, 1.0, 0.0])) };
+        let mesh = build(&p, &tr, &basis, 1);
+        let any_in = mesh.pos.iter().any(|v| {
+            let c = vp.mul_v4([v[0], v[1], v[2], 1.0]);
+            c[3] > 0.0 && c[0].abs() <= c[3] && c[1].abs() <= c[3] && c[2] >= -c[3]
+        });
+        let (centre, radius) = bound(&p, &Modules::default(), &tr).expect("a plain cloud has a bound");
+        let out = outside(&vp, centre, radius);
+        // every particle of the cloud is inside its sphere
+        assert!(mesh.pos.iter().all(|v| length(sub(*v, centre)) <= radius), "the bound holds the whole mesh: {p:?}");
+        if any_in {
+            inside += 1;
+            assert!(!out, "a cloud with a particle in the picture was called outside: {p:?} {tr:?}");
+        }
+        if out {
+            culled += 1;
+        }
+    }
+    assert!(culled > 40 && inside > 40, "the test is meaningful: {culled} clouds outside, {inside} with a particle in the picture");
+}
+
+#[test]
+fn a_cloud_wholly_outside_the_picture_is_not_built_and_one_in_it_is() {
+    let mut s = Sim::new(1);
+    let spawn = |s: &mut Sim, uid: u64, comps: &str| {
+        let Json::Obj(components) = parse(comps).unwrap() else { panic!() };
+        s.apply(&Command::Spawn { uid: Some(uid), components }).unwrap();
+    };
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,0,10]},"Camera":{}}"#);
+    let cloud = |x: f32, z: f32| format!(r#"{{"Transform":{{"pos":[{x},0,{z}]}},"Particles":{{"count":200,"lifetime":2,"extent":[2,2,2],"shape":1,"speed_range":[1,2],"size":[0.5,0.2]}}}}"#);
+    spawn(&mut s, 2, &cloud(0.0, 0.0)); // in front of the camera
+    spawn(&mut s, 3, &cloud(500.0, 0.0)); // far to the side
+    spawn(&mut s, 4, &cloud(0.0, 400.0)); // behind the camera
+    let mut tex = TextureCache::new(None);
+    let scene = crate::render::gather_scene(&mut s.world, &mut tex, &RenderOptions { width: 96, height: 64, ..RenderOptions::default() }).unwrap();
+    let uids: Vec<u64> = scene.particles.iter().map(|p| p.uid).collect();
+    assert_eq!(uids, vec![2], "only the cloud in the picture is built");
+}

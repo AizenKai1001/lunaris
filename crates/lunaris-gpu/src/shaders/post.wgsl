@@ -67,6 +67,12 @@ fn depth_at(px: vec2<i32>) -> f32 {
     return textureLoad(depth_tex, clamp(px, vec2<i32>(0), size - vec2<i32>(1)), 0);
 }
 
+// Which of the four pixels a half-size pixel covers is looked at in this picture.
+fn half_jitter() -> vec2<i32> {
+    let j = i32(frame.p8.w * 997.0) & 3;
+    return vec2<i32>(j & 1, (j >> 1) & 1);
+}
+
 const AO_SLICES: i32 = 3;
 const AO_STEPS: i32 = 8;
 
@@ -87,7 +93,8 @@ fn fast_acos(x: f32) -> f32 {
 // Output: r = visibility (1 = open), g = distance from the camera (for the depth-aware blur).
 @fragment
 fn fs_ssao(in: FullOut) -> @location(0) vec4<f32> {
-    let px = vec2<i32>(in.pos.xy);
+    // the target is half the size of the picture: each of its pixels looks at one of the four pixels it covers, a different one each picture (the picture's own noise and the temporal anti-aliasing average them)
+    let px = vec2<i32>(in.pos.xy) * 2 + half_jitter();
     let d0 = depth_at(px);
     if (d0 <= 0.0) {
         return vec4<f32>(1.0, 1.0e6, 0.0, 1.0); // the sky
@@ -202,7 +209,7 @@ fn pcg3(v_in: vec3<u32>) -> vec3<u32> {
 // in that picture) comes back along it. Output: rgb = the bounced light as the average over the rays (rays that find nothing add nothing: the sky is the shader's own), a = the distance from the camera.
 @fragment
 fn fs_gi(in: FullOut) -> @location(0) vec4<f32> {
-    let px = vec2<i32>(in.pos.xy);
+    let px = vec2<i32>(in.pos.xy) * 2 + half_jitter();
     let d0 = depth_at(px);
     if (d0 <= 0.0) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0e6);
@@ -269,20 +276,30 @@ fn fs_gi(in: FullOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_ssao_blur(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.pos.xy);
-    let size = vec2<i32>(frame.p1.xy);
-    let center = textureLoad(ao_in, px, 0);
+    let d_here = depth_at(px);
+    if (d_here <= 0.0) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0); // the sky: nothing to occlude or light
+    }
+    // the occlusion and the bounced light were made at half size: this pixel's value comes from the half-size pixels about it, weighed by how near they are on the screen and by how near their distance from the camera
+    // is to this pixel's own (so that a value does not leak across the edge of a surface)
+    let here = world_at(px);
+    let center_dist = length(frame.eye.xyz - here);
+    let lsize = vec2<i32>(textureDimensions(ao_in));
+    let fpos = (vec2<f32>(px) + vec2<f32>(0.5)) * 0.5 - vec2<f32>(0.5);
+    let base = vec2<i32>(round(fpos));
     var sum = 0.0;
     var gsum = vec3<f32>(0.0);
     var wsum = 0.0;
     var gwsum = 0.0;
     let wide = frame.p23.x > 0.0;
-    let lo = select(-2, -3, wide);
-    let hi = select(2, 3, wide);
-    for (var y = lo; y < hi; y = y + 1) {
-        for (var x = lo; x < hi; x = x + 1) {
-            let q = clamp(px + vec2<i32>(x, y), vec2<i32>(0), size - vec2<i32>(1));
+    let r = select(1, 2, wide);
+    for (var y = -r; y <= r; y = y + 1) {
+        for (var x = -r; x <= r; x = x + 1) {
+            let t = base + vec2<i32>(x, y);
+            let q = clamp(t, vec2<i32>(0), lsize - vec2<i32>(1));
             let s = textureLoad(ao_in, q, 0);
-            let w = exp(-abs(s.g - center.g) * 6.0 / max(center.g, 1.0) * 10.0);
+            let dv = vec2<f32>(t) - fpos;
+            let w = exp(-abs(s.g - center_dist) * 6.0 / max(center_dist, 1.0) * 10.0) * exp(-dot(dv, dv) * 0.8);
             sum = sum + s.r * w;
             wsum = wsum + w;
             if (wide) {
@@ -292,9 +309,9 @@ fn fs_ssao_blur(in: FullOut) -> @location(0) vec4<f32> {
         }
     }
     var gi = gsum / max(gwsum, 1.0e-4);
-    if (wide && frame.p24.x < 0.999 && depth_at(px) > 0.0) {
+    if (wide && frame.p24.x < 0.999) {
         // where this surface was in the last picture, and what the history held there
-        let pc = frame.prev_view_proj * vec4<f32>(world_at(px), 1.0);
+        let pc = frame.prev_view_proj * vec4<f32>(here, 1.0);
         if (pc.w > 0.0) {
             let pn = pc.xy / pc.w;
             let puv = vec2<f32>(pn.x * 0.5 + 0.5, 0.5 - pn.y * 0.5);
@@ -319,7 +336,11 @@ fn scene_view_depth(px: vec2<i32>) -> f32 {
     if (d <= 0.0) {
         return 1.0e9;
     }
-    return view_depth(world_at(px));
+    // (the distance in front of the camera from the depth alone: `p5.zw` are made from the projection, see `view_depth_constants`)
+    if (frame.p4.w > 0.5) {
+        return d * frame.p5.z + frame.p5.w;
+    }
+    return 1.0 / (d * frame.p5.z + frame.p5.w);
 }
 
 // The way along a ray in the picture: the part (0 to 1) of the ray's length reached when a fraction `u` of the ray's length on the screen is done. The screen is not linear in the
@@ -672,9 +693,10 @@ fn fs_bloom_first(in: FullOut) -> @location(0) vec4<f32> {
     let w4 = karis(g4);
     let c0 = (g0 * w0 * 0.125 + g1 * w1 * 0.125 + g2 * w2 * 0.125 + g3 * w3 * 0.125 + g4 * w4 * 0.5) / (w0 * 0.125 + w1 * 0.125 + w2 * 0.125 + w3 * 0.125 + w4 * 0.5);
     // what glows is judged after the eye has adapted (a lamp in a dark room glows, the same lamp in the sun does not)
-    var lit = c0;
+    // (the sun's glint on smooth water is a million times white: unclamped it would spread over the whole picture, so the input of the glow is held to forty times)
+    var lit = min(c0, vec3<f32>(40.0));
     if (frame.p15.x > 0.5) {
-        lit = c0 * ae_factor();
+        lit = lit * ae_factor();
     }
     return vec4<f32>(prefilter(lit), 1.0);
 }

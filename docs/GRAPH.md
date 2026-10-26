@@ -44,7 +44,7 @@ saved with the scene, recorded and replayed, snapshotted, and every change is un
 | `{"res_set": "name", "to": expr}` | Set a world resource (a named global number: score, timer, a key's state). Queued like the structural statements, applied in uid order. |
 | `{"res_add": "name", "by": expr}` | Add to a world resource. Many entities can add to the same one: the sum is the same for any thread count or storage order. |
 | `{"spawn": {"Comp": {"field": expr, ...}, ...}}` | Create an entity with these components (scalar fields; others take defaults). |
-| `{"spawn_prefab": "Name", "at": [x, y, z], "velocity": [x, y, z], "with": {"Comp": {"field": expr}}}` | Spawn a prefab (an entity template, `docs/PREFABS.md`): the root and all its children, with consecutive uids. `at` is the root's `Transform.pos`, `velocity` its `Velocity.lin` (each three expressions), `with` replaces scalar fields of the root's components. Bullets, pickups, enemies, anything that appears over and over. A system with this statement runs on the interpreter, not the batch vm. |
+| `{"spawn_prefab": "Name", "at": [x, y, z], "velocity": [x, y, z], "with": {"Comp": {"field": expr}}}` | Spawn a prefab (an entity template, `docs/PREFABS.md`): the root and all its children, with consecutive uids. `at` is the root's `Transform.pos`, `velocity` its `Velocity.lin` (each three expressions), `with` replaces fields of the root's components: a number, flag or text, or an **array** of them in square brackets (`"Decal": {"normal": [0, 1, {"get": "Transform.pos[2]"}]}`, `"Transform": {"rot": [0, 0, 0, 1]}`: each element is an expression, at most 64; the array replaces the whole field; plain `spawn` still takes scalars only). Bullets, pickups, enemies, anything that appears over and over. A system with this statement runs on the interpreter, not the batch vm. |
 | `{"add": "Comp", "values": {"field": expr}}` | Add a component to this entity. |
 | `{"remove": "Comp"}` | Remove a component from this entity. |
 
@@ -114,6 +114,19 @@ A system can name a compiled library instead of `do`: `{"name": "seek", "plugin"
 - **Runtime errors** (division by zero, writing the wrong type, ...) skip the rest of that entity's statements for that tick,
   are stored as the system's `last_error` (see the `systems` tool) and never stop the simulation.
 
+## Seeing what a system did: `trace_system`
+
+`trace_system` runs one graph system once for one entity and says what every expression came to, without changing anything:
+
+```json
+{"tool": "trace_system", "arguments": {"name": "fall", "uid": 12}}
+{"matched": true, "tick": 340, "values": {"do[0].be": 0.1633, "do[0].be.mul[1]": 0.016667, "do[1].to.sub[0]": 2.0, "do[1].to": 1.8367, "do[2].if": false, "do[2].if.lt[0]": 5.0}, "ran": ["do[0]", "do[1]", "do[2]"]}
+```
+
+`values` maps the **path** of each expression that is more than a constant (the same `do[1].to.sub[0]` paths that definition errors carry) to the value it had. A `let`'s `be`, a `set`'s `to`, an `if`'s condition and every operation inside them each have one; a branch's condition tells which way it went. `ran` lists the paths of the statements that ran, in the order they ran (`do[0]`, `do[2]`, `do[2].then[0]`): which way an `if` went, and whether a statement was reached at all. `matched` is false when the entity lacks a component of `each` (or has one of `without`): the system never visits it. `error` (with the values found before it) says what stopped the run, for example a division by zero. `def` traces a definition that is not defined yet, for a graph that is still being edited; plugin, wasm and `on_contact` systems are not traced (`note` says so).
+
+How: the definition is compiled again with every non-constant expression tagged by its path (`Expr::Tag`; the tag is only in this compile, never in a running system, so the batch vm and the speed above are untouched), the reference interpreter runs it for the one entity on a **copy of the world**, and the copy is thrown away: the real world, its hash and its revision do not move. The Blueprint tab shows these values on the wires of the selected entity (`docs/EDITOR.md`).
+
 ## Performance
 
 Graph systems run on a **batch vm** (`crates/lunaris-sim/src/vm.rs`). At definition time the expression tree is type-checked and lowered
@@ -136,5 +149,5 @@ interpreter would reject at run time stays on the interpreter, and `systems` rep
 
 ## Tools
 
-`define_system`, `remove_system`, `enable_system`, `systems`, `get_system`; and for writing them as text `compile_script`, `define_script`, `get_script` (`docs/SCRIPT.md`). A node editor will be a *view* of this same text:
+`define_system`, `remove_system`, `enable_system`, `systems`, `get_system`, `trace_system`; and for writing them as text `compile_script`, `define_script`, `get_script` (`docs/SCRIPT.md`). A node editor will be a *view* of this same text:
 statements and operations are nodes, `get`/`set` paths are pins, and saving the graph writes exactly this JSON.

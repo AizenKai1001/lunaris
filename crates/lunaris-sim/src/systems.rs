@@ -291,6 +291,8 @@ pub fn particles(world: &mut World, ctx: &mut SimCtx) {
 /// the simulation needs to do (and it is deterministic and replay-exact like any other system).
 pub fn animate(world: &mut World, ctx: &mut SimCtx) {
     let dt = ctx.dt;
+    // animators with an `Inertia` notice their switches before the clocks move (and do not crossfade)
+    crate::inertia::begin(world, dt);
     world
         .for_each::<(&mut Animator,), _>(|_, (a,)| {
             if !a.started {
@@ -410,7 +412,11 @@ pub fn physics(world: &mut World, ctx: &mut SimCtx) {
         })
         .expect("physics settings query is valid");
     ctx.gravity = gravity;
-    ctx.contacts = crate::physics::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes);
+    ctx.contacts = if ctx.reference_physics {
+        crate::physics::step_reference(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes, &mut ctx.contact_memory, &mut ctx.sleep)
+    } else {
+        crate::physics::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes, &ctx.physics, ctx.threads, &mut ctx.contact_memory, &mut ctx.sleep)
+    };
     // raycast vehicles push their chassis with what the wheels meet (a world without a `Vehicle` finds none and goes on)
     crate::vehicle::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes);
     // what the entities with a `Probe` can see of the ground, the water and one ray, for the graph systems that run next

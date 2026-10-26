@@ -2,8 +2,10 @@
 resolver = "2"
 members = [
     "crates/lunaris-json",
+    "crates/lunaris-citygen",
     "crates/lunaris-ecs",
     "crates/lunaris-sim",
+    "crates/lunaris-creature",
     "crates/lunaris-api",
     "crates/lunaris-render",
     "crates/lunaris-mind",

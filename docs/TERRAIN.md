@@ -103,7 +103,7 @@ materials (Unity's terrain layers, Unreal's landscape layers) that a **splat map
                    "layers": "grass grass uv_scale=900\nrock dirt uv_scale=500 tint=0.8,0.8,0.85\nsand sand uv_scale=700\nsnow terrain/snow.png uv_scale=600"}}
 ```
 
-`splat` is a PNG of the workspace (8 or 16 bits, any size; RGB works for three layers). `layers` is text, one layer a line, `NAME [TEXTURE] [uv_scale=N] [bump=D] [tint=R,G,B]`:
+`splat` is a PNG of the workspace (8 or 16 bits, any size; RGB works for three layers). `layers` is text, one layer a line, `NAME [TEXTURE] [uv_scale=N] [bump=D] [tint=R,G,B] [cliff=1]`:
 
 | word | meaning |
 |---|---|
@@ -112,6 +112,9 @@ materials (Unity's terrain layers, Unreal's landscape layers) that a **splat map
 | `uv_scale=N` | how many times the texture repeats across the **whole** ground (as for `Terrain.uv_scale`); `uv_scale=60,40` for different counts along x and z. Left out, the terrain's own `uv_scale`. A 5 km ground wants hundreds. |
 | `bump=D` | the depth in metres of the built-in material's relief in the GPU renderer's high qualities (default 0.03, 0 for flat). A picture has no relief to show. |
 | `tint=R,G,B` | a colour the texture is multiplied by, each 0 to 4: snow from `concrete tint=1.6,1.6,1.7`, a darker `dirt` for rock. |
+| `cliff=1` | steep ground shows this layer (one layer at most), laid on from the sides (triplanar) instead of from above: a photograph or a texture projected from above stretches into vertical streaks down a wall. Where the ground is steeper than about 45 degrees the layer takes the place of the layers and of the terrain's own photograph, keeping the photograph's broad light and dark; the GPU renderer's high qualities only. The rock layer of a mountain. |
+
+`TerrainLayers.photo` (0 to 1, default 0.85) is for a terrain that also has a `Terrain.texture`, a photograph of the ground, in the GPU renderer's high qualities: how much of the colour is the photograph's (the layers give the detail as a ratio to their own average); 1 keeps the photograph's colour entirely and uses the layers only for detail and for the `cliff` layer.
 
 Blank lines and lines that start with `#` are skipped. `Terrain.color` multiplies the blend the way it multiplies a texture, so set it to `[1, 1, 1, 1]` to see the layers as they are (the default is a green that would tint all of them);
 `Terrain.texture` is not used while the layers are there, and the ground is drawn opaque.

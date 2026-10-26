@@ -1,0 +1,84 @@
+{
+  "name": "muzzle flash (voxel)",
+  "bounds": 4,
+  "budget": 80,
+  "emitters": [
+    {
+      "name": "flash",
+      "space": "local",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": 2}]},
+      "init": {"life": [0.04, 0.06], "size": [0.28, 0.4], "rotation": [0, 90], "color": [1, 0.9, 0.55, 1]},
+      "curves": {"size": [[0, 0.6], [0.4, 1], [1, 0.7]], "alpha": [[0, 1], [1, 0]]},
+      "render": {
+        "texture": "square",
+        "filter": "nearest",
+        "blend": "add",
+        "light": {"intensity": 14, "range": 9, "max": 1, "color": [1, 0.75, 0.4]}
+      }
+    },
+    {
+      "name": "sparks",
+      "space": "world",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": [4, 7]}]},
+      "init": {
+        "life": [0.1, 0.25],
+        "speed": [6, 14],
+        "direction": [0, 0, -1],
+        "spread": 22,
+        "size": [0.02, 0.035],
+        "color": [1, 0.8, 0.4, 1]
+      },
+      "update": {"gravity": [0, -9.8, 0], "drag": 1.2},
+      "curves": {"alpha": [[0, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "add"}
+    },
+    {
+      "name": "smoke",
+      "space": "world",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": [2, 3]}]},
+      "init": {
+        "life": [0.5, 0.9],
+        "speed": [0.4, 1.2],
+        "direction": [0, 0, -1],
+        "spread": 25,
+        "size": [0.05, 0.08],
+        "color": [0.55, 0.55, 0.55, 0.6]
+      },
+      "update": {"gravity": [0, 0.3, 0], "drag": 1.4},
+      "curves": {"size": [[0, 1], [1, 3.5]], "alpha": [[0, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "alpha"}
+    },
+    {
+      "name": "casing",
+      "space": "world",
+      "loop": false,
+      "delay": 0.02,
+      "spawn": {"bursts": [{"time": 0, "count": 1}]},
+      "init": {
+        "life": [1.2, 2.0],
+        "speed": [2.0, 3.2],
+        "direction": [1, 0.7, 0.2],
+        "spread": 16,
+        "size": 0.035,
+        "spin": [-900, 900],
+        "color": [0.95, 0.72, 0.25, 1]
+      },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "drag": 0.1,
+        "collide": {
+          "mode": "bounce",
+          "bounce": 0.3,
+          "friction": 0.5,
+          "world": true,
+          "planes": [{"normal": [0, 1, 0], "d": 0, "relative": true}]
+        }
+      },
+      "curves": {"alpha": [[0, 1], [0.85, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube"}
+    }
+  ]
+}

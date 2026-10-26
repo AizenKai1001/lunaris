@@ -387,3 +387,57 @@ fn the_bar_components_are_registered_with_their_documentation() {
     }
     let _ = UiScrollBar::default();
 }
+
+#[test]
+fn the_shared_hidden_set_is_always_the_one_made_from_scratch_whatever_changes() {
+    use crate::ui_kit3::{hidden_compute, hidden_set_shared};
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+    let mut s = Sim::new(1);
+    // two groups, ten children, a grandchild each, and an element with no parent
+    spawn(&mut s, 1, r#"{"Ui":{},"UiGroup":{"shown":true}}"#);
+    spawn(&mut s, 2, r#"{"Ui":{},"UiGroup":{"shown":true}}"#);
+    for k in 0..10u64 {
+        spawn(&mut s, 10 + k, &format!(r#"{{"Ui":{{}},"Parent":{{"target":{}}}}}"#, 1 + k % 2));
+        spawn(&mut s, 30 + k, &format!(r#"{{"Ui":{{}},"Parent":{{"target":{}}}}}"#, 10 + k));
+    }
+    spawn(&mut s, 50, r#"{"Ui":{}}"#);
+    let check = |s: &mut Sim, what: &str| {
+        let shared = hidden_set_shared(&mut s.world);
+        let mut off = BTreeSet::new();
+        let _ = s.world.for_each_uid::<(&components::UiGroup,), _>(|_, uid, (g,)| {
+            if !g.shown {
+                off.insert(uid);
+            }
+        });
+        assert_eq!(*shared, hidden_compute(&mut s.world, off), "{what}");
+        shared
+    };
+    let set = |s: &mut Sim, uid: u64, component: &str, json: &str| s.apply(&Command::Set { uid, component: component.into(), value: parse(json).unwrap() }).unwrap();
+    assert!(check(&mut s, "all shown").is_empty());
+    set(&mut s, 1, "UiGroup", r#"{"shown":false}"#);
+    let a = check(&mut s, "group 1 off");
+    assert!(a.contains(&1) && a.contains(&10) && a.contains(&30) && !a.contains(&11) && !a.contains(&50));
+    // nothing changed: the same set, not a new one
+    assert!(Arc::ptr_eq(&a, &check(&mut s, "again")));
+    set(&mut s, 2, "UiGroup", r#"{"shown":false}"#);
+    check(&mut s, "both off");
+    // an element moves under the other group, one under the loose element, a parent goes away, another comes
+    set(&mut s, 12, "Parent", r#"{"target":2}"#);
+    check(&mut s, "12 under group 2");
+    set(&mut s, 13, "Parent", r#"{"target":50}"#);
+    check(&mut s, "13 under the loose element");
+    set(&mut s, 1, "UiGroup", r#"{"shown":true}"#);
+    let b = check(&mut s, "group 1 back");
+    assert!(!b.contains(&10) && b.contains(&11) && b.contains(&31) && !b.contains(&33), "{b:?}");
+    s.apply(&Command::Despawn { uid: 11 }).unwrap();
+    check(&mut s, "a child despawned");
+    set(&mut s, 50, "Ui", r#"{}"#);
+    spawn(&mut s, 60, r#"{"Ui":{},"Parent":{"target":50}}"#);
+    check(&mut s, "a child of the loose element");
+    s.apply(&Command::Add { uid: 50, component: "Parent".into(), value: parse(r#"{"target":2}"#).unwrap() }).unwrap();
+    let c = check(&mut s, "the loose element under group 2");
+    assert!(c.contains(&50) && c.contains(&60) && c.contains(&13) && c.contains(&33), "{c:?}");
+    set(&mut s, 2, "UiGroup", r#"{"shown":true}"#);
+    assert!(check(&mut s, "everything shown again").is_empty());
+}

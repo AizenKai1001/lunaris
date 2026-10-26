@@ -847,13 +847,38 @@ impl<'a> Parser<'a> {
             }
             let (name, nr) = self.expect_ident("a field name")?;
             self.expect_punct(":", "after the field name")?;
-            let e = self.expr()?;
-            self.spans.add(format!("{path}.{name}"), nr);
-            e.record(&format!("{path}.{name}"), &mut self.spans);
+            let (json, span) = if self.is_punct("[") {
+                // an array of values, `normal: [0, 1, 0]` (the `with` of spawn_prefab sets array fields this way)
+                let open = self.expect_punct("[", "to start the array")?;
+                let mut items = Vec::new();
+                loop {
+                    if self.is_punct("]") {
+                        break;
+                    }
+                    let e = self.expr()?;
+                    e.record(&format!("{path}.{name}[{}]", items.len()), &mut self.spans);
+                    items.push(e.json);
+                    if self.is_punct(",") {
+                        self.pos += 1;
+                    } else if !self.is_punct("]") {
+                        let r = self.here();
+                        let found = self.describe();
+                        return self.fail(r, format!("expected `,` or `]` after the value, found {found}"));
+                    }
+                }
+                let close = self.expect_punct("]", "to close the array")?;
+                self.spans.add(format!("{path}.{name}"), nr);
+                (Json::Arr(items), open.start..close.end)
+            } else {
+                let e = self.expr()?;
+                self.spans.add(format!("{path}.{name}"), nr);
+                e.record(&format!("{path}.{name}"), &mut self.spans);
+                (e.json, e.span.clone())
+            };
             if fields.iter().any(|(k, _)| *k == name) {
-                return self.fail(e.span.clone(), format!("`{name}` is given twice"));
+                return self.fail(span, format!("`{name}` is given twice"));
             }
-            fields.push((name, e.json));
+            fields.push((name, json));
             if self.is_punct(",") {
                 self.pos += 1;
             } else if !self.is_punct("}") {

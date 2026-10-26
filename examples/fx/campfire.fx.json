@@ -1,0 +1,42 @@
+{
+  "name": "campfire",
+  "bounds": 5,
+  "budget": 900,
+  "lod": { "near": 25, "far": 70 },
+  "emitters": [
+    {
+      "name": "flames",
+      "space": "local",
+      "max": 220,
+      "spawn": { "rate": 70, "shape": { "type": "disc", "radius": 0.22 } },
+      "init": { "life": [0.5, 0.9], "speed": [0.5, 1.1], "direction": [0, 1, 0], "spread": 10, "size": [0.28, 0.5], "rotation": [0, 360], "spin": [-40, 40], "color": [1, 0.62, 0.2, 1] },
+      "update": { "gravity": [0, 1.2, 0], "drag": 0.8, "noise": { "strength": 2.2, "scale": 0.45, "speed": 0.8 } },
+      "curves": {
+        "size": [[0, 0.55], [0.25, 1], [1, 0.1]],
+        "alpha": [[0, 0], [0.12, 0.9], [0.6, 0.5], [1, 0]],
+        "color": [[0, [1, 0.95, 0.7, 1]], [0.4, [1, 0.55, 0.15, 1]], [1, [0.5, 0.08, 0.02, 1]]]
+      },
+      "render": { "texture": "soft", "blend": "add", "soft": 0.25, "light": { "intensity": 3.5, "range": 9, "max": 2 } }
+    },
+    {
+      "name": "embers",
+      "space": "world",
+      "max": 120,
+      "spawn": { "rate": 9, "shape": { "type": "disc", "radius": 0.25 } },
+      "init": { "life": [1.2, 2.6], "speed": [0.6, 1.6], "spread": 28, "size": [0.02, 0.045], "color": [1, 0.7, 0.25, 1], "inherit_velocity": 0.3 },
+      "update": { "gravity": [0, 0.5, 0], "drag": 0.2, "noise": { "strength": 2.5, "scale": 0.7, "speed": 0.6 } },
+      "curves": { "alpha": [[0, 1], [0.7, 0.9], [1, 0]], "size": [[0, 1], [1, 0.3]] },
+      "render": { "texture": "circle", "blend": "add", "facing": "velocity", "stretch": 0.05 }
+    },
+    {
+      "name": "smoke",
+      "space": "world",
+      "max": 120,
+      "spawn": { "rate": 8, "shape": { "type": "disc", "radius": 0.2 } },
+      "init": { "life": [2.5, 4], "speed": [0.3, 0.7], "spread": 12, "size": [0.5, 0.8], "spin": [-20, 20], "color": [0.22, 0.22, 0.24, 0.4], "inherit_velocity": 0.5 },
+      "update": { "gravity": [0, 0.45, 0], "drag": 0.4, "wind": [0.2, 0, 0], "noise": { "strength": 0.9, "scale": 1.2, "speed": 0.3 } },
+      "curves": { "size": [[0, 0.5], [1, 2.6]], "alpha": [[0, 0], [0.15, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "alpha", "soft": 0.5, "sort": true }
+    }
+  ]
+}

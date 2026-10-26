@@ -70,11 +70,14 @@ pub fn actions(world: &mut World) {
     let Some((_, map)) = maps.into_iter().min_by_key(|m| m.0) else { return };
     let text = world.strings().get(map.bindings.0).to_string();
     let Ok((list, dead)) = parse_actions(&text) else { return };
+    // while a text field has the focus the keys are its: every action reads 0 (a letter typed in a chat box must not reload, drop or build), and the ones that were held are released
+    // (the same while a `KeyBind` button waits for the key that will be its own: `rebind.rs`)
+    let typing = crate::ui_kit::has_focused_input(world) || crate::rebind::blocking(world);
     for (name, terms) in list {
         let terms: Vec<Term> = terms.into_iter().map(|(resource, scale)| Term { resource, scale }).collect();
         let mut v = 0.0;
         for t in &terms {
-            let raw = world.resource(&t.resource).unwrap_or(0.0) * t.scale;
+            let raw = if typing { 0.0 } else { world.resource(&t.resource).unwrap_or(0.0) * t.scale };
             if raw.abs() >= dead {
                 v += raw;
             }
@@ -867,6 +870,79 @@ fn timelines(world: &mut World, dt: f32, events: &mut Vec<(String, u64, Option<V
     }
 }
 
+/// How long a timeline is: the end of its last step (the end of a ramp counts, not its start).
+pub fn timeline_length(entries: &[Entry]) -> f32 {
+    entries
+        .iter()
+        .map(|x| match &x.step {
+            Step::Ramp { dur, .. } => x.at + dur,
+            _ => x.at,
+        })
+        .fold(0.0f32, f32::max)
+}
+
+/// Put the `Timeline` of `e` at `time` seconds (clamped to its length) for a preview: every number a ramp or a `set` of the timeline moves gets the value it would have
+/// at that time, and the timeline's clock reads `time`. Events, resources and `+=` steps are not run (they cannot be undone by going back); a number whose first step is
+/// still ahead is put at that step's starting value when the step is a ramp (and left alone when it is a `set`). Returns how many numbers were written and the length.
+pub fn seek_timeline(world: &mut World, e: Entity, time: f32) -> Result<(usize, f32), String> {
+    let tl = *world.get::<Timeline>(e).ok_or("the entity has no Timeline")?;
+    let text = world.strings().get(tl.script.0).to_string();
+    let entries = parse_timeline(&text)?;
+    let length = timeline_length(&entries);
+    let t = if time.is_finite() { time.clamp(0.0, length) } else { 0.0 };
+    // the value of every path at `t`: the last step that has begun decides, a ramp by its progress
+    let mut paths: Vec<String> = Vec::new();
+    for x in &entries {
+        let p = match &x.step {
+            Step::Ramp { path, .. } => Some(path.clone()),
+            Step::Do(Action::Field { path, add: false, .. }) => Some(path.clone()),
+            _ => None,
+        };
+        if let Some(p) = p {
+            if !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
+    }
+    let mut written = 0;
+    for path in paths {
+        let mut steps: Vec<&Entry> = entries
+            .iter()
+            .filter(|x| match &x.step {
+                Step::Ramp { path: p, .. } => *p == path,
+                Step::Do(Action::Field { path: p, add: false, .. }) => *p == path,
+                _ => false,
+            })
+            .collect();
+        steps.sort_by(|a, b| a.at.total_cmp(&b.at));
+        let value = match steps.iter().rev().find(|x| x.at <= t) {
+            Some(x) => match &x.step {
+                Step::Ramp { from, to, dur, ease: kind, .. } => {
+                    let p = if *dur > 0.0 { ((t - x.at) / dur).clamp(0.0, 1.0) } else { 1.0 };
+                    Some(from + (to - from) * ease(*kind, p))
+                }
+                Step::Do(Action::Field { value, .. }) => Some(*value as f32),
+                _ => None,
+            },
+            // nothing of this path has begun: its first ramp's starting value (a `set` has none to go back to)
+            None => steps.first().and_then(|x| match &x.step {
+                Step::Ramp { from, .. } => Some(*from),
+                _ => None,
+            }),
+        };
+        if let (Some(v), Ok(slot)) = (value, fieldio::slot(world, &path)) {
+            if fieldio::write(world, e, &slot, v as f64) {
+                written += 1;
+            }
+        }
+    }
+    if let Some(w) = world.get_mut::<Timeline>(e) {
+        w.time = t;
+        w.done = false;
+    }
+    Ok((written, length))
+}
+
 // ================================================================================================================ tweens
 
 /// The eased value of progress `p` (0 to 1) for each `Tween.ease` number.
@@ -1041,21 +1117,95 @@ fn shake_noise(uid: u64, axis: u64, tick: u64, dt: f32) -> f32 {
     (a + (b - a) * s) * 2.0 - 1.0
 }
 
+/// A target that moves faster than this (m/s, measured over a tick) was put somewhere else (a teleport): the pivot goes with it instead of flying after it.
+const PIVOT_TELEPORT_SPEED: f32 = 90.0;
+/// The time (s) over which the target's velocity is smoothed for the pivot's look-ahead: one stray tick of movement (a step up, a pushed-out contact) does not kick the spring.
+const PIVOT_LEAD_SMOOTH: f64 = 0.1;
+
+/// A critically damped spring (the closed form `x(t) = ((v + w x) t + x) e^-wt`), `x` the position relative to where it rests: the position and the velocity after `dt`. Exact for any `dt` and never overshoots.
+fn spring_critical(x: f32, v: f32, w: f32, dt: f32) -> (f32, f32) {
+    let e = detmath::exp(-(w as f64) * dt as f64) as f32;
+    let c = v + w * x;
+    ((x + c * dt) * e, (v - c * w * dt) * e)
+}
+
+/// `CameraRig.lag`: moves the rig's pivot one tick towards its target, as a critically damped spring on each axis (stiffer sideways than up, so a jump or a fall is followed softly and stairs do not shake the picture),
+/// aimed `lead` seconds of the target's velocity ahead; the farthest it may fall behind (`lag_max`, `lag_max_up`) is kept by clamping.
+fn follow_pivot(rig: &mut CameraRig, target: V3, dt: f32) {
+    let dtd = dt.max(1.0e-6);
+    let step = sub(target, rig.pivot_from);
+    let speed = (step[0] * step[0] + step[1] * step[1] + step[2] * step[2]).sqrt() / dtd;
+    if !rig.pivot_on || !(speed <= PIVOT_TELEPORT_SPEED) || !rig.pivot.iter().chain(rig.pivot_vel.iter()).all(|v| v.is_finite()) {
+        rig.pivot = target;
+        rig.pivot_vel = [0.0; 3];
+        rig.pivot_lead = [0.0; 3];
+        rig.pivot_from = target;
+        rig.pivot_on = true;
+        return;
+    }
+    let a = 1.0 - detmath::exp(-(dt as f64) / PIVOT_LEAD_SMOOTH) as f32;
+    for i in 0..3 {
+        rig.pivot_lead[i] += (step[i] / dtd - rig.pivot_lead[i]) * a;
+    }
+    rig.pivot_from = target;
+    let wh = rig.lag;
+    let wv = if rig.lag_up > 0.0 { rig.lag_up } else { rig.lag };
+    let lead = rig.lead.max(0.0);
+    for i in 0..3 {
+        let (w, ahead) = if i == 1 { (wv, 0.0) } else { (wh, rig.pivot_lead[i] * lead) };
+        let rest = target[i] + ahead;
+        let (x, v) = spring_critical(rig.pivot[i] - rest, rig.pivot_vel[i], w, dt);
+        rig.pivot[i] = rest + x;
+        rig.pivot_vel[i] = v;
+    }
+    if rig.lag_max > 0.0 {
+        let (ex, ez) = (rig.pivot[0] - target[0], rig.pivot[2] - target[2]);
+        let d = (ex * ex + ez * ez).sqrt();
+        if d > rig.lag_max {
+            let (nx, nz) = (ex / d, ez / d);
+            rig.pivot[0] = target[0] + nx * rig.lag_max;
+            rig.pivot[2] = target[2] + nz * rig.lag_max;
+            let out = rig.pivot_vel[0] * nx + rig.pivot_vel[2] * nz;
+            if out > 0.0 {
+                rig.pivot_vel[0] -= out * nx;
+                rig.pivot_vel[2] -= out * nz;
+            }
+        }
+    }
+    let up = if rig.lag_max_up > 0.0 { rig.lag_max_up } else { rig.lag_max };
+    if up > 0.0 {
+        let e = rig.pivot[1] - target[1];
+        if e.abs() > up {
+            rig.pivot[1] = target[1] + up * e.signum();
+            if rig.pivot_vel[1] * e > 0.0 {
+                rig.pivot_vel[1] = 0.0;
+            }
+        }
+    }
+}
+
 fn camera_rigs(world: &mut World, tick: u64, dt: f32) {
     let mut list: Vec<(u64, Entity, CameraRig, Transform)> = Vec::new();
     let _ = world.for_each_uid::<(&CameraRig, &Transform), _>(|e, uid, (r, t)| list.push((uid, e, *r, *t)));
     list.sort_by_key(|l| l.0);
-    for (uid, e, rig, t) in list {
+    for (uid, e, mut rig, t) in list {
         let Some(target) = world.entity(rig.target.0).and_then(|te| world.get::<Transform>(te)).map(|tt| tt.pos) else { continue };
-        let focus = add(target, rig.look_offset);
+        let spring = rig.lag > 0.0 && rig.lag.is_finite();
+        let pivot = if spring {
+            follow_pivot(&mut rig, target, dt);
+            rig.pivot
+        } else {
+            target
+        };
+        let focus = add(pivot, rig.look_offset);
         let desired = if rig.mode == 1 {
             let (yaw, pitch) = (rig.yaw as f64, rig.pitch as f64);
             let (cp, sp, cy, sy) = (detmath::cos(pitch) as f32, detmath::sin(pitch) as f32, detmath::cos(yaw) as f32, detmath::sin(yaw) as f32);
             add(focus, [rig.distance * cp * sy, rig.distance * sp, rig.distance * cp * cy])
         } else {
-            add(target, rig.offset)
+            add(pivot, rig.offset)
         };
-        let base = if rig.follow_speed <= 0.0 || !t.pos.iter().all(|v| v.is_finite()) {
+        let base = if spring || rig.follow_speed <= 0.0 || !t.pos.iter().all(|v| v.is_finite()) {
             desired
         } else {
             let k = 1.0 - detmath::exp(-(rig.follow_speed as f64) * dt as f64) as f32;
@@ -1064,7 +1214,12 @@ fn camera_rigs(world: &mut World, tick: u64, dt: f32) {
         let trauma = (rig.shake - rig.shake_decay.max(0.0) * dt).max(0.0).min(1.0);
         let power = trauma * trauma * rig.shake_amount;
         let jitter = [shake_noise(uid, 0, tick, dt) * power, shake_noise(uid, 1, tick, dt) * power, shake_noise(uid, 2, tick, dt) * power];
-        let rot = if rig.look_at { look_rotation(sub(focus, base)) } else { None };
+        let mut rot = if rig.look_at { look_rotation(sub(focus, base)) } else { None };
+        if rig.roll != 0.0 && rig.roll.is_finite() {
+            let h = rig.roll as f64 * 0.5;
+            let r = [0.0, 0.0, -(detmath::sin(h) as f32), detmath::cos(h) as f32];
+            rot = rot.map(|q| crate::physics_rot::quat_mul(q, r));
+        }
         if let Some(tr) = world.get_mut::<Transform>(e) {
             tr.pos = add(base, jitter);
             if let Some(q) = rot {
@@ -1073,12 +1228,35 @@ fn camera_rigs(world: &mut World, tick: u64, dt: f32) {
         }
         if let Some(r) = world.get_mut::<CameraRig>(e) {
             r.shake = trauma;
+            if spring {
+                (r.pivot, r.pivot_vel, r.pivot_from, r.pivot_lead, r.pivot_on) = (rig.pivot, rig.pivot_vel, rig.pivot_from, rig.pivot_lead, rig.pivot_on);
+            }
         }
     }
 }
 
+/// How far along the line from `from` to `to` is free (bisected to 1/512 of its length), `None` when nothing is in the way.
+fn free_distance(world: &mut World, fields: &Terrains, level: &[crate::meshcol::Instance], hulls: &[crate::meshcol::HullInstance], from: V3, to: V3, skip: [u64; 2]) -> Option<f32> {
+    if !blocked(world, fields, level, hulls, from, to, skip, None) {
+        return None;
+    }
+    let d = sub(to, from);
+    let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+    let dir = [d[0] / len, d[1] / len, d[2] / len];
+    let (mut free, mut hit) = (0.0f32, len);
+    for _ in 0..9 {
+        let mid = 0.5 * (free + hit);
+        if blocked(world, fields, level, hulls, from, add(from, [dir[0] * mid, dir[1] * mid, dir[2] * mid]), skip, None) {
+            hit = mid;
+        } else {
+            free = mid;
+        }
+    }
+    Some(free)
+}
+
 /// `CameraCollide`: a camera that a rig has just placed is pulled in when a wall, a tree, a rock or the ground is between it and what it looks at.
-fn camera_collisions(world: &mut World, fields: &Terrains, meshes: &crate::meshcol::MeshStore) {
+fn camera_collisions(world: &mut World, fields: &Terrains, meshes: &crate::meshcol::MeshStore, dt: f32) {
     let mut list: Vec<(u64, Entity, CameraCollide, CameraRig, Transform)> = Vec::new();
     let _ = world.for_each_uid::<(&CameraCollide, &CameraRig, &Transform), _>(|e, uid, (c, r, t)| list.push((uid, e, *c, *r, *t)));
     if list.is_empty() {
@@ -1096,22 +1274,57 @@ fn camera_collisions(world: &mut World, fields: &Terrains, meshes: &crate::meshc
             continue;
         }
         let skip = [rig.target.0, uid];
-        if !blocked(world, fields, &level, &hulls, focus, t.pos, skip, None) {
-            continue;
-        }
         let dir = [d[0] / len, d[1] / len, d[2] / len];
-        let (mut free, mut hit) = (0.0f32, len);
-        for _ in 0..9 {
-            let mid = 0.5 * (free + hit);
-            if blocked(world, fields, &level, &hulls, focus, add(focus, [dir[0] * mid, dir[1] * mid, dir[2] * mid]), skip, None) {
-                hit = mid;
-            } else {
-                free = mid;
+        // how far the camera may be: all the way, or in front of what is in the way
+        let mut limit = match free_distance(world, fields, &level, &hulls, focus, t.pos, skip) {
+            Some(free) => (free - cc.radius.max(0.0)).max(cc.min_distance.max(0.0)).min(len),
+            None => len,
+        };
+        // the whiskers: lines to the sides, above and below the camera's place; what they hit pulls the camera in a little early
+        if cc.whisker > 0.0 && cc.whisker.is_finite() {
+            let h = (dir[0] * dir[0] + dir[2] * dir[2]).sqrt();
+            if h > 1.0e-4 {
+                let right = [dir[2] / h, 0.0, -dir[0] / h];
+                let up = [dir[1] * right[2] - dir[2] * right[1], dir[2] * right[0] - dir[0] * right[2], dir[0] * right[1] - dir[1] * right[0]];
+                for off in [right, [-right[0], -right[1], -right[2]], up, [-up[0], -up[1], -up[2]]] {
+                    let end = add(t.pos, [off[0] * cc.whisker, off[1] * cc.whisker, off[2] * cc.whisker]);
+                    if let Some(free) = free_distance(world, fields, &level, &hulls, focus, end, skip) {
+                        let pull = (free - cc.radius.max(0.0)).max(cc.min_distance.max(0.0)) + cc.whisker;
+                        limit = limit.min(pull);
+                    }
+                }
             }
         }
-        let keep = (free - cc.radius.max(0.0)).max(cc.min_distance.max(0.0)).min(len);
-        if let Some(tr) = world.get_mut::<Transform>(e) {
-            tr.pos = add(focus, [dir[0] * keep, dir[1] * keep, dir[2] * keep]);
+        // pulled in at once, let out at `recover` per second (the distance it is held at is kept in `held`; 0 when it is free)
+        let easing = (cc.recover > 0.0 && cc.recover.is_finite()) || (cc.pull_in > 0.0 && cc.pull_in.is_finite());
+        let keep = if easing {
+            let held = if cc.held > 0.0 && cc.held.is_finite() { cc.held } else { len };
+            let eased = if limit < held {
+                if cc.pull_in > 0.0 {
+                    // (never deeper into the margin of the wall than 0.7 of it: the ease rounds off a small step, a big one is taken at once)
+                    let soft = held + (limit - held) * (1.0 - detmath::exp(-(cc.pull_in as f64) * dt as f64) as f32);
+                    soft.min(limit + 0.7 * cc.radius.max(0.0))
+                } else {
+                    limit
+                }
+            } else if cc.recover > 0.0 {
+                held + (limit - held) * (1.0 - detmath::exp(-(cc.recover as f64) * dt as f64) as f32)
+            } else {
+                limit
+            };
+            eased.min(len)
+        } else {
+            limit
+        };
+        if easing {
+            if let Some(c) = world.get_mut::<CameraCollide>(e) {
+                c.held = if keep < len - 1.0e-3 { keep } else { 0.0 };
+            }
+        }
+        if keep < len {
+            if let Some(tr) = world.get_mut::<Transform>(e) {
+                tr.pos = add(focus, [dir[0] * keep, dir[1] * keep, dir[2] * keep]);
+            }
         }
     }
 }
@@ -1257,26 +1470,59 @@ fn sensors(world: &mut World, fields: &Terrains, meshes: &crate::meshcol::MeshSt
 
 // ================================================================================================================ lifetimes, spawners
 
-/// Remove these entities and everything attached to them by `Parent`, children before parents, in uid order.
-fn despawn_trees(world: &mut World, roots: Vec<u64>) {
+/// A hasher for sets of uids (which are already well spread): one multiplication.
+#[derive(Default, Clone, Copy)]
+struct UidHash(u64);
+
+impl std::hash::Hasher for UidHash {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.write_u64(*b as u64);
+        }
+    }
+    fn write_u64(&mut self, v: u64) {
+        self.0 = v.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
+/// The roots and everything attached to them by `Parent`, children and all, in uid order. One pass over the world's `Parent`s collects the (child, parent) pairs; the tree is then found by passes over that list (a tree is
+/// a few levels deep: each pass takes the children of what is doomed already and drops those pairs). This used to build a map of every child of every parent in the world on each call, which in a city with tens of
+/// thousands of attached parts cost milliseconds, and the lifetimes, explosions, the director and the streaming of cells call it often.
+pub fn doomed_trees(world: &mut World, roots: Vec<u64>) -> Vec<u64> {
+    let mut doomed: std::collections::HashSet<u64, std::hash::BuildHasherDefault<UidHash>> = roots.into_iter().collect();
+    if doomed.is_empty() {
+        return Vec::new();
+    }
+    let mut pairs: Vec<(u64, u64)> = Vec::new();
+    let _ = world.for_each_uid::<(&Parent,), _>(|_, uid, (p,)| pairs.push((uid, p.target.0)));
+    loop {
+        let before = doomed.len();
+        pairs.retain(|&(child, parent)| {
+            if doomed.contains(&parent) {
+                doomed.insert(child);
+                false
+            } else {
+                true
+            }
+        });
+        if doomed.len() == before {
+            break;
+        }
+    }
+    let mut order: Vec<u64> = doomed.into_iter().collect();
+    order.sort_unstable();
+    order
+}
+
+/// Remove these entities and everything attached to them by `Parent`, in uid order.
+pub fn despawn_trees(world: &mut World, roots: Vec<u64>) {
     if roots.is_empty() {
         return;
     }
-    let mut children: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
-    let _ = world.for_each_uid::<(&Parent,), _>(|_, uid, (p,)| children.entry(p.target.0).or_default().push(uid));
-    let mut doomed: Vec<u64> = Vec::new();
-    let mut stack = roots;
-    while let Some(u) = stack.pop() {
-        if doomed.contains(&u) {
-            continue;
-        }
-        doomed.push(u);
-        if let Some(kids) = children.get(&u) {
-            stack.extend(kids.iter().copied());
-        }
-    }
-    doomed.sort_unstable();
-    for u in doomed {
+    for u in doomed_trees(world, roots) {
         if let Some(e) = world.entity(u) {
             world.despawn(e);
         }
@@ -1328,49 +1574,365 @@ fn health(world: &mut World, dt: f32, events: &mut Vec<(String, u64, Option<V3>)
     }
 }
 
-/// Load and unload `StreamZone`s by the distance of their target.
-fn streaming(world: &mut World, scripts: &mut ScriptSet) {
-    let mut zones: Vec<(u64, Entity, StreamZone, Transform)> = Vec::new();
-    let _ = world.for_each_uid::<(&StreamZone, &Transform), _>(|e, uid, (z, t)| zones.push((uid, e, *z, *t)));
-    if zones.is_empty() {
+/// Expand the prefab `name`: one the world defines, or (for a name the world does not know) one the procedural provider makes (`procgen`, a transient definition: nothing is stored).
+fn plan_prefab(scripts: &ScriptSet, name: &str, overrides: &[(String, lunaris_json::Json)]) -> Option<Vec<crate::prefab::Planned>> {
+    if scripts.prefabs.contains_key(name) {
+        return crate::prefab::plan(&scripts.prefabs, name, overrides).ok();
+    }
+    let text = crate::procgen::provider()?.prefab(name)?;
+    let def = lunaris_json::parse(&text).ok()?;
+    let mut one = crate::prefab::Prefabs::new();
+    one.insert(name.to_string(), def);
+    crate::prefab::plan(&one, name, overrides).ok()
+}
+
+/// Spawn one entity made of the given components (a transient prefab) and return its uid.
+fn spawn_transient(world: &mut World, scripts: &mut ScriptSet, components: lunaris_json::Json) -> Option<u64> {
+    let def = lunaris_json::Json::obj([("components", components)]);
+    let mut one = crate::prefab::Prefabs::new();
+    one.insert("zone".to_string(), def);
+    let plan = crate::prefab::plan(&one, "zone", &[]).ok()?;
+    let base = world.next_uid();
+    let cmds = crate::prefab::spawn_commands(&plan, base);
+    crate::command::apply_batch(world, scripts, &cmds).ok()?;
+    world.entity(base).map(|_| base)
+}
+
+/// As [`spawn_transient`], for several entities: one batch, so that the world's hierarchy is worked out once (`apply_batch` ends with a pass over every attached entity) and not after each of them: a cell of a city has a
+/// hundred zones, which cost a hundred of those passes, ten milliseconds in a tick. The entities get the uids they would get one after the other.
+fn spawn_transients(world: &mut World, scripts: &mut ScriptSet, list: Vec<lunaris_json::Json>) -> Vec<Option<u64>> {
+    let base = world.next_uid();
+    let mut cmds = Vec::new();
+    let mut uids: Vec<Option<u64>> = Vec::new();
+    for components in &list {
+        let def = lunaris_json::Json::obj([("components", components.clone())]);
+        let mut one = crate::prefab::Prefabs::new();
+        one.insert("zone".to_string(), def);
+        match crate::prefab::plan(&one, "zone", &[]) {
+            Ok(plan) => {
+                let b = base + cmds.len() as u64;
+                uids.push(Some(b));
+                cmds.extend(crate::prefab::spawn_commands(&plan, b));
+            }
+            Err(_) => uids.push(None),
+        }
+    }
+    if crate::command::apply_batch(world, scripts, &cmds).is_err() {
+        // (a batch that fails is undone whole: do them one at a time, as it was)
+        return list.into_iter().map(|c| spawn_transient(world, scripts, c)).collect();
+    }
+    uids.into_iter().map(|u| u.and_then(|b| world.entity(b).map(|_| b))).collect()
+}
+
+/// Keep the `StreamZone`s of the cells near the camera that a procedural provider makes for each `ProcGrid` (`procgen`): the cells within `radius` get their zones, a few a tick and the nearest first, the ones beyond `radius + hysteresis` lose them.
+/// The resource `procgrid.every` (a whole number, 1 or missing: every step) says that the cells are looked at only every that many steps: a server with two hundred players and a city of three grids spends a millisecond a step
+/// on it, and a player does not cross a cell (a hundred metres) in a few steps.
+fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
+    use crate::components::{GridZone, ProcGrid};
+    use lunaris_json::Json;
+    let every = world.resource("procgrid.every").filter(|v| v.is_finite() && *v >= 1.0).map_or(1, |v| v as u64);
+    if every > 1 && tick % every != 0 {
         return;
     }
-    zones.sort_by_key(|z| z.0);
-    // the active camera (the lowest uid among the active ones) for zones that do not name a target
+    let mut grids: Vec<(u64, ProcGrid)> = Vec::new();
+    let _ = world.for_each_uid::<(&ProcGrid,), _>(|_, uid, (g,)| grids.push((uid, *g)));
+    if grids.is_empty() {
+        return;
+    }
+    let Some(provider) = crate::procgen::provider() else { return };
+    grids.sort_by_key(|g| g.0);
+    let anchors = stream_anchors(world);
+    if anchors.is_empty() {
+        return;
+    }
+    // the zones that exist, by grid and cell
+    let mut present: BTreeMap<(u64, i32, i32), Vec<(u64, Entity)>> = BTreeMap::new();
+    let _ = world.for_each_uid::<(&GridZone,), _>(|e, uid, (z,)| present.entry((z.grid.0, z.i as i32, z.j as i32)).or_default().push((uid, e)));
+    for (guid, g) in grids {
+        let name = world.strings().get(g.grid.0).to_string();
+        let (cell, r, hy) = (g.cell.max(10.0), g.radius.max(1.0), g.hysteresis.max(0.0));
+        let centre = |i: i32, j: i32| ((i as f32 + 0.5) * cell, (j as f32 + 0.5) * cell);
+        // (the distance of a cell from an anchor)
+        let from = |i: i32, j: i32, c: &V3| {
+            let (x, z) = centre(i, j);
+            ((x - c[0]).powi(2) + (z - c[2]).powi(2)).sqrt()
+        };
+        let in_map = |i: i32, j: i32| {
+            let (x, z) = centre(i, j);
+            g.extent <= 0.0 || (x.abs() <= g.extent && z.abs() <= g.extent)
+        };
+        // the cells to drop: beyond the radius and its margin of every anchor (the first anchor that is near enough keeps a cell: with hundreds of players most cells are kept by one of the first few)
+        let mut gone: Vec<(i32, i32)> = present.keys().filter(|k| k.0 == guid && !anchors.iter().any(|c| from(k.1, k.2, c) <= r + hy)).map(|k| (k.1, k.2)).collect();
+        gone.sort_unstable();
+        if !gone.is_empty() {
+            let mut zone_uids: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+            let mut ents: Vec<Entity> = Vec::new();
+            for (i, j) in &gone {
+                for (uid, e) in present.remove(&(guid, *i, *j)).unwrap_or_default() {
+                    zone_uids.insert(uid);
+                    ents.push(e);
+                }
+            }
+            let mut roots: Vec<u64> = Vec::new();
+            let _ = world.for_each_uid::<(&crate::components::SpawnedBy,), _>(|_, ruid, (b,)| {
+                if zone_uids.contains(&b.spawner.0) {
+                    roots.push(ruid);
+                }
+            });
+            despawn_trees(world, roots);
+            for e in ents {
+                world.despawn(e);
+            }
+        }
+        // the cells to make: within the radius, none yet, nearest first, a few a tick
+        // (the nearest anchor of each cell that some anchor is within `radius` of: found by walking the cells round each anchor, not by measuring every cell against every anchor)
+        let mut nearest: std::collections::HashMap<(i32, i32), f32> = std::collections::HashMap::new();
+        for c in &anchors {
+            let (i0, i1) = (((c[0] - r) / cell).floor() as i32, ((c[0] + r) / cell).floor() as i32);
+            let (j0, j1) = (((c[2] - r) / cell).floor() as i32, ((c[2] + r) / cell).floor() as i32);
+            for j in j0..=j1 {
+                for i in i0..=i1 {
+                    let d = from(i, j, c);
+                    if d <= r {
+                        let e = nearest.entry((i, j)).or_insert(f32::INFINITY);
+                        *e = e.min(d);
+                    }
+                }
+            }
+        }
+        let mut want: Vec<(f32, i32, i32)> = nearest.into_iter().filter(|&((i, j), _)| in_map(i, j) && !present.contains_key(&(guid, i, j))).map(|((i, j), d)| (d, i, j)).collect();
+        want.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+        let n = |v: f32| Json::Float(v as f64);
+        // the zones of the cells to make, spawned in one batch (see `spawn_transients`): per cell its place, how many entities it has and whether the one entity is its marker
+        let mut cells: Vec<(i32, i32, usize, bool)> = Vec::new();
+        let mut all: Vec<Json> = Vec::new();
+        let marker = |i: i32, j: i32| Json::obj([("grid", Json::from(guid as i64)), ("i", Json::Float(i as f64)), ("j", Json::Float(j as f64))]);
+        for (_, i, j) in want.into_iter().take(g.per_tick.max(1) as usize) {
+            let zones = provider.zones(&name, i, j);
+            // a cell with no zones at all is remembered too, by a marker entity, so that it is not asked for again every tick
+            if zones.is_empty() {
+                all.push(Json::obj([("GridZone", marker(i, j))]));
+                cells.push((i, j, 1, true));
+                continue;
+            }
+            cells.push((i, j, zones.len(), false));
+            for z in zones {
+                all.push(Json::obj([
+                    ("Name", Json::obj([("value", Json::str(z.name.clone()))])),
+                    ("Transform", Json::obj([("pos", Json::arr(z.pos.map(n)))])),
+                    (
+                        "StreamZone",
+                        Json::obj([
+                            ("prefab", Json::str(z.prefab.clone())),
+                            ("radius", n(z.radius)),
+                            ("min_radius", n(z.min_radius)),
+                            ("hysteresis", n(z.hysteresis)),
+                            ("prefetch", n(z.prefetch)),
+                            ("vertical", n(z.vertical)),
+                            ("assets", Json::str(z.assets.clone())),
+                        ]),
+                    ),
+                    ("GridZone", marker(i, j)),
+                ]));
+            }
+        }
+        if cells.is_empty() {
+            continue;
+        }
+        let mut uids = spawn_transients(world, scripts, all).into_iter();
+        for (i, j, count, is_marker) in cells {
+            let mut made: Vec<(u64, Entity)> = Vec::new();
+            for _ in 0..count {
+                if let Some(uid) = uids.next().flatten() {
+                    if let Some(e) = world.entity(uid) {
+                        made.push((uid, e));
+                    }
+                }
+            }
+            // (zones that could not be made leave the cell marked all the same)
+            if made.is_empty() && !is_marker {
+                if let Some(uid) = spawn_transient(world, scripts, Json::obj([("GridZone", marker(i, j))])) {
+                    if let Some(e) = world.entity(uid) {
+                        made.push((uid, e));
+                    }
+                }
+            }
+            present.insert((guid, i, j), made);
+        }
+    }
+}
+
+/// The places streaming works from (`StreamAnchor`): the active camera (the lowest uid among the active ones) and every entity that has a `StreamAnchor` that is on, in the order of their uids.
+fn stream_anchors(world: &mut World) -> Vec<V3> {
     let mut cam: Option<(u64, V3)> = None;
     let _ = world.for_each_uid::<(&crate::components::Camera, &Transform), _>(|_, uid, (c, t)| {
         if c.active && cam.is_none_or(|b| uid < b.0) {
             cam = Some((uid, t.pos));
         }
     });
-    for (uid, e, z, t) in zones {
-        let target = if z.target.0 != 0 { world.entity(z.target.0).and_then(|te| world.get::<Transform>(te)).map(|tt| tt.pos) } else { cam.map(|c| c.1) };
-        let Some(tp) = target else { continue };
+    let mut found: Vec<(u64, V3)> = Vec::new();
+    let _ = world.for_each_uid::<(&crate::components::StreamAnchor, &Transform), _>(|_, uid, (a, t)| {
+        if a.on {
+            found.push((uid, t.pos));
+        }
+    });
+    found.sort_by_key(|f| f.0);
+    cam.into_iter().map(|c| c.1).chain(found.into_iter().map(|f| f.1)).collect()
+}
+
+/// Load and unload `StreamZone`s by the distance of their target. The resource `stream.loads_per_tick` (a whole number, 0 or missing: no limit) is how many zones may be loaded in one tick: a world that shows up zone by zone
+/// (a streamed city) spreads the cost of its prefabs over the ticks, the nearest zone first, instead of spending thirty milliseconds of one tick on two of them.
+fn streaming(world: &mut World, scripts: &mut ScriptSet) {
+    // the zones that are loaded as this tick starts (a zone that `requires` another goes by it): a streamed city has tens of thousands of zones and a few hundred of them loaded, so nothing here costs more than one
+    // light pass over all the zones
+    let mut loaded_at_start: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+    let mut any = false;
+    let _ = world.for_each_uid::<(&StreamZone,), _>(|_, uid, (z,)| {
+        any = true;
+        if z.loaded {
+            loaded_at_start.insert(uid);
+        }
+    });
+    if !any {
+        return;
+    }
+    // the places the zones that do not name a target work from: the active camera and every `StreamAnchor`
+    let anchors = stream_anchors(world);
+    let limit = world.resource("stream.loads_per_tick").filter(|v| v.is_finite() && *v >= 1.0).map_or(usize::MAX, |v| v as usize);
+    let required_loaded = |z: &StreamZone| z.requires.0 == 0 || loaded_at_start.contains(&z.requires.0);
+    // what a zone does at a distance from its target: Some(true) loads it, Some(false) unloads it
+    let decide = |z: &StreamZone, dist: f32, dy: f32| -> Option<bool> {
+        let near = z.min_radius.max(0.0);
+        let hy = z.hysteresis.max(0.0);
+        let in_height = z.vertical <= 0.0 || dy <= z.vertical;
+        let keep_height = z.vertical <= 0.0 || dy <= z.vertical + hy;
+        if !z.loaded && dist <= z.radius && dist >= near && in_height && required_loaded(z) {
+            Some(true)
+        } else if z.loaded && (dist > z.radius + hy || (near > 0.0 && dist < near - hy) || !keep_height || !required_loaded(z)) {
+            Some(false)
+        } else {
+            None
+        }
+    };
+    // with many anchors (a server's players) the anchors are kept in squares of 256 m, so that a zone that is not loaded looks only at the anchors that are near enough to want it
+    const SQUARE: f32 = 256.0;
+    let square = |v: f32| (v / SQUARE).floor() as i32;
+    let mut by_square: std::collections::HashMap<(i32, i32), Vec<usize>> = std::collections::HashMap::new();
+    if anchors.len() > 8 {
+        for (n, c) in anchors.iter().enumerate() {
+            by_square.entry((square(c[0]), square(c[2]))).or_default().push(n);
+        }
+    }
+    // the zones with something to do (uid, entity, zone, place, distance, load?), and those that name a target (their distance needs the world)
+    let mut acts: Vec<(u64, Entity, StreamZone, Transform, f32, bool)> = Vec::new();
+    let mut targeted: Vec<(u64, Entity, StreamZone, Transform)> = Vec::new();
+    let mut near_anchors: Vec<usize> = Vec::new();
+    let _ = world.for_each_uid::<(&StreamZone, &Transform), _>(|e, uid, (z, t)| {
+        if z.target.0 != 0 {
+            targeted.push((uid, e, *z, *t));
+        } else if !anchors.is_empty() {
+            let dist_to = |c: &V3| ((c[0] - t.pos[0]).powi(2) + (c[2] - t.pos[2]).powi(2)).sqrt();
+            if z.loaded {
+                // a zone that is loaded goes when every anchor has let it go: the first anchor that keeps it is enough
+                let keep = anchors.iter().any(|c| decide(z, dist_to(c), (c[1] - t.pos[1]).abs()).is_none());
+                if !keep {
+                    acts.push((uid, e, *z, *t, 0.0, false));
+                }
+            } else {
+                // a zone that is not loaded loads when any anchor wants it (the nearest of those orders the loads, when there is a limit); only an anchor within its radius can
+                let r = z.radius.max(0.0);
+                let (s0, s1, t0, t1) = (square(t.pos[0] - r), square(t.pos[0] + r), square(t.pos[2] - r), square(t.pos[2] + r));
+                let window = (s1 - s0 + 1) as i64 * (t1 - t0 + 1) as i64;
+                let mut load_at: Option<f32> = None;
+                let mut consider = |c: &V3| -> bool {
+                    let dist = dist_to(c);
+                    if decide(z, dist, (c[1] - t.pos[1]).abs()) == Some(true) {
+                        load_at = Some(load_at.map_or(dist, |d: f32| d.min(dist)));
+                        return limit == usize::MAX;
+                    }
+                    false
+                };
+                if !by_square.is_empty() && window < anchors.len() as i64 {
+                    near_anchors.clear();
+                    for sj in t0..=t1 {
+                        for si in s0..=s1 {
+                            if let Some(v) = by_square.get(&(si, sj)) {
+                                near_anchors.extend_from_slice(v);
+                            }
+                        }
+                    }
+                    for &n in near_anchors.iter() {
+                        if consider(&anchors[n]) {
+                            break;
+                        }
+                    }
+                } else {
+                    for c in &anchors {
+                        if consider(c) {
+                            break;
+                        }
+                    }
+                }
+                if let Some(d) = load_at {
+                    acts.push((uid, e, *z, *t, d, true));
+                }
+            }
+        }
+    });
+    for (uid, e, z, t) in targeted {
+        let Some(tp) = world.entity(z.target.0).and_then(|te| world.get::<Transform>(te)).map(|tt| tt.pos) else { continue };
         let dist = ((tp[0] - t.pos[0]).powi(2) + (tp[2] - t.pos[2]).powi(2)).sqrt();
-        if !z.loaded && dist <= z.radius {
+        let ty = world.entity(z.target.0).and_then(|te| world.get::<Transform>(te)).map_or(0.0, |tt| tt.pos[1]);
+        if let Some(load) = decide(&z, dist, (ty - t.pos[1]).abs()) {
+            acts.push((uid, e, z, t, dist, load));
+        }
+    }
+    // in the order of the uids, whatever order the storage gave them in
+    acts.sort_by_key(|a| a.0);
+    // the zones to unload go in one go (the things they spawned are found in one pass over the world, not one pass for each zone)
+    let unload: std::collections::BTreeSet<u64> = acts.iter().filter(|a| !a.5).map(|a| a.0).collect();
+    if !unload.is_empty() {
+        let mut roots: Vec<u64> = Vec::new();
+        let _ = world.for_each_uid::<(&crate::components::SpawnedBy,), _>(|_, ruid, (b,)| {
+            if unload.contains(&b.spawner.0) {
+                roots.push(ruid);
+            }
+        });
+        despawn_trees(world, roots);
+        for a in acts.iter().filter(|a| !a.5) {
+            if let Some(w) = world.get_mut::<StreamZone>(a.1) {
+                w.loaded = false;
+            }
+        }
+    }
+    // the zones to load (distance, uid, entity, zone, place), nearest first when there is a limit
+    let mut to_load: Vec<(f32, u64, Entity, StreamZone, Transform)> = acts.into_iter().filter(|a| a.5).map(|a| (a.4, a.0, a.1, a.2, a.3)).collect();
+    if limit != usize::MAX {
+        to_load.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        to_load.truncate(limit);
+    }
+    for (_, uid, e, z, t) in to_load {
+        {
             let name = world.strings().get(z.prefab.0).to_string();
             let num = |v: f32| lunaris_json::Json::Float(v as f64);
             let mut ov: Vec<(String, lunaris_json::Json)> = Vec::new();
             crate::prefab::merge_component(&mut ov, "Transform", &lunaris_json::Json::obj([("pos", lunaris_json::Json::arr(t.pos.map(num))), ("rot", lunaris_json::Json::arr(t.rot.map(num)))]));
             crate::prefab::merge_component(&mut ov, "SpawnedBy", &lunaris_json::Json::obj([("spawner", lunaris_json::Json::from(uid as i64))]));
-            let Ok(plan) = crate::prefab::plan(&scripts.prefabs, &name, &ov) else { continue };
+            let t_plan = std::time::Instant::now();
+            let Some(plan) = plan_prefab(scripts, &name, &ov) else { continue };
+            let plan_ms = t_plan.elapsed().as_secs_f64() * 1e3;
             let base = world.next_uid();
             let cmds = crate::prefab::spawn_commands(&plan, base);
-            if crate::command::apply_batch(world, scripts, &cmds).is_ok() {
+            let t_apply = std::time::Instant::now();
+            let applied = crate::command::apply_batch(world, scripts, &cmds).is_ok();
+            // (`LUNARIS_STREAM_LOG=1` says what each zone load cost: the prefab's planning, and the spawning of its entities)
+            if std::env::var_os("LUNARIS_STREAM_LOG").is_some() {
+                eprintln!("stream: {name}: plan {:.1} ms, spawn {:.1} ms, {} commands", plan_ms, t_apply.elapsed().as_secs_f64() * 1e3, cmds.len());
+            }
+            if applied {
                 if let Some(w) = world.get_mut::<StreamZone>(e) {
                     w.loaded = true;
                 }
-            }
-        } else if z.loaded && dist > z.radius + z.hysteresis.max(0.0) {
-            let mut roots: Vec<u64> = Vec::new();
-            let _ = world.for_each_uid::<(&crate::components::SpawnedBy,), _>(|_, ruid, (b,)| {
-                if b.spawner.0 == uid {
-                    roots.push(ruid);
-                }
-            });
-            despawn_trees(world, roots);
-            if let Some(w) = world.get_mut::<StreamZone>(e) {
-                w.loaded = false;
             }
         }
     }
@@ -1740,6 +2302,9 @@ fn root_motion(world: &mut World) {
     }
 }
 
+/// How many events of one name a tick `EventWatch` tells apart (`event.NAME.0.x` to `event.NAME.3.x`); `event.NAME` counts all of them.
+pub const EVENT_SLOTS: usize = 4;
+
 /// The events of the tick before, as resources, for the names an `EventWatch` asks for.
 pub fn publish_events(world: &mut World, events: &[crate::sim::Event], tick: u64) {
     let mut syms: Vec<u32> = Vec::new();
@@ -1761,6 +2326,19 @@ pub fn publish_events(world: &mut World, events: &[crate::sim::Event], tick: u64
             let p = first.pos.unwrap_or([0.0; 3]);
             for (k, v) in [("x", p[0] as f64), ("y", p[1] as f64), ("z", p[2] as f64), ("uid", first.uid as f64)] {
                 let _ = world.set_resource(&format!("event.{name}.{k}"), Some(v));
+            }
+        }
+        // the first `EVENT_SLOTS` of them one by one, `event.NAME.K.x/.y/.z/.uid`, and how many slots are filled, `event.NAME.n` (it exists from the first event of the name on: a scene that never
+        // has one is unchanged, and from then on it reads 0 in a tick without)
+        let n = recent.len().min(EVENT_SLOTS);
+        let n_name = format!("event.{name}.n");
+        if n > 0 || world.resource(&n_name).is_some() {
+            let _ = world.set_resource(&n_name, Some(n as f64));
+        }
+        for (k, ev) in recent.iter().take(EVENT_SLOTS).enumerate() {
+            let p = ev.pos.unwrap_or([0.0; 3]);
+            for (f, v) in [("x", p[0] as f64), ("y", p[1] as f64), ("z", p[2] as f64), ("uid", ev.uid as f64)] {
+                let _ = world.set_resource(&format!("event.{name}.{k}.{f}"), Some(v));
             }
         }
     }
@@ -1797,36 +2375,90 @@ fn particle_clocks(world: &mut World, dt: f32) {
     });
 }
 
+/// The clock of every `ParticleSystem` (docs/FX.md): what the picture steps the particles up to.
+fn fx_clocks(world: &mut World, dt: f32) {
+    let _ = world.for_each::<(&mut crate::components::ParticleSystem,), _>(|_, (p,)| {
+        if p.playing && p.speed.is_finite() && p.time.is_finite() {
+            p.time = (p.time + p.speed * dt).min(1.0e6);
+            if p.repeat > 0.0 && p.repeat.is_finite() && p.time >= p.repeat {
+                p.time %= p.repeat;
+            }
+        }
+    });
+}
+
 /// After the graph systems, navigation and characters: lifetimes run out, spawners spawn, the sun moves, sensors look, state machines react,
 /// tweens move, cameras follow. Events from the machines go to the script set's events.
-pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fields: &Terrains, meshes: &crate::meshcol::MeshStore) {
-    lifetimes(world, dt);
-    waters(world, dt);
-    decals(world, dt);
-    particle_clocks(world, dt);
-    root_motion(world);
-    sways(world, dt);
-    grass_fields(world, dt);
-    streaming(world, scripts);
-    anim_layers(world, dt);
-    spawners(world, scripts, dt);
+pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fields: &Terrains, meshes: &crate::meshcol::MeshStore, mut prof: Option<&mut crate::sim::StepProfile>) {
+    // `part!("name", work)` runs the work and, while profiling (`Sim::profile`), adds its time under "gameplay name"
+    macro_rules! part {
+        ($name:expr, $body:expr) => {{
+            match prof.as_deref_mut() {
+                Some(p) => {
+                    let t = std::time::Instant::now();
+                    let r = $body;
+                    p.add(concat!("gameplay ", $name), t.elapsed().as_secs_f64() * 1e3);
+                    r
+                }
+                None => $body,
+            }
+        }};
+    }
+    part!("lifetimes", lifetimes(world, dt));
+    part!("waters", waters(world, dt));
+    part!("decals", decals(world, dt));
+    part!("particle_clocks", particle_clocks(world, dt));
+    part!("fx_clocks", fx_clocks(world, dt));
+    part!("root_motion", root_motion(world));
+    part!("sways", sways(world, dt));
+    part!("grass_fields", grass_fields(world, dt));
+    part!("procgrid", procgrid(world, scripts, tick));
+    part!("streaming", streaming(world, scripts));
+    part!("anim_layers", anim_layers(world, dt));
+    part!("spawners", spawners(world, scripts, dt));
     let mut flow_events: Vec<(String, u64, Option<V3>)> = Vec::new();
-    health(world, dt, &mut flow_events);
-    behavior_trees(world, scripts, dt, &mut flow_events);
-    followers(world, dt);
-    timelines(world, dt, &mut flow_events);
-    anim_events(world, &mut flow_events);
-    crate::spriteanim::update(world, &mut flow_events);
-    crate::lookctl::update(world, dt);
-    crate::steer::update(world, tick, dt);
-    crate::dialogue::update(world, dt, &mut flow_events);
+    part!("armor::update", crate::armor::update(world));
+    part!("gear::update", crate::gear::update(world));
+    part!("loadout::before", crate::loadout::before(world));
+    part!("weapons::update", crate::weapons::update(world, tick, dt, fields, meshes, &mut flow_events, &scripts.rewind));
+    part!("loadout::after", crate::loadout::after(world));
+    part!("walker::relay", crate::walker::relay(world, &mut flow_events));
+    part!("blast::update", crate::blast::update(world, scripts, tick, dt, fields, meshes, &mut flow_events));
+    part!("survival::update", crate::survival::update(world, dt, &mut flow_events));
+    part!("health", health(world, dt, &mut flow_events));
+    part!("stealth::update", crate::stealth::update(world, dt));
+    part!("perception::update", crate::perception::update(world, dt, fields, meshes, &mut flow_events));
+    part!("flyagent::update", crate::flyagent::update(world, dt, fields, meshes));
+    part!("hacking::update", crate::hacking::update(world, dt, fields, meshes, &mut flow_events));
+    part!("stomp::update", crate::stomp::update(world, dt, &mut flow_events));
+    part!("walker::update", crate::walker::update(world, dt, &mut flow_events));
+    part!("director::update", crate::director::update(world, scripts, tick, dt, fields, meshes, &mut flow_events));
+    part!("escalation::walkers", crate::escalation::walkers(world, scripts, tick, fields, meshes, &mut flow_events));
+    part!("events::update", crate::events::update(world, scripts, tick, dt, fields, meshes, &mut flow_events));
+    part!("building::update", crate::building::update(world, scripts, tick, dt, fields, meshes, &mut flow_events));
+    part!("respawn::update", crate::respawn::update(world, scripts, tick, dt, &mut flow_events));
+    part!("lock::update", crate::lock::update(world, tick, dt, fields, meshes, &mut flow_events));
+    part!("depth::update", crate::depth::update(world, tick, dt, fields, meshes, &mut flow_events));
+    part!("interact::update", crate::interact::update(world, tick, dt, fields, meshes, &mut flow_events));
+    part!("seats::update", crate::seats::update(world, &mut flow_events));
+    part!("behavior_trees", behavior_trees(world, scripts, dt, &mut flow_events));
+    part!("followers", followers(world, dt));
+    part!("timelines", timelines(world, dt, &mut flow_events));
+    part!("anim_events", anim_events(world, &mut flow_events));
+    part!("spriteanim::update", crate::spriteanim::update(world, &mut flow_events));
+    part!("lookctl::update", crate::lookctl::update(world, dt));
+    part!("steer::update", crate::steer::update(world, tick, dt));
+    part!("dialogue::update", crate::dialogue::update(world, dt, &mut flow_events));
+    part!("loot::update", crate::loot::update(world, dt, &mut flow_events));
+    part!("loot::drops", crate::loot::drops(world, scripts, fields, meshes, &mut flow_events));
+    part!("inventory::update", crate::inventory::update(world, dt, &mut flow_events));
     scripts.events.extend(flow_events);
-    time_of_day(world, dt);
-    sensors(world, fields, meshes);
+    part!("time_of_day", time_of_day(world, dt));
+    part!("sensors", sensors(world, fields, meshes));
     let mut events: Vec<(String, u64, Option<V3>)> = Vec::new();
-    state_machines(world, dt, &mut events);
+    part!("state_machines", state_machines(world, dt, &mut events));
     scripts.events.extend(events);
-    tweens(world, dt);
-    camera_rigs(world, tick, dt);
-    camera_collisions(world, fields, meshes);
+    part!("tweens", tweens(world, dt));
+    part!("camera_rigs", camera_rigs(world, tick, dt));
+    part!("camera_collisions", camera_collisions(world, fields, meshes, dt));
 }

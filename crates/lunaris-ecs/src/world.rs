@@ -53,9 +53,72 @@ impl Hasher for UidHasher {
     fn write_u64(&mut self, i: u64) {
         self.0 = i.wrapping_mul(0x9E37_79B9_7F4A_7C15);
     }
+    fn write_u128(&mut self, i: u128) {
+        self.0 = (i as u64 ^ (i >> 64) as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
 }
 
 type UidMap = HashMap<u64, Entity, BuildHasherDefault<UidHasher>>;
+
+/// The most a uid may lie beyond the end of the dense array and still go in it (the array grows to hold it).
+const UID_SLACK: u64 = 16;
+
+/// uid -> entity. Uids are handed out one after another, so the table is a plain array indexed by uid (4 bytes an entity, one load to look one up, a `memcpy` to clone)
+/// for every uid that is not far past what the array already holds; only a uid that is (an explicit one in a loaded scene) goes to a hash map. An array entry is the
+/// slot index of the entity plus one (0 is empty): the generation is read from the slot table, so an entry cannot go stale.
+#[derive(Clone, Default)]
+struct UidTable {
+    dense: Vec<u32>,
+    sparse: UidMap,
+}
+
+impl UidTable {
+    #[inline]
+    fn get(&self, uid: u64, meta: &[EntityMeta]) -> Option<Entity> {
+        if uid < self.dense.len() as u64 {
+            let v = self.dense[uid as usize];
+            if v != 0 {
+                let index = v - 1;
+                return Some(Entity { index, generation: meta[index as usize].generation });
+            }
+        }
+        if self.sparse.is_empty() {
+            None
+        } else {
+            self.sparse.get(&uid).copied()
+        }
+    }
+
+    fn contains(&self, uid: u64) -> bool {
+        (uid < self.dense.len() as u64 && self.dense[uid as usize] != 0) || self.sparse.contains_key(&uid)
+    }
+
+    #[inline]
+    fn insert(&mut self, uid: u64, e: Entity) {
+        if uid < self.dense.len() as u64 + UID_SLACK {
+            if uid >= self.dense.len() as u64 {
+                self.dense.resize(uid as usize + 1, 0);
+            }
+            self.dense[uid as usize] = e.index + 1;
+        } else {
+            self.sparse.insert(uid, e);
+        }
+    }
+
+    #[inline]
+    fn remove(&mut self, uid: u64) {
+        if uid < self.dense.len() as u64 {
+            self.dense[uid as usize] = 0;
+        }
+        if !self.sparse.is_empty() {
+            self.sparse.remove(&uid);
+        }
+    }
+
+    fn reserve(&mut self, extra: usize) {
+        self.dense.reserve(extra);
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct EntityMeta {
@@ -67,13 +130,43 @@ struct EntityMeta {
 
 #[derive(Clone)]
 pub struct Archetype {
+    /// A bit for each component of the archetype (`1 << (id % 64)`): a query that needs a component this has no bit for need not look any further (the other way round proves nothing: ids share bits).
+    pub(crate) mask: u64,
     pub(crate) components: Vec<u32>,
     pub(crate) columns: Vec<Column>,
     pub(crate) entities: Vec<Entity>,
-    add_edges: BTreeMap<u32, u32>,
-    remove_edges: BTreeMap<u32, u32>,
+    /// Where an entity of this archetype goes when a component is added or removed: indexed by component id (`NO_EDGE` = not worked out yet), so that the common
+    /// move is one array read instead of a tree search.
+    add_edges: Vec<u32>,
+    remove_edges: Vec<u32>,
     /// Indices into `components`, ordered by component name (canonical order for hashing and scenes).
     name_order: Vec<usize>,
+}
+
+/// An edge that has not been worked out yet.
+const NO_EDGE: u32 = u32::MAX;
+
+/// The archetype an edge table says to go to for `cid`, if it has been worked out.
+#[inline]
+fn edge(table: &[u32], cid: u32) -> Option<u32> {
+    match table.get(cid as usize) {
+        Some(&t) if t != NO_EDGE => Some(t),
+        _ => None,
+    }
+}
+
+/// Remember that `cid` leads to archetype `to`.
+fn set_edge(table: &mut Vec<u32>, cid: u32, to: u32) {
+    if table.len() <= cid as usize {
+        table.resize(cid as usize + 1, NO_EDGE);
+    }
+    table[cid as usize] = to;
+}
+
+/// The bit of a component in an archetype's `mask`.
+#[inline]
+fn component_bit(cid: u32) -> u64 {
+    1u64 << (cid & 63)
 }
 
 impl Archetype {
@@ -121,7 +214,8 @@ impl Archetype {
 struct Registry {
     infos: Vec<ComponentInfo>,
     by_name: BTreeMap<String, u32>,
-    by_type: HashMap<TypeId, u32>,
+    /// A `TypeId` is already a hash, so it is only mixed (a lookup happens on every typed insert, query and spawn).
+    by_type: HashMap<TypeId, u32, BuildHasherDefault<UidHasher>>,
 }
 
 #[derive(Clone)]
@@ -133,7 +227,7 @@ pub struct World {
     free: Vec<u32>,
     archetypes: Vec<Archetype>,
     arch_index: BTreeMap<Vec<u32>, u32>,
-    uids: UidMap,
+    uids: UidTable,
     next_uid: u64,
     strings: StringTable,
     live: usize,
@@ -181,7 +275,7 @@ impl World {
             free: Vec::new(),
             archetypes: Vec::new(),
             arch_index: BTreeMap::new(),
-            uids: UidMap::default(),
+            uids: UidTable::default(),
             next_uid: 1,
             strings: StringTable::default(),
             live: 0,
@@ -330,6 +424,20 @@ impl World {
         &self.registry.infos
     }
 
+    /// The values a new component of this kind starts with, as the JSON a `get` of it would give (an empty object for a component with no fields).
+    pub fn default_json(&self, id: ComponentId) -> Json {
+        let info = &self.registry.infos[id.0 as usize];
+        if info.size == 0 {
+            return Json::Obj(Vec::new());
+        }
+        let mut buf = vec![0u64; info.size.div_ceil(8).max(1)];
+        // SAFETY: buf is 8-aligned with at least `size` bytes and default_bytes has exactly `size` bytes laid out as the component.
+        unsafe {
+            ptr::copy_nonoverlapping(info.default_bytes.as_ptr(), buf.as_mut_ptr().cast::<u8>(), info.size);
+            info.read_json(buf.as_ptr().cast::<u8>(), &self.strings)
+        }
+    }
+
     pub fn strings(&self) -> &StringTable {
         &self.strings
     }
@@ -353,32 +461,33 @@ impl World {
         let mut name_order: Vec<usize> = (0..comps.len()).collect();
         name_order.sort_by(|&a, &b| self.registry.infos[comps[a] as usize].name.cmp(&self.registry.infos[comps[b] as usize].name));
         let id = self.archetypes.len() as u32;
-        self.archetypes.push(Archetype { components: comps.clone(), columns, entities: Vec::new(), add_edges: BTreeMap::new(), remove_edges: BTreeMap::new(), name_order });
+        let mask = comps.iter().fold(0u64, |m, &c| m | component_bit(c));
+        self.archetypes.push(Archetype { mask, components: comps.clone(), columns, entities: Vec::new(), add_edges: Vec::new(), remove_edges: Vec::new(), name_order });
         self.arch_index.insert(comps, id);
         id
     }
 
     fn arch_after_add(&mut self, from: u32, cid: u32) -> u32 {
-        if let Some(&t) = self.archetypes[from as usize].add_edges.get(&cid) {
+        if let Some(t) = edge(&self.archetypes[from as usize].add_edges, cid) {
             return t;
         }
         let mut comps = self.archetypes[from as usize].components.clone();
         let pos = comps.binary_search(&cid).unwrap_err();
         comps.insert(pos, cid);
         let t = self.get_or_create_archetype(comps);
-        self.archetypes[from as usize].add_edges.insert(cid, t);
+        set_edge(&mut self.archetypes[from as usize].add_edges, cid, t);
         t
     }
 
     fn arch_after_remove(&mut self, from: u32, cid: u32) -> u32 {
-        if let Some(&t) = self.archetypes[from as usize].remove_edges.get(&cid) {
+        if let Some(t) = edge(&self.archetypes[from as usize].remove_edges, cid) {
             return t;
         }
         let mut comps = self.archetypes[from as usize].components.clone();
         let pos = comps.binary_search(&cid).expect("component present");
         comps.remove(pos);
         let t = self.get_or_create_archetype(comps);
-        self.archetypes[from as usize].remove_edges.insert(cid, t);
+        set_edge(&mut self.archetypes[from as usize].remove_edges, cid, t);
         t
     }
 
@@ -423,7 +532,7 @@ impl World {
         if uid == 0 {
             return Err(EcsError::new("bad_uid", "uid 0 is reserved for \"no entity\"").hint("omit the uid to get the next free one"));
         }
-        if self.uids.contains_key(&uid) {
+        if self.uids.contains(uid) {
             return Err(EcsError::new("duplicate_uid", format!("an entity with uid {uid} already exists")));
         }
         self.next_uid = self.next_uid.max(uid + 1);
@@ -443,7 +552,7 @@ impl World {
         let uid = match uid {
             Some(0) => return Err(EcsError::new("bad_uid", "uid 0 is reserved for \"no entity\"").hint("omit the uid to get the next free one")),
             Some(u) => {
-                if self.uids.contains_key(&u) {
+                if self.uids.contains(u) {
                     return Err(EcsError::new("duplicate_uid", format!("an entity with uid {u} already exists")));
                 }
                 self.next_uid = self.next_uid.max(u + 1);
@@ -505,6 +614,89 @@ impl World {
         unsafe { self.spawn_raw(None, &[(ca, (&a as *const A).cast()), (cb, (&b as *const B).cast()), (cc, (&c as *const C).cast())]) }
     }
 
+    /// The archetype for the components of a bundle (sorted ids), created when it does not exist yet. `order` is the permutation that sorts `ids`.
+    fn bundle_archetype(&mut self, ids: &[ComponentId], order: &mut [u8; MAX_BUNDLE]) -> Result<u32> {
+        let n = ids.len();
+        for (k, o) in order.iter_mut().enumerate().take(n) {
+            *o = k as u8;
+        }
+        // insertion sort: a bundle has a handful of components
+        for i in 1..n {
+            let mut j = i;
+            while j > 0 && ids[order[j - 1] as usize].0 > ids[order[j] as usize].0 {
+                order.swap(j - 1, j);
+                j -= 1;
+            }
+        }
+        if (1..n).any(|k| ids[order[k - 1] as usize] == ids[order[k] as usize]) {
+            return Err(EcsError::new("duplicate_component", "a component appears twice in the spawn"));
+        }
+        let mut sorted = [0u32; MAX_BUNDLE];
+        for k in 0..n {
+            sorted[k] = ids[order[k] as usize].0;
+        }
+        if let Some(&a) = self.arch_index.get(&sorted[..n]) {
+            return Ok(a);
+        }
+        Ok(self.get_or_create_archetype(sorted[..n].to_vec()))
+    }
+
+    /// Create an entity with every component of the bundle (a tuple of up to 8 components), directly in its final archetype.
+    pub fn spawn_bundle<B: Bundle>(&mut self, bundle: B) -> Result<Entity> {
+        let mut ids = [ComponentId(0); MAX_BUNDLE];
+        B::register(self, &mut ids)?;
+        let mut order = [0u8; MAX_BUNDLE];
+        let arch = self.bundle_archetype(&ids[..B::COUNT], &mut order)?;
+        let mut addrs = [ptr::null::<u8>(); MAX_BUNDLE];
+        bundle.addrs(&mut addrs);
+        let uid = self.next_uid;
+        self.next_uid += 1;
+        let e = self.alloc_entity_in(uid, arch);
+        let a = &mut self.archetypes[arch as usize];
+        for (k, &i) in order[..B::COUNT].iter().enumerate() {
+            let size = a.columns[k].elem_size();
+            // SAFETY: the address is that of a live component value of the registered type; zero-sized components copy nothing.
+            unsafe { a.columns[k].push_copy(if size == 0 { ptr::NonNull::<u8>::dangling().as_ptr() } else { addrs[i as usize] }) };
+        }
+        Ok(e)
+    }
+
+    /// Create many entities with the same kind of bundle. The archetype is looked up once and the storage is reserved up front, so this is
+    /// several times faster than a loop of `spawn_bundle`. Returns the new entities in order.
+    pub fn spawn_batch<B: Bundle, I: IntoIterator<Item = B>>(&mut self, items: I) -> Result<Vec<Entity>> {
+        let items = items.into_iter();
+        let mut ids = [ComponentId(0); MAX_BUNDLE];
+        B::register(self, &mut ids)?;
+        let mut order = [0u8; MAX_BUNDLE];
+        let arch = self.bundle_archetype(&ids[..B::COUNT], &mut order)?;
+        let expect = items.size_hint().0;
+        {
+            let a = &mut self.archetypes[arch as usize];
+            a.entities.reserve(expect);
+            for c in &mut a.columns {
+                c.reserve(expect);
+            }
+        }
+        self.meta.reserve(expect.saturating_sub(self.free.len()));
+        self.uids.reserve(expect);
+        let mut out = Vec::with_capacity(expect);
+        let mut addrs = [ptr::null::<u8>(); MAX_BUNDLE];
+        for bundle in items {
+            bundle.addrs(&mut addrs);
+            let uid = self.next_uid;
+            self.next_uid += 1;
+            let e = self.alloc_entity_in(uid, arch);
+            let a = &mut self.archetypes[arch as usize];
+            for (k, &i) in order[..B::COUNT].iter().enumerate() {
+                let size = a.columns[k].elem_size();
+                // SAFETY: as in `spawn_bundle`; `bundle` lives until the end of this iteration.
+                unsafe { a.columns[k].push_copy(if size == 0 { ptr::NonNull::<u8>::dangling().as_ptr() } else { addrs[i as usize] }) };
+            }
+            out.push(e);
+        }
+        Ok(out)
+    }
+
     pub fn is_alive(&self, e: Entity) -> bool {
         self.meta.get(e.index as usize).is_some_and(|m| m.arch != DEAD && m.generation == e.generation)
     }
@@ -525,6 +717,12 @@ impl World {
         self.next_uid = self.next_uid.max(uid);
     }
 
+    /// How many entries the dense part of the uid table holds (a test looks at it: a few uids a long way apart must not make it grow).
+    #[cfg(test)]
+    pub(crate) fn uid_table_len(&self) -> usize {
+        self.uids.dense.len()
+    }
+
     pub fn uid_of(&self, e: Entity) -> Option<u64> {
         self.is_alive(e).then(|| self.meta[e.index as usize].uid)
     }
@@ -538,7 +736,7 @@ impl World {
     }
 
     pub fn entity(&self, uid: u64) -> Option<Entity> {
-        self.uids.get(&uid).copied()
+        self.uids.get(uid, &self.meta)
     }
 
     pub fn require_entity(&self, uid: u64) -> Result<Entity> {
@@ -554,7 +752,7 @@ impl World {
         if let Some(moved) = moved {
             self.meta[moved.index as usize].row = m.row;
         }
-        self.uids.remove(&m.uid);
+        self.uids.remove(m.uid);
         let slot = &mut self.meta[e.index as usize];
         slot.arch = DEAD;
         slot.generation = slot.generation.wrapping_add(1);
@@ -600,32 +798,34 @@ impl World {
         }
         let size = self.registry.infos[cid.0 as usize].size;
         let m = self.meta[e.index as usize];
-        if let Some(p) = self.component_ptr(e, cid) {
-            if let Some(s) = src {
-                // SAFETY: both point to `size` valid bytes; the source is caller-provided and distinct from the column row.
-                unsafe { ptr::copy(s, p, size) };
+        {
+            let a = &self.archetypes[m.arch as usize];
+            if let Some(ci) = a.col_index(cid.0) {
+                if let Some(s) = src {
+                    // SAFETY: both point to `size` valid bytes; the source is caller-provided and distinct from the column row.
+                    unsafe { ptr::copy(s, a.columns[ci].ptr_at(m.row as usize), size) };
+                }
+                return Ok(());
             }
-            return Ok(());
         }
         let to = self.arch_after_add(m.arch, cid.0);
-        // the default bytes live in the registry; copy them out so the borrow ends before the move
-        let default_bytes: Vec<u8>;
+        // the default bytes live in the registry (a different field from the archetypes: no copy is needed)
         let data: *const u8 = match src {
             Some(s) => s,
-            None => {
-                default_bytes = self.registry.infos[cid.0 as usize].default_bytes.clone();
-                default_bytes.as_ptr()
-            }
+            None => self.registry.infos[cid.0 as usize].default_bytes.as_ptr(),
         };
         let (from_a, to_a) = two_mut(&mut self.archetypes, m.arch as usize, to as usize);
-        for (k, &c) in to_a.components.iter().enumerate() {
-            if c == cid.0 {
+        // both component lists are sorted and `to` is `from` plus `cid`: one pass pairs the columns
+        let mut j = 0;
+        for k in 0..to_a.components.len() {
+            if to_a.components[k] == cid.0 {
                 // SAFETY: data points to `size` bytes (caller contract or default bytes of exactly this size).
                 unsafe { to_a.columns[k].push_copy(if size == 0 { ptr::NonNull::<u8>::dangling().as_ptr() } else { data }) };
             } else {
-                let fi = from_a.col_index(c).expect("source has every other component");
+                debug_assert_eq!(from_a.components[j], to_a.components[k]);
                 // SAFETY: the row exists in the source column.
-                unsafe { to_a.columns[k].push_copy(from_a.columns[fi].ptr_at(m.row as usize)) };
+                unsafe { to_a.columns[k].push_copy(from_a.columns[j].ptr_at(m.row as usize)) };
+                j += 1;
             }
         }
         to_a.entities.push(e);
@@ -650,10 +850,16 @@ impl World {
         }
         let to = self.arch_after_remove(m.arch, cid.0);
         let (from_a, to_a) = two_mut(&mut self.archetypes, m.arch as usize, to as usize);
-        for (k, &c) in to_a.components.iter().enumerate() {
-            let fi = from_a.col_index(c).expect("source has every remaining component");
+        // both component lists are sorted and `from` is `to` plus `cid`: one pass pairs the columns
+        let mut k = 0;
+        for j in 0..from_a.components.len() {
+            if from_a.components[j] == cid.0 {
+                continue;
+            }
+            debug_assert_eq!(from_a.components[j], to_a.components[k]);
             // SAFETY: the row exists in the source column.
-            unsafe { to_a.columns[k].push_copy(from_a.columns[fi].ptr_at(m.row as usize)) };
+            unsafe { to_a.columns[k].push_copy(from_a.columns[j].ptr_at(m.row as usize)) };
+            k += 1;
         }
         to_a.entities.push(e);
         let new_row = to_a.entities.len() as u32 - 1;
@@ -742,10 +948,11 @@ impl World {
     // ------------------------------------------------------------------------------------------ queries
     /// Archetypes that contain every `with` component and none of the `without` ones.
     pub fn matching_archetypes(&self, with: &[ComponentId], without: &[ComponentId]) -> Vec<usize> {
+        let need = with.iter().fold(0u64, |m, c| m | component_bit(c.0));
         self.archetypes
             .iter()
             .enumerate()
-            .filter(|(_, a)| !a.entities.is_empty() && with.iter().all(|c| a.col_index(c.0).is_some()) && without.iter().all(|c| a.col_index(c.0).is_none()))
+            .filter(|(_, a)| a.mask & need == need && !a.entities.is_empty() && with.iter().all(|c| a.col_index(c.0).is_some()) && without.iter().all(|c| a.col_index(c.0).is_none()))
             .map(|(i, _)| i)
             .collect()
     }
@@ -755,7 +962,7 @@ impl World {
     where
         F: for<'w> FnMut(Entity, Q::Item<'w>),
     {
-        self.query_impl::<Q, _>(|e, _uid, item| f(e, item))
+        self.query_impl::<Q, false, _>(|e, _uid, item| f(e, item))
     }
 
     /// Like `for_each`, but also passes the entity's stable uid (useful for order-independent per-entity randomness).
@@ -763,45 +970,47 @@ impl World {
     where
         F: for<'w> FnMut(Entity, u64, Q::Item<'w>),
     {
-        self.query_impl::<Q, _>(f)
+        self.query_impl::<Q, true, _>(f)
     }
 
-    fn query_impl<Q: Query, F>(&mut self, mut f: F) -> Result<()>
-    where
-        F: for<'w> FnMut(Entity, u64, Q::Item<'w>),
-    {
+    /// The terms of `Q` as ids (after checking that no component is fetched twice when one access is mutable).
+    fn query_terms<Q: Query>(&mut self) -> Result<Terms> {
         let terms = Q::terms(self)?;
-        for i in 0..terms.len() {
-            for j in i + 1..terms.len() {
-                if terms[i].0 == terms[j].0 && (terms[i].1 || terms[j].1) {
+        for i in 0..terms.len {
+            for j in i + 1..terms.len {
+                if terms.ids[i].0 == terms.ids[j].0 && (terms.mutable[i] || terms.mutable[j]) {
                     return Err(EcsError::new("aliasing_query", "a query cannot fetch the same component twice when one access is mutable"));
                 }
             }
         }
-        let ids: Vec<u32> = terms.iter().map(|t| (t.0).0).collect();
-        let mut bases: Vec<*mut u8> = vec![ptr::null_mut(); ids.len()];
-        for a in &self.archetypes {
-            if a.entities.is_empty() {
+        Ok(terms)
+    }
+
+    fn query_impl<Q: Query, const UID: bool, F>(&mut self, mut f: F) -> Result<()>
+    where
+        F: for<'w> FnMut(Entity, u64, Q::Item<'w>),
+    {
+        let terms = self.query_terms::<Q>()?;
+        let need = terms.ids[..terms.len].iter().fold(0u64, |m, id| m | component_bit(id.0));
+        let mut bases = [ptr::null_mut::<u8>(); MAX_TERMS];
+        'arch: for a in &self.archetypes {
+            if a.mask & need != need || a.entities.is_empty() {
                 continue;
             }
-            let mut ok = true;
-            for (k, id) in ids.iter().enumerate() {
-                match a.col_index(*id) {
-                    Some(ci) => bases[k] = a.columns[ci].base(),
-                    None => {
-                        ok = false;
-                        break;
-                    }
+            for (slot, id) in bases.iter_mut().zip(&terms.ids[..terms.len]) {
+                match a.col_index(id.0) {
+                    Some(ci) => *slot = a.columns[ci].base(),
+                    None => continue 'arch,
                 }
             }
-            if !ok {
-                continue;
-            }
-            for row in 0..a.entities.len() {
-                // SAFETY: bases point at columns of this archetype with at least `entities.len()` rows; aliasing was checked above.
-                let item = unsafe { Q::fetch(&bases, row) };
-                let e = a.entities[row];
-                f(e, self.meta[e.index as usize].uid, item);
+            // the column pointers sit in a local tuple, so the loop below keeps them in registers
+            let ptrs = Q::ptrs(&bases);
+            let entities = &a.entities[..];
+            for (row, &e) in entities.iter().enumerate() {
+                // SAFETY: ptrs point at columns of this archetype with `entities.len()` rows; aliasing was checked above.
+                let item = unsafe { Q::fetch(&ptrs, row) };
+                let uid = if UID { self.meta[e.index as usize].uid } else { 0 };
+                f(e, uid, item);
             }
         }
         Ok(())
@@ -810,9 +1019,14 @@ impl World {
     /// Split the rows of every archetype matching the query into chunks of at most `chunk_rows` rows. Chunks never overlap, so
     /// they can be processed on different threads; the list is in archetype order, so it is the same on every run.
     pub fn chunks(&self, with: &[ComponentId], without: &[ComponentId], chunk_rows: usize) -> Vec<Chunk> {
+        self.chunks_of(&self.matching_archetypes(with, without), chunk_rows)
+    }
+
+    /// The chunks of the archetypes `archetypes` (from [`World::matching_archetypes`]: a caller that has them already does not look for them again).
+    pub fn chunks_of(&self, archetypes: &[usize], chunk_rows: usize) -> Vec<Chunk> {
         let step = chunk_rows.max(1);
         let mut out = Vec::new();
-        for ai in self.matching_archetypes(with, without) {
+        for &ai in archetypes {
             let n = self.archetypes[ai].entities.len();
             let mut start = 0;
             while start < n {
@@ -830,18 +1044,11 @@ impl World {
     where
         F: for<'w> Fn(Entity, u64, Q::Item<'w>) + Sync,
     {
-        let terms = Q::terms(self)?;
-        for i in 0..terms.len() {
-            for j in i + 1..terms.len() {
-                if terms[i].0 == terms[j].0 && (terms[i].1 || terms[j].1) {
-                    return Err(EcsError::new("aliasing_query", "a query cannot fetch the same component twice when one access is mutable"));
-                }
-            }
-        }
-        let ids: Vec<ComponentId> = terms.iter().map(|t| t.0).collect();
+        let terms = self.query_terms::<Q>()?;
+        let ids: Vec<ComponentId> = terms.ids[..terms.len].to_vec();
         let total: usize = self.archetypes.iter().map(|a| a.entities.len()).sum();
         if threads <= 1 || total < 4096 {
-            return self.query_impl::<Q, _>(|e, uid, item| f(e, uid, item));
+            return self.query_impl::<Q, true, _>(|e, uid, item| f(e, uid, item));
         }
         let chunks = self.chunks(&ids, &[], (total / (threads * 4)).clamp(1024, 65_536));
         // column bases per archetype, as integers so they can cross threads (they are only turned back into pointers inside)
@@ -855,13 +1062,14 @@ impl World {
         std::thread::scope(|scope| {
             for _ in 0..threads.min(chunks.len()) {
                 scope.spawn(|| {
-                    let mut ptrs: Vec<*mut u8> = vec![ptr::null_mut(); ids.len()];
+                    let mut raw = [ptr::null_mut::<u8>(); MAX_TERMS];
                     loop {
                         let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         let Some(c) = chunks.get(k) else { break };
-                        for (slot, b) in ptrs.iter_mut().zip(&bases[c.arch]) {
+                        for (slot, b) in raw.iter_mut().zip(&bases[c.arch]) {
                             *slot = *b as *mut u8;
                         }
+                        let ptrs = Q::ptrs(&raw);
                         let a = &archetypes[c.arch];
                         for row in c.start..c.end {
                             // SAFETY: chunks are disjoint row ranges, aliasing between terms was checked above, and the
@@ -884,6 +1092,62 @@ impl World {
         h.u64(self.live as u64);
         h.u64(self.next_uid);
         // only when present, so worlds without resources keep the hashes they always had
+        if !self.resources.is_empty() {
+            h.u64(self.resources.len() as u64);
+            for (k, v) in &self.resources {
+                h.bytes(k.as_bytes());
+                h.u64(v.to_bits());
+            }
+        }
+        // what to feed the hasher for the entities of an archetype is the same for all of them: worked out once for each archetype that has entities
+        let mut plans: Vec<Option<Vec<HashOp>>> = vec![None; self.archetypes.len()];
+        // the state lives in a local for the whole walk (see `mix_word`)
+        let mut s = h.raw();
+        for e in self.entities_by_uid() {
+            let m = self.meta[e.index as usize];
+            s = mix_word(s, m.uid);
+            let a = &self.archetypes[m.arch as usize];
+            let plan = plans[m.arch as usize].get_or_insert_with(|| self.hash_plan(a));
+            let row = m.row as usize;
+            for op in plan.iter() {
+                match *op {
+                    HashOp::Word(w) => s = mix_word(s, w),
+                    // SAFETY: the row exists in every column of its archetype and holds a value of the component the run was made from, whose fields lie inside it.
+                    HashOp::Run { col, offset, ty, count } => unsafe {
+                        let p = a.columns[col].ptr_at(row).add(offset);
+                        match ty {
+                            FieldType::F32 => (0..count).for_each(|i| s = mix_word(s, p.cast::<f32>().add(i).read().to_bits() as u64)),
+                            FieldType::F64 => (0..count).for_each(|i| s = mix_word(s, p.cast::<f64>().add(i).read().to_bits())),
+                            FieldType::I32 => (0..count).for_each(|i| s = mix_word(s, p.cast::<i32>().add(i).read() as i64 as u64)),
+                            FieldType::U32 => (0..count).for_each(|i| s = mix_word(s, p.cast::<u32>().add(i).read() as u64)),
+                            FieldType::I64 => (0..count).for_each(|i| s = mix_word(s, p.cast::<i64>().add(i).read() as u64)),
+                            FieldType::U64 | FieldType::Uid => (0..count).for_each(|i| s = mix_word(s, p.cast::<u64>().add(i).read())),
+                            FieldType::Bool => (0..count).for_each(|i| s = mix_word(s, (p.add(i).read() != 0) as u64)),
+                            FieldType::Str => (0..count).for_each(|i| s = mix_bytes(s, self.strings.get(p.cast::<u32>().add(i).read()).as_bytes())),
+                        }
+                    },
+                }
+            }
+        }
+        h.set_raw(s);
+        h.finish()
+    }
+
+    /// The steps that hash one entity of archetype `a` after its uid: the number of components, then each component by name with its fields.
+    fn hash_plan(&self, a: &Archetype) -> Vec<HashOp> {
+        let mut ops = vec![HashOp::Word(a.components.len() as u64)];
+        for &oi in &a.name_order {
+            self.registry.infos[a.components[oi] as usize].push_hash_ops(oi, &mut ops);
+        }
+        ops
+    }
+
+    /// The straightforward way to hash the state, entity by entity and field by field (what `state_hash` does with a plan worked out for each archetype): kept to check the plan.
+    #[cfg(test)]
+    pub(crate) fn state_hash_reference(&self) -> u64 {
+        let mut h = StateHasher::default();
+        h.u64(self.live as u64);
+        h.u64(self.next_uid);
         if !self.resources.is_empty() {
             h.u64(self.resources.len() as u64);
             for (k, v) in &self.resources {
@@ -942,24 +1206,56 @@ impl<T: Component> QueryTerm for &mut T {
     }
 }
 
+/// Most terms a query can have.
+pub const MAX_TERMS: usize = 6;
+
+/// The components a query fetches, as a fixed-size list (no allocation per query).
+pub struct Terms {
+    pub ids: [ComponentId; MAX_TERMS],
+    pub mutable: [bool; MAX_TERMS],
+    pub len: usize,
+}
+
 pub trait Query {
     type Item<'w>;
-    fn terms(world: &mut World) -> Result<Vec<(ComponentId, bool)>>;
+    /// One raw column pointer per term, kept in a local by the query loop.
+    type Ptrs: Copy;
+    fn terms(world: &mut World) -> Result<Terms>;
+    /// The pointers of one archetype, from the column bases in term order.
+    fn ptrs(bases: &[*mut u8; MAX_TERMS]) -> Self::Ptrs;
     /// # Safety
-    /// `bases[i]` must be the column base for term `i` and `row` in bounds.
-    unsafe fn fetch<'w>(bases: &[*mut u8], row: usize) -> Self::Item<'w>;
+    /// `ptrs` must be the column bases of this query's terms and `row` in bounds.
+    unsafe fn fetch<'w>(ptrs: &Self::Ptrs, row: usize) -> Self::Item<'w>;
+}
+
+macro_rules! raw_ptr {
+    ($T:ident) => {
+        *mut u8
+    };
 }
 
 macro_rules! impl_query {
     ($($T:ident $i:tt),+) => {
         impl<$($T: QueryTerm),+> Query for ($($T,)+) {
             type Item<'w> = ($($T::Item<'w>,)+);
-            fn terms(world: &mut World) -> Result<Vec<(ComponentId, bool)>> {
-                Ok(vec![$(($T::component(world)?, $T::MUTABLE)),+])
+            type Ptrs = ($(raw_ptr!($T),)+);
+            fn terms(world: &mut World) -> Result<Terms> {
+                let mut t = Terms { ids: [ComponentId(0); MAX_TERMS], mutable: [false; MAX_TERMS], len: 0 };
+                $(
+                    t.ids[$i] = $T::component(world)?;
+                    t.mutable[$i] = $T::MUTABLE;
+                    t.len += 1;
+                )+
+                Ok(t)
             }
-            unsafe fn fetch<'w>(bases: &[*mut u8], row: usize) -> Self::Item<'w> {
+            #[inline(always)]
+            fn ptrs(bases: &[*mut u8; MAX_TERMS]) -> Self::Ptrs {
+                ($(bases[$i],)+)
+            }
+            #[inline(always)]
+            unsafe fn fetch<'w>(ptrs: &Self::Ptrs, row: usize) -> Self::Item<'w> {
                 // SAFETY: forwarded from the caller.
-                unsafe { ($($T::fetch(bases[$i], row),)+) }
+                unsafe { ($($T::fetch(ptrs.$i, row),)+) }
             }
         }
     };
@@ -970,6 +1266,44 @@ impl_query!(A 0, B 1, C 2);
 impl_query!(A 0, B 1, C 2, D 3);
 impl_query!(A 0, B 1, C 2, D 3, E 4);
 impl_query!(A 0, B 1, C 2, D 3, E 4, F 5);
+
+// ---------------------------------------------------------------------------------------------------------------
+// bundles
+/// Most components in a bundle.
+pub const MAX_BUNDLE: usize = 8;
+
+/// A set of components that are spawned together: a tuple of up to 8 components (`world.spawn_bundle((Position::default(), Velocity::default()))`).
+pub trait Bundle {
+    const COUNT: usize;
+    /// Register every component and write the ids, in tuple order, to the front of `out`.
+    fn register(world: &mut World, out: &mut [ComponentId; MAX_BUNDLE]) -> Result<()>;
+    /// Write the address of each value, in tuple order, to the front of `out`.
+    fn addrs(&self, out: &mut [*const u8; MAX_BUNDLE]);
+}
+
+macro_rules! impl_bundle {
+    ($n:expr; $($T:ident $i:tt),+) => {
+        impl<$($T: Component),+> Bundle for ($($T,)+) {
+            const COUNT: usize = $n;
+            fn register(world: &mut World, out: &mut [ComponentId; MAX_BUNDLE]) -> Result<()> {
+                $( out[$i] = world.register_native::<$T>()?; )+
+                Ok(())
+            }
+            #[inline(always)]
+            fn addrs(&self, out: &mut [*const u8; MAX_BUNDLE]) {
+                $( out[$i] = (&self.$i as *const $T).cast::<u8>(); )+
+            }
+        }
+    };
+}
+impl_bundle!(1; A 0);
+impl_bundle!(2; A 0, B 1);
+impl_bundle!(3; A 0, B 1, C 2);
+impl_bundle!(4; A 0, B 1, C 2, D 3);
+impl_bundle!(5; A 0, B 1, C 2, D 3, E 4);
+impl_bundle!(6; A 0, B 1, C 2, D 3, E 4, F 5);
+impl_bundle!(7; A 0, B 1, C 2, D 3, E 4, F 5, G 6);
+impl_bundle!(8; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7);
 
 /// Resource names: dot-separated parts of letters, digits and underscores, at most 64 characters in all.
 pub fn valid_resource_name(name: &str) -> bool {

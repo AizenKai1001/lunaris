@@ -39,7 +39,7 @@ pub(crate) fn update(world: &mut World, dt: f32) {
     let Some((box_uid, be, mut b, bui)) = boxes.into_iter().min_by_key(|b| b.0) else { return };
     let mut triggers: Vec<(u64, Sym, f32, Ui)> = Vec::new();
     let _ = world.for_each_uid::<(&UiTooltip, &Ui), _>(|_, uid, (t, u)| triggers.push((uid, t.text, t.delay, *u)));
-    let hidden = crate::ui_kit3::hidden_set(world);
+    let hidden = crate::ui_kit3::hidden_set_shared(world);
     let clips = crate::ui_kit3::clip_rects(world);
     let aspect = crate::ui_kit3::aspect_of(world);
     let ptr = pointer(world);

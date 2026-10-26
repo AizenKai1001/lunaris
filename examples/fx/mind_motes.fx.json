@@ -1,0 +1,36 @@
+{
+  "name": "the mind: ten thousand motes",
+  "bounds": 24,
+  "budget": 14000,
+  "lod": { "near": 60, "far": 400 },
+  "emitters": [
+    {
+      "name": "motes",
+      "simulate": "gpu",
+      "space": "local",
+      "max": 12000,
+      "spawn": { "rate": 1000, "shape": { "type": "sphere", "radius": 7, "shell": true } },
+      "init": { "life": [9, 13], "speed": [0, 0.4], "spread": 180, "size": [0.07, 0.15], "color": [0.35, 0.8, 1, 1], "color_jitter": 0.3 },
+      "update": {
+        "drag": 0.2,
+        "noise": { "strength": 1.1, "scale": 3, "speed": 0.12 },
+        "vortices": [{ "pos": [0, 0, 0], "axis": [0, 1, 0], "strength": 3.2, "pull": 0.6, "radius": 18 }],
+        "attractors": [{ "pos": [0, 0, 0], "strength": 0.9, "radius": 20, "falloff": 0, "kill": 0.8 }]
+      },
+      "curves": {
+        "alpha": [[0, 0], [0.08, 1], [0.85, 1], [1, 0]],
+        "color": [[0, [0.35, 0.8, 1, 1]], [0.7, [0.6, 0.45, 1, 1]], [1, [1, 0.3, 0.55, 1]]]
+      },
+      "render": { "texture": "circle", "blend": "add" }
+    },
+    {
+      "name": "glow",
+      "space": "local",
+      "max": 4,
+      "spawn": { "rate": 1.5 },
+      "init": { "life": [1.2, 1.6], "size": 3.5, "color": [0.4, 0.55, 1, 0.25] },
+      "curves": { "alpha": [[0, 0], [0.3, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "add", "light": { "intensity": 6, "range": 40, "max": 1, "color": [0.4, 0.55, 1] } }
+    }
+  ]
+}

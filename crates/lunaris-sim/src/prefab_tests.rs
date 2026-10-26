@@ -164,3 +164,46 @@ fn a_missing_prefab_in_a_graph_system_is_the_systems_error_not_a_crash() {
     let err = s.apply(&Command::DefineSystem { def: j(r#"{"name": "bad2", "each": ["Spawner"], "do": [{"spawn_prefab": "X", "at": [1, 2]}]}"#) }).unwrap_err();
     assert!(err.message.contains("three values"), "{}", err.message);
 }
+
+#[test]
+fn spawn_prefab_with_can_set_array_fields_from_expressions() {
+    let mut s = Sim::new(1);
+    s.apply(&Command::Define { def: j(r#"{"name": "Spawner", "fields": [{"name": "k", "type": "f32", "default": 0}]}"#) }).unwrap();
+    define(&mut s, "Mark", r#"{"components": {"Name": {"value": "Mark"}, "Transform": {}, "Decal": {}}}"#);
+    s.apply(&Command::Spawn { uid: Some(1), components: vec![("Spawner".into(), j(r#"{"k": 0.5}"#))] }).unwrap();
+    // an array of numbers, one of them an expression, in a component of the prefab's root: `Decal.normal` and `Transform.rot` (a four-element array) and a colour
+    let def = r#"{"name": "marker", "each": ["Spawner"], "do": [
+        {"if": {"eq": [{"tick": true}, 2]}, "then": [
+            {"spawn_prefab": "Mark", "at": [1, 2, 3], "with": {"Decal": {"normal": [0, {"get": "Spawner.k"}, 1], "size": [2, 3], "life": 7}, "Transform": {"rot": [0, 1, 0, 0]}}}]}]}"#;
+    s.apply(&Command::DefineSystem { def: j(def) }).unwrap();
+    s.step_n(5);
+    assert!(s.scripts.get("marker").unwrap().last_error.is_none(), "{:?}", s.scripts.get("marker").unwrap().last_error);
+    let e = s.world.entity(2).expect("the prefab was spawned");
+    let d = *s.world.get::<crate::components::Decal>(e).unwrap();
+    assert_eq!((d.normal, d.size, d.life), ([0.0, 0.5, 1.0], [2.0, 3.0], 7.0), "{d:?}");
+    let t = *s.world.get::<Transform>(e).unwrap();
+    assert_eq!((t.rot, t.pos), ([0.0, 1.0, 0.0, 0.0], [1.0, 2.0, 3.0]), "{t:?}");
+    // a scalar `with` field is as before, and the second spawn is an equal one (the run is deterministic: same hash from the same inputs)
+    let mut u = Sim::new(1);
+    u.apply(&Command::Define { def: j(r#"{"name": "Spawner", "fields": [{"name": "k", "type": "f32", "default": 0}]}"#) }).unwrap();
+    define(&mut u, "Mark", r#"{"components": {"Name": {"value": "Mark"}, "Transform": {}, "Decal": {}}}"#);
+    u.apply(&Command::Spawn { uid: Some(1), components: vec![("Spawner".into(), j(r#"{"k": 0.5}"#))] }).unwrap();
+    u.apply(&Command::DefineSystem { def: j(def) }).unwrap();
+    u.step_n(5);
+    assert_eq!(u.state_hash(), s.state_hash());
+}
+
+#[test]
+fn an_array_field_that_is_too_long_or_holds_something_that_is_not_a_value_is_refused_when_the_system_is_defined() {
+    let mut s = Sim::new(1);
+    s.apply(&Command::Define { def: j(r#"{"name": "Spawner", "fields": []}"#) }).unwrap();
+    define(&mut s, "Mark", r#"{"components": {"Name": {"value": "Mark"}, "Transform": {}, "Decal": {}}}"#);
+    let long = format!("[{}]", vec!["1"; 65].join(","));
+    let err = s.apply(&Command::DefineSystem { def: j(&format!(r#"{{"name": "a", "each": ["Spawner"], "do": [{{"spawn_prefab": "Mark", "with": {{"Decal": {{"normal": {long}}}}}}}]}}"#)) }).unwrap_err();
+    assert!(err.message.contains("at most 64"), "{}", err.message);
+    // an array inside an array is not a value, and a plain `spawn` still takes no array (it is run by the batch interpreter)
+    let err = s.apply(&Command::DefineSystem { def: j(r#"{"name": "b", "each": ["Spawner"], "do": [{"spawn_prefab": "Mark", "with": {"Decal": {"normal": [[0, 1], 0]}}}]}"#) }).unwrap_err();
+    assert!(err.message.contains("array is not a value"), "{}", err.message);
+    let err = s.apply(&Command::DefineSystem { def: j(r#"{"name": "c", "each": ["Spawner"], "do": [{"spawn": {"Decal": {"normal": [0, 1, 0]}}}]}"#) }).unwrap_err();
+    assert!(err.message.contains("array is not a value"), "{}", err.message);
+}

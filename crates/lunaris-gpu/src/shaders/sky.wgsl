@@ -29,7 +29,11 @@ fn hash31(p: vec3<f32>) -> f32 {
 
 // Stars on a dark sky: a grid of cells on the sphere, a few with a star at a random spot, a few of those bright.
 fn stars(dir: vec3<f32>) -> vec3<f32> {
-    let night = 1.0 - smoothstep(0.015, 0.2, luminance(frame.sky_top.rgb));
+    // with the sky of the air the stars come out when the sun is well under the horizon (the colours of the Environment are not the sky's then)
+    var night = 1.0 - smoothstep(0.015, 0.2, luminance(frame.sky_top.rgb));
+    if (frame.p26.x > 0.5) {
+        night = smoothstep(0.0, -0.22, normalize(frame.sun_dir.xyz).y);
+    }
     if (night <= 0.0 || dir.y <= 0.0) {
         return vec3<f32>(0.0);
     }
@@ -144,62 +148,54 @@ fn far_hit(o: vec3<f32>, d: vec3<f32>, r: f32) -> f32 {
     return -b + sqrt(disc);
 }
 
+// The in-scattered light sums of the atmosphere (Rayleigh, Mie) that `skylut.wgsl` integrates once a picture for a grid of view directions: 64 steps of the angle between the view's heading and the sun's, 64 of the
+// view's elevation (squared). Two vec4 for each point.
+@group(0) @binding(15) var<storage, read> sky_lut: array<vec4<f32>>;
+
+struct SkySums {
+    r: vec3<f32>,
+    m: vec3<f32>,
+}
+
+fn sky_sums(d: vec3<f32>) -> SkySums {
+    let sun = normalize(frame.sun_dir.xyz);
+    var sx = vec2<f32>(1.0, 0.0);
+    if (length(sun.xz) > 1.0e-4) {
+        sx = normalize(sun.xz);
+    }
+    var phi = 0.0;
+    let hl = length(d.xz);
+    if (hl > 1.0e-5) {
+        phi = acos(clamp(dot(d.xz / hl, sx), -1.0, 1.0)) / PI;
+    }
+    let v = sqrt(asin(clamp(d.y, 0.0, 1.0)) / (0.5 * PI));
+    let fx = phi * 63.0;
+    let fy = v * 63.0;
+    let ix = min(u32(fx), 62u);
+    let iy = min(u32(fy), 62u);
+    let tx = fx - f32(ix);
+    let ty = fy - f32(iy);
+    let a = (iy * 64u + ix) * 2u;
+    let b = a + 2u;
+    let c = a + 128u;
+    let e = c + 2u;
+    var out: SkySums;
+    out.r = mix(mix(sky_lut[a].rgb, sky_lut[b].rgb, tx), mix(sky_lut[c].rgb, sky_lut[e].rgb, tx), ty);
+    out.m = mix(mix(sky_lut[a + 1u].rgb, sky_lut[b + 1u].rgb, tx), mix(sky_lut[c + 1u].rgb, sky_lut[e + 1u].rgb, tx), ty);
+    return out;
+}
+
 fn atmosphere_sky(dir: vec3<f32>) -> vec3<f32> {
     let beta_r = vec3<f32>(0.0058, 0.0135, 0.0331);
     let beta_m = 0.021;
-    let turb = frame.p25.x * 0.5;
-    let ray = frame.p25.y;
     let g = frame.p25.z;
     let sun = normalize(frame.sun_dir.xyz);
-    let h0 = clamp(frame.eye.y * 0.001, 0.0, 5.0);
-    let o = vec3<f32>(0.0, R_EARTH + h0 + 0.0005, 0.0);
     let d = normalize(vec3<f32>(dir.x, max(dir.y, 0.0), dir.z));
-    let t_max = far_hit(o, d, R_TOP);
-    if (t_max <= 0.0) {
-        return vec3<f32>(0.0);
-    }
-    let ds = t_max / 16.0;
-    let jit = interleaved_noise(g_pix);
-    var od_r = 0.0;
-    var od_m = 0.0;
-    var sum_r = vec3<f32>(0.0);
-    var sum_m = vec3<f32>(0.0);
-    for (var i = 0; i < 16; i = i + 1) {
-        let p = o + d * ((f32(i) + jit) * ds);
-        let h = length(p) - R_EARTH;
-        let hr = exp(-h / 8.0) * ds * ray;
-        let hm = exp(-h / 1.2) * ds * turb;
-        od_r = od_r + hr;
-        od_m = od_m + hm;
-        let tl = far_hit(p, sun, R_TOP);
-        if (tl <= 0.0) {
-            continue;
-        }
-        let dl = tl / 6.0;
-        var odr_l = 0.0;
-        var odm_l = 0.0;
-        var shadow = false;
-        for (var j = 0; j < 6; j = j + 1) {
-            let q = p + sun * ((f32(j) + 0.5) * dl);
-            let hq = length(q) - R_EARTH;
-            if (hq < 0.0) {
-                shadow = true;
-                break;
-            }
-            odr_l = odr_l + exp(-hq / 8.0) * dl * ray;
-            odm_l = odm_l + exp(-hq / 1.2) * dl * turb;
-        }
-        if (shadow) {
-            continue;
-        }
-        let att = exp(-(beta_r * (od_r + odr_l) + vec3<f32>(beta_m * 1.1 * (od_m + odm_l))));
-        sum_r = sum_r + att * hr;
-        sum_m = sum_m + att * hm;
-    }
+    let s = sky_sums(d);
     let cosg = dot(d, sun);
     let ph_r = 3.0 / (16.0 * PI) * (1.0 + cosg * cosg);
     let ph_m = 3.0 / (8.0 * PI) * ((1.0 - g * g) * (1.0 + cosg * cosg)) / ((2.0 + g * g) * pow(max(1.0 + g * g - 2.0 * g * cosg, 1.0e-4), 1.5));
-    return 20.0 * frame.p25.w * (sum_r * beta_r * ph_r + sum_m * beta_m * ph_m);
+    return 20.0 * frame.p25.w * (s.r * beta_r * ph_r + s.m * beta_m * ph_m);
 }
 
 // The colour fog has looking along `dir`: its own colour, and (with the sky of the air) brighter towards the sun, the haze that glows round it.
@@ -242,7 +238,32 @@ fn sky_color(dir: vec3<f32>, with_sun: bool) -> vec3<f32> {
 // The light the sky sends to a surface that faces `n`: the lower hemisphere is the ground, the upper one the sky.
 fn sky_irradiance(n: vec3<f32>) -> vec3<f32> {
     let up = mix(frame.sky_horizon.rgb, frame.sky_top.rgb, 0.5);
-    return mix(frame.ground.rgb, up, smoothstep(-0.6, 0.8, n.y)) * frame.p0.x;
+    // (`Lighting.fill`: the lowest light the sky gives a surface, a night sky's glow, so that what no light reaches is not black)
+    return (mix(frame.ground.rgb, up, smoothstep(-0.6, 0.8, n.y)) + frame.p31.rgb) * frame.p0.x;
+}
+
+// The share of the sun's (or the moon's) light that comes back as ambient light from the ground and the walls (`Lighting.bounce`): most on faces that look down or sideways, little on the ground itself, and
+// none when the light is below the horizon.
+fn sun_bounce(n: vec3<f32>) -> vec3<f32> {
+    let up = clamp(frame.sun_dir.y, 0.0, 1.0);
+    return frame.sun_color.rgb * (frame.p31.w * up * clamp(0.6 - 0.4 * n.y, 0.2, 1.0)) * frame.p0.x;
+}
+
+// The light of a point or spot light at `dist` metres, as a share of its colour times intensity: the old window (a broad pool that fades smoothly to nothing at the range), blended towards inverse-square light from a soft core
+// with the same window at the range (`Lighting.lamp_falloff`), scaled to match the old curve at 60% of the range.
+fn lamp_atten(dist: f32, range: f32) -> f32 {
+    let k = min(dist / range, 1.0);
+    let w = 1.0 - k * k;
+    let legacy = w * w;
+    let f = frame.p32.x;
+    if (f <= 0.0) {
+        return legacy;
+    }
+    let core = frame.p32.y;
+    let kk = k * k;
+    let win = clamp(1.0 - kk * kk, 0.0, 1.0);
+    let inv = (core * core) / (kk + core * core);
+    return mix(legacy, win * win * inv * frame.p32.z, f);
 }
 
 // Karis' analytic fit of the split-sum environment BRDF: the scale and bias applied to the specular colour.

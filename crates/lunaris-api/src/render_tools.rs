@@ -89,6 +89,13 @@ impl Engine {
                 if let Some(h) = a.0.get("ortho_height").and_then(|v| v.as_f64()) {
                     c.ortho_height = Some(h as f32);
                 }
+                // how far the view reaches (default 1000 m: a real landscape needs more) and how near it starts
+                if let Some(f) = a.0.get("far").and_then(|v| v.as_f64()) {
+                    c.far = f as f32;
+                }
+                if let Some(n) = a.0.get("near").and_then(|v| v.as_f64()) {
+                    c.near = n as f32;
+                }
                 View::Explicit(c)
             }
             (Some(_), Some(_)) => return Err(EcsError::new("bad_arguments", "give either `camera` (an entity uid) or `eye`/`target`, not both")),
@@ -103,11 +110,18 @@ impl Engine {
     /// Draw the world through its own camera to raw pixels, with this engine's thread count (the native player calls this every frame).
     pub fn render_rgba(&mut self, width: u32, height: u32) -> Result<Frame> {
         let opts = RenderOptions { width, height, view: View::World(None), supersample: 1, threads: self.sim.threads };
+        self.share_world();
         render(&mut self.sim.world, &mut self.textures, &opts)
+    }
+
+    /// Lets the pictures look at the world as the simulation does (its mesh colliders and terrain: particles that bounce off the world need them).
+    pub fn share_world(&mut self) {
+        self.textures.share_world(self.sim.meshes.clone(), self.sim.heightfields.clone());
     }
 
     fn frame_for(&mut self, a: &Args, w: u32, h: u32) -> Result<Frame> {
         let opts = self.view_options(a, w, h)?;
+        self.share_world();
         render(&mut self.sim.world, &mut self.textures, &opts)
     }
 
@@ -128,6 +142,7 @@ impl Engine {
             Some(other) => return Err(EcsError::new("bad_arguments", format!("unknown quality `{other}`")).hint("quality is reference (the CPU renderer: identical everywhere), classic, low, medium, high or ultra (the GPU renderer), or auto").at("quality")),
         };
         let opts = self.view_options(a, 640, 360)?;
+        self.share_world();
         let mut note = String::new();
         if asked != "reference" {
             if self.gpu_ready() {
@@ -315,7 +330,7 @@ impl Engine {
                 None => legend.push((ch, if ch == '@' { name.clone() } else { group.clone() }, 1)),
             }
             if listed.len() < 40 {
-                listed.push(Json::obj([("symbol", Json::str(ch.to_string())), ("uid", uid_json(*uid)), ("name", Json::str(name)), ("pos", Json::arr(pos.iter().map(|&x| Json::from(x as f64))))]));
+                listed.push(Json::obj([("symbol", Json::str(ch.to_string())), ("uid", uid_json(*uid)), ("name", Json::str(name)), ("pos", Json::arr(pos.iter().map(|&x| Json::from(x))))]));
             }
         }
         // terrain: the empty cells show the ground, as a letter from `a` (lowest) to `j` (highest) in the top view, as `#` under the ground in
@@ -366,7 +381,7 @@ impl Engine {
             ("relief", relief),
             ("rows", Json::Arr(rows)),
             ("cell_size", Json::from(cell as f64)),
-            ("center", Json::arr(center.iter().map(|&x| Json::from(x as f64)))),
+            ("center", Json::arr(center.iter().map(|&x| Json::from(x)))),
             ("radius", Json::from(radius as f64)),
             ("right", Json::str("+x")),
             ("up", Json::str(if side_view { "+y" } else { "-z" })),
@@ -417,7 +432,7 @@ impl Engine {
                 let mut o = Json::obj([
                     ("a", uid_json(c.a)),
                     ("b", uid_json(c.b)),
-                    ("normal", Json::arr(c.normal.iter().map(|&x| Json::from(x as f64)))),
+                    ("normal", Json::arr(c.normal.iter().map(|&x| Json::from(x)))),
                     ("depth", Json::from(c.depth as f64)),
                     ("trigger", Json::Bool(c.trigger)),
                 ]);
@@ -453,8 +468,8 @@ impl Engine {
                     ("hit", Json::Bool(true)),
                     ("uid", uid_json(h.uid)),
                     ("distance", Json::from(h.distance as f64)),
-                    ("point", Json::arr(h.point.iter().map(|&x| Json::from(x as f64)))),
-                    ("normal", Json::arr(h.normal.iter().map(|&x| Json::from(x as f64)))),
+                    ("point", Json::arr(h.point.iter().map(|&x| Json::from(x)))),
+                    ("normal", Json::arr(h.normal.iter().map(|&x| Json::from(x)))),
                 ]);
                 if let Some(n) = self.name_of(h.uid) {
                     o.set("name", Json::str(n));
@@ -494,7 +509,7 @@ impl Engine {
             .into_iter()
             .take(limit)
             .map(|(d, uid, pos)| {
-                let mut o = Json::obj([("uid", uid_json(uid)), ("distance", Json::from(d as f64)), ("pos", Json::arr(pos.iter().map(|&x| Json::from(x as f64))))]);
+                let mut o = Json::obj([("uid", uid_json(uid)), ("distance", Json::from(d as f64)), ("pos", Json::arr(pos.iter().map(|&x| Json::from(x))))]);
                 if let Some(n) = self.name_of(uid) {
                     o.set("name", Json::str(n));
                 }

@@ -1,33 +1,37 @@
-//! The Unity look: a flat, neutral-grey dark theme, blue selection, small type, tab strips over every panel.
-//! (The colours are the ones of Unity's dark skin, to the nearest value; the editor is not made of Unity's code or artwork.)
+//! The Unreal Editor look: a flat, near-black neutral theme (panels #242424, toolbars #111111 to #171717, fields #0f0f0f, bands #2f2f2f, rows striped #1a1a1a and #151515, a slate-blue
+//! selection #40576f and a saturated blue for what is active), small type, tab strips over every panel. The values were read off the screenshots of Epic's own documentation
+//! (the editor layout page of Unreal Engine 5): the editor is not made of Unreal's code or artwork.
 use eframe::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, TextStyle};
 use std::sync::Arc;
 
 /// The window and the panels' background.
-pub const PANEL: Color32 = Color32::from_rgb(56, 56, 56);
+pub const PANEL: Color32 = Color32::from_rgb(36, 36, 36);
 /// The toolbar and the menu bar.
-pub const TOOLBAR: Color32 = Color32::from_rgb(40, 40, 40);
+pub const TOOLBAR: Color32 = Color32::from_rgb(22, 22, 22);
 /// The strip with the tabs of a panel.
-pub const TAB_STRIP: Color32 = Color32::from_rgb(35, 35, 35);
-/// Lists, text fields and everything that is "inside" something.
-pub const FIELD: Color32 = Color32::from_rgb(42, 42, 42);
+pub const TAB_STRIP: Color32 = Color32::from_rgb(26, 26, 26);
+/// Text fields and everything that is "inside" something.
+pub const FIELD: Color32 = Color32::from_rgb(15, 15, 15);
 /// The lines between panels and around fields.
-pub const LINE: Color32 = Color32::from_rgb(25, 25, 25);
-pub const BUTTON: Color32 = Color32::from_rgb(88, 88, 88);
-pub const BUTTON_HOVER: Color32 = Color32::from_rgb(103, 103, 103);
-pub const BUTTON_ACTIVE: Color32 = Color32::from_rgb(70, 70, 70);
-/// A selected row in the window that has the focus.
-pub const SELECT: Color32 = Color32::from_rgb(44, 93, 135);
-/// The bright blue of the Play button while playing, and of links.
-pub const PLAY_BLUE: Color32 = Color32::from_rgb(62, 108, 168);
-pub const BLUE: Color32 = Color32::from_rgb(70, 130, 200);
-pub const HOVER_ROW: Color32 = Color32::from_rgb(72, 72, 72);
-/// The title bar of a component in the inspector.
-pub const HEADER: Color32 = Color32::from_rgb(63, 63, 63);
-pub const ROW_ALT: Color32 = Color32::from_rgb(60, 60, 60);
-pub const TEXT: Color32 = Color32::from_rgb(210, 210, 210);
-pub const TEXT_DIM: Color32 = Color32::from_rgb(145, 145, 145);
-pub const TEXT_BRIGHT: Color32 = Color32::from_rgb(240, 240, 240);
+pub const LINE: Color32 = Color32::from_rgb(12, 12, 12);
+pub const BUTTON: Color32 = Color32::from_rgb(47, 47, 47);
+pub const BUTTON_HOVER: Color32 = Color32::from_rgb(64, 64, 64);
+pub const BUTTON_ACTIVE: Color32 = Color32::from_rgb(30, 30, 30);
+/// A selected row.
+pub const SELECT: Color32 = Color32::from_rgb(64, 87, 111);
+/// The blue of the Play button while playing, and of what is on or active.
+pub const PLAY_BLUE: Color32 = Color32::from_rgb(0, 112, 224);
+pub const BLUE: Color32 = Color32::from_rgb(26, 140, 240);
+pub const HOVER_ROW: Color32 = Color32::from_rgb(46, 46, 46);
+/// The band of a category in the inspector, the header of a list and the status line under it.
+pub const HEADER: Color32 = Color32::from_rgb(47, 47, 47);
+pub const ROW_ALT: Color32 = Color32::from_rgb(41, 41, 41);
+/// The rows of a list (the outliner, the content browser's tree): two shades in turn, on a darker ground than the panel.
+pub const LIST_A: Color32 = Color32::from_rgb(26, 26, 26);
+pub const LIST_B: Color32 = Color32::from_rgb(21, 21, 21);
+pub const TEXT: Color32 = Color32::from_rgb(192, 192, 192);
+pub const TEXT_DIM: Color32 = Color32::from_rgb(128, 128, 128);
+pub const TEXT_BRIGHT: Color32 = Color32::from_rgb(232, 232, 232);
 pub const OK: Color32 = Color32::from_rgb(110, 200, 130);
 pub const WARN: Color32 = Color32::from_rgb(235, 190, 90);
 pub const ERR: Color32 = Color32::from_rgb(230, 90, 80);
@@ -76,7 +80,7 @@ pub fn apply(ctx: &egui::Context) {
     fonts(ctx);
     let mut v = egui::Visuals::dark();
     v.panel_fill = PANEL;
-    v.window_fill = Color32::from_rgb(64, 64, 64);
+    v.window_fill = Color32::from_rgb(34, 34, 34);
     v.extreme_bg_color = FIELD;
     v.faint_bg_color = ROW_ALT;
     v.override_text_color = Some(TEXT);
@@ -96,11 +100,11 @@ pub fn apply(ctx: &egui::Context) {
     v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, TEXT);
     v.widgets.inactive.bg_fill = BUTTON;
     v.widgets.inactive.weak_bg_fill = BUTTON;
-    v.widgets.inactive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(34, 34, 34));
+    v.widgets.inactive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(18, 18, 18));
     v.widgets.inactive.fg_stroke = Stroke::new(1.0, TEXT);
     v.widgets.hovered.bg_fill = BUTTON_HOVER;
     v.widgets.hovered.weak_bg_fill = BUTTON_HOVER;
-    v.widgets.hovered.bg_stroke = Stroke::new(1.0, Color32::from_rgb(34, 34, 34));
+    v.widgets.hovered.bg_stroke = Stroke::new(1.0, Color32::from_rgb(18, 18, 18));
     v.widgets.hovered.fg_stroke = Stroke::new(1.0, TEXT_BRIGHT);
     v.widgets.active.bg_fill = BUTTON_ACTIVE;
     v.widgets.active.weak_bg_fill = BUTTON_ACTIVE;

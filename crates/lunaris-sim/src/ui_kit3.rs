@@ -89,12 +89,60 @@ fn bar_parts(world: &mut World) -> BTreeSet<u64> {
 
 /// What a `UiGroup` with `shown` false hides: the entity it is on and everything below it (every entity whose `Parent` chain reaches it).
 pub fn hidden_set(world: &mut World) -> BTreeSet<u64> {
+    hidden_set_shared(world).as_ref().clone()
+}
+
+/// A number that is the same for the same groups that are off and the same `Parent` relation of the world (the two things the hidden set is made of), added up over the entities so that their order does not matter.
+fn hidden_key(world: &mut World, off: &BTreeSet<u64>) -> u64 {
+    fn mix(a: u64, b: u64) -> u64 {
+        let mut z = a.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ b.wrapping_add(0xD6E8_FEB8_6659_FD93).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+        z ^= z >> 32;
+        z = z.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
+        z ^ (z >> 29)
+    }
+    let (mut sum, mut n) = (0u64, 0u64);
+    let _ = world.for_each_uid::<(&Parent,), _>(|_, uid, (p,)| {
+        if p.target.0 != 0 {
+            sum = sum.wrapping_add(mix(uid, p.target.0));
+            n += 1;
+        }
+    });
+    let mut off_sum = 0u64;
+    for &u in off {
+        off_sum = off_sum.wrapping_add(mix(u, 0x5851_F42D_4C95_7F2D));
+    }
+    mix(sum, n) ^ mix(off_sum, off.len() as u64 + 1)
+}
+
+thread_local! {
+    /// The last hidden set of this thread and what it was made from.
+    static HIDDEN: std::cell::RefCell<Option<(u64, std::sync::Arc<BTreeSet<u64>>)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// [`hidden_set`], shared: a world with a group switched off pays one pass over the world's `Parent`s to find out that the set is the one of the last call (the widgets ask for it half a dozen times a tick, and the
+/// renderers once a picture; building it means mapping every parent of the world, which in a city with thousands of attached parts cost 0.3 to 0.4 ms each time). The set is a function of the groups that are off and
+/// of the `Parent` relation, and the key covers both.
+pub fn hidden_set_shared(world: &mut World) -> std::sync::Arc<BTreeSet<u64>> {
     let mut off: BTreeSet<u64> = BTreeSet::new();
     let _ = world.for_each_uid::<(&UiGroup,), _>(|_, uid, (g,)| {
         if !g.shown {
             off.insert(uid);
         }
     });
+    if off.is_empty() {
+        return std::sync::Arc::new(BTreeSet::new());
+    }
+    let key = hidden_key(world, &off);
+    if let Some(hit) = HIDDEN.with(|c| c.borrow().as_ref().filter(|h| h.0 == key).map(|h| h.1.clone())) {
+        return hit;
+    }
+    let set = std::sync::Arc::new(hidden_compute(world, off));
+    HIDDEN.with(|c| *c.borrow_mut() = Some((key, set.clone())));
+    set
+}
+
+/// The hidden set made from scratch: the groups that are off and everything whose `Parent` chain reaches one.
+pub(crate) fn hidden_compute(world: &mut World, off: BTreeSet<u64>) -> BTreeSet<u64> {
     if off.is_empty() {
         return off;
     }
@@ -110,7 +158,7 @@ pub fn hidden_set(world: &mut World) -> BTreeSet<u64> {
 
 /// A button that a group has hidden is not under the pointer, whatever the rectangle says.
 pub(crate) fn hide_pointer(world: &mut World) {
-    for uid in hidden_set(world) {
+    for &uid in hidden_set_shared(world).iter() {
         if let Some(u) = world.entity(uid).and_then(|e| world.get_mut::<Ui>(e)) {
             if u.button {
                 u.hover = false;
@@ -399,7 +447,7 @@ pub(crate) fn scroll_apply(world: &mut World) {
     let bars = bars(world);
     let aspect = aspect_of(world);
     let nav = nav_current(world);
-    let hidden = hidden_set(world);
+    let hidden = hidden_set_shared(world);
     let mut order: Vec<(usize, u64)> = first.iter().map(|v| (ancestors(&parents, v.uid).count(), v.uid)).collect();
     order.sort_unstable();
     for (_, uid) in order {

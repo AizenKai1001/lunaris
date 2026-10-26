@@ -10,6 +10,8 @@ struct Harness {
     ctx: egui::Context,
     app: App,
     time: f64,
+    /// What egui drew, kept for `shoot`.
+    screen: crate::shot::Screen,
 }
 
 fn j(s: &str) -> Json {
@@ -24,7 +26,7 @@ impl Harness {
         let ctx = egui::Context::default();
         let opts = Options { root: dir, quality: "reference".to_string(), mute: true, ..Options::default() };
         let app = App::new(&ctx, opts);
-        let mut h = Harness { ctx, app, time: 0.0 };
+        let mut h = Harness { ctx, app, time: 0.0, screen: Default::default() };
         for c in [
             r#"{"components":{"Name":{"value":"Floor"},"Transform":{"pos":[0,-0.5,0],"scale":[20,1,20]},"MeshRenderer":{"mesh":"cube","color":[0.3,0.6,0.3,1]}}}"#,
             r#"{"components":{"Name":{"value":"Box"},"Transform":{"pos":[0,1,0]},"MeshRenderer":{"mesh":"cube","color":[0.9,0.2,0.2,1]}}}"#,
@@ -44,6 +46,8 @@ impl Harness {
         let raw = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1600.0, 900.0))), time: Some(self.time), events, focused: true, ..RawInput::default() };
         let app = &mut self.app;
         let mut out = self.ctx.run_ui(raw, |ui| app.draw(ui));
+        // (the textures egui hands over are kept, so that `shoot` can draw the window in software)
+        self.screen.apply(&out);
         // there is no graphics card behind this window: the picture it would have drawn is dropped
         out.textures_delta.clear();
     }
@@ -52,6 +56,26 @@ impl Harness {
         for _ in 0..n {
             self.frame(vec![]);
         }
+    }
+
+    /// An editor on the workspace `dir` (already holding what it should show), with no scene made.
+    fn on(dir: std::path::PathBuf) -> Harness {
+        let ctx = egui::Context::default();
+        let opts = Options { root: dir, quality: "reference".to_string(), mute: true, ..Options::default() };
+        let app = App::new(&ctx, opts);
+        let mut h = Harness { ctx, app, time: 0.0, screen: Default::default() };
+        h.frames(3);
+        h
+    }
+
+    /// A picture of the window as it is now (1600 x 900), written to `LUNARIS_SHOTS`/`name`.png.
+    fn shoot(&mut self, name: &str) {
+        let Ok(dir) = std::env::var("LUNARIS_SHOTS") else { return };
+        self.screen.keep_shapes = true;
+        self.frames(2);
+        self.screen.keep_shapes = false;
+        let rgba = self.screen.picture(&self.ctx, 1600, 900);
+        crate::shot::save_png(&std::path::Path::new(&dir).join(format!("{name}.png")), 1600, 900, &rgba);
     }
 
     fn uid(&self, name: &str) -> u64 {
@@ -143,6 +167,49 @@ fn dragging_a_gizmo_handle_moves_the_selection_along_that_axis_only_and_is_one_u
     h.key(Key::Z, Modifiers::COMMAND);
     let undone = h.pos_of("Box");
     assert!((undone[0] - before[0]).abs() < 1e-4, "one undo puts it back: {undone:?}");
+}
+
+#[test]
+fn the_snap_steps_chosen_in_the_toolbar_round_what_the_handles_do() {
+    use crate::viewport::Tool;
+    let mut h = Harness::new();
+    h.click(h.screen_of("Box", [0.0, 1.0, 0.0]));
+    // move, with a step of one metre: the box ends on a whole number of metres
+    h.app.viewport.snap_move = 1.0;
+    let from = h.app.viewport.handle_point(&h.app.studio, Axis::X, 0.6).unwrap();
+    let tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    h.drag(from, Pos2::new(from.x + (tip.x - from.x) * 2.0 + 13.0, from.y + (tip.y - from.y) * 2.0));
+    let after = h.pos_of("Box");
+    assert!(after[0] > 0.9 && (after[0] - after[0].round()).abs() < 1e-3, "a whole number of metres: {after:?}");
+    // with the step off and no Ctrl a drag is free
+    h.app.viewport.snap_move = 0.0;
+    h.frames(2);
+    let from = h.app.viewport.handle_point(&h.app.studio, Axis::X, 0.6).unwrap();
+    let tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    h.drag(from, Pos2::new(from.x + (tip.x - from.x) * 1.4 + 7.0, from.y + (tip.y - from.y) * 1.4));
+    let free = h.pos_of("Box");
+    assert!(free[0] > after[0] && (free[0] * 100.0 - (free[0] * 100.0).round()).abs() > 1e-3, "not on a step: {free:?}");
+    // scale, a step of a quarter
+    h.app.viewport.snap_scale = 0.25;
+    h.app.viewport.tool = Tool::Scale;
+    h.frames(2);
+    let from = h.app.viewport.handle_point(&h.app.studio, Axis::X, 0.8).unwrap();
+    let tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    h.drag(from, Pos2::new(from.x + (tip.x - from.x) * 3.0, from.y + (tip.y - from.y) * 3.0));
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{},"components":["Transform"]}}"#, h.uid("Box")))).unwrap();
+    let sc: Vec<f64> = g.get("components").unwrap().get("Transform").unwrap().get("scale").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    assert!(sc[0] > 1.2 && (sc[0] * 4.0 - (sc[0] * 4.0).round()).abs() < 1e-3, "a quarter step: {sc:?}");
+    // rotate, a step of 30 degrees: a sweep of 40 ends on 30
+    h.app.viewport.snap_rot = 30.0;
+    h.app.viewport.tool = Tool::Rotate;
+    h.frames(2);
+    let (a, b) = (h.app.viewport.ring_point(&h.app.studio, Axis::Y, 10.0).unwrap(), h.app.viewport.ring_point(&h.app.studio, Axis::Y, 50.0).unwrap());
+    h.drag(a, b);
+    let uid = h.uid("Box");
+    h.app.studio.select(Some(uid));
+    h.app.studio.refresh_entity();
+    let e = crate::mathx::q_to_euler(h.app.studio.entity.as_ref().unwrap().quat("Transform", "rot").unwrap());
+    assert!((e[1] - 30.0).abs() < 1.0, "on a step of 30 degrees: {e:?}");
 }
 
 #[test]
@@ -239,7 +306,7 @@ fn a_new_scene_has_a_camera_and_a_light_and_saving_then_opening_gives_the_same_w
 fn the_whole_window_draws_in_every_mode_without_trouble() {
     let mut h = Harness::new();
     h.app.studio.select(Some(h.uid("Sun")));
-    for tab in [crate::state::BottomTab::Project, crate::state::BottomTab::Console, crate::state::BottomTab::Systems] {
+    for tab in [crate::state::BottomTab::Project, crate::state::BottomTab::Console, crate::state::BottomTab::Systems, crate::state::BottomTab::Profiler] {
         h.app.studio.tab = tab;
         h.frames(3);
     }
@@ -263,6 +330,589 @@ fn the_whole_window_draws_in_every_mode_without_trouble() {
     let console_errors = h.app.studio.console.iter().filter(|l| l.kind == crate::state::LogKind::Error).count();
     assert!(console_errors < 10, "{console_errors} errors");
     assert!(h.app.viewport.error.is_none(), "{:?}", h.app.viewport.error);
+}
+
+#[test]
+fn several_entities_can_be_selected_moved_duplicated_and_deleted_together() {
+    let mut h = Harness::new();
+    let (b, ball) = (h.uid("Box"), h.uid("Ball"));
+    let total = h.app.studio.total_entities;
+    h.app.studio.select(Some(b));
+    h.app.studio.toggle_select(ball);
+    assert_eq!(h.app.studio.selected, vec![b, ball]);
+    assert_eq!(h.app.studio.selection, Some(ball), "the one selected last is the main one");
+    // Ctrl+click again takes one out; a plain select collapses everything onto one
+    h.app.studio.toggle_select(b);
+    assert_eq!(h.app.studio.selected, vec![ball]);
+    h.app.studio.toggle_select(b);
+    assert_eq!((h.app.studio.selected.clone(), h.app.studio.selection), (vec![ball, b], Some(b)));
+    // a range from the Hierarchy: whatever is between, the clicked one is the main one
+    let all: Vec<u64> = h.app.studio.rows.iter().map(|r| r.uid).collect();
+    h.app.studio.select_many(all.clone(), Some(ball));
+    assert_eq!(h.app.studio.selected.len(), all.len());
+    assert_eq!(h.app.studio.selection, Some(ball));
+    h.app.studio.select(Some(b));
+    h.app.studio.toggle_select(ball);
+    h.frames(3);
+    // dragging the move handle of the main one takes the others along by the same amount
+    let (before_ball, before_box) = (h.pos_of("Ball"), h.pos_of("Box"));
+    let from = h.app.viewport.handle_point(&h.app.studio, Axis::X, 0.8).unwrap();
+    let tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    h.drag(from, Pos2::new(from.x + (tip.x - from.x) * 3.0, from.y + (tip.y - from.y) * 3.0));
+    let (after_ball, after_box) = (h.pos_of("Ball"), h.pos_of("Box"));
+    let (dx_ball, dx_box) = (after_ball[0] - before_ball[0], after_box[0] - before_box[0]);
+    assert!(dx_ball > 0.5, "the main one moved along x: {dx_ball}");
+    assert!((dx_ball - dx_box).abs() < 1e-3, "both moved by the same amount: {dx_ball} and {dx_box}");
+    assert!((after_ball[1] - before_ball[1]).abs() < 1e-4 && (after_box[2] - before_box[2]).abs() < 1e-4, "and only along x");
+    // duplicate: both are copied and the copies are the selection
+    h.app.studio.duplicate_selected();
+    h.frames(3);
+    assert_eq!(h.app.studio.total_entities, total + 2);
+    assert_eq!(h.app.studio.selected.len(), 2);
+    assert!(!h.app.studio.is_selected(b) && !h.app.studio.is_selected(ball));
+    // delete the selection: the copies go, the originals stay
+    h.app.studio.delete_selected();
+    h.frames(3);
+    assert_eq!(h.app.studio.total_entities, total);
+    assert!(h.app.studio.selected.is_empty() && h.app.studio.selection.is_none());
+    assert_eq!(h.app.studio.all.iter().filter(|r| r.uid == b || r.uid == ball).count(), 2);
+    // an entity that disappears leaves the selection
+    h.app.studio.select(Some(b));
+    h.app.studio.toggle_select(ball);
+    h.app.studio.call("despawn", j(&format!(r#"{{"uid":{ball}}}"#))).unwrap();
+    h.app.studio.rows_dirty = true;
+    h.frames(3);
+    assert_eq!(h.app.studio.selected, vec![b]);
+}
+
+#[test]
+fn a_value_set_with_several_selected_goes_to_every_selected_entity_that_has_the_component_and_is_one_undo_step() {
+    let mut h = Harness::new();
+    let (b, ball, sun, floor) = (h.uid("Box"), h.uid("Ball"), h.uid("Sun"), h.uid("Floor"));
+    let color_of = |h: &mut Harness, uid: u64| -> Vec<f64> {
+        let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["MeshRenderer"]}}"#))).unwrap();
+        match g.get("components").and_then(|c| c.get("MeshRenderer")) {
+            Some(m) => m.get("color").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect(),
+            None => vec![],
+        }
+    };
+    let (box_before, floor_before) = (color_of(&mut h, b), color_of(&mut h, floor));
+    // Box, the Sun (which has no MeshRenderer) and Ball selected, Ball the main one
+    h.app.studio.select(Some(b));
+    h.app.studio.toggle_select(sun);
+    h.app.studio.toggle_select(ball);
+    assert_eq!(h.app.studio.selection, Some(ball));
+    let errors = |h: &Harness| h.app.studio.console.iter().filter(|l| l.kind == crate::state::LogKind::Error).count();
+    let errors_before = errors(&h);
+    h.app.studio.set_selected(ball, "MeshRenderer", j(r#"{"color":[0,1,0,1]}"#), Some("g-1"));
+    assert_eq!(color_of(&mut h, ball), vec![0.0, 1.0, 0.0, 1.0], "the main one");
+    assert_eq!(color_of(&mut h, b), vec![0.0, 1.0, 0.0, 1.0], "the other mesh that is selected");
+    assert_eq!(color_of(&mut h, floor), floor_before, "what is not selected stays");
+    assert_eq!(errors(&h), errors_before, "the Sun has no MeshRenderer: skipped quietly, no error in the Console");
+    // one Undo takes the edit back everywhere
+    h.app.studio.undo();
+    assert_eq!(color_of(&mut h, b), box_before);
+    assert_ne!(color_of(&mut h, ball), vec![0.0, 1.0, 0.0, 1.0]);
+    // a name is not copied; with one selected only that one changes
+    h.app.studio.set_selected(ball, "Name", j(r#"{"value":"Renamed"}"#), None);
+    assert_eq!(h.app.studio.all.iter().filter(|r| r.name == "Renamed").count(), 0, "rows refresh later, so look at the entity");
+    let n = h.app.studio.call("get", j(&format!(r#"{{"uid":{b},"components":["Name"]}}"#))).unwrap();
+    assert_eq!(n.get("components").unwrap().get("Name").unwrap().get("value").and_then(|v| v.as_str()), Some("Box"));
+    h.app.studio.select(Some(b));
+    h.app.studio.set_selected(b, "MeshRenderer", j(r#"{"color":[1,1,0,1]}"#), Some("g-2"));
+    assert_eq!(color_of(&mut h, b), vec![1.0, 1.0, 0.0, 1.0]);
+    assert_ne!(color_of(&mut h, ball), vec![1.0, 1.0, 0.0, 1.0]);
+}
+
+#[test]
+fn the_effects_tab_lists_the_files_plays_an_effect_says_what_is_wrong_saves_and_puts_it_on_an_entity() {
+    use crate::state::Center;
+    let mut h = Harness::new();
+    let root = h.app.studio.opts.root.clone();
+    std::fs::create_dir_all(root.join("fx")).unwrap();
+    std::fs::write(root.join("fx/spark.fx.json"), crate::effects::TEMPLATE).unwrap();
+    h.app.studio.center = Center::Effects;
+    h.frames(4);
+    assert_eq!(h.app.effects.test_files(), ["fx/spark.fx.json"]);
+    // an effect (the template) plays at once, on a stage of its own
+    assert!(h.app.effects.test_has_picture());
+    assert!(h.app.effects.effect().is_some(), "the template reads");
+    assert!(h.app.effects.dirty(), "a new effect is not saved yet");
+    // opening a file reads its text; nothing is changed yet
+    assert!(h.app.effects.open(&mut h.app.studio, "fx/spark.fx.json"));
+    h.frames(2);
+    assert!(!h.app.effects.dirty());
+    h.shoot("15_effects");
+    // a mistake is the reader's own message, and the effect is not one until it is mended
+    h.app.effects.text = h.app.effects.text.replace("\"rate\": 40", "\"rate\": -3");
+    h.frames(2);
+    assert!(h.app.effects.dirty() && h.app.effects.effect().is_none());
+    h.shoot("16_effects_error");
+    // mended and saved: the file on disk is the text
+    h.app.effects.text = h.app.effects.text.replace("\"rate\": -3", "\"rate\": 90");
+    h.frames(2);
+    assert!(h.app.effects.effect().is_some());
+    h.app.effects.save(&mut h.app.studio);
+    assert!(!h.app.effects.dirty());
+    assert!(std::fs::read_to_string(root.join("fx/spark.fx.json")).unwrap().contains("\"rate\": 90"));
+    // the effect goes on the selected entity as its file, through the `set` tool (or `add_component` when it has none), and the entity has it
+    let ball = h.uid("Ball");
+    h.app.studio.select(Some(ball));
+    h.app.effects.use_on_selection(&mut h.app.studio);
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{ball},"components":["ParticleSystem"]}}"#))).unwrap();
+    assert_eq!(g.get("components").unwrap().get("ParticleSystem").unwrap().get("effect").unwrap().as_str(), Some("fx/spark.fx.json"));
+    // and `check` reads it
+    let c = h.app.studio.call("check", Json::Null).unwrap();
+    assert_eq!(c.get("errors").and_then(|e| e.as_u64()), Some(0), "{c:?}");
+    // a new effect has no file until it is saved, and is saved under its name
+    h.app.effects.new_effect();
+    h.app.effects.text = h.app.effects.text.replace("new effect", "Big Flame");
+    h.frames(2);
+    h.app.effects.save(&mut h.app.studio);
+    assert!(root.join("fx/big_flame.fx.json").is_file());
+    h.frames(2);
+    assert_eq!(h.app.effects.test_files(), ["fx/big_flame.fx.json", "fx/spark.fx.json"]);
+}
+
+#[test]
+fn the_sequencer_tab_reads_a_timeline_scrubs_a_preview_and_writes_edits_back() {
+    use crate::sequencer::Kind;
+    use crate::state::Center;
+    let mut h = Harness::new();
+    // the box gets a timeline: its height goes 0 -> 6 over 2 seconds, a flash event at 1, the end at 2
+    let b = h.uid("Box");
+    h.app.studio.call("add_component", j(&format!(r#"{{"uid":{b},"component":"Timeline","value":{{"script":"at 0 ramp Transform.pos[1] 0 -> 6 over 2\nat 1 event flash\nat 2 end","playing":false}}}}"#))).unwrap();
+    h.app.studio.select(Some(b));
+    h.app.studio.center = Center::Sequencer;
+    h.frames(4);
+    let seq = h.app.sequencer.test_seq().clone();
+    assert_eq!(seq.items().count(), 3, "the three steps were read");
+    assert_eq!(seq.lanes().iter().map(|l| l.label.as_str()).collect::<Vec<_>>(), ["Transform.pos[1]", "events"]);
+    assert_eq!(seq.length(), 2.0);
+    // in edit mode scrubbing moves the playhead and nothing else: the author's scene is not touched
+    h.app.sequencer.seek(&mut h.app.studio, 1.0);
+    assert!((h.pos_of("Box")[1] - 1.0).abs() < 1e-6, "the box stayed where the author put it");
+    // in a preview the scene is where the sequence has it at that second
+    h.app.studio.play();
+    h.app.studio.pause();
+    h.app.sequencer.seek(&mut h.app.studio, 1.0);
+    h.frames(2);
+    assert!((h.pos_of("Box")[1] - 3.0).abs() < 1e-4, "half way up the ramp: {:?}", h.pos_of("Box"));
+    h.app.sequencer.seek(&mut h.app.studio, 99.0);
+    assert!((h.pos_of("Box")[1] - 6.0).abs() < 1e-4, "past the end: the last value");
+    // Stop puts the scene back exactly
+    h.app.stop();
+    h.frames(2);
+    assert!((h.pos_of("Box")[1] - 1.0).abs() < 1e-6, "the preview left no trace in the scene");
+    // an edit goes back into the entity's script: the event moves to 1.5 s
+    let event_line = seq.items().find(|(_, i)| matches!(i.kind, Kind::Event(_))).map(|(l, _)| l).unwrap();
+    h.app.sequencer.test_edit(|s| s.item_mut(event_line).unwrap().at = 1.5);
+    h.app.sequencer.test_commit(&mut h.app.studio);
+    h.frames(3);
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{b},"components":["Timeline"]}}"#))).unwrap();
+    let script = g.get("components").unwrap().get("Timeline").unwrap().get("script").unwrap().as_str().unwrap().to_string();
+    assert!(script.contains("at 1.5 event flash") && script.contains("at 0 ramp Transform.pos[1] 0 -> 6 over 2") && script.contains("at 2 end"), "{script}");
+    assert_eq!(h.app.sequencer.test_script(), script);
+    // the engine reads what the sequencer wrote
+    let entries = lunaris_sim::gameplay::parse_timeline(&script).unwrap();
+    assert_eq!(entries.len(), 3);
+    // an entity with no Timeline shows nothing to edit (the tab offers to add one)
+    let ball = h.uid("Ball");
+    h.app.studio.select(Some(ball));
+    h.frames(3);
+    assert_eq!(h.app.sequencer.test_seq().items().count(), 0);
+}
+
+#[test]
+fn the_project_settings_window_draws_and_saves_what_is_changed() {
+    use crate::project_settings::{ProjectSettings, FILE};
+    let mut h = Harness::new();
+    let root = h.app.studio.opts.root.clone();
+    // a scene in the workspace, so that the start-scene list has something to show
+    h.app.studio.call("save_scene_as", j(r#"{"path":"scenes/level1.lunaris.json"}"#)).ok();
+    assert_eq!(ProjectSettings::load(&root), ProjectSettings::default(), "a new project has the defaults and no file");
+    assert!(!root.join(FILE).exists());
+    h.app.open_settings();
+    h.frames(4);
+    assert!(h.app.settings_open);
+    h.app.settings.name = "Coin Chase".into();
+    h.app.settings.size = (1920, 1080);
+    h.app.settings.quality = "medium".into();
+    h.app.settings.seed = 77;
+    h.frames(3);
+    assert!(!root.join(FILE).exists(), "nothing is written until Save or Close");
+    h.app.save_settings();
+    assert_eq!(ProjectSettings::load(&root), h.app.settings);
+    assert_eq!(ProjectSettings::load(&root).size, (1920, 1080));
+    // a second editor on the same workspace starts with the saved settings
+    let ctx = egui::Context::default();
+    let again = App::new(&ctx, Options { root: root.clone(), quality: "reference".to_string(), mute: true, ..Options::default() });
+    assert_eq!(again.settings.name, "Coin Chase");
+    assert_eq!(again.settings.seed, 77);
+}
+
+#[test]
+fn the_project_panel_shows_a_picture_as_its_own_thumbnail() {
+    use crate::state::BottomTab;
+    let mut h = Harness::new();
+    // a 200 x 100 picture, red above and blue below, in the workspace
+    let rgba: Vec<u8> = (0..200 * 100).flat_map(|i| if i / 200 < 50 { [220, 20, 20, 255] } else { [20, 20, 220, 255] }).collect();
+    let png = lunaris_render::encode_png(200, 100, &rgba).unwrap();
+    std::fs::write(h.app.studio.opts.root.join("flag.png"), png).unwrap();
+    std::fs::write(h.app.studio.opts.root.join("notes.bin"), b"not a picture").unwrap();
+    h.app.studio.tab = BottomTab::Project;
+    h.app.project.reload();
+    // the worker thread decodes it in the background: draw frames until the thumbnail is there
+    let mut ready = false;
+    for _ in 0..400 {
+        h.frames(1);
+        if h.app.project.thumbs_ready() > 0 {
+            ready = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(ready, "the picture's thumbnail was made");
+    // exactly one: the file that is not a picture keeps its icon
+    h.frames(5);
+    assert_eq!(h.app.project.thumbs_ready(), 1);
+}
+
+#[test]
+fn a_model_has_a_thumbnail_and_can_be_dragged_into_the_scene_where_it_stands_on_what_is_under_the_pointer() {
+    use crate::state::BottomTab;
+    let mut h = Harness::new();
+    let root = h.app.studio.opts.root.clone();
+    let crate_glb = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/models/crate.glb")).unwrap();
+    std::fs::write(root.join("crate.glb"), crate_glb).unwrap();
+    // a picture and a one-tenth-of-a-second-long sound as well
+    let rgba: Vec<u8> = (0..16 * 16).flat_map(|_| [30, 200, 60, 255]).collect();
+    std::fs::write(root.join("green.png"), lunaris_render::encode_png(16, 16, &rgba).unwrap()).unwrap();
+    let mut wav = Vec::new();
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&(36u32 + 800).to_le_bytes());
+    wav.extend_from_slice(b"WAVEfmt ");
+    for v in [16u32, 0x0001_0001, 8000, 8000, 0x0008_0001] {
+        wav.extend_from_slice(&v.to_le_bytes());
+    }
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&800u32.to_le_bytes());
+    wav.extend((0..800).map(|i| if (i / 20) % 2 == 0 { 200u8 } else { 56u8 }));
+    std::fs::write(root.join("beep.wav"), wav).unwrap();
+    h.app.studio.tab = BottomTab::Project;
+    h.app.project.reload();
+    // the model, the picture and the sound (its waveform) all get a thumbnail (made on worker threads)
+    let mut ready = false;
+    for _ in 0..600 {
+        h.frames(1);
+        if h.app.project.thumbs_ready() >= 3 {
+            ready = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(ready, "the model's, the picture's and the sound's thumbnails were made: {}", h.app.project.thumbs_ready());
+    h.frames(3);
+
+    // drag the model's tile into the scene view, onto the floor
+    let tile = h.app.project.tile_center("crate.glb").expect("the model has a tile");
+    let before = h.app.studio.total_entities;
+    let target = h.screen_of("floor", [3.0, 0.0, 2.0]);
+    h.drag(tile, target);
+    assert_eq!(h.app.studio.total_entities, before + 1, "dropping a model adds an entity");
+    let uid = h.app.studio.selection.expect("the new entity is selected");
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid}}}"#))).unwrap();
+    let comps = g.get("components").unwrap();
+    assert_eq!(comps.get("Name").and_then(|n| n.get("value")).and_then(|v| v.as_str()), Some("crate"), "named after the file");
+    assert_eq!(comps.get("MeshRenderer").and_then(|m| m.get("mesh")).and_then(|v| v.as_str()), Some("crate.glb"));
+    let pos: Vec<f64> = comps.get("Transform").unwrap().get("pos").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    assert!((pos[0] - 3.0).abs() < 0.4 && (pos[2] - 2.0).abs() < 0.4, "where the pointer was: {pos:?}");
+    // the floor's top is at y = 0: the crate's lowest point is on it
+    let info = h.app.studio.call("model_info", j(r#"{"path":"crate.glb"}"#)).unwrap();
+    let lowest = info.get("bounds").unwrap().get("min").unwrap().as_array().unwrap()[1].as_f64().unwrap();
+    assert!((pos[1] + lowest).abs() < 0.02, "stands on the floor: y {} lowest {lowest}", pos[1]);
+
+    // a picture dropped on a mesh becomes its texture; dropped on nothing it changes nothing
+    let tile = h.app.project.tile_center("green.png").expect("the picture has a tile");
+    let on_box = h.screen_of("box", [0.0, 1.0, 0.0]);
+    h.drag(tile, on_box);
+    let box_uid = h.uid("Box");
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{box_uid},"components":["MeshRenderer"]}}"#))).unwrap();
+    assert_eq!(g.get("components").unwrap().get("MeshRenderer").unwrap().get("texture").and_then(|v| v.as_str()), Some("green.png"));
+    let tile = h.app.project.tile_center("green.png").unwrap();
+    let ball_uid = h.uid("Ball");
+    h.drag(tile, Pos2::new(h.app.viewport.last_rect.min.x + 4.0, h.app.viewport.last_rect.min.y + 4.0));
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{ball_uid},"components":["MeshRenderer"]}}"#))).unwrap();
+    assert_eq!(g.get("components").unwrap().get("MeshRenderer").unwrap().get("texture").and_then(|v| v.as_str()).unwrap_or(""), "", "nothing was under the pointer there");
+
+    // a sound dropped in the scene becomes an Audio Source that plays it
+    let tile = h.app.project.tile_center("beep.wav").expect("the sound has a tile");
+    let n = h.app.studio.total_entities;
+    let target = h.screen_of("floor", [-3.0, 0.0, 1.0]);
+    h.drag(tile, target);
+    assert_eq!(h.app.studio.total_entities, n + 1);
+    let uid = h.app.studio.selection.unwrap();
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["AudioSource"]}}"#))).unwrap();
+    assert_eq!(g.get("components").unwrap().get("AudioSource").unwrap().get("file").and_then(|v| v.as_str()), Some("beep.wav"));
+
+    // letting go over the Hierarchy (or anywhere else) does nothing
+    let n = h.app.studio.total_entities;
+    let tile = h.app.project.tile_center("crate.glb").unwrap();
+    h.drag(tile, Pos2::new(40.0, 200.0));
+    assert_eq!(h.app.studio.total_entities, n);
+
+    // the type filter narrows the tiles to one kind, from every folder
+    std::fs::create_dir_all(root.join("deep")).unwrap();
+    std::fs::write(root.join("deep").join("tick.wav"), std::fs::read(root.join("beep.wav")).unwrap()).unwrap();
+    h.app.project.reload();
+    h.app.project.set_kind_filter("sound");
+    h.frames(4);
+    assert!(h.app.project.tile_center("beep.wav").is_some() && h.app.project.tile_center("deep/tick.wav").is_some(), "both sounds, in whatever folder");
+    assert!(h.app.project.tile_center("crate.glb").is_none() && h.app.project.tile_center("green.png").is_none(), "nothing else");
+    h.app.project.set_kind_filter("model");
+    h.frames(3);
+    assert!(h.app.project.tile_center("crate.glb").is_some() && h.app.project.tile_center("beep.wav").is_none());
+    h.app.project.set_kind_filter("");
+    h.frames(3);
+    assert!(h.app.project.tile_center("green.png").is_some() && h.app.project.tile_center("deep/tick.wav").is_none(), "all types: this folder only again");
+}
+
+#[test]
+fn the_place_panel_adds_a_thing_by_a_click_or_where_it_is_dropped_standing_on_what_is_there() {
+    use crate::state::{LeftTab, Template};
+    let mut h = Harness::new();
+    h.app.studio.left_tab = LeftTab::Place;
+    h.frames(3);
+    // every template has a row
+    for t in Template::ALL {
+        assert!(h.app.place.row_center(t).is_some(), "no row for {}", t.label());
+    }
+    // a click adds it in front of the camera and selects it
+    let before = h.app.studio.total_entities;
+    let sphere = h.app.place.row_center(Template::Sphere).unwrap();
+    h.click(sphere);
+    assert_eq!(h.app.studio.total_entities, before + 1);
+    assert!(h.app.studio.selection.is_some());
+    // a drag into the view adds it where it is dropped, resting on the floor (its top is at y = 0): a unit cube stands half its height above it
+    let cube = h.app.place.row_center(Template::Cube).unwrap();
+    let target = h.screen_of("floor", [-3.0, 0.0, 2.0]);
+    let n = h.app.studio.total_entities;
+    h.drag(cube, target);
+    assert_eq!(h.app.studio.total_entities, n + 1, "the dropped cube was added");
+    let uid = h.app.studio.selection.unwrap();
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["Transform","MeshRenderer"]}}"#))).unwrap();
+    let comps = g.get("components").unwrap();
+    assert_eq!(comps.get("MeshRenderer").and_then(|m| m.get("mesh")).and_then(|v| v.as_str()), Some("cube"));
+    let pos: Vec<f64> = comps.get("Transform").unwrap().get("pos").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    assert!((pos[0] + 3.0).abs() < 0.4 && (pos[2] - 2.0).abs() < 0.4, "where it was dropped: {pos:?}");
+    assert!((pos[1] - 0.5).abs() < 0.02, "standing on the floor: {pos:?}");
+    // a light is hung in the air above the point
+    let light = h.app.place.row_center(Template::PointLight).unwrap();
+    let n = h.app.studio.total_entities;
+    let bare = h.screen_of("floor", [2.0, 0.0, 2.0]);
+    h.drag(light, bare);
+    assert_eq!(h.app.studio.total_entities, n + 1);
+    let uid = h.app.studio.selection.unwrap();
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["Transform","Light"]}}"#))).unwrap();
+    let y = g.get("components").unwrap().get("Transform").unwrap().get("pos").unwrap().as_array().unwrap()[1].as_f64().unwrap();
+    assert!((y - 2.0).abs() < 0.02, "two metres up: {y}");
+    // letting go over the Hierarchy adds nothing; the search narrows the rows
+    let n = h.app.studio.total_entities;
+    let cube = h.app.place.row_center(Template::Cube).unwrap();
+    h.drag(cube, Pos2::new(cube.x, cube.y + 300.0));
+    assert_eq!(h.app.studio.total_entities, n);
+    // a prefab of the scene is a row too, and is dropped like the rest
+    h.app.studio.call("define_prefab", j(r#"{"name":"Lamp","def":{"components":{"Name":{"value":"lamp"},"Transform":{"pos":[0,0,0]},"MeshRenderer":{"mesh":"cylinder"}}}}"#)).unwrap();
+    h.app.studio.rows_dirty = true;
+    // (the search box narrows the rows to the one: the list is longer than the panel is high)
+    h.app.place.set_filter("lamp");
+    h.frames(6);
+    let row = h.app.place.prefab_center("Lamp").expect("the prefab has a row");
+    let n = h.app.studio.total_entities;
+    h.drag(row, h.screen_of("floor", [4.0, 0.0, -2.0]));
+    assert_eq!(h.app.studio.total_entities, n + 1, "the dropped prefab was spawned");
+    let uid = h.app.studio.selection.unwrap();
+    let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["Transform"]}}"#))).unwrap();
+    let pos: Vec<f64> = g.get("components").unwrap().get("Transform").unwrap().get("pos").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    assert!((pos[0] - 4.0).abs() < 0.4 && (pos[2] + 2.0).abs() < 0.4, "where it was dropped: {pos:?}");
+    // the Hierarchy tab shows the entities again
+    h.app.studio.left_tab = LeftTab::Hierarchy;
+    h.frames(3);
+    assert!(h.app.place.row_center(Template::Cube).is_none() || h.app.place.row_center(Template::Cube).is_some());
+}
+
+#[test]
+fn the_paint_brush_sprinkles_copies_on_the_ground_where_it_is_dragged_and_one_undo_takes_the_stroke_back() {
+    use crate::paint::{Brush, BrushItem};
+    use crate::state::Template;
+    let mut h = Harness::new();
+    let mut b = Brush::new(BrushItem::Template(Template::Cube));
+    b.radius = 1.5;
+    b.spacing = 1.0;
+    h.app.studio.brush = Some(b);
+    h.frames(3);
+    // a drag across the floor paints a row of cubes round the line it went along, each standing on the floor (a unit cube is centred half a height above it, scaled 0.8..1.2)
+    let before = h.app.studio.total_entities;
+    let (from, to) = (h.screen_of("floor", [-4.0, 0.0, 3.0]), h.screen_of("floor", [4.0, 0.0, 3.0]));
+    h.drag(from, to);
+    let made = h.app.studio.total_entities - before;
+    assert!(made >= 8, "a stroke of eight metres made only {made}");
+    let copies: Vec<u64> = h.app.studio.all.iter().filter(|r| r.name.starts_with("Cube ")).map(|r| r.uid).collect();
+    assert_eq!(copies.len(), made);
+    let (mut lo, mut hi, mut turned) = (f64::MAX, f64::MIN, false);
+    for uid in &copies {
+        let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["Transform"]}}"#))).unwrap();
+        let t = g.get("components").unwrap().get("Transform").unwrap();
+        let p: Vec<f64> = t.get("pos").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+        let s = t.get("scale").unwrap().as_array().unwrap()[0].as_f64().unwrap();
+        assert!((0.8..=1.2).contains(&s) && (p[1] - 0.5 * s).abs() < 0.02, "stands on the floor at its size: {p:?} x{s}");
+        assert!((p[2] - 3.0).abs() < 1.5 + 0.5, "near the line the pointer went along: {p:?}");
+        lo = lo.min(p[0]);
+        hi = hi.max(p[0]);
+        turned |= t.get("rot").and_then(|r| r.as_array()).is_some_and(|r| r[1].as_f64().unwrap().abs() > 0.05);
+    }
+    assert!(lo < -2.5 && hi > 2.5, "the cubes run along the stroke: {lo}..{hi}");
+    assert!(turned, "each copy has a turn of its own");
+    // picking is off while painting: a click on the box does not select it, it paints
+    let n = h.app.studio.total_entities;
+    h.click(h.screen_of("Box", [0.0, 1.0, 0.0]));
+    assert_eq!(h.app.studio.selection, None, "the click painted, it did not pick");
+    assert!(h.app.studio.total_entities > n, "a click is a stroke of one point");
+    // one Undo takes the click's copies back, another one the whole stroke's
+    h.app.studio.undo();
+    h.frames(3);
+    assert_eq!(h.app.studio.total_entities, n, "one undo took the click back");
+    h.app.studio.undo();
+    h.frames(3);
+    assert_eq!(h.app.studio.total_entities, before, "one undo took the whole stroke back");
+    // Esc puts the brush down: a drag adds nothing and a click picks again
+    h.key(Key::Escape, Modifiers::NONE);
+    assert!(h.app.studio.brush.is_none());
+    h.drag(from, to);
+    assert_eq!(h.app.studio.total_entities, before);
+    h.click(h.screen_of("Box", [0.0, 1.0, 0.0]));
+    assert_eq!(h.app.studio.selection, Some(h.uid("Box")));
+}
+
+#[test]
+fn the_outliner_has_an_eye_that_hides_a_mesh_and_what_is_attached_under_it_in_one_undo_step() {
+    let mut h = Harness::new();
+    let (b, ball) = (h.uid("Box"), h.uid("Ball"));
+    h.frames(3);
+    let visible = |h: &mut Harness, uid: u64| {
+        let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["MeshRenderer"]}}"#))).unwrap();
+        g.get("components").unwrap().get("MeshRenderer").unwrap().get("visible").unwrap().as_bool().unwrap()
+    };
+    assert!(visible(&mut h, b));
+    // a mesh has an eye, the Sun does not
+    assert!(h.app.hierarchy.eye_center(b).is_some(), "the box has an eye");
+    assert!(h.app.hierarchy.eye_center(h.uid("Sun")).is_none(), "the sun has none");
+    // a click on it hides the mesh and does not select the row
+    h.click(h.app.hierarchy.eye_center(b).unwrap());
+    assert!(!visible(&mut h, b), "the eye hid it");
+    assert_eq!(h.app.studio.selection, None, "the eye does not select");
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == b).unwrap().shown, 0);
+    // another click shows it again
+    h.click(h.app.hierarchy.eye_center(b).unwrap());
+    assert!(visible(&mut h, b));
+    // with the ball attached under the box, the box's eye acts on both, and one Undo shows both again
+    crate::hierarchy::attach_to(&mut h.app.studio, ball, Some(b));
+    h.app.studio.rows_dirty = true;
+    h.frames(3);
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == b).unwrap().meshes, 2);
+    h.click(h.app.hierarchy.eye_center(b).unwrap());
+    assert!(!visible(&mut h, b) && !visible(&mut h, ball), "both are hidden");
+    h.app.studio.undo();
+    h.frames(3);
+    assert!(visible(&mut h, b) && visible(&mut h, ball), "one undo showed both");
+}
+
+#[test]
+fn the_paint_brush_is_armed_from_a_row_of_the_place_panel_and_shows_its_bar() {
+    use crate::state::{LeftTab, Template};
+    let mut h = Harness::new();
+    h.app.studio.left_tab = LeftTab::Place;
+    h.frames(3);
+    assert!(crate::place::paintable(Template::Sphere) && !crate::place::paintable(Template::Camera) && !crate::place::paintable(Template::Plane));
+    // a right click on a row opens its menu; "Paint with this" arms the brush
+    let row = h.app.place.row_center(Template::Sphere).unwrap();
+    h.move_to(row);
+    h.frame(vec![Event::PointerButton { pos: row, button: PointerButton::Secondary, pressed: true, modifiers: Modifiers::NONE }]);
+    h.frame(vec![Event::PointerButton { pos: row, button: PointerButton::Secondary, pressed: false, modifiers: Modifiers::NONE }]);
+    h.frames(3);
+    let item = h.app.place.menu_item_center().expect("the row's menu is open with a Paint entry");
+    h.click(item);
+    let brush = h.app.studio.brush.clone().expect("the brush is armed");
+    assert_eq!(brush.label(), "Sphere");
+    assert!(brush.per_point() >= 1);
+}
+
+#[test]
+fn a_field_that_is_not_what_a_new_component_starts_with_has_a_reset_arrow_that_puts_it_back() {
+    let mut h = Harness::new();
+    let b = h.uid("Box");
+    // the schema says what a new Transform starts with
+    let d = h.app.studio.def("Transform").defaults.expect("the schema answers with defaults");
+    assert_eq!(d.get("scale").and_then(|s| s.as_array()).map(|a| a.len()), Some(3));
+    h.app.studio.select(Some(b));
+    h.frames(4);
+    // the Box was made at [0, 1, 0] with a colour of its own: those rows have an arrow, a field at its default does not
+    let has = |h: &Harness, key: &str| h.app.inspector.resets.iter().any(|(k, _)| k == key);
+    assert!(has(&h, "Transform.pos") && has(&h, "MeshRenderer.color"), "{:?}", h.app.inspector.resets);
+    assert!(!has(&h, "Transform.scale") && !has(&h, "Transform.rot"), "{:?}", h.app.inspector.resets);
+    // a click on the arrow of the position puts it back (one undo step)
+    let at = h.app.inspector.resets.iter().find(|(k, _)| k == "Transform.pos").map(|(_, p)| *p).unwrap();
+    h.click(at);
+    h.frames(3);
+    assert_eq!(h.pos_of("Box"), [0.0, 0.0, 0.0]);
+    assert!(!has(&h, "Transform.pos"), "no arrow once it is the default");
+    h.app.studio.undo();
+    h.frames(3);
+    assert_eq!(h.pos_of("Box")[1], 1.0, "one Undo brings the old position back");
+}
+
+#[test]
+fn the_statistics_overlay_draws_and_the_wheel_sets_the_fly_speed_between_a_tenth_and_ten_times() {
+    use crate::viewport::fly_speed_after_scroll;
+    let mut h = Harness::new();
+    h.app.viewport.stats = true;
+    h.frames(5);
+    assert!(h.app.viewport.frame_ms > 0.0, "the overlay measures the editor's frames");
+    assert!(h.app.viewport.picture_ms > 0.0, "and the last picture");
+    // the wheel: a notch faster, a notch slower, never outside the range
+    assert!(fly_speed_after_scroll(1.0, 50.0) > 1.1 && fly_speed_after_scroll(1.0, -50.0) < 0.9);
+    assert!((fly_speed_after_scroll(1.0, 0.0) - 1.0).abs() < 1e-6);
+    let mut s = 1.0;
+    for _ in 0..200 {
+        s = fly_speed_after_scroll(s, 100.0);
+    }
+    assert_eq!(s, 10.0);
+    for _ in 0..400 {
+        s = fly_speed_after_scroll(s, -100.0);
+    }
+    assert_eq!(s, 0.1);
+}
+
+#[test]
+fn the_profiler_tab_times_the_game_while_it_plays_and_only_while_it_is_showing() {
+    use crate::state::BottomTab;
+    let mut h = Harness::new();
+    // not showing: playing does not time anything
+    h.app.studio.tab = BottomTab::Console;
+    h.app.play();
+    h.frames(40);
+    assert!(h.app.studio.engine.sim.profile.is_none(), "a closed Profiler tab costs nothing");
+    // showing: windows of one second of game time arrive
+    h.app.studio.tab = BottomTab::Profiler;
+    h.frames(200);
+    let w = h.app.profiler.last.clone().expect("a window of measurements after a few seconds of play");
+    assert!(w.ticks >= crate::profiler::WINDOW_TICKS && !w.rows.is_empty(), "{} ticks, {} stages", w.ticks, w.rows.len());
+    assert!(w.avg_ms > 0.0 && h.app.profiler.history.len() >= 1);
+    // leaving the tab switches the timing off again
+    h.app.studio.tab = BottomTab::Console;
+    h.frames(3);
+    assert!(h.app.studio.engine.sim.profile.is_none());
+    h.app.stop();
 }
 
 #[test]
@@ -434,6 +1084,93 @@ fn type_text(h: &mut Harness, text: &str) {
 }
 
 #[test]
+fn a_breakpoint_on_a_statement_stops_the_game_when_the_selected_entity_is_about_to_run_it() {
+    use crate::blueprint::{Pin, PinKind};
+    let mut h = Harness::new();
+    // above 2 the box drops to 0 (the `then` branch); otherwise it rises by half a unit
+    let def = r#"{"name":"cap","each":["Transform"],"do":[{"if":{"gt":[{"get":"Transform.pos[1]"},2]},"then":[{"set":"Transform.pos[1]","to":0}],"else":[{"set":"Transform.pos[1]","to":{"add":[{"get":"Transform.pos[1]"},0.5]}}]}]}"#;
+    h.app.studio.call("define_system", j(def)).unwrap();
+    let b = h.uid("Box");
+    h.app.studio.select(Some(b));
+    blueprint_tab(&mut h);
+    let bp = h.app.blueprint.test_bp().unwrap().clone();
+    let sets: Vec<u32> = bp.nodes.iter().filter(|n| n.op == "set").map(|n| n.id).collect();
+    assert_eq!(sets.len(), 2);
+    // the `then` branch's set has a plain 0 in its box, the `else` one a wire from the add
+    let then_set = *sets.iter().find(|id| bp.wire_into(Pin { node: **id, kind: PinKind::DataIn(0) }).is_none()).unwrap();
+    // a node that is not a statement cannot have a breakpoint
+    let get = bp.nodes.iter().find(|n| n.op == "get").unwrap().id;
+    h.app.blueprint.test_toggle_break(get);
+    assert!(!h.app.blueprint.test_has_breakpoints(), "a value is not a statement");
+    h.app.blueprint.test_toggle_break(then_set);
+    assert!(h.app.blueprint.test_has_breakpoints());
+    // play: y goes 1, 1.5, 2, 2.5; after the tick that makes it 2.5 the next one would take the `then` branch, so the game stops before it
+    h.app.play();
+    assert_eq!(h.app.studio.mode, Mode::Play);
+    for _ in 0..40 {
+        h.frames(1);
+        if h.app.studio.mode == Mode::Paused {
+            break;
+        }
+    }
+    assert_eq!(h.app.studio.mode, Mode::Paused, "the game stopped at the breakpoint");
+    assert!((h.pos_of("Box")[1] - 2.5).abs() < 1e-5, "stopped before the statement ran: {:?}", h.pos_of("Box"));
+    assert_eq!(h.app.blueprint.test_hit(), Some(then_set));
+    assert!(h.app.blueprint.test_ran().contains(&then_set), "the statement is marked as the one that runs next");
+    // go on: the `then` branch runs (y = 0) and the next tick takes the `else` branch, which has no breakpoint
+    h.app.studio.play();
+    for _ in 0..3 {
+        h.frames(1);
+        if h.app.studio.mode == Mode::Paused {
+            break;
+        }
+    }
+    assert!(h.app.studio.mode == Mode::Play || h.pos_of("Box")[1] < 2.0, "it went on past the breakpoint: {:?}", h.pos_of("Box"));
+    // stopping the game clears the mark; removing the breakpoint stops the stops
+    h.app.stop();
+    h.frames(3);
+    assert_eq!(h.app.blueprint.test_hit(), None);
+    h.app.blueprint.test_toggle_break(then_set);
+    assert!(!h.app.blueprint.test_has_breakpoints());
+}
+
+#[test]
+fn the_blueprint_tab_shows_the_values_of_the_selected_entity_on_its_wires_even_for_an_edit_not_compiled_yet() {
+    let mut h = Harness::new();
+    h.app.studio.call("define_system", j(DRIFT)).unwrap();
+    // nothing selected: nothing to show
+    h.app.studio.select(None);
+    blueprint_tab(&mut h);
+    assert_eq!(h.app.blueprint.test_live_summary(), None);
+    // the box stands at y = 1: `get` reads 1 and `add` makes 1.5
+    let b = h.uid("Box");
+    h.app.studio.select(Some(b));
+    h.frames(3);
+    assert_eq!(h.app.blueprint.test_live_summary(), Some((2, true)), "the add and the get have a value");
+    let bp = h.app.blueprint.test_bp().unwrap().clone();
+    let (add, get) = (bp.nodes.iter().find(|n| n.op == "add").unwrap().id, bp.nodes.iter().find(|n| n.op == "get").unwrap().id);
+    assert_eq!(h.app.blueprint.test_live(get).as_deref(), Some("1"));
+    assert_eq!(h.app.blueprint.test_live(add).as_deref(), Some("1.5"));
+    // an edit that is not compiled: 0.5 becomes 2.5, and the values follow the graph on the screen
+    let at = h.app.blueprint.test_default_screen(add, 1).expect("the box is on the screen");
+    h.click(at);
+    type_text(&mut h, "2.5");
+    h.key(Key::Enter, Modifiers::NONE);
+    assert!(h.app.blueprint.test_dirty());
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    h.frames(3);
+    assert_eq!(h.app.blueprint.test_live(add).as_deref(), Some("3.5"), "1 + 2.5, before Compile");
+    // the world was not touched by any of this
+    assert!((h.pos_of("Box")[1] - 1.0).abs() < 1e-6);
+    // an entity without a Transform is not visited by the system
+    let bare = h.app.studio.call("spawn", j(r#"{"components":{"Name":{"value":"Bare"}}}"#)).unwrap().get("uid").unwrap().as_u64().unwrap();
+    h.app.studio.select(Some(bare));
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    h.frames(3);
+    assert_eq!(h.app.blueprint.test_live_summary(), Some((0, false)));
+}
+
+#[test]
 fn the_blueprint_tab_shows_a_system_as_nodes_and_an_edited_value_compiles_into_the_world() {
     use crate::blueprint::{Pin, PinKind};
     let mut h = Harness::new();
@@ -599,4 +1336,166 @@ fn a_handle_resizes_and_delete_and_duplicate_work_on_the_selected_widget() {
     h.key(Key::Delete, Modifiers::NONE);
     h.frames(2);
     assert_eq!(h.app.designer.test_widgets().len(), n, "deleted the copy");
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for e in std::fs::read_dir(from).unwrap().flatten() {
+        let (src, dst) = (e.path(), to.join(e.file_name()));
+        if src.is_dir() {
+            copy_dir(&src, &dst);
+        } else {
+            std::fs::copy(&src, &dst).unwrap();
+        }
+    }
+}
+
+/// Pictures of the editor for looking at, drawn in software (`shot.rs`) from the Caldera example: nothing is checked, and without `LUNARIS_SHOTS` (the folder to write
+/// them to) the test does nothing. `LUNARIS_SHOTS=/tmp/shots cargo test --release -p lunaris-studio screenshots -- --nocapture`.
+#[test]
+fn screenshots_of_the_editor_for_looking_at() {
+    use crate::state::{BottomTab, Center, LeftTab};
+    if std::env::var("LUNARIS_SHOTS").is_err() {
+        return;
+    }
+    // (the scene names its models as `examples/caldera/models/...`: the workspace is the folder that holds `examples`)
+    let dir = std::env::temp_dir().join(format!("lunaris-shots-{}", std::process::id()));
+    copy_dir(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/caldera"), &dir.join("examples").join("caldera"));
+    let mut h = Harness::on(dir);
+    h.app.studio.open_scene("examples/caldera/island.lunaris.json");
+    h.frames(8);
+    // 1: the whole window: the scene, the Hierarchy, the Inspector of the hero, the Project panel with the models' thumbnails
+    h.app.project.set_folder("examples/caldera/models");
+    h.app.studio.tab = BottomTab::Project;
+    let hero = h.app.studio.all.iter().find(|r| r.name.to_lowercase().contains("hero")).map(|r| (r.uid, r.pos));
+    if let Some((u, pos)) = hero {
+        h.app.studio.select(Some(u));
+        if let Some(p) = pos {
+            // (a view of the hero and what stands round it, not of the hero's nose)
+            h.app.viewport.focus([p[0], p[1] + 1.0, p[2]], 7.0);
+        }
+    }
+    for _ in 0..200 {
+        h.frames(1);
+        if h.app.project.thumbs_ready() >= 12 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    }
+    h.frames(6);
+    h.shoot("01_editor");
+    // 2: the Place tab
+    h.app.studio.left_tab = LeftTab::Place;
+    h.frames(4);
+    h.shoot("02_place");
+    h.app.studio.left_tab = LeftTab::Hierarchy;
+    // 3: several things selected
+    let area = h.app.viewport.last_rect;
+    let names: Vec<(u64, String)> = h
+        .app
+        .studio
+        .all
+        .iter()
+        .filter(|r| r.kind == crate::state::Kind::Mesh && Some(r.uid) != hero.map(|x| x.0))
+        .filter(|r| r.pos.and_then(|p| h.app.viewport.project(p)).is_some_and(|s| area.shrink(60.0).contains(s)))
+        .take(4)
+        .map(|r| (r.uid, r.name.clone()))
+        .collect();
+    if let Some((first, _)) = names.first() {
+        h.app.studio.select(Some(*first));
+        for (u, _) in names.iter().skip(1) {
+            h.app.studio.toggle_select(*u);
+        }
+    }
+    h.frames(6);
+    h.shoot("03_several_selected");
+    // 4: a model carried from the Project panel over the scene
+    let tile = h.app.project.tile_center("examples/caldera/models/golem.glb").or_else(|| h.app.project.tile_center("examples/caldera/models/hero.glb"));
+    if let Some(from) = tile {
+        let to = Pos2::new(900.0, 420.0);
+        h.move_to(from);
+        h.press(from);
+        for i in 1..=10 {
+            let t = i as f32 / 10.0;
+            h.move_to(Pos2::new(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t));
+        }
+        h.shoot("04_dragging_a_model");
+        h.release(to);
+        h.frames(4);
+        h.shoot("05_model_dropped");
+    }
+    // 5: Paint mode with a model as the brush: a stroke in the making (the ring and the dots), then what it left
+    let model = ["golem", "hero"].iter().find_map(|m| {
+        let p = format!("examples/caldera/models/{m}.glb");
+        h.app.project.tile_center(&p).map(|_| p)
+    });
+    if let Some(path) = model {
+        let mut b = crate::paint::Brush::new(crate::paint::BrushItem::Model(path));
+        b.radius = 4.0;
+        b.spacing = 2.0;
+        h.app.studio.brush = Some(b);
+        h.app.studio.left_tab = LeftTab::Place;
+        h.frames(3);
+        let r = h.app.viewport.last_rect;
+        let (from, to) = (Pos2::new(r.center().x - 200.0, r.center().y + 80.0), Pos2::new(r.center().x + 200.0, r.center().y + 120.0));
+        h.move_to(from);
+        h.press(from);
+        for i in 1..=10 {
+            let t = i as f32 / 10.0;
+            h.move_to(Pos2::new(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t));
+        }
+        h.shoot("16_painting");
+        h.release(to);
+        h.frames(4);
+        h.shoot("17_painted");
+        h.app.studio.brush = None;
+        h.app.studio.left_tab = LeftTab::Hierarchy;
+        h.frames(2);
+    }
+    // 6: the Blueprint of a system, the Script of another
+    h.app.studio.open_blueprint = Some("fader".to_string());
+    h.frames(6);
+    h.shoot("06_blueprint");
+    h.app.studio.open_script = Some("fire_switch".to_string());
+    h.frames(6);
+    h.shoot("07_script");
+    // 7: the Sequencer on an entity that has a Timeline
+    let b = h.app.studio.all.first().map(|r| r.uid).unwrap();
+    h.app.studio.call("add_component", j(&format!(r#"{{"uid":{b},"component":"Timeline","value":{{"script":"at 0 ramp Transform.pos[1] 0 -> 6 over 2\nat 0.5 set score 10\nat 1 event flash\nat 2.5 end","playing":false}}}}"#))).unwrap();
+    h.app.studio.select(Some(b));
+    h.app.studio.center = Center::Sequencer;
+    h.frames(6);
+    h.shoot("08_sequencer");
+    // 8: the Project Settings window
+    // 8b: the other tabs of the middle: the game as the camera sees it, the UI designer, the notes canvas
+    h.app.studio.center = Center::View;
+    h.app.viewport.set_kind(crate::viewport::ViewKind::Game);
+    h.frames(6);
+    h.shoot("09_game_view");
+    h.app.viewport.set_kind(crate::viewport::ViewKind::Scene);
+    h.app.studio.center = Center::Ui;
+    h.frames(6);
+    h.shoot("10_ui_designer");
+    h.app.studio.center = Center::Canvas;
+    h.frames(6);
+    h.shoot("11_canvas");
+    h.app.studio.center = Center::View;
+    h.app.open_settings();
+    h.frames(6);
+    h.shoot("12_project_settings");
+    h.app.settings_open = false;
+    // 8c: the bottom panel's other tabs
+    h.app.studio.tab = BottomTab::Console;
+    h.frames(4);
+    h.shoot("14_console");
+    h.app.studio.tab = BottomTab::Systems;
+    h.frames(4);
+    h.shoot("15_systems");
+    // 9: playing, with the Profiler showing
+    h.app.studio.tab = BottomTab::Profiler;
+    h.app.studio.play();
+    for _ in 0..70 {
+        h.frames(1);
+    }
+    h.shoot("13_profiler_while_playing");
 }

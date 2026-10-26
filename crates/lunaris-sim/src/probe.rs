@@ -14,6 +14,12 @@ fn finite3(v: V3) -> bool {
     v.iter().all(|c| c.is_finite())
 }
 
+#[cfg(test)]
+thread_local! {
+    /// How many times a step gathered the static world (tests check that a step in which nothing casts does not).
+    pub(crate) static GATHERS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
 pub fn step(world: &mut World, fields: &Terrains, meshes: &MeshStore) {
     let mut probes: Vec<(u64, Entity, Transform, Probe)> = Vec::new();
     let _ = world.for_each_uid::<(&Transform, &Probe), _>(|e, uid, (t, p)| probes.push((uid, e, *t, *p)));
@@ -21,18 +27,32 @@ pub fn step(world: &mut World, fields: &Terrains, meshes: &MeshStore) {
         return;
     }
     probes.sort_by_key(|p| p.0);
-    let ray = RayWorld::gather(world, fields, meshes, None);
-    let layers = Layers::gather(world);
+    // the static world and the layers are gathered when the first probe casts and not before: a step in which no probe casts (a game that lets its probes
+    // cast every few steps sets `ray_max` to 0 and `up` and `depth` to 0 in between) costs nothing of it
+    let mut gathered: Option<(RayWorld, Layers)> = None;
     let waters = crate::water::bodies(world, fields);
     for (uid, entity, t, p) in probes {
         let mut out = p;
-        let who = layers.of(uid);
         let pos = if finite3(t.pos) { t.pos } else { [0.0; 3] };
-        // ---- the ground: down from `up` metres above the feet
+        // ---- the ground: down from `up` metres above the feet (no cast when `up` + `depth` is 0)
         let up = if p.up.is_finite() { p.up.clamp(0.0, 1000.0) } else { 2.0 };
         let depth = if p.depth.is_finite() { p.depth.clamp(0.0, 10000.0) } else { 100.0 };
         let origin = [pos[0], pos[1] + up, pos[2]];
-        match ray.cast(origin, [0.0, -1.0, 0.0], up + depth, who, uid) {
+        let ray_dir_ok = p.ray_max.is_finite() && p.ray_max > 0.0 && finite3(p.ray_dir) && finite3(p.ray_from);
+        if up + depth > 0.0 || ray_dir_ok {
+            gathered.get_or_insert_with(|| {
+                #[cfg(test)]
+                GATHERS.with(|g| g.set(g.get() + 1));
+                (RayWorld::gather(world, fields, meshes, None), Layers::gather(world))
+            });
+        }
+        let ground = if up + depth > 0.0 {
+            let (ray, layers) = gathered.as_ref().expect("gathered above");
+            ray.cast(origin, [0.0, -1.0, 0.0], up + depth, layers.of(uid), uid)
+        } else {
+            None
+        };
+        match ground {
             Some(h) => {
                 out.over_ground = true;
                 out.ground = origin[1] - h.t;
@@ -61,7 +81,9 @@ pub fn step(world: &mut World, fields: &Terrains, meshes: &MeshStore) {
         out.hit = false;
         out.hit_dist = 0.0;
         out.hit_uid = Uid(0);
-        if p.ray_max.is_finite() && p.ray_max > 0.0 && finite3(p.ray_dir) && finite3(p.ray_from) {
+        if ray_dir_ok {
+            let (ray, layers) = gathered.as_ref().expect("gathered above");
+            let who = layers.of(uid);
             let (from, dir) = if p.ray_local { (turn(t.rot, p.ray_from), turn(t.rot, p.ray_dir)) } else { (p.ray_from, p.ray_dir) };
             let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
             if len > 1.0e-9 {
@@ -119,6 +141,48 @@ mod tests {
         s.world.get_mut::<components::Transform>(e).unwrap().pos = [3.5, 5.0, 0.0];
         s.step_n(1);
         assert!((probe(&s, 10).ground - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn a_step_in_which_no_probe_casts_does_not_gather_the_world_and_one_that_does_gathers_it_once() {
+        let mut s = Sim::new(1);
+        spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-0.5,0],"scale":[100,1,100]},"Collider":{"shape":1}}"#);
+        // three probes that do not cast (no ground cast: up and depth 0; no ray: ray_max 0)
+        for uid in 10..13 {
+            spawn(&mut s, uid, r#"{"Transform":{"pos":[1,3,1]},"Probe":{"up":0,"depth":0}}"#);
+        }
+        super::GATHERS.with(|g| g.set(0));
+        s.step_n(3);
+        assert_eq!(super::GATHERS.with(|g| g.get()), 0, "nothing cast, nothing gathered");
+        let a = probe(&s, 10);
+        assert!(!a.over_ground && a.ground == 3.0 && a.ground_normal == [0.0, 1.0, 0.0] && a.ground_uid.0 == 0 && !a.hit && !a.wet, "{a:?}");
+        // one of them casts the ground: one gather a step, however many probes cast
+        let e = s.world.entity(11).unwrap();
+        s.world.get_mut::<components::Probe>(e).unwrap().depth = 10.0;
+        let e = s.world.entity(12).unwrap();
+        s.world.get_mut::<components::Probe>(e).unwrap().depth = 10.0;
+        s.step_n(2);
+        assert_eq!(super::GATHERS.with(|g| g.get()), 2, "one gather a step");
+        assert!(probe(&s, 11).over_ground && (probe(&s, 11).ground - 0.0).abs() < 1e-4 && probe(&s, 12).over_ground);
+        assert!(!probe(&s, 10).over_ground, "the probe that does not cast still does not");
+        // a probe that only casts its ray gathers too
+        let e = s.world.entity(10).unwrap();
+        {
+            let p = s.world.get_mut::<components::Probe>(e).unwrap();
+            p.ray_max = 10.0;
+            p.ray_dir = [0.0, -1.0, 0.0];
+            p.ray_from = [0.0, 0.0, 0.0];
+        }
+        let e11 = s.world.entity(11).unwrap();
+        s.world.get_mut::<components::Probe>(e11).unwrap().depth = 0.0;
+        let e12 = s.world.entity(12).unwrap();
+        s.world.get_mut::<components::Probe>(e12).unwrap().depth = 0.0;
+        super::GATHERS.with(|g| g.set(0));
+        s.step_n(1);
+        assert_eq!(super::GATHERS.with(|g| g.get()), 1);
+        let a = probe(&s, 10);
+        assert!(a.hit && (a.hit_dist - 3.0).abs() < 1e-3, "{a:?}");
+        assert!(!a.over_ground, "its ground is not cast");
     }
 
     #[test]

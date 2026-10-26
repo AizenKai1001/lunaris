@@ -1,0 +1,28 @@
+{
+  "name": "rain splashes (voxel)",
+  "bounds": 12,
+  "budget": 400,
+  "lod": {"near": 20, "far": 60},
+  "emitters": [
+    {
+      "name": "droplets",
+      "space": "world",
+      "max": 300,
+      "spawn": {
+        "rate": 120,
+        "shape": {"type": "disc", "radius": 9}
+      },
+      "init": {
+        "life": [0.15, 0.3],
+        "speed": [0.8, 2.0],
+        "direction": [0, 1, 0],
+        "spread": 45,
+        "size": [0.015, 0.03],
+        "color": [0.8, 0.88, 1, 0.9]
+      },
+      "update": {"gravity": [0, -9.8, 0]},
+      "curves": {"alpha": [[0, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "alpha"}
+    }
+  ]
+}

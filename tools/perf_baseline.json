@@ -1,0 +1,33 @@
+{
+  "entities": 200000,
+  "machines": {
+    "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz x8": {
+      "bytes_per_entity": 102.7,
+      "rows": {
+        "characters": 1.2,
+        "fx campfires": 0.443,
+        "gather": 0.065,
+        "graph (1 thread)": 2.05,
+        "graph interpreted": 9.533,
+        "graph system": 0.943,
+        "nav city": 4.184,
+        "nav city kept": 0.091,
+        "nav open": 0.154,
+        "physics": 1.361,
+        "physics column": 1.022,
+        "probe cast": 0.412,
+        "probe idle": 0.005,
+        "query pass": 0.367,
+        "render (threads)": 15.252,
+        "render 960x540": 39.905,
+        "scene export": 274.113,
+        "scene import": 156.376,
+        "snapshot": 5.206,
+        "spawn": 18.732,
+        "state hash": 15.971,
+        "step": 1.266,
+        "step (1 thread)": 2.458
+      }
+    }
+  }
+}

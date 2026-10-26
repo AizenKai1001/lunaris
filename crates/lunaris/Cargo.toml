@@ -20,6 +20,7 @@ lunaris-gpu = { path = "../lunaris-gpu" }
 lunaris-net = { path = "../lunaris-net" }
 lunaris-audio = { path = "../lunaris-audio" }
 lunaris-pad = { path = "../lunaris-pad" }
+lunaris-citygen = { path = "../lunaris-citygen" }
 
 [target.'cfg(windows)'.dependencies]
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }

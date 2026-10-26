@@ -16,7 +16,7 @@ pub use error::{EcsError, Result};
 pub use scene::{load_scene_json, parse_component_def, to_scene_json, SCENE_VERSION};
 pub use schema::{compute_layout, valid_identifier, Component, ComponentId, ComponentInfo, Field, FieldKind, FieldSpec, FieldType, NativeSpec, ScalarKind, StateHasher, Sym, Uid};
 pub use strings::StringTable;
-pub use world::{valid_resource_name, Archetype, Chunk, Entity, Query, QueryTerm, World};
+pub use world::{valid_resource_name, Archetype, Bundle, Chunk, Entity, Query, QueryTerm, Terms, World, MAX_BUNDLE, MAX_TERMS};
 
 #[cfg(test)]
 mod tests;

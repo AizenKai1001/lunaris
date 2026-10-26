@@ -262,19 +262,21 @@ pub fn draw(p: &Painter, r: Rect, icon: Icon, color: Color32) {
 pub fn button(ui: &mut egui::Ui, icon: Icon, selected: bool, tip: &str) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::click());
     let hovered = resp.hovered();
-    let fill = if selected { crate::theme::BUTTON_ACTIVE } else if hovered { crate::theme::BUTTON_HOVER } else { crate::theme::BUTTON };
-    ui.painter().rect_filled(rect, CornerRadius::same(2), fill);
-    ui.painter().rect_stroke(rect, CornerRadius::same(2), Stroke::new(1.0, if selected { crate::theme::BLUE } else { Color32::from_rgb(34, 34, 34) }), StrokeKind::Inside);
-    draw(ui.painter(), rect.shrink(4.0), icon, if selected { crate::theme::TEXT_BRIGHT } else { crate::theme::TEXT });
+    // flat, as Unreal's toolbars are: no box until the pointer is over it, and the tool that is on is a bright blue picture
+    let fill = if selected { Color32::from_rgb(28, 28, 28) } else if hovered { crate::theme::BUTTON_HOVER } else { Color32::TRANSPARENT };
+    ui.painter().rect_filled(rect, CornerRadius::same(3), fill);
+    draw(ui.painter(), rect.shrink(4.0), icon, if selected { Color32::from_rgb(38, 187, 255) } else { crate::theme::TEXT });
     resp.on_hover_text(tip)
 }
 
 /// A button with an icon on a coloured background (the Play button).
 pub fn colored_button(ui: &mut egui::Ui, icon: Icon, fill: Color32, enabled: bool, tip: &str) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(32.0, 24.0), if enabled { egui::Sense::click() } else { egui::Sense::hover() });
-    let f = if !enabled { crate::theme::BUTTON.gamma_multiply(0.6) } else if resp.hovered() { fill.gamma_multiply(1.2) } else { fill };
-    ui.painter().rect_filled(rect, CornerRadius::same(2), f);
-    ui.painter().rect_stroke(rect, CornerRadius::same(2), Stroke::new(1.0, Color32::from_rgb(34, 34, 34)), StrokeKind::Inside);
-    draw(ui.painter(), rect.shrink2(Vec2::new(8.0, 4.0)), icon, if enabled { crate::theme::TEXT_BRIGHT } else { crate::theme::TEXT_DIM });
+    // (a button that is not on is flat; one that is on keeps its colour; Play is Unreal's green)
+    let on = fill != crate::theme::BUTTON;
+    let f = if on { if resp.hovered() { fill.gamma_multiply(1.2) } else { fill } } else if resp.hovered() && enabled { crate::theme::BUTTON_HOVER } else { Color32::TRANSPARENT };
+    ui.painter().rect_filled(rect, CornerRadius::same(3), f);
+    let ink = if !enabled { Color32::from_rgb(78, 78, 78) } else if on { crate::theme::TEXT_BRIGHT } else if icon == Icon::Play { Color32::from_rgb(98, 204, 72) } else { crate::theme::TEXT_BRIGHT };
+    draw(ui.painter(), rect.shrink2(Vec2::new(8.0, 4.0)), icon, ink);
     resp.on_hover_text(tip)
 }

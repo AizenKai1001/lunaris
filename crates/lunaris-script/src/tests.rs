@@ -402,3 +402,20 @@ fn a_resource_name_may_have_a_number_between_dots() {
     let text = v[0].def.to_string_compact().unwrap();
     assert!(text.contains(r#""res_set":"game.has.1""#) && text.contains(r#"{"res":"game.has.1"}"#) && text.contains(r#"{"res":"a.5"}"#), "{text}");
 }
+
+#[test]
+fn a_field_of_with_can_be_an_array_in_square_brackets_and_prints_back_the_same() {
+    let src = "system mark each Transform {\n    let k = Transform.pos[0];\n    spawn_prefab \"Mark\" at (1, 2, 3) with { Decal { normal: [0, k, 1], size: [2, 3] }, Transform { rot: [0, 0, 0, 1], scale: [] } };\n}\n";
+    let c = one(src);
+    let d = c.def.get("do").unwrap().as_array().unwrap();
+    assert_eq!(d[1].to_string_compact().unwrap(), r#"{"spawn_prefab":"Mark","at":[1,2,3],"with":{"Decal":{"normal":[0,{"var":"k"},1],"size":[2,3]},"Transform":{"rot":[0,0,0,1],"scale":[]}}}"#);
+    let text = decompile(&c.def).unwrap();
+    assert!(text.contains("normal: [0, k, 1]"), "{text}");
+    assert_eq!(one(&text).def, c.def, "\n{text}");
+    // a trailing comma is fine, a missing bracket or comma is told
+    assert!(compile("system a each A { spawn_prefab \"M\" with { C { v: [1, 2,] } }; }").is_ok());
+    let e = compile("system a each A { spawn_prefab \"M\" with { C { v: [1 2] } }; }").unwrap_err();
+    assert!(e.iter().any(|d| d.message.contains("expected `,` or `]`")), "{e:?}");
+    let e = compile("system a each A { spawn_prefab \"M\" with { C { v: [1, 2, w: 3 } }; }").unwrap_err();
+    assert!(!e.is_empty());
+}

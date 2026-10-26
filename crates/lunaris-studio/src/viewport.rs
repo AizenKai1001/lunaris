@@ -6,11 +6,23 @@ use crate::gizmo::{self, Handles};
 pub use crate::gizmo::{Axis, Tool};
 use crate::icons::{self, Icon};
 use crate::mathx::*;
+use crate::place::PlaceDrag;
+use crate::project::AssetDrag;
 use crate::state::{Kind, Mode, Studio};
 use crate::theme;
 use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, Key, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, TextureOptions, Vec2};
 use lunaris_gpu::{GpuRenderer, Quality};
+use lunaris_json::Json;
 use lunaris_render::{ExplicitCamera, Frame, RenderOptions, TextureCache, View};
+
+/// What letting go of a file dragged out of the Project panel would do where the pointer is.
+enum DropPlan {
+    /// Add a new entity (a model, an Audio Source) at this point of the world.
+    Place(V3),
+    /// Use the picture as the texture of this entity.
+    Texture(u64),
+    Nothing,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ViewKind {
@@ -30,6 +42,8 @@ struct Drag {
     start_scale: V3,
     start_rot: Q,
     group: String,
+    /// Where every selected entity was when the drag began (world position): a move takes all of them along.
+    starts: Vec<(u64, V3)>,
 }
 
 /// The camera the picture was drawn with (what the overlays and the picking use).
@@ -74,9 +88,22 @@ pub struct Viewport {
     stamp: u64,
     pub info: String,
     drag: Option<Drag>,
+    /// The points of the stroke being painted (Paint mode), in the world.
+    stroke: Vec<V3>,
     hover_axis: Option<Axis>,
     pub grid: bool,
     pub gizmos: bool,
+    /// The steps the handles snap to (0 = off): positions in metres, turns in degrees, scale factors. Ctrl snaps to the step, or to 0.5, 15 and 0.1 when there is none.
+    pub snap_move: f32,
+    pub snap_rot: f32,
+    pub snap_scale: f32,
+    /// The statistics overlay (frame time, picture time, entities, tick, fly speed).
+    pub stats: bool,
+    /// How fast the fly camera moves, as a multiple of its usual speed (right button held and the wheel changes it).
+    pub fly_speed: f32,
+    /// Time between editor frames (smoothed) and the last picture's drawing time, in milliseconds.
+    pub frame_ms: f32,
+    pub picture_ms: f32,
     pub error: Option<String>,
     forced: bool,
     pub game_input: bool,
@@ -107,9 +134,17 @@ impl Viewport {
             stamp: 0,
             info: String::new(),
             drag: None,
+            stroke: Vec::new(),
+            snap_move: 0.0,
+            snap_rot: 0.0,
+            snap_scale: 0.0,
             hover_axis: None,
             grid: true,
             gizmos: true,
+            stats: false,
+            fly_speed: 1.0,
+            frame_ms: 0.0,
+            picture_ms: 0.0,
             error: None,
             forced: true,
             game_input: false,
@@ -145,6 +180,17 @@ impl Viewport {
     }
 
     pub fn focus_selection(&mut self, studio: &Studio) {
+        if studio.selected.len() > 1 {
+            // several: their middle, far enough back to see them all
+            let ps: Vec<V3> = studio.selected.iter().filter_map(|u| studio.world_of(*u)).collect();
+            if !ps.is_empty() {
+                let n = ps.len() as f32;
+                let mid = [ps.iter().map(|p| p[0]).sum::<f32>() / n, ps.iter().map(|p| p[1]).sum::<f32>() / n, ps.iter().map(|p| p[2]).sum::<f32>() / n];
+                let reach = ps.iter().map(|p| ((p[0] - mid[0]).powi(2) + (p[1] - mid[1]).powi(2) + (p[2] - mid[2]).powi(2)).sqrt()).fold(0.0f32, f32::max);
+                self.focus(mid, (reach + 1.0).clamp(0.5, 100.0));
+                return;
+            }
+        }
         if let Some(p) = studio.entity_world_pos() {
             let size = studio.entity.as_ref().and_then(|e| e.vec3("Transform", "scale")).map(|s| s[0].abs().max(s[1].abs()).max(s[2].abs())).unwrap_or(1.0).clamp(0.5, 50.0);
             self.focus(p, size);
@@ -225,7 +271,8 @@ impl Viewport {
                 self.ids = f.ids;
                 self.view_proj = Mat(f.view_proj.0);
                 self.cam = if self.kind == ViewKind::Game { None } else { Some(cam) };
-                self.info = format!("{} - {}x{} - {:.1} ms{}", used, f.width, f.height, started.elapsed().as_secs_f32() * 1000.0, if f.warnings.is_empty() { String::new() } else { format!(" - {}", f.warnings.join("; ")) });
+                self.picture_ms = started.elapsed().as_secs_f32() * 1000.0;
+                self.info = format!("{} - {}x{} - {:.1} ms{}", used, f.width, f.height, self.picture_ms, if f.warnings.is_empty() { String::new() } else { format!(" - {}", f.warnings.join("; ")) });
                 self.error = None;
             }
             Err(e) => self.error = Some(e),
@@ -247,6 +294,8 @@ impl Viewport {
                 crate::center::CenterTab::Blueprint => self.goto = Some(crate::state::Center::Blueprint),
                 crate::center::CenterTab::Ui => self.goto = Some(crate::state::Center::Ui),
                 crate::center::CenterTab::Canvas => self.goto = Some(crate::state::Center::Canvas),
+                crate::center::CenterTab::Sequencer => self.goto = Some(crate::state::Center::Sequencer),
+                crate::center::CenterTab::Effects => self.goto = Some(crate::state::Center::Effects),
                 _ => {
                     self.kind = if t == crate::center::CenterTab::Game { ViewKind::Game } else if self.kind == ViewKind::Scene2D { ViewKind::Scene2D } else { ViewKind::Scene };
                     self.forced = true;
@@ -275,13 +324,24 @@ impl Viewport {
             });
             chrome::rule(ui);
             let two_d = self.kind == ViewKind::Scene2D;
-            if ui.selectable_label(two_d, "2D").clicked() && self.kind != ViewKind::Game {
+            if chrome::pill(ui, "2D", two_d, false).clicked() && self.kind != ViewKind::Game {
                 self.kind = if two_d { ViewKind::Scene } else { ViewKind::Scene2D };
                 self.forced = true;
             }
-            ui.toggle_value(&mut self.grid, "Grid");
+            if chrome::pill(ui, "Grid", self.grid, false).clicked() {
+                self.grid = !self.grid;
+            }
+            if chrome::pill(ui, "Stats", self.stats, false).on_hover_text("Frame time, picture time, entities and tick; with the right button held the wheel sets the fly speed").clicked() {
+                self.stats = !self.stats;
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.toggle_value(&mut self.gizmos, "Gizmos");
+                if chrome::pill(ui, "Gizmos", self.gizmos, false).clicked() {
+                    self.gizmos = !self.gizmos;
+                }
+                // (Unreal's snap settings: a step for each of the three handles, or off)
+                snap_menu(ui, "Scale", "", &mut self.snap_scale, &[0.05, 0.1, 0.25, 0.5, 1.0]);
+                snap_menu(ui, "Rotate", "\u{b0}", &mut self.snap_rot, &[5.0, 10.0, 15.0, 30.0, 45.0, 90.0]);
+                snap_menu(ui, "Move", " m", &mut self.snap_move, &[0.1, 0.25, 0.5, 1.0, 5.0, 10.0]);
                 if let Some(e) = &self.error {
                     ui.label(egui::RichText::new(e).small().color(theme::ERR));
                 }
@@ -309,10 +369,14 @@ impl Viewport {
         }
         // picking and the handles work on the camera of the last picture
         let cam = self.basis(w as f32 / h as f32);
+        // Paint mode: the button paints instead of picking and dragging handles
+        let painting = studio.brush.is_some() && !playing && self.kind == ViewKind::Scene;
         if !game_play && self.kind != ViewKind::Game {
-            self.interact(ui, &resp, rect, studio, ppp, &cam);
+            if !painting {
+                self.interact(ui, &resp, rect, studio, ppp, &cam);
+            }
         } else if resp.clicked() && !playing {
-            self.pick(studio, &resp, rect, ppp);
+            self.pick(studio, &resp, rect, ppp, false);
         }
 
         // draw again only when something that shows has changed
@@ -329,6 +393,8 @@ impl Viewport {
             ui.ctx().request_repaint();
         }
 
+        let dt_ms = ui.input(|i| i.unstable_dt) * 1000.0;
+        self.frame_ms = if self.frame_ms == 0.0 { dt_ms } else { self.frame_ms * 0.9 + dt_ms * 0.1 };
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, CornerRadius::ZERO, Color32::from_rgb(48, 48, 50));
         if let Some(t) = &self.tex {
@@ -343,6 +409,15 @@ impl Viewport {
         } else {
             self.selection_outline(&painter, rect, studio);
         }
+        if painting {
+            self.paint_stroke(ui, &resp, rect, studio, &cam, &painter);
+        } else {
+            self.stroke.clear();
+        }
+        if !playing && self.kind != ViewKind::Game {
+            self.asset_drop(ui, &resp, rect, studio, &cam, ppp, &painter);
+            self.template_drop(ui, &resp, rect, studio, &cam, &painter);
+        }
         if self.kind == ViewKind::Game && playing && self.game_input {
             painter.text(rect.right_top() + Vec2::new(-8.0, 6.0), Align2::RIGHT_TOP, "keyboard and mouse go to the game", FontId::proportional(11.0), theme::TEXT_DIM);
         }
@@ -350,8 +425,215 @@ impl Viewport {
             painter.text(rect.center(), Align2::CENTER_CENTER, e, FontId::proportional(14.0), theme::ERR);
         }
         painter.text(rect.left_bottom() + Vec2::new(8.0, -6.0), Align2::LEFT_BOTTOM, &self.info, FontId::proportional(11.0), Color32::from_rgba_unmultiplied(200, 205, 215, 150));
+        if self.stats {
+            self.stats_overlay(&painter, rect, studio);
+        }
         if studio.total_entities == 0 && self.error.is_none() {
             painter.text(rect.center(), Align2::CENTER_CENTER, "An empty scene. Use Entity > Create, or File > Open Scene.", FontId::proportional(14.0), theme::TEXT_DIM);
+        }
+    }
+
+    /// Drop the stroke being painted without spawning it (the brush was put down).
+    pub fn cancel_stroke(&mut self) {
+        self.stroke.clear();
+    }
+
+    /// Paint mode: a ring of the brush's size at the pointer (on what the pointer is over); a stroke with the left button collects points `spacing` apart and, when the button is let go,
+    /// everything of it is spawned at once (one Undo). (Esc puts the brush down: the window handles that key.)
+    fn paint_stroke(&mut self, ui: &egui::Ui, resp: &egui::Response, rect: Rect, studio: &mut Studio, cam: &Cam, painter: &egui::Painter) {
+        let Some(brush) = studio.brush.clone() else { return };
+        let ring = Stroke::new(2.0, theme::OUTLINE);
+        let pointer = ui.input(|i| i.pointer.latest_pos());
+        let inside = pointer.filter(|p| rect.contains(*p));
+        let (down, alt) = ui.input(|i| (i.pointer.primary_down(), i.modifiers.alt));
+        let active = down && !alt && resp.is_pointer_button_down_on();
+        let mut here = None;
+        if let Some(p) = inside {
+            if !ui.input(|i| i.pointer.secondary_down() || i.pointer.middle_down()) {
+                here = Some(self.drop_point(studio, rect, p, cam));
+            }
+        }
+        if active {
+            if let Some(at) = here {
+                let far = match self.stroke.last() {
+                    Some(l) => (0..3).map(|k| (l[k] - at[k]).powi(2)).sum::<f32>().sqrt() >= brush.spacing,
+                    None => true,
+                };
+                if far && self.stroke.len() < 400 {
+                    self.stroke.push(at);
+                }
+            }
+        } else if !self.stroke.is_empty() {
+            // the button went up: the stroke is spawned
+            let points = std::mem::take(&mut self.stroke);
+            let n = crate::paint::stamp(studio, &brush, &points);
+            if n > 0 {
+                studio.toast(format!("Painted {n} x {}", brush.label()), false);
+            }
+            self.forced = true;
+        }
+        // the dots of the stroke, the ring at the pointer
+        for pt in &self.stroke {
+            if let Some(s) = self.project(*pt) {
+                painter.circle_filled(s, 3.0, theme::OUTLINE);
+            }
+        }
+        if let Some(at) = here {
+            let pts: Vec<Pos2> = (0..=48)
+                .filter_map(|k| {
+                    let a = k as f32 / 48.0 * std::f32::consts::TAU;
+                    self.project([at[0] + a.cos() * brush.radius, at[1], at[2] + a.sin() * brush.radius])
+                })
+                .collect();
+            painter.add(egui::Shape::line(pts, ring));
+            if let Some(s) = self.project(at) {
+                painter.circle_filled(s, 2.5, theme::OUTLINE);
+            }
+        }
+        // the banner at the top of the view
+        let text = format!("Painting {}: drag over the scene, Esc to stop  ({:.1} m brush)", brush.label(), brush.radius);
+        let galley = painter.layout_no_wrap(text, FontId::proportional(12.0), theme::TEXT_BRIGHT);
+        let at = Pos2::new(rect.center().x - galley.size().x * 0.5 - 8.0, rect.min.y + 8.0);
+        painter.rect_filled(Rect::from_min_size(at, galley.size() + Vec2::new(16.0, 8.0)), CornerRadius::same(4), Color32::from_rgba_unmultiplied(20, 22, 26, 230));
+        painter.galley(at + Vec2::new(8.0, 4.0), galley, theme::TEXT_BRIGHT);
+        ui.ctx().request_repaint();
+    }
+
+    /// A model, a picture or a sound dragged out of the Project panel over the view: a ring and a label show what letting go would do and where; letting go does it.
+    #[allow(clippy::too_many_arguments)]
+    fn asset_drop(&mut self, ui: &egui::Ui, resp: &egui::Response, rect: Rect, studio: &mut Studio, cam: &Cam, ppp: f32, painter: &egui::Painter) {
+        // (only when it is a file that is carried: taking a payload of another type would throw it away)
+        if !egui::DragAndDrop::has_payload_of_type::<AssetDrag>(ui.ctx()) {
+            return;
+        }
+        let released = resp.dnd_release_payload::<AssetDrag>();
+        let Some(a) = released.clone().or_else(|| resp.dnd_hover_payload::<AssetDrag>()) else { return };
+        let Some(p) = ui.input(|i| i.pointer.latest_pos()) else { return };
+        let plan = self.drop_plan(studio, &a, rect, p, cam, ppp);
+        if released.is_some() {
+            match plan {
+                DropPlan::Place(at) => {
+                    if a.kind == "model" {
+                        studio.add_model(&a.path, at);
+                    } else {
+                        studio.add_sound(&a.path, at);
+                    }
+                }
+                DropPlan::Texture(uid) => studio.set(uid, "MeshRenderer", Json::obj([("texture", Json::str(a.path.clone()))]), None),
+                DropPlan::Nothing => {}
+            }
+            self.forced = true;
+            return;
+        }
+        // still carrying it: say what letting go would do
+        let ring = Stroke::new(2.0, theme::OUTLINE);
+        painter.rect_stroke(rect.shrink(1.0), CornerRadius::ZERO, ring, StrokeKind::Inside);
+        let (at, text) = match plan {
+            DropPlan::Place(at) => {
+                if let Some(s) = self.project(at) {
+                    painter.circle_stroke(s, 9.0, ring);
+                    painter.circle_filled(s, 2.5, theme::OUTLINE);
+                }
+                (p, format!("add {}", a.name()))
+            }
+            DropPlan::Texture(uid) => (p, format!("use {} on {}", a.name(), studio.all.iter().find(|r| r.uid == uid).map_or("", |r| r.name.as_str()))),
+            DropPlan::Nothing => (p, "drop it on a mesh".to_string()),
+        };
+        let galley = painter.layout_no_wrap(text, FontId::proportional(12.0), theme::TEXT_BRIGHT);
+        let at = at + Vec2::new(14.0, 30.0);
+        painter.rect_filled(Rect::from_min_size(at, galley.size() + Vec2::new(12.0, 6.0)), CornerRadius::same(3), Color32::from_rgba_unmultiplied(20, 22, 26, 230));
+        painter.galley(at + Vec2::new(6.0, 3.0), galley, theme::TEXT_BRIGHT);
+        ui.ctx().request_repaint();
+    }
+
+    /// A thing dragged out of the Place panel over the view: the ring and the label say where it will land; letting go adds it there (standing on what is under the pointer).
+    fn template_drop(&mut self, ui: &egui::Ui, resp: &egui::Response, rect: Rect, studio: &mut Studio, cam: &Cam, painter: &egui::Painter) {
+        if !egui::DragAndDrop::has_payload_of_type::<PlaceDrag>(ui.ctx()) {
+            return;
+        }
+        let released = resp.dnd_release_payload::<PlaceDrag>();
+        let Some(t) = released.clone().or_else(|| resp.dnd_hover_payload::<PlaceDrag>()) else { return };
+        let Some(p) = ui.input(|i| i.pointer.latest_pos()) else { return };
+        let at = self.drop_point(studio, rect, p, cam);
+        if released.is_some() {
+            match &*t {
+                PlaceDrag::Template(k) => {
+                    studio.spawn_template(*k, [at[0], at[1] + crate::place::lift(*k), at[2]]);
+                }
+                PlaceDrag::Prefab(name) => studio.spawn_prefab(name, at),
+            }
+            self.forced = true;
+            return;
+        }
+        let ring = Stroke::new(2.0, theme::OUTLINE);
+        painter.rect_stroke(rect.shrink(1.0), CornerRadius::ZERO, ring, StrokeKind::Inside);
+        if let Some(s) = self.project(at) {
+            painter.circle_stroke(s, 9.0, ring);
+            painter.circle_filled(s, 2.5, theme::OUTLINE);
+        }
+        let galley = painter.layout_no_wrap(format!("add {}", t.label()), FontId::proportional(12.0), theme::TEXT_BRIGHT);
+        let at = p + Vec2::new(14.0, 30.0);
+        painter.rect_filled(Rect::from_min_size(at, galley.size() + Vec2::new(12.0, 6.0)), CornerRadius::same(3), Color32::from_rgba_unmultiplied(20, 22, 26, 230));
+        painter.galley(at + Vec2::new(6.0, 3.0), galley, theme::TEXT_BRIGHT);
+        ui.ctx().request_repaint();
+    }
+
+    fn drop_plan(&self, studio: &mut Studio, a: &AssetDrag, rect: Rect, p: Pos2, cam: &Cam, ppp: f32) -> DropPlan {
+        match a.kind.as_str() {
+            "model" | "sound" => DropPlan::Place(self.drop_point(studio, rect, p, cam)),
+            "texture" => {
+                let (x, y) = (((p.x - rect.min.x) * ppp) as i64, ((p.y - rect.min.y) * ppp) as i64);
+                let uid = if x >= 0 && y >= 0 && (x as u32) < self.img.0 && (y as u32) < self.img.1 { self.ids.get(y as usize * self.img.0 as usize + x as usize).copied().unwrap_or(0) } else { 0 };
+                if studio.all.iter().any(|r| r.uid == uid && r.kind == Kind::Mesh) {
+                    DropPlan::Texture(uid)
+                } else {
+                    DropPlan::Nothing
+                }
+            }
+            _ => DropPlan::Nothing,
+        }
+    }
+
+    /// Where something dropped at the pointer lands: on the first thing the ray through the pointer hits, else on the ground (the plane y = 0; z = 0 in the 2D view), else in front of the camera.
+    fn drop_point(&self, studio: &mut Studio, rect: Rect, p: Pos2, cam: &Cam) -> V3 {
+        let (o, dir) = self.ray_at(rect, p, cam);
+        let arr = |v: V3| Json::arr(v.iter().map(|x| Json::from(*x)));
+        if self.kind == ViewKind::Scene2D {
+            return if dir[2].abs() > 1e-6 { add(o, mul(dir, -o[2] / dir[2])) } else { [o[0], o[1], 0.0] };
+        }
+        if let Some(r) = studio.try_call("raycast", Json::obj([("origin", arr(o)), ("direction", arr(dir)), ("max_distance", Json::from(1000.0))])) {
+            if r.get("hit").and_then(|h| h.as_bool()) == Some(true) {
+                if let Some(pt) = r.get("point").and_then(|a| a.as_array()).filter(|a| a.len() == 3) {
+                    return [pt[0].as_f64().unwrap_or(0.0) as f32, pt[1].as_f64().unwrap_or(0.0) as f32, pt[2].as_f64().unwrap_or(0.0) as f32];
+                }
+            }
+        }
+        if dir[1].abs() > 1e-5 {
+            let t = -o[1] / dir[1];
+            if t > 0.0 && t < 2000.0 {
+                return add(o, mul(dir, t));
+            }
+        }
+        add(o, mul(dir, 8.0))
+    }
+
+    /// The statistics in the corner of the view: how fast the editor itself runs, what a picture costs, how much is in the scene.
+    fn stats_overlay(&self, painter: &egui::Painter, rect: Rect, studio: &Studio) {
+        let fps = if self.frame_ms > 0.0 { 1000.0 / self.frame_ms } else { 0.0 };
+        let mut lines = vec![
+            format!("frame   {:5.1} ms  {:4.0} fps", self.frame_ms, fps),
+            format!("picture {:5.1} ms  {}x{}", self.picture_ms, self.img.0, self.img.1),
+            format!("entities {}", studio.total_entities),
+            format!("tick     {}", studio.tick),
+        ];
+        if self.kind == ViewKind::Scene {
+            lines.push(format!("fly speed x{:.2}", self.fly_speed));
+        }
+        let (w, h) = (172.0, 8.0 + lines.len() as f32 * 14.0);
+        let r = Rect::from_min_size(rect.min + Vec2::new(8.0, 8.0), Vec2::new(w, h));
+        painter.rect_filled(r, CornerRadius::same(3), Color32::from_rgba_unmultiplied(20, 22, 26, 190));
+        for (i, l) in lines.iter().enumerate() {
+            painter.text(r.min + Vec2::new(8.0, 5.0 + i as f32 * 14.0), Align2::LEFT_TOP, l, FontId::monospace(11.0), theme::TEXT);
         }
     }
 
@@ -386,7 +668,7 @@ impl Viewport {
                 });
                 if fwd != 0.0 || right != 0.0 || up != 0.0 {
                     let dt = ui.input(|i| i.stable_dt).min(0.1);
-                    let speed = self.dist.max(2.0) * 1.2 * if shift { 3.0 } else { 1.0 };
+                    let speed = self.dist.max(2.0) * 1.2 * self.fly_speed * if shift { 3.0 } else { 1.0 };
                     let flat = norm([cam.fwd[0], 0.0, cam.fwd[2]]);
                     let step = add(add(mul(flat, fwd * speed * dt), mul(cam.right, right * speed * dt)), mul([0.0, 1.0, 0.0], up * speed * dt));
                     self.target = add(self.target, step);
@@ -396,7 +678,10 @@ impl Viewport {
         }
         if resp.hovered() {
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-            if scroll != 0.0 {
+            if scroll != 0.0 && resp.dragged_by(PointerButton::Secondary) && self.kind == ViewKind::Scene {
+                // flying: the wheel sets the speed, as in the other editors
+                self.fly_speed = fly_speed_after_scroll(self.fly_speed, scroll);
+            } else if scroll != 0.0 {
                 let k = (1.0 - scroll * 0.0015).clamp(0.5, 2.0);
                 self.dist = (self.dist * k).clamp(0.3, 2000.0);
                 self.ortho_h = (self.ortho_h * k).clamp(0.5, 4000.0);
@@ -412,10 +697,17 @@ impl Viewport {
         (x >= 0 && y >= 0 && (x as u32) < self.img.0 && (y as u32) < self.img.1).then_some((x as usize, y as usize))
     }
 
-    fn pick(&mut self, studio: &mut Studio, resp: &egui::Response, rect: Rect, ppp: f32) {
+    fn pick(&mut self, studio: &mut Studio, resp: &egui::Response, rect: Rect, ppp: f32, additive: bool) {
         let Some((x, y)) = self.pixel(resp, rect, ppp) else { return };
         let uid = self.ids.get(y * self.img.0 as usize + x).copied().unwrap_or(0);
-        studio.select((uid != 0).then_some(uid));
+        if additive {
+            // Ctrl+click on something adds it (or takes it out); on nothing it changes nothing
+            if uid != 0 {
+                studio.toggle_select(uid);
+            }
+        } else {
+            studio.select((uid != 0).then_some(uid));
+        }
     }
 
     /// The icon of something that has no picture (a camera, a light) that is near the pointer.
@@ -498,7 +790,8 @@ impl Viewport {
                 let (ro, rd) = self.ray_at(rect, p, cam);
                 if let Some(grab) = gizmo::grab_value(self.tool, &hd, axis, ro, rd) {
                     let group = studio.next_group();
-                    self.drag = Some(Drag { tool: self.tool, axis, grab, handles: hd, start_scale: ent.vec3("Transform", "scale").unwrap_or([1.0; 3]), start_rot: ent.quat("Transform", "rot").unwrap_or([0.0, 0.0, 0.0, 1.0]), group });
+                    let starts: Vec<(u64, V3)> = studio.selected.iter().filter_map(|u| studio.world_of(*u).map(|p| (*u, p))).collect();
+                    self.drag = Some(Drag { tool: self.tool, axis, grab, handles: hd, start_scale: ent.vec3("Transform", "scale").unwrap_or([1.0; 3]), start_rot: ent.quat("Transform", "rot").unwrap_or([0.0, 0.0, 0.0, 1.0]), group, starts });
                 }
             }
         }
@@ -508,13 +801,24 @@ impl Viewport {
                     let (ro, rd) = self.ray_at(rect, p, cam);
                     let (ctrl, shift) = ui.input(|i| (i.modifiers.ctrl, i.modifiers.shift));
                     let group = d.group.clone();
+                    // the step in force: the one chosen in the toolbar, or with Ctrl held the usual one
+                    let step = |set: f32, usual: f32| if set > 0.0 { set } else if ctrl { usual } else { 0.0 };
+                    let (move_step, rot_step, scale_step) = (step(self.snap_move, 0.5), step(self.snap_rot, 15.0), step(self.snap_scale, 0.1));
                     match d.tool {
                         Tool::Move => {
                             if let Some(mut np) = gizmo::moved(&d.handles, d.axis, d.grab, ro, rd) {
-                                if ctrl {
-                                    np = [(np[0] * 2.0).round() / 2.0, (np[1] * 2.0).round() / 2.0, (np[2] * 2.0).round() / 2.0];
+                                if move_step > 0.0 {
+                                    np = [(np[0] / move_step).round() * move_step, (np[1] / move_step).round() * move_step, (np[2] / move_step).round() * move_step];
                                 }
+                                // the others move by the same amount as the main one
+                                let delta = [np[0] - d.handles.origin[0], np[1] - d.handles.origin[1], np[2] - d.handles.origin[2]];
+                                let starts = d.starts.clone();
                                 studio.move_to(sel, np, &group);
+                                for (u, p0) in starts {
+                                    if u != sel {
+                                        studio.move_to(u, [p0[0] + delta[0], p0[1] + delta[1], p0[2] + delta[2]], &group);
+                                    }
+                                }
                                 self.forced = true;
                             }
                         }
@@ -526,12 +830,16 @@ impl Viewport {
                                 } else {
                                     s[d.axis.index()] *= f;
                                 }
+                                if scale_step > 0.0 {
+                                    s = [(s[0] / scale_step).round() * scale_step, (s[1] / scale_step).round() * scale_step, (s[2] / scale_step).round() * scale_step];
+                                    s = [s[0].max(scale_step), s[1].max(scale_step), s[2].max(scale_step)];
+                                }
                                 studio.scale_to(sel, s, &group);
                                 self.forced = true;
                             }
                         }
                         Tool::Rotate => {
-                            if let Some(q) = gizmo::turned(&d.handles, d.axis, d.grab, ro, rd, ctrl.then_some(15.0)) {
+                            if let Some(q) = gizmo::turned(&d.handles, d.axis, d.grab, ro, rd, (rot_step > 0.0).then_some(rot_step)) {
                                 studio.rotate_to(sel, q_norm(q_mul(q, d.start_rot)), &group);
                                 self.forced = true;
                             }
@@ -550,10 +858,15 @@ impl Viewport {
         // a click selects: the entity drawn under the pointer, or a camera or light icon
         if resp.clicked_by(PointerButton::Primary) && self.drag.is_none() && self.tool != Tool::Hand {
             if let Some(p) = resp.interact_pointer_pos() {
+                let additive = ui.input(|i| i.modifiers.command);
                 if let Some(uid) = self.icon_at(studio, rect, p) {
-                    studio.select(Some(uid));
+                    if additive {
+                        studio.toggle_select(uid);
+                    } else {
+                        studio.select(Some(uid));
+                    }
                 } else {
-                    self.pick(studio, resp, rect, ppp);
+                    self.pick(studio, resp, rect, ppp, additive);
                 }
             }
         }
@@ -564,7 +877,43 @@ impl Viewport {
 
     // ------------------------------------------------------------------------------------------------------------- overlays
 
+    /// The outlines of several selected entities: the main one in the usual colour, the others dimmer.
+    fn multi_outline(&self, painter: &egui::Painter, rect: Rect, studio: &Studio) {
+        if self.img.0 == 0 || self.ids.len() != (self.img.0 * self.img.1) as usize {
+            return;
+        }
+        let (w, h) = (self.img.0 as usize, self.img.1 as usize);
+        let mut boxes: std::collections::HashMap<u64, (usize, usize, usize, usize)> = std::collections::HashMap::new();
+        let (mut last, mut last_wanted) = (0u64, false);
+        for y in 0..h {
+            for x in 0..w {
+                let id = self.ids[y * w + x];
+                if id != last {
+                    last = id;
+                    last_wanted = id != 0 && studio.is_selected(id);
+                }
+                if last_wanted {
+                    let b = boxes.entry(id).or_insert((x, y, x, y));
+                    b.0 = b.0.min(x);
+                    b.1 = b.1.min(y);
+                    b.2 = b.2.max(x);
+                    b.3 = b.3.max(y);
+                }
+            }
+        }
+        let (sx, sy) = (rect.width() / w as f32, rect.height() / h as f32);
+        for (uid, (x0, y0, x1, y1)) in boxes {
+            let r = Rect::from_min_max(Pos2::new(rect.min.x + x0 as f32 * sx - 1.0, rect.min.y + y0 as f32 * sy - 1.0), Pos2::new(rect.min.x + (x1 + 1) as f32 * sx + 1.0, rect.min.y + (y1 + 1) as f32 * sy + 1.0));
+            let main = studio.selection == Some(uid);
+            painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(if main { 1.5 } else { 1.0 }, if main { theme::OUTLINE } else { theme::OUTLINE.gamma_multiply(0.6) }), StrokeKind::Outside);
+        }
+    }
+
     fn selection_outline(&self, painter: &egui::Painter, rect: Rect, studio: &Studio) {
+        if studio.selected.len() > 1 {
+            self.multi_outline(painter, rect, studio);
+            return;
+        }
         let Some(sel) = studio.selection else { return };
         if self.img.0 == 0 || self.ids.len() != (self.img.0 * self.img.1) as usize {
             return;
@@ -624,7 +973,7 @@ impl Viewport {
             let Some(p) = r.pos else { continue };
             let Some(s) = to_screen(&self.view_proj, p, w, h) else { continue };
             let c = at(s);
-            let selected = studio.selection == Some(r.uid);
+            let selected = studio.is_selected(r.uid);
             let icon = Icon::of_kind(r.kind);
             icons::draw(painter, Rect::from_center_size(c, Vec2::splat(22.0)), icon, if selected { theme::OUTLINE } else { icon.tint() });
         }
@@ -648,4 +997,23 @@ impl Viewport {
             painter.text(origin + Vec2::new(0.0, 46.0), Align2::CENTER_CENTER, "< Persp", FontId::proportional(11.0), Color32::from_rgba_unmultiplied(220, 220, 225, 170));
         }
     }
+}
+
+/// The fly speed after the wheel turned by `scroll` points while flying: 15% a notch (a notch is about 50 points), kept between a tenth and ten times the usual speed.
+pub fn fly_speed_after_scroll(speed: f32, scroll: f32) -> f32 {
+    (speed * (1.0 + scroll * 0.003).clamp(0.5, 2.0)).clamp(0.1, 10.0)
+}
+
+/// A drop-down pill for a snap step: "Off" and the usual steps.
+fn snap_menu(ui: &mut egui::Ui, title: &str, unit: &str, value: &mut f32, steps: &[f32]) {
+    let label = if *value > 0.0 { format!("{title} {}{unit}", *value) } else { format!("{title} off") };
+    chrome::drop_down(ui, &label, |ui| {
+        for s in std::iter::once(0.0).chain(steps.iter().copied()) {
+            let text = if s == 0.0 { "Off".to_string() } else { format!("{s}{unit}") };
+            if ui.selectable_label(*value == s, text).clicked() {
+                *value = s;
+                ui.close();
+            }
+        }
+    });
 }

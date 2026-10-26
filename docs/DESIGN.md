@@ -51,7 +51,12 @@ the (future) editor are thin wrappers. A feature is not done until it is a tool 
 undo step). `define_component` is irreversible and says so.
 
 **D7. Text scenes.** `{ "lunaris": 1, "components": [...], "entities": [...] }`, ordered by uid, so saving twice gives the same
-bytes and `git diff` shows exactly what changed. Loading is atomic.
+bytes and `git diff` shows exactly what changed. Loading is atomic. **Numbers are written as the shortest text that reads back as the same
+value**: an `f32` field that holds 0.1 is written `0.1` (not the widened `0.10000000149011612` that `x as f64` prints), a position of 12.375 is
+`12.375`. Nothing is lost: the writer (`lunaris_json::f32_value`) checks that the text read as an `f64` and narrowed with `as f32` (which is what
+loading does) gives the very same `f32` before it uses the short text, and falls back to the long one when no short text does; a test runs three
+million bit patterns through it. A scene file and every tool's answer for an `f32` field are therefore shorter, faster to write and to read, and
+what a person (or an AI) expects to see. Scenes saved before this change still load, to the same bits.
 
 **D8. Zero dependencies for the core.** JSON, hashing, RNG and the ECS are in-tree, so the core can be audited and is fast
 to build. Third-party crates are used at the edges only (graphics, windowing, audio, physics, image decode).

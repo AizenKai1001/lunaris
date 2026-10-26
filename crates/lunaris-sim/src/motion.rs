@@ -4,7 +4,7 @@
 //! character really gets, whether gravity works on it this tick, the vertical speed it starts with, and (while it is being pulled up a ledge) the
 //! place it is carried to. The walk itself, the collisions and the grounding stay the controller's. Everything is f32 with only `+ - * / sqrt`, in a
 //! fixed order, so results are identical on every machine.
-use crate::character::{blocked, lower_to_contact, too_steep, Grid};
+use crate::character::{blocked, lower_to_contact, too_steep, View};
 use crate::components::{CharacterBody, CharacterMotion, Climbable};
 use lunaris_ecs::Uid;
 
@@ -20,7 +20,7 @@ pub(crate) struct Ladder {
 
 /// What `pre` needs to know about the world around the character.
 pub(crate) struct Env<'a, 'g> {
-    pub grid: &'a Grid<'g>,
+    pub grid: &'a View<'a, 'g>,
     pub r: f32,
     pub height: f32,
     pub step_h: f32,

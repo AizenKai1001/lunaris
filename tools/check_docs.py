@@ -11,7 +11,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 docs = [os.path.join(ROOT, "README.md")] + sorted(glob.glob(os.path.join(ROOT, "docs", "*.md")))
 pat = re.compile(r"`((?:docs|examples|tools|clients|crates)/[A-Za-z0-9_./\-]+?)`")
 # shorthand that is not a path: example names without the extension, and the MCP method `tools/list`
-SHORTHAND = {"examples/orb_dash", "examples/moon_hopper", "tools/list"}
+SHORTHAND = {"examples/orb_dash", "examples/moon_hopper", "tools/list", "tools/call"}
 missing = {}
 for d in docs:
     text = open(d, encoding="utf-8").read()

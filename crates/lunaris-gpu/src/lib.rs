@@ -7,9 +7,14 @@
 //! * **High** is the one made to look good: HDR rendering, physically based materials (`metallic`, `roughness`), a procedural sky that
 //!   lights the scene and shows in reflections, cascaded shadow maps from the sun, screen-space ambient occlusion, bloom, distance
 //!   fog, 4x multisampling, filmic tone mapping and true sRGB output. The `Environment` component steers it.
+pub mod compress;
 pub mod gpu;
+pub mod occlusion;
 pub mod pipelines;
 pub mod renderer;
+mod fx_gpu;
+mod procstat;
+mod skin;
 pub mod util;
 
 pub use gpu::Gpu;

@@ -93,11 +93,22 @@ struct Frame {
     p24: vec4<f32>,
     // the sky of the air: turbidity, rayleigh, mie_g, intensity; then (x) on, (y) the glow of fog towards the sun
     p25: vec4<f32>,
+    // (p26) atmosphere on, the sky's aerial scale, how hard it rains (`vs_rain`), the rain's clock
     p26: vec4<f32>,
     // temporal anti-aliasing: the share of the new picture, and (y) 1 when it is on
     p27: vec4<f32>,
     // water that looks at the depth of what is behind it: x is 1 when the picture has that depth
     p28: vec4<f32>,
+    // the sea the terrain meets: x the significant wave height, y the wave length of the peak (the terrain works out where the waves put the surface)
+    p29: vec4<f32>,
+    // the window of the sea's depth (`sea_floor`): the world x and z of its first point, 1 over the distance between points, and 1 when there is one
+    p30: vec4<f32>,
+    // `Lighting`: the fill (rgb) and the bounce
+    p31: vec4<f32>,
+    // `Lighting`: the lamps' falloff blend (0 = the old window), the size of the core, the gain that matches the two curves
+    p32: vec4<f32>,
+    // the depth of the sea over that window, 128 x 128 points as 16-bit floats, two to a word
+    sea: array<vec4<u32>, 2048>,
     // each probe: its centre (xyz), then half the size of its box (xyz)
     probes: array<vec4<f32>, 8>,
     // the view-projection matrix of the previous picture (motion blur)
@@ -105,7 +116,7 @@ struct Frame {
     // the view-projection of this picture and of the last one, without the sub-pixel shift (temporal anti-aliasing)
     unj_vp: mat4x4<f32>,
     unj_prev_vp: mat4x4<f32>,
-    psh: array<PointShadow, 2>,
+    psh: array<PointShadow, 4>,
     lights: array<Light, 16>,
 };
 
@@ -149,4 +160,6 @@ struct Object {
     ids: vec4<u32>,
     // `PbrMaps`: normal strength, occlusion strength, which maps (1 normal, 2 arm, 3 both; 0 none), roughness scale
     pbr: vec4<f32>,
+    // `MacroVary`: strength, scale (metres), colour lean, roughness variation (all 0 for an object without it)
+    vary: vec4<f32>,
 };

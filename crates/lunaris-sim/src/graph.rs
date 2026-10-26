@@ -203,7 +203,19 @@ pub(crate) enum Expr {
     Smooth(Box<Expr>, Box<Expr>, Box<Expr>),
     /// Value noise in [-1, 1] at (x, y) for a seed.
     Noise(Box<Expr>, Box<Expr>, Box<Expr>),
+    /// Only in a system compiled for `trace`: the expression inside, whose value is written down (under this number, an index into the list of paths) when it is evaluated.
+    Tag(Box<Expr>, u32),
 }
+
+/// A field value in the `with` of `spawn_prefab`: one number, flag or text, or an array of them (`Decal.normal`, `Transform.rot`, `Light.color`), each an expression.
+#[derive(Clone, Debug)]
+pub(crate) enum FieldVal {
+    One(Expr),
+    List(Vec<Expr>),
+}
+
+/// The most elements an array field of `with` can have (the longest array a component holds is an inventory's 48 slots).
+const MAX_FIELD_ARRAY: usize = 64;
 
 #[derive(Clone, Debug)]
 pub(crate) enum Stmt {
@@ -221,10 +233,16 @@ pub(crate) enum Stmt {
     Emit(String),
     Spawn(Vec<(String, Vec<(String, Expr)>)>),
     /// Spawn a prefab: `with` is `(component, field values)`, `at` the root's `Transform.pos`, `velocity` its `Velocity.lin`.
-    SpawnPrefab { name: String, with: Vec<(String, Vec<(String, Expr)>)>, at: Option<Vec<Expr>>, velocity: Option<Vec<Expr>> },
+    SpawnPrefab { name: String, with: Vec<(String, Vec<(String, FieldVal)>)>, at: Option<Vec<Expr>>, velocity: Option<Vec<Expr>> },
     Add(String, Vec<(String, Expr)>),
     Remove(String),
+    /// Only in a system compiled for `trace`: a marker that does nothing but write down that the statement after it (the number is an index into the list of statement paths) is
+    /// about to run.
+    Tag(u32),
 }
+
+/// A tag number with this bit set is a statement's (a marker before it ran), without it an expression's (its value).
+const STMT_BIT: u32 = 0x8000_0000;
 
 /// Which overlaps an `on_contact` system reacts to.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -264,8 +282,9 @@ pub struct ScriptSystem {
     pub doc: String,
     pub order: i64,
     pub enabled: bool,
-    /// The definition exactly as given (the source of truth; the compiled form is derived from it).
-    pub def: Json,
+    /// The definition exactly as given (the source of truth; the compiled form is derived from it). Shared, not copied, when a system is cloned: a save copies the whole simulation on the thread of the server, and the definitions of 200 systems
+    /// were deep trees to copy (2.4 ms of the 3.7 ms a save held the tick up).
+    pub def: Arc<Json>,
     compiled: Arc<Compiled>,
     pub last_error: Option<String>,
     /// Wall-clock milliseconds of the last run (profiling information only, never part of the state).
@@ -313,6 +332,8 @@ pub struct ScriptSet {
     pub prefabs: crate::prefab::Prefabs,
     /// What each running behaviour tree remembers (see `gameplay`): by entity, the hash of its script and one number per node.
     pub bt: std::collections::BTreeMap<u64, (u64, Vec<f32>)>,
+    /// Where the shooters' targets were when they pulled the trigger, set by a game server before a step (lag compensation, `weapons::Rewind`). Host policy, not state.
+    pub rewind: crate::weapons::Rewind,
 }
 
 impl ScriptSet {
@@ -369,7 +390,7 @@ impl ScriptSet {
     /// Definitions as stored in scenes (`enabled` is part of each definition object).
     pub fn defs_json(&self) -> Json {
         Json::arr(self.systems.iter().map(|s| {
-            let mut d = s.def.clone();
+            let mut d: Json = (*s.def).clone();
             d.set("enabled", Json::Bool(s.enabled));
             d
         }))
@@ -387,6 +408,10 @@ struct Cx<'a> {
     res: Vec<String>,
     /// Some(na) in an `on_contact` system: paths start with `a.` or `b.`, and `terms[..na]` belong to role a.
     contact_na: Option<usize>,
+    /// `Some` when compiling for `trace`: the path in the definition of every expression that was tagged, in tag order.
+    traced: Option<Vec<String>>,
+    /// The same for statements (`do[2]`, `do[2].then[0]`).
+    traced_stmts: Option<Vec<String>>,
 }
 
 const EXPR_OPS: &str = "get var res contact dt tick uid rand add sub mul div mod neg abs sign sqrt floor ceil round trunc fract sin cos tan atan atan2 exp ln pow hypot min max clamp lerp smoothstep noise lt le gt ge eq ne and or not select";
@@ -444,6 +469,18 @@ impl<'a> Cx<'a> {
     }
 
     fn expr(&mut self, j: &Json, at: &str) -> Result<Expr> {
+        let e = self.expr_plain(j, at)?;
+        // an expression that is more than a constant is tagged with where it is in the definition (only when compiling for `trace`)
+        match (&mut self.traced, &e) {
+            (Some(paths), e) if !matches!(e, Expr::Const(_)) => {
+                paths.push(at.to_string());
+                Ok(Expr::Tag(Box::new(e.clone()), (paths.len() - 1) as u32))
+            }
+            _ => Ok(e),
+        }
+    }
+
+    fn expr_plain(&mut self, j: &Json, at: &str) -> Result<Expr> {
         self.nodes += 1;
         match j {
             Json::Int(i) => Ok(Expr::Const(Val::Num(*i as f64))),
@@ -591,12 +628,37 @@ impl<'a> Cx<'a> {
         pairs.iter().map(|(k, v)| Ok((k.clone(), self.expr(v, &format!("{at}.{k}"))?))).collect()
     }
 
+    /// Field values of `spawn_prefab`'s `with`: like `values`, and a field may also be an array of expressions: `"normal": [0, 1, {"get": "Transform.pos[2]"}]`.
+    fn field_values(&mut self, obj: &Json, at: &str) -> Result<Vec<(String, FieldVal)>> {
+        let pairs = obj.as_object().ok_or_else(|| bad("expected an object of field values", at))?;
+        let mut out = Vec::with_capacity(pairs.len());
+        for (k, v) in pairs {
+            let here = format!("{at}.{k}");
+            let val = match v {
+                Json::Arr(items) => {
+                    if items.len() > MAX_FIELD_ARRAY {
+                        return Err(bad(format!("an array field can have at most {MAX_FIELD_ARRAY} values"), &here));
+                    }
+                    FieldVal::List(items.iter().enumerate().map(|(i, x)| self.expr(x, &format!("{here}[{i}]"))).collect::<Result<Vec<_>>>()?)
+                }
+                other => FieldVal::One(self.expr(other, &here)?),
+            };
+            out.push((k.clone(), val));
+        }
+        Ok(out)
+    }
+
     fn block(&mut self, list: &Json, at: &str) -> Result<Vec<Stmt>> {
         let arr = list.as_array().ok_or_else(|| bad("expected an array of statements", at))?;
         let mark = self.scopes.len();
         let mut out = Vec::with_capacity(arr.len());
         for (i, s) in arr.iter().enumerate() {
-            out.push(self.stmt(s, &format!("{at}[{i}]"))?);
+            let path = format!("{at}[{i}]");
+            if let Some(paths) = &mut self.traced_stmts {
+                paths.push(path.clone());
+                out.push(Stmt::Tag((paths.len() - 1) as u32));
+            }
+            out.push(self.stmt(s, &path)?);
         }
         self.scopes.truncate(mark);
         Ok(out)
@@ -649,7 +711,7 @@ impl<'a> Cx<'a> {
                 Ok(if first == "res_set" { Stmt::ResSet(name.to_string(), e) } else { Stmt::ResAdd(name.to_string(), e) })
             }
             "spawn" => {
-                let comps = key("spawn").and_then(|v| v.as_object()).ok_or_else(|| bad("`spawn` needs an object of components", at).hint("{\"spawn\": {\"Transform\": {\"pos\": [..]}}}: give each field as a value, array fields as pos_0.. is not supported; spawn then use set from another system"))?;
+                let comps = key("spawn").and_then(|v| v.as_object()).ok_or_else(|| bad("`spawn` needs an object of components", at).hint("{\"spawn\": {\"Health\": {\"hp\": 5}}}: give each field as a value; array fields (Transform.pos) are not supported here: use spawn_prefab with `with`, or spawn then set from another system"))?;
                 let mut out = Vec::new();
                 for (cname, fields) in comps {
                     self.world.require_component(cname).map_err(|e| e.at(format!("{at}.spawn.{cname}")))?;
@@ -676,10 +738,10 @@ impl<'a> Cx<'a> {
                     Some(Json::Obj(comps)) => {
                         for (cname, fields) in comps {
                             self.world.require_component(cname).map_err(|e| e.at(format!("{at}.with.{cname}")))?;
-                            with.push((cname.clone(), self.values(fields, &format!("{at}.with.{cname}"))?));
+                            with.push((cname.clone(), self.field_values(fields, &format!("{at}.with.{cname}"))?));
                         }
                     }
-                    Some(_) => return Err(bad("`with` must be an object of components: {\"Health\": {\"hp\": 5}}", at)),
+                    Some(_) => return Err(bad("`with` must be an object of components: {\"Health\": {\"hp\": 5}}", at).hint("a field is a value, or an array of values: {\"Decal\": {\"normal\": [0, 1, 0]}}")),
                 }
                 Ok(Stmt::SpawnPrefab { name: name.to_string(), with, at: pos, velocity: vel })
             }
@@ -715,6 +777,11 @@ pub fn compile(world: &mut World, def: &Json) -> Result<ScriptSystem> {
 
 /// `compile`, with the workspace folder native plugins may be loaded from (`None` = plugins are not allowed).
 pub fn compile_with(world: &mut World, def: &Json, plugin_root: Option<&std::path::Path>, wasm: Option<&crate::plugin::WasmHost>) -> Result<ScriptSystem> {
+    compile_inner(world, def, plugin_root, wasm, false).map(|(s, _, _)| s)
+}
+
+/// `compile_with`; with `traced` the expressions of the body are tagged (see `Expr::Tag`) and their paths come back in tag order, and no batch program is made.
+fn compile_inner(world: &mut World, def: &Json, plugin_root: Option<&std::path::Path>, wasm: Option<&crate::plugin::WasmHost>, traced: bool) -> Result<(ScriptSystem, Vec<String>, Vec<String>)> {
     let obj = def.as_object().ok_or_else(|| bad("a system definition must be an object", "").hint("{\"name\": ..., \"each\": [...], \"do\": [...]}"))?;
     for (k, _) in obj {
         if !["name", "doc", "order", "each", "on_contact", "without", "do", "enabled", "plugin", "wasm", "fuel", "export", "fields", "writes", "res", "parallel"].contains(&k.as_str()) {
@@ -788,34 +855,35 @@ pub fn compile_with(world: &mut World, def: &Json, plugin_root: Option<&std::pat
         return Err(bad("a system is a native `plugin` or a sandboxed `wasm` module, not both", "wasm"));
     }
     if let Some(plugin) = def.get("plugin") {
-        return compile_plugin(world, def, name, plugin, false, terms, without, contact_na, order, enabled, plugin_root, wasm);
+        return compile_plugin(world, def, name, plugin, false, terms, without, contact_na, order, enabled, plugin_root, wasm).map(|s| (s, Vec::new(), Vec::new()));
     }
     if let Some(module) = def.get("wasm") {
-        return compile_plugin(world, def, name, module, true, terms, without, contact_na, order, enabled, plugin_root, wasm);
+        return compile_plugin(world, def, name, module, true, terms, without, contact_na, order, enabled, plugin_root, wasm).map(|s| (s, Vec::new(), Vec::new()));
     }
     for k in ["export", "fields", "writes", "res", "parallel", "fuel"] {
         if def.get(k).is_some() {
             return Err(bad(format!("`{k}` belongs to plugin and wasm systems"), k).hint("a plugin system has `plugin` (a shared library in the workspace), a wasm system has `wasm` (a .wasm file); graph systems have `do`"));
         }
     }
-    let mut cx = Cx { world, terms: terms.clone(), scopes: Vec::new(), nlocals: 0, nodes: 0, res: Vec::new(), contact_na };
+    let mut cx = Cx { world, terms: terms.clone(), scopes: Vec::new(), nlocals: 0, nodes: 0, res: Vec::new(), contact_na, traced: traced.then(Vec::new), traced_stmts: traced.then(Vec::new) };
     let body = cx.block(def.get("do").ok_or_else(|| bad("`do` (the list of statements) is missing", "do"))?, "do")?;
-    let (nlocals, nodes, res) = (cx.nlocals, cx.nodes, cx.res);
-    let program = if contact_na.is_some() { None } else { crate::vm::lower(&body, nlocals) };
+    let (nlocals, nodes, res, paths, stmt_paths) = (cx.nlocals, cx.nodes, cx.res, cx.traced.take().unwrap_or_default(), cx.traced_stmts.take().unwrap_or_default());
+    let program = if contact_na.is_some() || traced { None } else { crate::vm::lower(&body, nlocals) };
     let mut clean = def.clone();
     if let Json::Obj(p) = &mut clean {
         p.retain(|(k, _)| k != "enabled");
     }
-    Ok(ScriptSystem {
+    let system = ScriptSystem {
         name: name.to_string(),
         doc: def.get("doc").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         order,
         enabled,
-        def: clean,
+        def: Arc::new(clean),
         compiled: Arc::new(Compiled { terms: terms.into_iter().map(|t| t.1).collect(), without, body, nlocals, nodes, res, contact: contact_na.map(|na| ContactSpec { na, triggers }), program, plugin: None }),
         last_error: None,
         last_ms: 0.0,
-    })
+    };
+    Ok((system, paths, stmt_paths))
 }
 
 /// A system whose work is done by a native plugin: `{"plugin": "plugins/x.dll", "each": [...], "fields": [...], "writes": [...], "res": [...]}`.
@@ -858,7 +926,7 @@ fn compile_plugin(world: &mut World, def: &Json, name: &str, plugin: &Json, is_w
     if field_paths.len() > 256 || res.len() > 256 {
         return Err(bad("a plugin system may list at most 256 fields and 256 resources", "fields"));
     }
-    let cx = Cx { world, terms: terms.clone(), scopes: Vec::new(), nlocals: 0, nodes: 0, res: Vec::new(), contact_na: None };
+    let cx = Cx { world, terms: terms.clone(), scopes: Vec::new(), nlocals: 0, nodes: 0, res: Vec::new(), contact_na: None, traced: None, traced_stmts: None };
     let mut fields = Vec::with_capacity(field_paths.len());
     for (i, p) in field_paths.iter().enumerate() {
         fields.push(cx.path(p, &format!("fields[{i}]"))?);
@@ -896,7 +964,7 @@ fn compile_plugin(world: &mut World, def: &Json, name: &str, plugin: &Json, is_w
         doc: def.get("doc").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         order,
         enabled,
-        def: clean,
+        def: Arc::new(clean),
         compiled: Arc::new(Compiled { terms: terms.into_iter().map(|t| t.1).collect(), without, body: Vec::new(), nlocals: 0, nodes: 0, res, contact: None, program: None, plugin: Some(spec) }),
         last_error: None,
         last_ms: 0.0,
@@ -920,6 +988,8 @@ struct Env<'a> {
     strings: &'a StringTable,
     /// Values of the resources this system reads (see `Compiled::res`), taken before any entity runs.
     res: &'a [f64],
+    /// Only in a trace: where the values of tagged expressions are written down (tag, value).
+    trace: Option<&'a std::cell::RefCell<Vec<(u32, Val)>>>,
 }
 
 pub(crate) enum DOp {
@@ -1139,6 +1209,13 @@ fn eval(e: &Expr, env: &Env) -> std::result::Result<Val, String> {
             let (x, y, seed) = (num(eval(x, env)?)?, num(eval(y, env)?)?, num(eval(seed, env)?)?);
             Val::Num(crate::noise::noise2(x, y, seed))
         }
+        Expr::Tag(inner, id) => {
+            let v = eval(inner, env)?;
+            if let Some(t) = env.trace {
+                t.borrow_mut().push((*id, v));
+            }
+            v
+        }
     })
 }
 
@@ -1154,6 +1231,24 @@ fn values_json(vals: &[(String, Expr)], env: &Env) -> std::result::Result<Json, 
     let mut o = Vec::with_capacity(vals.len());
     for (k, e) in vals {
         o.push((k.clone(), to_json(eval(e, env)?, env.strings)));
+    }
+    Ok(Json::Obj(o))
+}
+
+fn field_values_json(vals: &[(String, FieldVal)], env: &Env) -> std::result::Result<Json, String> {
+    let mut o = Vec::with_capacity(vals.len());
+    for (k, v) in vals {
+        let j = match v {
+            FieldVal::One(e) => to_json(eval(e, env)?, env.strings),
+            FieldVal::List(es) => {
+                let mut a = Vec::with_capacity(es.len());
+                for e in es {
+                    a.push(to_json(eval(e, env)?, env.strings));
+                }
+                Json::Arr(a)
+            }
+        };
+        o.push((k.clone(), j));
     }
     Ok(Json::Obj(o))
 }
@@ -1210,7 +1305,7 @@ fn exec(stmts: &[Stmt], env: &mut Env, out: &mut Vec<(u64, u32, DOp)>, seq: &mut
             Stmt::SpawnPrefab { name, with, at, velocity } => {
                 let mut over: Vec<(String, Json)> = Vec::new();
                 for (cname, fields) in with {
-                    crate::prefab::merge_component(&mut over, cname, &values_json(fields, env)?);
+                    crate::prefab::merge_component(&mut over, cname, &field_values_json(fields, env)?);
                 }
                 for (cname, field, exprs) in [("Transform", "pos", at), ("Velocity", "lin", velocity)] {
                     if let Some(exprs) = exprs {
@@ -1228,6 +1323,11 @@ fn exec(stmts: &[Stmt], env: &mut Env, out: &mut Vec<(u64, u32, DOp)>, seq: &mut
                 push(out, env.uid, seq, DOp::Add(name.clone(), value))?;
             }
             Stmt::Remove(name) => push(out, env.uid, seq, DOp::Remove(name.clone()))?,
+            Stmt::Tag(id) => {
+                if let Some(t) = env.trace {
+                    t.borrow_mut().push((*id | STMT_BIT, Val::Bool(true)));
+                }
+            }
         }
     }
     Ok(())
@@ -1250,9 +1350,8 @@ pub fn run_all(world: &mut World, scripts: &mut ScriptSet, contacts: &[Contact],
     order.sort_by_key(|&i| (scripts.systems[i].order, i));
     for i in order {
         let t0 = Instant::now();
-        let compiled = scripts.systems[i].compiled.clone();
-        let name = scripts.systems[i].name.clone();
-        let error = run_one(world, &compiled, &name, tick, dt, seed, threads, scripts.interpret_only, contacts, &scripts.prefabs, &mut emitted);
+        let sys = &scripts.systems[i];
+        let error = run_one(world, &sys.compiled, &sys.name, tick, dt, seed, threads, scripts.interpret_only, contacts, &scripts.prefabs, &mut emitted);
         let s = &mut scripts.systems[i];
         s.last_ms = t0.elapsed().as_secs_f64() * 1000.0;
         if error.is_some() {
@@ -1300,7 +1399,7 @@ fn run_chunks(world: &World, c: &Compiled, chunks: &[lunaris_ecs::Chunk], next: 
         return run_chunks_vm(world, c, chunks, next, res, tick, dt, seed);
     }
     let sizes: Vec<usize> = c.terms.iter().map(|&t| world.info(t).size).collect();
-    let mut env = Env { bases: vec![std::ptr::null_mut(); c.terms.len()], sizes, row: 0, locals: vec![Val::Num(0.0); c.nlocals], uid: 0, uid_b: 0, contact: [0.0; 5], dt: dt as f64, tick, seed, strings: world.strings(), res };
+    let mut env = Env { bases: vec![std::ptr::null_mut(); c.terms.len()], sizes, row: 0, locals: vec![Val::Num(0.0); c.nlocals], uid: 0, uid_b: 0, contact: [0.0; 5], dt: dt as f64, tick, seed, strings: world.strings(), res, trace: None };
     let mut deferred: Vec<(u64, u32, DOp)> = Vec::new();
     let mut first_error: Option<(u64, String)> = None;
     loop {
@@ -1351,7 +1450,7 @@ fn run_contact(world: &World, c: &Compiled, spec: &ContactSpec, contacts: &[Cont
     pairs.sort_by_key(|p| (p.0, p.1));
     let res: Vec<f64> = c.res.iter().map(|n| world.resource(n).unwrap_or(0.0)).collect();
     let sizes: Vec<usize> = c.terms.iter().map(|&t| world.info(t).size).collect();
-    let mut env = Env { bases: vec![std::ptr::null_mut(); c.terms.len()], sizes, row: 0, locals: vec![Val::Num(0.0); c.nlocals], uid: 0, uid_b: 0, contact: [0.0; 5], dt: dt as f64, tick, seed, strings: world.strings(), res: &res };
+    let mut env = Env { bases: vec![std::ptr::null_mut(); c.terms.len()], sizes, row: 0, locals: vec![Val::Num(0.0); c.nlocals], uid: 0, uid_b: 0, contact: [0.0; 5], dt: dt as f64, tick, seed, strings: world.strings(), res: &res, trace: None };
     let mut deferred: Vec<(u64, u32, DOp)> = Vec::new();
     let mut seq = 0u32; // one counter for the whole run: with the uid of `a` it keeps the pairs' effects in processing order
     let mut first_error: Option<String> = None;
@@ -1387,9 +1486,15 @@ fn run_one(world: &mut World, c: &Compiled, name: &str, tick: u64, dt: f32, seed
         first_error = e;
     } else {
         let w: &World = world;
-        let total: usize = w.matching_archetypes(&c.terms, &c.without).iter().map(|&i| w.archetypes()[i].len()).sum();
+        let matched = w.matching_archetypes(&c.terms, &c.without);
+        // (a system that no entity matches does nothing at all, and is not made ready to: most of a game's systems are for things that are not there at the moment, a server's for a screen it has none of. A plugin may
+        // report an error for its own sake even then, so it is looked at as it was)
+        if matched.is_empty() && c.plugin.is_none() {
+            return first_error;
+        }
+        let total: usize = matched.iter().map(|&i| w.archetypes()[i].len()).sum();
         let parallel = threads > 1 && total >= 2048 && c.plugin.as_ref().is_none_or(|p| p.parallel);
-        let chunks = w.chunks(&c.terms, &c.without, if parallel { (total / (threads * 4)).clamp(512, 32_768) } else { usize::MAX / 2 });
+        let chunks = w.chunks_of(&matched, if parallel { (total / (threads * 4)).clamp(512, 32_768) } else { usize::MAX / 2 });
         let next = std::sync::atomic::AtomicUsize::new(0);
         let res: Vec<f64> = c.res.iter().map(|n| w.resource(n).unwrap_or(0.0)).collect();
         let res = &res[..];
@@ -1486,6 +1591,55 @@ fn run_one(world: &mut World, c: &Compiled, name: &str, tick: u64, dt: f32, seed
         }
     }
     first_error
+}
+
+/// What one graph system does for one entity, for live values in an editor: the value of every expression that is not a constant, as it was evaluated, under its
+/// path in the definition (`do[0].to.add[1]`, the same `at` paths that compile errors carry).
+#[derive(Debug, Clone, Default)]
+pub struct Traced {
+    /// The entity has every component of `each` and none of `without` (otherwise the system does not visit it and there is nothing to show).
+    pub matched: bool,
+    /// Expression paths and their values, in the order they were evaluated (a path appears once: statements run once for an entity).
+    pub values: Vec<(String, Json)>,
+    /// The paths of the statements that ran, in the order they ran (`do[0]`, `do[2]`, `do[2].then[0]`): which way an `if` went is in here.
+    pub ran: Vec<String>,
+    /// What stopped the run (a division by zero, a number where a flag was wanted), with the values found before it.
+    pub error: Option<String>,
+    /// Why there is nothing to show for a kind of system that is not traced.
+    pub note: Option<String>,
+}
+
+/// Run the graph system `def` once for the entity `uid` on a copy of the world and report what its expressions came to. Nothing of the real world changes (the copy is thrown
+/// away, which is also why compiling the definition for the trace is free of side effects). Plugin, wasm and `on_contact` systems are not traced.
+pub fn trace(world: &World, def: &Json, uid: u64, tick: u64, dt: f32, seed: u64) -> Result<Traced> {
+    let mut w = world.clone();
+    let (sys, paths, stmt_paths) = compile_inner(&mut w, def, None, None, true)?;
+    let c = &sys.compiled;
+    if c.plugin.is_some() {
+        return Ok(Traced { note: Some("plugin and wasm systems are not traced".to_string()), ..Default::default() });
+    }
+    if c.contact.is_some() {
+        return Ok(Traced { note: Some("on_contact systems are not traced".to_string()), ..Default::default() });
+    }
+    let e = w.require_entity(uid)?;
+    let have = w.components_of(e);
+    if !c.terms.iter().all(|t| have.contains(t)) || c.without.iter().any(|t| have.contains(t)) {
+        return Ok(Traced::default());
+    }
+    let (arch_index, row) = w.locate(e).expect("the entity was just found alive");
+    let res: Vec<f64> = c.res.iter().map(|n| w.resource(n).unwrap_or(0.0)).collect();
+    let sizes: Vec<usize> = c.terms.iter().map(|&t| w.info(t).size).collect();
+    let tags = std::cell::RefCell::new(Vec::new());
+    let mut env = Env { bases: vec![std::ptr::null_mut(); c.terms.len()], sizes, row, locals: vec![Val::Num(0.0); c.nlocals], uid, uid_b: 0, contact: [0.0; 5], dt: dt as f64, tick, seed, strings: w.strings(), res: &res, trace: Some(&tags) };
+    for (slot, &t) in env.bases.iter_mut().zip(&c.terms) {
+        *slot = w.archetypes()[arch_index].column_base(t).expect("the entity's archetype has the component");
+    }
+    let (mut deferred, mut seq) = (Vec::new(), 0u32);
+    let error = exec(&c.body, &mut env, &mut deferred, &mut seq).err();
+    let log = tags.borrow();
+    let values = log.iter().filter(|(id, _)| id & STMT_BIT == 0).map(|(id, v)| (paths[*id as usize].clone(), to_json(*v, w.strings()))).collect();
+    let ran = log.iter().filter(|(id, _)| id & STMT_BIT != 0).map(|(id, _)| stmt_paths[(*id & !STMT_BIT) as usize].clone()).collect();
+    Ok(Traced { matched: true, values, ran, error, note: None })
 }
 
 /// A summary of a system for listings.

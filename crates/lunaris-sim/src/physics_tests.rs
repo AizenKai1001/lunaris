@@ -227,3 +227,81 @@ fn the_broad_phase_finds_exactly_the_overlapping_pairs_on_any_layout() {
         assert_eq!(got, want, "{name}");
     }
 }
+
+#[test]
+fn the_grid_broad_phase_finds_exactly_the_contacts_the_sweep_of_all_bodies_finds() {
+    use crate::physics::{BROAD_SWEEP_ALL, GRID_BUILT, GRID_CHECK, GRID_PATCHED};
+    // a scene that takes the reference path (one body spins) with hundreds of static colliders of every size (a floor and a long wall among them: wider than the grid's cells), a dozen movers of each shape,
+    // triggers, collision layers and bodies that fall, slide, are thrown through the scenery and bump into each other: with the grid and with the sweep of all bodies the contacts of every step and the world
+    // after 150 steps are the same
+    let build = |sweep_all: bool| -> (Vec<u64>, Vec<usize>, u32, u32) {
+        BROAD_SWEEP_ALL.with(|f| f.set(sweep_all));
+        GRID_CHECK.with(|f| f.set(!sweep_all));
+        GRID_BUILT.with(|f| f.set(0));
+        GRID_PATCHED.with(|f| f.set(0));
+        let mut s = Sim::new(1);
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut rnd = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            ((state >> 40) as f32) / 16_777_216.0
+        };
+        spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-0.5,0]},"Collider":{"shape":1,"size":[400,1,400]}}"#);
+        spawn(&mut s, 2, r#"{"Transform":{"pos":[0,3,-60]},"Collider":{"shape":1,"size":[300,6,1]}}"#);
+        let mut uid = 10u64;
+        for _ in 0..260 {
+            let (x, z) = ((rnd() - 0.5) * 120.0, (rnd() - 0.5) * 120.0);
+            let (w, h, d) = (0.5 + rnd() * 6.0, 0.5 + rnd() * 5.0, 0.5 + rnd() * 6.0);
+            let shape = if rnd() < 0.2 { 0 } else { 1 };
+            let layer = if rnd() < 0.3 { r#","CollisionLayer":{"layer":2,"mask":7}"# } else { "" };
+            spawn(&mut s, uid, &format!(r#"{{"Transform":{{"pos":[{x},{},{z}]}},"Collider":{{"shape":{shape},"size":[{w},{h},{d}]}}{layer}}}"#, h * 0.5));
+            uid += 1;
+        }
+        // movers: boxes, balls, a capsule, a spinning box; thrown about
+        for k in 0..14u64 {
+            let (x, z) = ((rnd() - 0.5) * 100.0, (rnd() - 0.5) * 100.0);
+            let (vx, vz) = ((rnd() - 0.5) * 30.0, (rnd() - 0.5) * 30.0);
+            let shape = [0, 1, 2][(k % 3) as usize];
+            let spin = if k == 3 { r#","AngularVelocity":{"damping":0}"# } else { "" };
+            let layer = if k % 4 == 0 { r#","CollisionLayer":{"layer":1,"mask":3}"# } else { "" };
+            spawn(&mut s, 1000 + k, &format!(r#"{{"Transform":{{"pos":[{x},{},{z}]}},"Velocity":{{"lin":[{vx},{},{vz}]}},"Collider":{{"shape":{shape},"size":[1,1.4,1]}},"RigidBody":{{"mass":1,"restitution":0.4}}{spin}{layer}}}"#, 2.0 + rnd() * 6.0, rnd() * 8.0));
+        }
+        // triggers: one small, one wide
+        spawn(&mut s, 2000, r#"{"Transform":{"pos":[5,1,5]},"Collider":{"shape":1,"size":[4,3,4],"trigger":true}}"#);
+        spawn(&mut s, 2001, r#"{"Transform":{"pos":[-20,1,10]},"Collider":{"shape":1,"size":[150,3,20],"trigger":true}}"#);
+        let (mut hashes, mut contacts) = (Vec::new(), Vec::new());
+        for step in 0..150u64 {
+            // a dozen of the static colliders are doors and platforms that are moved about (a step in two), one goes at step 60 and one comes at step 90 (the numbers of the rest shift)
+            if step % 2 == 0 {
+                for k in 0..12u64 {
+                    let e = s.world.entity(10 + k).unwrap();
+                    let a = (step * 5 + k * 11) as f32;
+                    let p = &mut s.world.get_mut::<Transform>(e).unwrap().pos;
+                    p[0] += a.sin() * 3.0;
+                    p[2] += a.cos() * 3.0;
+                }
+            }
+            if step == 60 {
+                s.apply(&Command::Despawn { uid: 40 }).unwrap();
+            }
+            if step == 90 {
+                spawn(&mut s, 3000, r#"{"Transform":{"pos":[3,1,3]},"Collider":{"shape":1,"size":[3,2,3]}}"#);
+            }
+            s.step();
+            contacts.push(s.contacts.len());
+            if step % 10 == 9 {
+                hashes.push(s.state_hash());
+            }
+        }
+        BROAD_SWEEP_ALL.with(|f| f.set(false));
+        GRID_CHECK.with(|f| f.set(false));
+        (hashes, contacts, GRID_BUILT.with(|f| f.get()), GRID_PATCHED.with(|f| f.get()))
+    };
+    let (grid, c_grid, built, patched) = build(false);
+    let (sweep, c_sweep, _, _) = build(true);
+    assert!(built <= 4 && patched > 100, "the grid is kept between steps, made again only when the numbers of the statics shift and patched for the doors: built {built}, patched {patched}");
+    assert_eq!(grid, sweep, "the world after every 10 steps");
+    assert_eq!(c_grid, c_sweep, "the number of contacts of every step");
+    assert!(c_grid.iter().sum::<usize>() > 300, "the scene has contacts to compare: {}", c_grid.iter().sum::<usize>());
+}

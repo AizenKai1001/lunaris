@@ -10,9 +10,11 @@ pub enum CenterTab {
     Blueprint,
     Script,
     Canvas,
+    Sequencer,
+    Effects,
 }
 
 /// The strip with the middle tabs. Returns the tab that was clicked.
 pub fn strip(ui: &mut Ui, active: CenterTab, right: impl FnOnce(&mut Ui)) -> Option<CenterTab> {
-    chrome::tab_strip(ui, &[(CenterTab::Scene, "Scene"), (CenterTab::Game, "Game"), (CenterTab::Ui, "UI"), (CenterTab::Blueprint, "Blueprint"), (CenterTab::Script, "Script"), (CenterTab::Canvas, "Canvas")], active, right)
+    chrome::tab_strip(ui, &[(CenterTab::Scene, "Scene"), (CenterTab::Game, "Game"), (CenterTab::Ui, "UI"), (CenterTab::Blueprint, "Blueprint"), (CenterTab::Script, "Script"), (CenterTab::Canvas, "Canvas"), (CenterTab::Sequencer, "Sequencer"), (CenterTab::Effects, "Effects")], active, right)
 }

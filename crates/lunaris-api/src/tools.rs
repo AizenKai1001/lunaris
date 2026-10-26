@@ -43,6 +43,8 @@ fn view_props(mut extra: Vec<(&'static str, Json)>) -> Vec<(&'static str, Json)>
         ("target", num3("Point to look at (default [0,0,0]).")),
         ("up", num3("Up direction (default [0,1,0]).")),
         ("fov", Json::obj([("type", Json::str("number")), ("description", Json::str("Vertical field of view in degrees for `eye` views (default 60)."))])),
+        ("far", Json::obj([("type", Json::str("number")), ("description", Json::str("How far an `eye` view reaches in metres (default 1000; a landscape with mountains needs thousands)."))])),
+        ("near", Json::obj([("type", Json::str("number")), ("description", Json::str("How near an `eye` view starts in metres (default 0.1; raise it with `far` to keep depth precision)."))])),
         ("ortho_height", Json::obj([("type", Json::str("number")), ("description", Json::str("Use an orthographic (2D) view this many world units tall."))])),
         ("supersample", int("1 to 3: render at that multiple and average down for smoother edges.")),
     ];
@@ -285,8 +287,12 @@ pub fn tool_defs() -> Vec<ToolDef> {
         tool("load_game", "Replace the world with a saved game (see `save_game`, `saves`). Clears undo history; refuses while a recording is running.", vec![("slot", s("The slot to load."))], &["slot"]),
         tool(
             "type_text",
-            "Type into the focused text field (a `UiInput`): one character per tick, then Enter when `enter` is true. Click the field first (set `input.mouse_x`, `input.mouse_y`, `input.mouse_left` with `input`, step, release, step). Advances the simulation by one tick per character. See docs/UI.md.",
-            vec![("text", s("What to type (up to 200 characters).")), ("enter", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Press Enter after the text (submits the field)."))]))],
+            "Type into the focused text field (a `UiInput`): one character per tick (or, with `paste`, all at once), then Enter when `enter` is true. Click the field first (set `input.mouse_x`, `input.mouse_y`, `input.mouse_left` with `input`, step, release, step). Advances the simulation by one tick per character. See docs/UI.md.",
+            vec![
+                ("text", s("What to type (up to 200 characters; up to 4096 with `paste`).")),
+                ("enter", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Press Enter after the text (submits the field)."))])),
+                ("paste", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Put all of the text into the field at once without advancing the simulation, as Ctrl+V does in a window (for a long text such as a connect token)."))])),
+            ],
             &["text"],
         ),
         tool("saves", "List the saved games of the workspace: slot, size in bytes, tick and number of entities.", vec![], &[]),
@@ -324,6 +330,18 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ),
         tool("systems", "List the systems that run each tick: native ones, and graph systems with their components, order, enabled flag and the last runtime error.", vec![], &[]),
         tool("get_system", "Read one graph system, including its full JSON definition (`def`), to inspect or edit it.", vec![("name", s("Graph system name (see `systems`)."))], &["name"]),
+        tool(
+            "timeline_seek",
+            "Put the `Timeline` of an entity at a time, for previewing a cutscene or scrubbing it in an editor: every number a ramp or a `set` of its script moves gets the value it would have at that second (events, resources and `+=` steps are not run), and the timeline's `time` reads that second. Returns `time` (clamped to the length), `length` and how many numbers were written. This changes the world (it is not undone by `undo`): take a `snapshot` first if the scene has to come back.",
+            vec![("uid", Json::obj([("type", Json::str("integer")), ("description", Json::str("The entity that has the Timeline."))])), ("time", Json::obj([("type", Json::str("number")), ("description", Json::str("Seconds from the start of the timeline."))]))],
+            &["uid", "time"],
+        ),
+        tool(
+            "trace_system",
+            "Run one graph system once for one entity on a throwaway copy of the world and say what every expression came to: `values` maps the path of each non-constant expression in the definition (`do[0].to.add[1]`, the same paths compile errors use) to its value, `ran` lists the paths of the statements that ran, in order (`do[0]`, `do[2].then[0]`: which way an `if` went), and `error` says what stopped the run. Nothing changes in the real world. For seeing why a system does what it does (the editor shows these values on the wires of a Blueprint). Plugin, wasm and on_contact systems are not traced.",
+            vec![("uid", Json::obj([("type", Json::str("integer")), ("description", Json::str("The entity to run it for."))])), ("name", s("Graph system name (see `systems`).")), ("def", Json::obj([("type", Json::str("object")), ("description", Json::str("A system definition to trace instead of a defined one (for a graph that is not applied yet)."))]))],
+            &["uid"],
+        ),
         tool(
             "path",
             "Find a walkable path between two points (or entities) around the solid colliders: up stairs, onto platforms, down short drops, never through walls. Returns waypoints [x, y, z] (feet positions), the length, whether the target itself is walkable (`exact`) and how many cells were searched. To make an entity walk there, set its `NavAgent` component (target + active); this tool only shows the route. See docs/NAVIGATION.md.",
@@ -389,6 +407,12 @@ pub fn tool_defs() -> Vec<ToolDef> {
             view_props(vec![("debug", Json::obj([("type", Json::str("array")), ("description", Json::str("Draw debug lines over the finished picture, always in front: \"colliders\" (the shapes physics uses: gray static, green dynamic, blue characters, yellow triggers), \"velocity\" (red), \"targets\" (where navigation agents are going, magenta), \"lights\" (the reach of point and spot lights, orange), \"sensors\" (range and view cone, cyan), \"wheels\" (the rays, struts and wheels of `Vehicle`s: green on the ground, red in the air), or \"all\"."))])), ("quality", s("reference (CPU, deterministic), classic, low, medium, high or ultra (GPU), or auto: what this host uses by default (high on a GPU host).")), ("path", s("Also save the PNG to this relative path in the workspace.")), ("image", Json::obj([("type", Json::str("boolean")), ("description", Json::str("Return the image itself (default true)."))])), ("visible_limit", int("Maximum entries in `visible` (default 20)."))]),
             &[],
         ),
+        tool(
+            "ui_audit",
+            "List the on-screen interface as a picture of `width` x `height` pixels would show it, for quality checks: every visible `Ui` and `Text` (a `UiGroup` that is hidden hides its elements) with its name, parent, layer, the box it covers (`rect`, pixels x0 y0 x1 y1, after the `UiScale` safe area and `UiEdge` pins), the box its letters cover (`ink`, from the real font layout), the words drawn with `{resource}`, `{#key}` and `{key:ACTION}` filled in (`label`) and as written (`template`), the font, the letter size and the colours. Changes nothing. Look for text that runs out of its button, texts over each other and elements off the screen (`tools/ui_overlap_check.py` of the game does).",
+            vec![("width", int("Picture width in pixels (default 1920, 16 to 8192).")), ("height", int("Picture height in pixels (default 1080, 16 to 8192)."))],
+            &[],
+        ),
         tool("pick", "Which entity is at pixel (x, y) of a render with the same view parameters?", view_props(vec![("x", int("Pixel column, 0 at the left.")), ("y", int("Pixel row, 0 at the top."))]), &["x", "y"]),
         tool(
             "minimap",
@@ -408,9 +432,13 @@ pub fn tool_defs() -> Vec<ToolDef> {
         tool("project", "Where does a world point appear in the image for this view? Returns pixel coordinates (y down) and whether it is on screen.", view_props(vec![("point", Json::obj([("type", Json::str("array")), ("description", Json::str("[x, y, z] in world units."))]))]), &["point"]),
         tool(
             "set_resource",
-            "Set (or remove, with null) a world resource: a named global number such as `score`, a timer, or a key's state. Graph systems read them with {\"res\": \"score\"} and change them with res_set / res_add. Undoable, saved in scenes.",
-            vec![("name", s("Resource name: letters, digits, underscores, dot-separated parts (for example `score` or `level.time_left`).")), ("value", Json::obj([("description", Json::str("A number, true/false (1/0), or null to remove it."))]))],
-            &["name"],
+            "Set (or remove, with null) a world resource: a named global number such as `score`, a timer, or a key's state. Graph systems read them with {\"res\": \"score\"} and change them with res_set / res_add. Undoable, saved in scenes. Give `values` (a map of name to number) instead of `name` and `value` to set many at once in one undo step.",
+            vec![
+                ("name", s("Resource name: letters, digits, underscores, dot-separated parts (for example `score` or `level.time_left`).")),
+                ("value", Json::obj([("description", Json::str("A number, true/false (1/0), or null to remove it."))])),
+                ("values", object("Instead of `name` and `value`: a map of resource name to number (or null to remove), all set in one step, for example {\"cpu.percent\": 12, \"net.rx\": 2500}.")),
+            ],
+            &[],
         ),
         tool("events", "Events emitted by graph systems with {\"emit\": \"name\"} (sounds, messages for the outside), newest `limit`, oldest first. `step` also returns the events of that call. Each has the `pos` of the emitting entity at that moment when it had a Transform (sound is placed there). Events are output, not state: they are not in the state hash and a replay makes them again.", vec![("since_tick", int("Only events from this tick on.")), ("limit", int("Most events to return (default 200).")) ], &[]),
         tool("resources", "List every world resource and its value (including live input state under `input.`).", vec![], &[]),

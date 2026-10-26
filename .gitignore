@@ -23,3 +23,21 @@ examples/hollowlight/textures/
 examples/gfx_lab/models/*/
 examples/gfx_lab/highlands/
 examples/gfx_lab/highlands.lunaris.json
+
+# derived data the engine caches next to a project (compressed textures)
+.lunaris/
+
+# scratch left in the repo root by experiments: pictures, probes, one-off patch scripts, model scratch (never commit)
+/*.png
+/dbg_tmp*.py
+/scratch_ui/
+tools/patch_*_tmp.py
+tools/citygen/_rain_paper.txt
+# generated terrain examples whose data origin is not verified yet
+examples/gfx_lab/coast/
+examples/gfx_lab/fjord/
+examples/gfx_lab/mountain/
+examples/gfx_lab/fjord.lunaris.json
+examples/gfx_lab/mountain.lunaris.json
+examples/spider_brain_nn3.json
+examples/spiders_blocks_*.lunaris.json

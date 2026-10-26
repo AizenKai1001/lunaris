@@ -1,0 +1,1603 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1000,
+   "components": {
+    "Name": {
+     "value": "Sky"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.14,
+      0.3,
+      0.6
+     ],
+     "sky_horizon": [
+      0.72,
+      0.8,
+      0.92
+     ],
+     "ground": [
+      0.2,
+      0.2,
+      0.22
+     ],
+     "clouds": 0.25,
+     "fog": 0.002,
+     "fog_color": [
+      0.7,
+      0.76,
+      0.86
+     ],
+     "bloom": 0.25,
+     "ssao": 1.0,
+     "shadow_distance": 40
+    }
+   }
+  },
+  {
+   "uid": 1001,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.55,
+      -0.3,
+      -0.25,
+      0.74
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.95,
+      0.85
+     ],
+     "intensity": 3.4
+    }
+   }
+  },
+  {
+   "uid": 1002,
+   "components": {
+    "Name": {
+     "value": "Floor"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      13.0,
+      1,
+      9.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "plane",
+     "color": [
+      0.46,
+      0.33,
+      0.22,
+      1
+     ],
+     "roughness": 0.7
+    }
+   }
+  },
+  {
+   "uid": 1003,
+   "components": {
+    "Name": {
+     "value": "North wall"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.5,
+      -4.1
+     ],
+     "scale": [
+      12.4,
+      3.0,
+      0.2
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.78,
+      0.74,
+      0.66,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1004,
+   "components": {
+    "Name": {
+     "value": "South wall"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.5,
+      4.1
+     ],
+     "scale": [
+      12.4,
+      3.0,
+      0.2
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.78,
+      0.74,
+      0.66,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": false
+    }
+   }
+  },
+  {
+   "uid": 1005,
+   "components": {
+    "Name": {
+     "value": "West wall"
+    },
+    "Transform": {
+     "pos": [
+      -6.1,
+      1.5,
+      0
+     ],
+     "scale": [
+      0.2,
+      3.0,
+      8.4
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.78,
+      0.74,
+      0.66,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1006,
+   "components": {
+    "Name": {
+     "value": "East wall"
+    },
+    "Transform": {
+     "pos": [
+      6.1,
+      1.5,
+      0
+     ],
+     "scale": [
+      0.2,
+      3.0,
+      8.4
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.78,
+      0.74,
+      0.66,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1007,
+   "components": {
+    "Name": {
+     "value": "Divider A"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.5,
+      -2.35
+     ],
+     "scale": [
+      0.2,
+      3.0,
+      3.3
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.78,
+      0.74,
+      0.66,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1008,
+   "components": {
+    "Name": {
+     "value": "Divider B"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.5,
+      2.35
+     ],
+     "scale": [
+      0.2,
+      3.0,
+      3.3
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.78,
+      0.74,
+      0.66,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1009,
+   "components": {
+    "Name": {
+     "value": "Table top"
+    },
+    "Transform": {
+     "pos": [
+      -3.0,
+      0.75,
+      -1.0
+     ],
+     "scale": [
+      1.6,
+      0.08,
+      0.9
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1010,
+   "components": {
+    "Name": {
+     "value": "Table leg"
+    },
+    "Transform": {
+     "pos": [
+      -3.7,
+      0.375,
+      -1.38
+     ],
+     "scale": [
+      0.08,
+      0.75,
+      0.08
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1011,
+   "components": {
+    "Name": {
+     "value": "Table leg"
+    },
+    "Transform": {
+     "pos": [
+      -3.7,
+      0.375,
+      -0.62
+     ],
+     "scale": [
+      0.08,
+      0.75,
+      0.08
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1012,
+   "components": {
+    "Name": {
+     "value": "Table leg"
+    },
+    "Transform": {
+     "pos": [
+      -2.3,
+      0.375,
+      -1.38
+     ],
+     "scale": [
+      0.08,
+      0.75,
+      0.08
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1013,
+   "components": {
+    "Name": {
+     "value": "Table leg"
+    },
+    "Transform": {
+     "pos": [
+      -2.3,
+      0.375,
+      -0.62
+     ],
+     "scale": [
+      0.08,
+      0.75,
+      0.08
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1014,
+   "components": {
+    "Name": {
+     "value": "Bookcase side"
+    },
+    "Transform": {
+     "pos": [
+      -5.25,
+      0.95,
+      -3.75
+     ],
+     "scale": [
+      0.05,
+      1.9,
+      0.35
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1015,
+   "components": {
+    "Name": {
+     "value": "Bookcase side"
+    },
+    "Transform": {
+     "pos": [
+      -3.35,
+      0.95,
+      -3.75
+     ],
+     "scale": [
+      0.05,
+      1.9,
+      0.35
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1016,
+   "components": {
+    "Name": {
+     "value": "Shelf"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      0.6,
+      -3.75
+     ],
+     "scale": [
+      1.9,
+      0.05,
+      0.35
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1017,
+   "components": {
+    "Name": {
+     "value": "Shelf"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      1.2,
+      -3.75
+     ],
+     "scale": [
+      1.9,
+      0.05,
+      0.35
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1018,
+   "components": {
+    "Name": {
+     "value": "Shelf"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      1.8,
+      -3.75
+     ],
+     "scale": [
+      1.9,
+      0.05,
+      0.35
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1019,
+   "components": {
+    "Name": {
+     "value": "Sofa"
+    },
+    "Transform": {
+     "pos": [
+      3.2,
+      0.25,
+      -2.2
+     ],
+     "scale": [
+      2.0,
+      0.5,
+      0.9
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.3,
+      0.38,
+      0.5,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1020,
+   "components": {
+    "Name": {
+     "value": "Cabinet"
+    },
+    "Transform": {
+     "pos": [
+      3.6,
+      0.8,
+      3.3
+     ],
+     "scale": [
+      1.2,
+      1.6,
+      0.6
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1021,
+   "components": {
+    "Name": {
+     "value": "Ledge"
+    },
+    "Transform": {
+     "pos": [
+      5.7,
+      2.3,
+      0.0
+     ],
+     "scale": [
+      0.4,
+      0.1,
+      2.0
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.42,
+      0.27,
+      0.15,
+      1
+     ],
+     "roughness": 0.85,
+     "visible": true
+    }
+   }
+  },
+  {
+   "uid": 1022,
+   "components": {
+    "Name": {
+     "value": "Cushion hill"
+    },
+    "Transform": {
+     "pos": [
+      -1.8,
+      0.0,
+      1.0
+     ]
+    },
+    "Terrain": {
+     "heightmap": "house_hill.png",
+     "size": [
+      1.2,
+      1.2
+     ],
+     "height": 0.3,
+     "color": [
+      0.65,
+      0.3,
+      0.27,
+      1
+     ],
+     "friction": 1.2
+    }
+   }
+  },
+  {
+   "uid": 1023,
+   "components": {
+    "Name": {
+     "value": "Cushion mound"
+    },
+    "Transform": {
+     "pos": [
+      2.3,
+      0.0,
+      1.2
+     ]
+    },
+    "Terrain": {
+     "heightmap": "house_mound.png",
+     "size": [
+      1.6,
+      1.6
+     ],
+     "height": 0.45,
+     "color": [
+      0.3,
+      0.5,
+      0.36,
+      1
+     ],
+     "friction": 1.2
+    }
+   }
+  },
+  {
+   "uid": 1024,
+   "components": {
+    "Name": {
+     "value": "Nest rug"
+    },
+    "Transform": {
+     "pos": [
+      -4.9,
+      0.006,
+      2.9
+     ],
+     "scale": [
+      1.8,
+      0.012,
+      1.5
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.2,
+      0.12,
+      0.1,
+      1
+     ],
+     "roughness": 1.0
+    }
+   }
+  },
+  {
+   "uid": 1025,
+   "components": {
+    "Name": {
+     "value": "Food spot 0"
+    },
+    "Transform": {
+     "pos": [
+      -4.5,
+      0.0324,
+      -2.0
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1026,
+   "components": {
+    "Name": {
+     "value": "Food spot 1"
+    },
+    "Transform": {
+     "pos": [
+      -2.0,
+      0.0324,
+      2.4
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1027,
+   "components": {
+    "Name": {
+     "value": "Food spot 2"
+    },
+    "Transform": {
+     "pos": [
+      -5.2,
+      0.0324,
+      0.6
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1028,
+   "components": {
+    "Name": {
+     "value": "Food spot 3"
+    },
+    "Transform": {
+     "pos": [
+      2.6,
+      0.0324,
+      -3.0
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1029,
+   "components": {
+    "Name": {
+     "value": "Food spot 4"
+    },
+    "Transform": {
+     "pos": [
+      4.8,
+      0.0324,
+      1.2
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1030,
+   "components": {
+    "Name": {
+     "value": "Food spot 5"
+    },
+    "Transform": {
+     "pos": [
+      1.8,
+      0.0324,
+      3.1
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1031,
+   "components": {
+    "Name": {
+     "value": "Food spot 6"
+    },
+    "Transform": {
+     "pos": [
+      -3.0,
+      0.8224,
+      -1.0
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1032,
+   "components": {
+    "Name": {
+     "value": "Food spot 7"
+    },
+    "Transform": {
+     "pos": [
+      -3.4,
+      0.8224,
+      -1.2
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1033,
+   "components": {
+    "Name": {
+     "value": "Food spot 8"
+    },
+    "Transform": {
+     "pos": [
+      3.2,
+      0.5324,
+      -2.2
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1034,
+   "components": {
+    "Name": {
+     "value": "Food spot 9"
+    },
+    "Transform": {
+     "pos": [
+      -1.8,
+      0.3324,
+      1.0
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1035,
+   "components": {
+    "Name": {
+     "value": "Food spot 10"
+    },
+    "Transform": {
+     "pos": [
+      -1.75,
+      0.3324,
+      1.05
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1036,
+   "components": {
+    "Name": {
+     "value": "Food spot 11"
+    },
+    "Transform": {
+     "pos": [
+      2.3,
+      0.4824,
+      1.2
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1037,
+   "components": {
+    "Name": {
+     "value": "Food spot 12"
+    },
+    "Transform": {
+     "pos": [
+      2.35,
+      0.4824,
+      1.15
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1038,
+   "components": {
+    "Name": {
+     "value": "Food spot 13"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      0.6574,
+      -3.7
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1039,
+   "components": {
+    "Name": {
+     "value": "Food spot 14"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      1.2574,
+      -3.7
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1040,
+   "components": {
+    "Name": {
+     "value": "Food spot 15"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      1.8574,
+      -3.7
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1041,
+   "components": {
+    "Name": {
+     "value": "Food spot 16"
+    },
+    "Transform": {
+     "pos": [
+      3.6,
+      1.6324,
+      3.3
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1042,
+   "components": {
+    "Name": {
+     "value": "Food spot 17"
+    },
+    "Transform": {
+     "pos": [
+      5.55,
+      2.3824,
+      0.0
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1043,
+   "components": {
+    "Name": {
+     "value": "Food spot 18"
+    },
+    "Transform": {
+     "pos": [
+      -5.93,
+      1.4,
+      -0.5
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1044,
+   "components": {
+    "Name": {
+     "value": "Food spot 19"
+    },
+    "Transform": {
+     "pos": [
+      -5.93,
+      2.2,
+      1.6
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 1045,
+   "components": {
+    "Name": {
+     "value": "Food spot 20"
+    },
+    "Transform": {
+     "pos": [
+      5.93,
+      1.5,
+      -2.5
+     ]
+    },
+    "FoodSpot": {}
+   }
+  },
+  {
+   "uid": 100,
+   "components": {
+    "Name": {
+     "value": "Food 0"
+    },
+    "Transform": {
+     "pos": [
+      -4.5,
+      0.0324,
+      -2.0
+     ],
+     "scale": [
+      0.036,
+      0.036,
+      0.036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.55,
+      0.15,
+      1
+     ],
+     "emissive": 2.0
+    },
+    "Food": {}
+   }
+  },
+  {
+   "uid": 101,
+   "components": {
+    "Name": {
+     "value": "Food 1"
+    },
+    "Transform": {
+     "pos": [
+      -3.0,
+      0.8224,
+      -1.0
+     ],
+     "scale": [
+      0.036,
+      0.036,
+      0.036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.55,
+      0.15,
+      1
+     ],
+     "emissive": 2.0
+    },
+    "Food": {}
+   }
+  },
+  {
+   "uid": 102,
+   "components": {
+    "Name": {
+     "value": "Food 2"
+    },
+    "Transform": {
+     "pos": [
+      -4.3,
+      1.2574,
+      -3.7
+     ],
+     "scale": [
+      0.036,
+      0.036,
+      0.036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.55,
+      0.15,
+      1
+     ],
+     "emissive": 2.0
+    },
+    "Food": {}
+   }
+  },
+  {
+   "uid": 103,
+   "components": {
+    "Name": {
+     "value": "Food 3"
+    },
+    "Transform": {
+     "pos": [
+      3.6,
+      1.6324,
+      3.3
+     ],
+     "scale": [
+      0.036,
+      0.036,
+      0.036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.55,
+      0.15,
+      1
+     ],
+     "emissive": 2.0
+    },
+    "Food": {}
+   }
+  },
+  {
+   "uid": 104,
+   "components": {
+    "Name": {
+     "value": "Food 4"
+    },
+    "Transform": {
+     "pos": [
+      -1.8,
+      0.3324,
+      1.0
+     ],
+     "scale": [
+      0.036,
+      0.036,
+      0.036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.55,
+      0.15,
+      1
+     ],
+     "emissive": 2.0
+    },
+    "Food": {}
+   }
+  },
+  {
+   "uid": 105,
+   "components": {
+    "Name": {
+     "value": "Food 5"
+    },
+    "Transform": {
+     "pos": [
+      2.3,
+      0.4824,
+      1.2
+     ],
+     "scale": [
+      0.036,
+      0.036,
+      0.036
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      1.0,
+      0.55,
+      0.15,
+      1
+     ],
+     "emissive": 2.0
+    },
+    "Food": {}
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Spider 0"
+    },
+    "Transform": {
+     "pos": [
+      -5.0,
+      0.0,
+      2.5
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_house.json",
+     "genome": 0,
+     "body_seed": 3,
+     "forage": true,
+     "size": 0.12
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Spider 1"
+    },
+    "Transform": {
+     "pos": [
+      -4.5,
+      0.0,
+      3.2
+     ],
+     "rot": [
+      0,
+      0.29552020666133955,
+      0,
+      0.955336489125606
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_house.json",
+     "genome": 1,
+     "body_seed": 8,
+     "forage": true,
+     "size": 0.12
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Spider 2"
+    },
+    "Transform": {
+     "pos": [
+      -4.0,
+      0.0,
+      2.6
+     ],
+     "rot": [
+      0,
+      0.5646424733950354,
+      0,
+      0.8253356149096783
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_house.json",
+     "genome": 2,
+     "body_seed": 13,
+     "forage": true,
+     "size": 0.12
+    }
+   }
+  },
+  {
+   "uid": 900,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      -4.5,
+      0.6,
+      3.5
+     ],
+     "rot": [
+      -0.1,
+      0.0,
+      0.0,
+      0.99
+     ]
+    },
+    "Camera": {
+     "fov_y": 58,
+     "far": 300,
+     "clear": [
+      0.05,
+      0.06,
+      0.09,
+      1
+     ]
+    },
+    "CameraRig": {
+     "target": 20,
+     "mode": 0,
+     "offset": [
+      -0.24,
+      0.33599999999999997,
+      0.432
+     ],
+     "look_at": true,
+     "look_offset": [
+      0.0,
+      0.024,
+      0.0
+     ],
+     "follow_speed": 3.0
+    }
+   }
+  },
+  {
+   "uid": 1046,
+   "components": {
+    "Name": {
+     "value": "Title"
+    },
+    "Text": {
+     "value": "the spiders' house: they go and get the food",
+     "pos": [
+      0.02,
+      0.03
+     ],
+     "size": 0.035,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "shadow": true
+    }
+   }
+  }
+ ]
+}

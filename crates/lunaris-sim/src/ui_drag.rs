@@ -61,7 +61,7 @@ pub(crate) fn update(world: &mut World) {
     }
     items.sort_by_key(|i| i.uid);
     slots.sort_by_key(|s| s.uid);
-    let hidden = crate::ui_kit3::hidden_set(world);
+    let hidden = crate::ui_kit3::hidden_set_shared(world);
     let ptr = pointer(world);
     let down = world.resource("input.mouse_left").is_some_and(|v| v > 0.5);
     // what a slot reported last tick is over: the resources go back to nothing in between two drops (the count stays)

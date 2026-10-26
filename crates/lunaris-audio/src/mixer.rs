@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 pub const RATE: u32 = 44_100;
 /// Voices that can play at once; a new voice replaces the quietest one that is not looping.
-pub const MAX_VOICES: usize = 32;
+pub const MAX_VOICES: usize = 48;
 /// The longest echo, seconds.
 pub const MAX_ECHO: f32 = 0.26;
 const HISTORY: usize = (RATE as f32 * MAX_ECHO) as usize + 4;

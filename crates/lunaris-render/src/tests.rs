@@ -624,6 +624,107 @@ fn an_animator_poses_the_model_in_the_picture_and_the_clock_is_the_state() {
 }
 
 #[test]
+fn posing_the_models_on_several_threads_draws_the_same_picture() {
+    use std::sync::atomic::Ordering;
+    // twelve animated models at different times of a clip: the picture must not depend on how many threads pose them (the models are shared out over the cores, `pose_models`)
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,1.0,15]},"Camera":{"fov_y":60}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"rot":[-0.7071,0,0,0.7071]},"Light":{"kind":0}}"#);
+    for k in 0..12u64 {
+        let x = (k as f32 - 5.5) * 1.3;
+        let t = 0.07 * k as f32;
+        spawn(&mut s, 10 + k, &format!(r#"{{"Transform":{{"pos":[{x},0,0]}},"MeshRenderer":{{"mesh":"examples/models/swayer.glb","color":[1,1,1,1]}},"Animator":{{"clip":"sway","time":{t},"speed":0.0}}}}"#));
+    }
+    let mut render_with = |threads: usize| {
+        crate::render::POSE_THREADS_OVERRIDE.store(threads, Ordering::Relaxed);
+        let mut tex = TextureCache::new(Some(repo_root()));
+        render(&mut s.world, &mut tex, &RenderOptions { width: 240, height: 120, ..RenderOptions::default() }).unwrap()
+    };
+    let one = render_with(1);
+    let two = render_with(2);
+    let eight = render_with(8);
+    let auto = render_with(0);
+    crate::render::POSE_THREADS_OVERRIDE.store(0, Ordering::Relaxed);
+    assert!(one.warnings.is_empty(), "{:?}", one.warnings);
+    assert_eq!(one.hash(), two.hash(), "two threads draw the same picture as one");
+    assert_eq!(one.hash(), eight.hash(), "eight threads draw the same picture as one");
+    assert_eq!(one.hash(), auto.hash(), "so does the automatic choice");
+}
+
+#[test]
+fn a_renderer_that_skins_on_the_card_is_handed_the_pose_and_not_the_vertices() {
+    use crate::render::{gather_scene, gather_scene_with, MeshRef};
+    // animated models at different times of a clip (and one in a crossfade): gathered for the card they are the rest pose and the joint matrices, which move the rest pose to exactly the vertices that the processor's pose makes
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,1.0,15]},"Camera":{"fov_y":60}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"rot":[-0.7071,0,0,0.7071]},"Light":{"kind":0}}"#);
+    for k in 0..5u64 {
+        let x = (k as f32 - 2.0) * 1.5;
+        let t = 0.11 * k as f32;
+        let extra = if k == 3 { r#","AnimLayers":{"clip_b":"nod","weight_b":0.4,"sync_b":false,"speed_b":0.0,"time_b":0.3}"# } else { "" };
+        spawn(&mut s, 10 + k, &format!(r#"{{"Transform":{{"pos":[{x},0,0]}},"MeshRenderer":{{"mesh":"examples/models/swayer.glb","color":[1,1,1,1]}},"Animator":{{"clip":"sway","time":{t},"speed":0.0}}{extra}}}"#));
+    }
+    spawn(&mut s, 30, r#"{"Transform":{"pos":[0,0,-3]},"MeshRenderer":{"mesh":"cube","color":[1,1,1,1]}}"#);
+    let opts = RenderOptions { width: 240, height: 120, ..RenderOptions::default() };
+    let mut tex = TextureCache::new(Some(repo_root()));
+    let on_cpu = gather_scene(&mut s.world, &mut tex, &opts).unwrap();
+    let mut tex = TextureCache::new(Some(repo_root()));
+    let on_card = gather_scene_with(&mut s.world, &mut tex, &opts, true).unwrap();
+    assert_eq!(on_cpu.meshes.len(), on_card.meshes.len());
+    let mut skinned = 0;
+    for (a, b) in on_cpu.meshes.iter().zip(&on_card.meshes) {
+        assert_eq!(a.uid, b.uid);
+        match (&a.mesh, &b.mesh) {
+            (MeshRef::Dynamic { mesh: posed, .. }, MeshRef::Skinned { base, matrices, .. }) => {
+                let rig = base.rig.as_ref().expect("a skeleton");
+                assert_eq!(matrices.len(), rig.joints.len(), "one matrix a joint");
+                let again = rig.skin(base, matrices);
+                assert_eq!(posed.pos, again.pos, "entity {}: the matrices move the rest pose to the processor's pose", a.uid);
+                assert_eq!(posed.nrm, again.nrm);
+                // (the rest pose is the model as it was loaded: it differs from the pose)
+                assert!(base.pos != posed.pos || a.uid == 10, "entity {}: the base is the rest pose", a.uid);
+                skinned += 1;
+            }
+            (MeshRef::Builtin(_), MeshRef::Builtin(_)) => {}
+            _ => panic!("entity {}: the two scenes hold different kinds of mesh", a.uid),
+        }
+    }
+    assert_eq!(skinned, 5);
+}
+
+/// A measure, not a test: what a picture of a crowd of armed mannequins costs on 1, 2, 4 and 8 pose threads (`pose_models`), at a size so small that the posing is most of it.
+///
+///     PUPPET_ROOT=/path/to/the/game/folder cargo test -p lunaris-render --release pose_threads_cost -- --ignored --nocapture
+#[test]
+#[ignore]
+fn pose_threads_cost() {
+    use std::sync::atomic::Ordering;
+    let Ok(root) = std::env::var("PUPPET_ROOT") else { return };
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,4,48]},"Camera":{"fov_y":50}}"#);
+    spawn(&mut s, 2, r#"{"Transform":{"rot":[-0.7071,0,0,0.7071]},"Light":{"kind":0}}"#);
+    let n = 60u64;
+    for k in 0..n {
+        let (x, z) = (((k % 10) as f32 - 4.5) * 2.2, ((k / 10) as f32) * -2.2);
+        let t = 0.05 * k as f32;
+        spawn(&mut s, 10 + k, &format!(r#"{{"Transform":{{"pos":[{x},0,{z}]}},"MeshRenderer":{{"mesh":"assets/models/player_rifle.glb","color":[1,1,1,1]}},"Animator":{{"clip":"rifle_walk","time":{t},"speed":0.0,"looping":true}}}}"#));
+    }
+    let mut tex = TextureCache::new(Some(std::path::PathBuf::from(root)));
+    for threads in [1usize, 2, 4, 8] {
+        crate::render::POSE_THREADS_OVERRIDE.store(threads, Ordering::Relaxed);
+        let opts = RenderOptions { width: 64, height: 36, ..RenderOptions::default() };
+        render(&mut s.world, &mut tex, &opts).unwrap();
+        let reps = 6;
+        let t0 = std::time::Instant::now();
+        for _ in 0..reps {
+            std::hint::black_box(render(&mut s.world, &mut tex, &opts).unwrap());
+        }
+        println!("{n} mannequins, {threads} pose threads: {:7.2} ms a picture", t0.elapsed().as_secs_f64() * 1000.0 / reps as f64);
+    }
+    crate::render::POSE_THREADS_OVERRIDE.store(0, Ordering::Relaxed);
+}
+
+#[test]
 fn ui_rectangles_borders_bars_labels_and_button_states_are_drawn_in_layer_order() {
     let mut sim = Sim::new(1);
     spawn(&mut sim, 1, r#"{"Camera":{"clear":[0,0,0,1]},"Transform":{"pos":[0,0,5]}}"#);

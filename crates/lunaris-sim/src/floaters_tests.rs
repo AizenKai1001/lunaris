@@ -230,3 +230,43 @@ fn floaters_ride_the_water_of_a_picture_and_not_the_dry_bank() {
     assert!(pos(&s, 11)[1] > 5.0 && pos(&s, 11)[1] < 6.5, "{:?}", pos(&s, 11));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_sea_shoals_and_loses_its_height_over_the_shallows_for_floaters_as_it_does_on_the_screen() {
+    use crate::png::tests::make_png;
+    // the pure function: deep water keeps the waves, a little deeper than half a wave length they grow by the fourth root of the depth, and at a metre of depth the significant height is held to half of it
+    assert_eq!(crate::floaters::shoal(80.0, 1.0, 10.0), 1.0);
+    let grown = crate::floaters::shoal(2.0, 0.4, 10.0);
+    assert!(grown > 1.2 && grown < 1.7, "{grown}");
+    assert!((crate::floaters::shoal(1.0, 1.0, 10.0) - 0.5).abs() < 1e-5);
+    assert_eq!(crate::floaters::shoal(0.0, 1.0, 10.0), 0.0);
+    assert_eq!(crate::floaters::shoal(-3.0, 1.0, 10.0), 0.0);
+    // a beach: the ground rises from 6 m under the sea at the west edge of a 64 m terrain to 2 m over it at the east edge (the water line at x = 16); the sea has a look, so its waves shoal
+    let dir = std::env::temp_dir().join(format!("lunaris-shoal-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let ramp: Vec<u16> = (0..33 * 33).map(|i| ((i % 33) as f32 / 32.0 * 65535.0) as u16).collect();
+    std::fs::write(dir.join("ramp.png"), make_png(33, 33, 16, 0, 4, &ramp)).unwrap();
+    let heave = |x: f32| -> f32 {
+        let mut s = Sim::new(1);
+        s.threads = 1;
+        s.asset_root = Some(dir.clone());
+        spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-6,0]},"Terrain":{"heightmap":"ramp.png","size":[64,64],"height":8}}"#);
+        spawn(&mut s, 2, r#"{"Transform":{"pos":[0,0,0]},"Water":{"size":[400,400],"wave_height":1.0,"wave_length":10,"speed":1},"WaterLook":{}}"#);
+        spawn(&mut s, 10, &plank(0.0, 0.0, "").replace(r#""pos":[0,"#, &format!(r#""pos":[{x},"#)));
+        s.step_n(240);
+        let (mut y0, mut y1) = (f32::MAX, f32::MIN);
+        for _ in 0..480 {
+            s.step();
+            let y = pos(&s, 10)[1];
+            y0 = y0.min(y);
+            y1 = y1.max(y);
+        }
+        y1 - y0
+    };
+    // out at 5 m of water the sea is whole, 0.75 m from the water line it is cut to a third of its height
+    let (deep, shallow) = (heave(-24.0), heave(10.0));
+    assert!(deep > 0.2, "the open sea rolls the plank: {deep}");
+    assert!(shallow < 0.6 * deep, "over the shallows the waves are smaller: {shallow} against {deep}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

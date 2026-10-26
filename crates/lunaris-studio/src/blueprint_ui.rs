@@ -4,12 +4,12 @@
 //! dragging a wire out of a pin and letting go on an empty place opens it with only the nodes that fit; C wraps the selection in a comment.
 //! Compile (Ctrl+S) sends the graph to the world as the JSON of `define_system`, and the positions are kept in `blueprints/<system>.bp.json`.
 use crate::blueprint::{self as bpm, Arity, Bp, Cat, Comment, Node, Pin, PinKind, Problem, Ty, EVENT, HEADER, ROW};
-use crate::state::{LogKind, Studio};
+use crate::state::{LogKind, Mode, Studio};
 use eframe::egui::{
     self, epaint::CubicBezierShape, Align, Align2, Color32, CornerRadius, FontFamily, FontId, Id, Key, Modifiers, Pos2, Rect, RichText, Sense, Shape, Stroke, StrokeKind, TextEdit, Ui, Vec2,
 };
 use lunaris_json::Json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -128,6 +128,65 @@ struct Doc {
     fit_all: bool,
     selected: Vec<u32>,
     problems: Vec<Problem>,
+    /// What a trace of the selected entity found (`trace_system`), shown as values at the output pins; `None` when nothing is selected or the graph cannot be traced.
+    live: Option<Live>,
+    live_at: Option<Instant>,
+    /// The statements that have a breakpoint (a red dot on the node): while a game runs, it pauses when the selected entity is about to run one of them.
+    breaks: Vec<u32>,
+    /// The breakpoint the game stopped at, until it runs on or stops.
+    hit: Option<u32>,
+}
+
+/// What `trace_system` said about the entity that is selected, by node: the value each data node had when the system ran for it.
+#[derive(Clone, Debug, Default)]
+struct Live {
+    uid: u64,
+    tick: i64,
+    /// The entity has the components of the system's `each`: otherwise the system does not visit it.
+    matched: bool,
+    /// What stopped the run (a division by zero ...), with the values found before it.
+    error: Option<String>,
+    values: HashMap<u32, Json>,
+    /// The statements that ran (or, with the game running, that run next) for the entity.
+    ran: HashSet<u32>,
+}
+
+impl Live {
+    /// The values of a trace, put on the nodes they belong to (a value of something that is not a data node, a statement's own field for instance, is left out).
+    fn from_trace(bp: &Bp, uid: u64, t: &Json) -> Live {
+        let mut values: HashMap<u32, Json> = HashMap::new();
+        if let Some(o) = t.get("values").and_then(|v| v.as_object()) {
+            for (path, v) in o {
+                if let Some(id) = locate(bp, path) {
+                    if bp.node(id).is_some_and(|n| !n.spec().exec_in && n.spec().out.is_some()) {
+                        values.entry(id).or_insert_with(|| v.clone());
+                    }
+                }
+            }
+        }
+        let ran: HashSet<u32> = t.get("ran").and_then(|r| r.as_array()).map(|a| a.iter().filter_map(|p| p.as_str().and_then(|p| locate(bp, p))).collect()).unwrap_or_default();
+        Live { uid, tick: t.get("tick").and_then(|v| v.as_i64()).unwrap_or(0), matched: t.get("matched").and_then(|v| v.as_bool()).unwrap_or(false), error: t.get("error").and_then(|e| e.as_str()).map(str::to_string), values, ran }
+    }
+}
+
+/// A value as it is written on a wire: numbers to three decimals (without trailing zeros), very big or small ones in exponent form, flags and text as they are.
+fn live_text(v: &Json) -> String {
+    match v {
+        Json::Bool(b) => b.to_string(),
+        Json::Int(i) => i.to_string(),
+        Json::Float(f) => {
+            if !f.is_finite() {
+                return f.to_string();
+            }
+            if *f != 0.0 && (f.abs() >= 1e6 || f.abs() < 1e-3) {
+                return format!("{f:.2e}");
+            }
+            let s = format!("{f:.3}");
+            s.trim_end_matches('0').trim_end_matches('.').to_string()
+        }
+        Json::Str(s) => format!("\"{}\"", s.chars().take(14).collect::<String>()),
+        other => other.to_string_compact().unwrap_or_default().chars().take(16).collect(),
+    }
 }
 
 #[derive(Default)]
@@ -188,7 +247,7 @@ impl BlueprintEditor {
                 }
             },
         };
-        self.docs.insert(name.to_string(), Doc { bp, applied: Some(def), undo: vec![], redo: vec![], pan: Vec2::new(40.0, 40.0), zoom: 1.0, fit: true, fit_all: false, selected: vec![], problems: vec![] });
+        self.docs.insert(name.to_string(), Doc { bp, applied: Some(def), undo: vec![], redo: vec![], pan: Vec2::new(40.0, 40.0), zoom: 1.0, fit: true, fit_all: false, selected: vec![], problems: vec![], live: None, live_at: None, breaks: vec![], hit: None });
         self.current = Some(name.to_string());
         self.msgs.push(Msg::Info(format!("opened {name}")));
     }
@@ -203,7 +262,7 @@ impl BlueprintEditor {
         let mut bp = Bp::new(&name);
         bp.auto_layout();
         let _ = studio;
-        self.docs.insert(name.clone(), Doc { bp, applied: None, undo: vec![], redo: vec![], pan: Vec2::new(40.0, 120.0), zoom: 1.0, fit: false, fit_all: false, selected: vec![], problems: vec![] });
+        self.docs.insert(name.clone(), Doc { bp, applied: None, undo: vec![], redo: vec![], pan: Vec2::new(40.0, 120.0), zoom: 1.0, fit: false, fit_all: false, selected: vec![], problems: vec![], live: None, live_at: None, breaks: vec![], hit: None });
         self.current = Some(name);
     }
 
@@ -222,6 +281,66 @@ impl BlueprintEditor {
                 self.resources = r.get("resources").and_then(|o| o.as_object()).map(|o| o.iter().map(|(k, _)| k.clone()).collect()).unwrap_or_default();
             }
         }
+    }
+
+    /// Are there breakpoints in the graph that is open?
+    pub fn has_breakpoints(&self) -> bool {
+        self.current.as_ref().and_then(|n| self.docs.get(n)).is_some_and(|d| !d.breaks.is_empty())
+    }
+
+    /// Called after every tick of a running game: is the selected entity about to run a statement that has a breakpoint? Asks `trace_system` what the next tick of the graph on the
+    /// screen would do for it (the state after the tick is the state the statement will see: the game stops *before* it runs). Returns the title of the node when it is, and the node is
+    /// marked until the game runs on. Nothing is asked in a scene of more than 20 000 entities (a trace copies the world), or for a system of touching pairs.
+    pub fn check_breakpoints(&mut self, studio: &mut Studio) -> Option<String> {
+        let name = self.current.clone()?;
+        let doc = self.docs.get_mut(&name)?;
+        doc.hit = None;
+        if doc.breaks.is_empty() || doc.bp.meta.contact.is_some() || studio.total_entities > 20_000 {
+            return None;
+        }
+        let uid = studio.selection?;
+        let def = doc.bp.to_json().ok()?;
+        let t = studio.engine.call("trace_system", &Json::obj([("uid", Json::from(uid as i64)), ("def", def)])).ok()?;
+        let live = Live::from_trace(&doc.bp, uid, &t);
+        let hit = doc.breaks.iter().copied().find(|b| live.ran.contains(b));
+        doc.live = Some(live);
+        doc.live_at = Some(Instant::now());
+        doc.hit = hit;
+        let node = hit?;
+        let title = doc.bp.node(node).map(|n| n.title()).unwrap_or("A node").to_string();
+        self.msgs.push(Msg::Warn(format!("Breakpoint: {title} is about to run for entity {uid} (tick {})", studio.engine.sim.tick)));
+        Some(title)
+    }
+
+    /// Ask the engine what the open system does for the selected entity (`trace_system` with the graph as it is now, so that an edit that is not compiled yet shows its values
+    /// too), a few times a second, and keep the answer by node. Nothing is asked for a system of touching pairs, for a graph that has problems, or in a scene too big to copy often.
+    fn update_live(&mut self, studio: &mut Studio) {
+        // the game that stopped at a breakpoint is gone once it is stopped
+        if studio.mode == Mode::Edit {
+            for d in self.docs.values_mut() {
+                d.hit = None;
+            }
+        }
+        let Some(name) = self.current.clone() else { return };
+        let Some(doc) = self.docs.get_mut(&name) else { return };
+        let Some(uid) = studio.selection else {
+            doc.live = None;
+            return;
+        };
+        let every = if studio.mode == Mode::Edit { 0.5 } else { 0.15 };
+        if doc.live_at.is_some_and(|t| t.elapsed().as_secs_f32() < every) {
+            return;
+        }
+        doc.live_at = Some(Instant::now());
+        if doc.bp.meta.contact.is_some() || studio.total_entities > 100_000 {
+            doc.live = None;
+            return;
+        }
+        let Ok(def) = doc.bp.to_json() else {
+            doc.live = None;
+            return;
+        };
+        doc.live = studio.engine.call("trace_system", &Json::obj([("uid", Json::from(uid as i64)), ("def", def)])).ok().map(|t| Live::from_trace(&doc.bp, uid, &t));
     }
 
     /// Send the graph to the world.
@@ -435,6 +554,39 @@ impl BlueprintEditor {
 
     pub fn test_dirty(&self) -> bool {
         self.is_dirty()
+    }
+
+    /// Put a breakpoint on a node (or take it off).
+    pub fn test_toggle_break(&mut self, node: u32) {
+        if let Some(d) = self.doc() {
+            toggle_breakpoint(d, node);
+        }
+    }
+
+    pub fn test_has_breakpoints(&self) -> bool {
+        self.has_breakpoints()
+    }
+
+    /// The node the game stopped at, if it did.
+    pub fn test_hit(&self) -> Option<u32> {
+        self.current.as_ref().and_then(|n| self.docs.get(n)).and_then(|d| d.hit)
+    }
+
+    /// Which nodes ran for the selected entity at the last trace.
+    pub fn test_ran(&self) -> Vec<u32> {
+        let mut v: Vec<u32> = self.current.as_ref().and_then(|n| self.docs.get(n)).and_then(|d| d.live.as_ref()).map(|l| l.ran.iter().copied().collect()).unwrap_or_default();
+        v.sort();
+        v
+    }
+
+    /// The live value of a node, as text (what is drawn at its output pin).
+    pub fn test_live(&self, node: u32) -> Option<String> {
+        self.current.as_ref().and_then(|n| self.docs.get(n)).and_then(|d| d.live.as_ref()).and_then(|l| l.values.get(&node)).map(live_text)
+    }
+
+    /// How many nodes have a live value, and whether the trace found the selected entity visited by the system.
+    pub fn test_live_summary(&self) -> Option<(usize, bool)> {
+        self.current.as_ref().and_then(|n| self.docs.get(n)).and_then(|d| d.live.as_ref()).map(|l| (l.values.len(), l.matched))
     }
 }
 
@@ -726,6 +878,7 @@ impl BlueprintEditor {
         if std::mem::take(&mut self.request_compile) || save {
             self.compile(studio);
         }
+        self.update_live(studio);
         self.toolbar(ui, studio);
         let log_h = if self.show_log { 110.0 } else { 0.0 };
         let avail = ui.available_rect_before_wrap();
@@ -799,7 +952,26 @@ impl BlueprintEditor {
         if let Some(n) = &self.current {
             let scene = studio.scene.clone().unwrap_or_else(|| "Scene".to_string());
             let scene = scene.rsplit('/').next().unwrap_or(&scene).trim_end_matches(".lunaris.json").to_string();
-            p.text(Pos2::new(rect.max.x - 12.0, rect.center().y), Align2::RIGHT_CENTER, format!("{scene}  >  {n}"), FontId::proportional(12.5), TEXT_DIM);
+            let crumb = p.text(Pos2::new(rect.max.x - 12.0, rect.center().y), Align2::RIGHT_CENTER, format!("{scene}  >  {n}"), FontId::proportional(12.5), TEXT_DIM);
+            // what the values on the wires are the values of
+            let stopped = self.docs.get(n).and_then(|d| d.hit.map(|_| d.live.as_ref().map(|l| l.uid).unwrap_or(0)));
+            let status = match self.docs.get(n).and_then(|d| d.live.as_ref()) {
+                _ if stopped.is_some() => Some((format!("stopped at a breakpoint (entity {}): Play or Step goes on", stopped.unwrap_or(0)), Color32::from_rgb(255, 120, 100))),
+                Some(l) if !l.matched => Some((format!("entity {} is not visited by this system", l.uid), TEXT_DIM)),
+                Some(l) => Some((
+                    format!("live: entity {}, tick {}{}", l.uid, l.tick, l.error.as_ref().map(|e| format!("   stopped: {e}")).unwrap_or_default()),
+                    if l.error.is_some() { ERR } else { Color32::from_rgb(110, 200, 130) },
+                )),
+                None if studio.selection.is_none() => Some(("select an entity to see the values on the wires".to_string(), TEXT_DIM)),
+                None => None,
+            };
+            if let Some((text, color)) = status {
+                // (a status that is longer than the room between the buttons and the crumb is cut short, not drawn over the buttons)
+                let shown = fit_text(&p, &text, FontId::proportional(12.0), (crumb.min.x - 24.0) - (x + 8.0));
+                if !shown.is_empty() {
+                    p.text(Pos2::new(crumb.min.x - 24.0, rect.center().y), Align2::RIGHT_CENTER, shown, FontId::proportional(12.0), color);
+                }
+            }
         }
         match action {
             Some("compile") | Some("save") => self.compile(studio),
@@ -1193,7 +1365,9 @@ impl BlueprintEditor {
             // a click that does not start a drag stays a click
             let _ = (primary_released, double);
             // ---- keys
-            if !editing_open && (resp.hovered() || resp.has_focus() || ctx.memory(|m| m.focused().is_none())) {
+            // keys belong to the graph only while nothing else has the keyboard (typing a name in Details must not delete nodes)
+            if !editing_open && resp.hovered() && ctx.memory(|m| m.focused().is_none()) {
+                let toggle_break = ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F9));
                 let (del, dup, all, comment, frame, undo, redo, copy, paste) = ctx.input_mut(|i| {
                     (
                         i.consume_key(Modifiers::NONE, Key::Delete) || i.consume_key(Modifiers::NONE, Key::Backspace),
@@ -1207,6 +1381,11 @@ impl BlueprintEditor {
                         i.consume_key(Modifiers::COMMAND, Key::V),
                     )
                 });
+                if toggle_break {
+                    for id in doc.selected.clone() {
+                        toggle_breakpoint(doc, id);
+                    }
+                }
                 if del {
                     if let Some(i) = selected_comment.take() {
                         if i < doc.bp.comments.len() {
@@ -1352,7 +1531,27 @@ impl BlueprintEditor {
                 if !r.intersects(rect) {
                     continue;
                 }
-                draw_node(&painter, &view, &doc.bp, n, doc.selected.contains(&n.id), problem_nodes.contains(&n.id), unreached.contains(&n.id), hover_pin);
+                draw_node(&painter, &view, &doc.bp, n, doc.selected.contains(&n.id), problem_nodes.contains(&n.id), unreached.contains(&n.id), hover_pin, Marks { breakpoint: doc.breaks.contains(&n.id), hit: doc.hit == Some(n.id), ran: doc.live.as_ref().is_some_and(|l| l.ran.contains(&n.id)) });
+            }
+            // ---- live values: at the output pin of every data node the trace found a value for
+            if let Some(live) = doc.live.as_ref().filter(|_| doc.zoom > 0.4) {
+                for (id, v) in &live.values {
+                    let Some(g) = pin_graph_pos(&doc.bp, Pin { node: *id, kind: PinKind::DataOut }) else { continue };
+                    let at = view.to_screen(g) + Vec2::new(10.0 * doc.zoom, 0.0);
+                    if !rect.contains(at) {
+                        continue;
+                    }
+                    let text = live_text(v);
+                    let galley = painter.layout_no_wrap(text, FontId::monospace(11.0 * doc.zoom), match v {
+                        Json::Bool(true) => Color32::from_rgb(120, 220, 140),
+                        Json::Bool(false) => Color32::from_rgb(235, 120, 110),
+                        _ => Color32::from_rgb(250, 232, 150),
+                    });
+                    let pill = Rect::from_min_size(at + Vec2::new(0.0, -galley.size().y / 2.0 - 2.0), galley.size() + Vec2::new(10.0, 4.0));
+                    painter.rect_filled(pill, CornerRadius::same(3), Color32::from_rgba_unmultiplied(12, 14, 18, 225));
+                    painter.rect_stroke(pill, CornerRadius::same(3), Stroke::new(1.0, Color32::from_rgb(70, 110, 160)), StrokeKind::Inside);
+                    painter.galley(pill.min + Vec2::new(5.0, 2.0), galley, TEXT);
+                }
             }
             // hovering a node with a problem shows what it is
             if let (Some(p), Hit::Node(id) | Hit::Param(id, _) | Hit::Default(id, _)) = (ptr, hit) {
@@ -1410,6 +1609,12 @@ impl BlueprintEditor {
                     Some(MenuTarget::Node(id)) => {
                         ui.set_width(190.0);
                         ui.label(RichText::new("Node Actions").size(11.0).color(TEXT_DIM));
+                        let is_statement = self.docs[&name].bp.node(id).is_some_and(|n| n.spec().exec_in);
+                        let has_break = self.docs[&name].breaks.contains(&id);
+                        if is_statement && ui.selectable_label(false, if has_break { "Remove Breakpoint (F9)" } else { "Add Breakpoint (F9)" }).clicked() {
+                            action = Some(format!("breakpoint:{id}"));
+                            close = true;
+                        }
                         for (label, id2) in [("Delete", "delete"), ("Duplicate", "duplicate"), ("Break All Pin Links", "break_all"), ("Create Comment from Selection", "comment")] {
                             if ui.selectable_label(false, label).clicked() {
                                 action = Some(format!("{id2}:{id}"));
@@ -1939,9 +2144,28 @@ fn connect_new(doc: &mut Doc, id: u32, from: Option<Pin>) {
     doc.bp.connect(p, pin);
 }
 
+/// Put a breakpoint on a statement node, or take it off (nodes that are not statements cannot have one).
+fn toggle_breakpoint(doc: &mut Doc, id: u32) {
+    if !doc.bp.node(id).is_some_and(|n| n.spec().exec_in) {
+        return;
+    }
+    match doc.breaks.iter().position(|b| *b == id) {
+        Some(i) => {
+            doc.breaks.remove(i);
+        }
+        None => doc.breaks.push(id),
+    }
+}
+
 fn run_menu_action(doc: &mut Doc, a: &str) {
     let mut it = a.split(':');
     let verb = it.next().unwrap_or("");
+    if verb == "breakpoint" {
+        // not an edit of the graph: no undo step
+        let id: u32 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        toggle_breakpoint(doc, id);
+        return;
+    }
     doc.snapshot();
     match verb {
         "delete" => {
@@ -2078,7 +2302,16 @@ fn draw_event(painter: &egui::Painter, v: &View, bp: &Bp, selected: bool, proble
     }
 }
 
-fn draw_node(painter: &egui::Painter, v: &View, bp: &Bp, n: &Node, selected: bool, problem: bool, unreached: bool, hover: Option<Pin>) {
+/// What a node shows about debugging: a breakpoint dot, that the game stopped at it, that it ran (or runs next) for the selected entity.
+#[derive(Clone, Copy, Default)]
+struct Marks {
+    breakpoint: bool,
+    hit: bool,
+    ran: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_node(painter: &egui::Painter, v: &View, bp: &Bp, n: &Node, selected: bool, problem: bool, unreached: bool, hover: Option<Pin>, marks: Marks) {
     let z = v.zoom;
     let size = bpm::node_size(n);
     let r = v.rect(n.pos, size);
@@ -2091,7 +2324,19 @@ fn draw_node(painter: &egui::Painter, v: &View, bp: &Bp, n: &Node, selected: boo
     let hround = CornerRadius { nw: round.nw, ne: round.ne, sw: 0, se: 0 };
     painter.rect_filled(head, hround, if unreached { alpha(hc, 150) } else { hc });
     painter.rect_filled(Rect::from_min_size(head.min, Vec2::new(head.width(), head.height() * 0.45)), hround, Color32::from_white_alpha(22));
-    painter.rect_stroke(r, round, Stroke::new(if selected || problem { 2.0 } else { 1.0 }, if problem { ERR } else if selected { SELECTED } else { Color32::from_black_alpha(220) }), StrokeKind::Inside);
+    painter.rect_stroke(r, round, Stroke::new(if selected || problem { 2.0 } else { 1.0 }, if problem { ERR } else if selected { SELECTED } else if marks.ran { Color32::from_rgb(70, 160, 95) } else { Color32::from_black_alpha(220) }), StrokeKind::Inside);
+    if marks.hit {
+        // the game stopped here: the statement is about to run
+        painter.rect_stroke(r.expand(3.0 * z), round, Stroke::new(2.5, Color32::from_rgb(255, 90, 70)), StrokeKind::Outside);
+        if z > 0.4 {
+            painter.text(r.right_top() + Vec2::new(-4.0 * z, -4.0 * z), Align2::RIGHT_BOTTOM, "STOPPED HERE", bold(10.5 * z), Color32::from_rgb(255, 120, 100));
+        }
+    }
+    if marks.breakpoint {
+        let c = r.min + Vec2::new(-9.0 * z, HEADER * z / 2.0);
+        painter.circle_filled(c, 6.0 * z, Color32::from_rgb(220, 50, 40));
+        painter.circle_stroke(c, 6.0 * z, Stroke::new(1.2, Color32::from_rgb(255, 170, 160)));
+    }
     if z > 0.3 {
         painter.text(r.min + Vec2::new(12.0 * z, HEADER * z / 2.0), Align2::LEFT_CENTER, sp.title, bold(13.0 * z), Color32::WHITE);
     }
@@ -2186,4 +2431,27 @@ fn draw_node(painter: &egui::Painter, v: &View, bp: &Bp, n: &Node, selected: boo
         painter.circle_filled(c, 8.0 * z, ERR);
         painter.text(c, Align2::CENTER_CENTER, "!", bold(11.0 * z), Color32::WHITE);
     }
+}
+
+/// `text` if it is at most `max_w` wide in `font`, else the longest start of it that fits with three dots after it, else nothing (when there is almost no room).
+fn fit_text(p: &egui::Painter, text: &str, font: FontId, max_w: f32) -> String {
+    if max_w <= 24.0 {
+        return String::new();
+    }
+    let width = |s: &str| p.layout_no_wrap(s.to_string(), font.clone(), TEXT).size().x;
+    if width(text) <= max_w {
+        return text.to_string();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let (mut lo, mut hi) = (0usize, chars.len());
+    while lo < hi {
+        let mid = (lo + hi).div_ceil(2);
+        let s: String = chars[..mid].iter().collect::<String>() + "...";
+        if width(&s) <= max_w {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    chars[..lo].iter().collect::<String>() + "..."
 }

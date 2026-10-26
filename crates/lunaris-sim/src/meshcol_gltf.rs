@@ -186,6 +186,10 @@ pub fn read_model(root: &Path, name: &str) -> Result<RawModel, String> {
         return Err(format!("`{name}` is not a model file: a MeshCollider needs a .glb or .gltf of the workspace (the built-in shapes such as `cube` are not files: use a Collider for those)"));
     }
     let path = root.join(rel);
+    // a model a procedural provider makes (`crate::procgen`) is not on the disk
+    if let Some(bytes) = crate::procgen::file(name) {
+        return parse_model(&bytes?, path.parent());
+    }
     let meta = std::fs::metadata(&path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     if meta.len() as usize > MAX_FILE {
         return Err(format!("the model is larger than the {} MB limit", MAX_FILE >> 20));

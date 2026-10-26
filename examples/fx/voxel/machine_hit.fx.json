@@ -1,0 +1,43 @@
+{
+  "name": "machine hit (voxel)",
+  "bounds": 4,
+  "budget": 60,
+  "emitters": [
+    {
+      "name": "sparks",
+      "space": "world",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": [5, 8]}]},
+      "init": {
+        "life": [0.15, 0.4],
+        "speed": [3, 8],
+        "spread": 80,
+        "size": [0.015, 0.03],
+        "color": [0.5, 0.9, 1, 1],
+        "color_jitter": 0.2
+      },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "drag": 0.4,
+        "collide": {
+          "mode": "bounce",
+          "bounce": 0.4,
+          "friction": 0.3,
+          "world": true,
+          "planes": [{"normal": [0, 1, 0], "d": 0, "relative": true}]
+        }
+      },
+      "curves": {"alpha": [[0, 1], [0.7, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "add"}
+    },
+    {
+      "name": "flash",
+      "space": "local",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": 1}]},
+      "init": {"life": [0.05, 0.07], "size": 0.14, "color": [0.7, 0.95, 1, 1]},
+      "curves": {"alpha": [[0, 1], [1, 0]]},
+      "render": {"texture": "square", "filter": "nearest", "blend": "add"}
+    }
+  ]
+}

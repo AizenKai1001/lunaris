@@ -3,6 +3,7 @@ use crate::command::{apply, Applied, Command};
 use crate::graph::{self, ScriptSet};
 use crate::physics::Contact;
 use crate::components::*;
+use crate::contact_memory::ContactMemory;
 use crate::rng::{hash_rand, Rng};
 use crate::systems;
 use lunaris_ecs::{EcsError, Result, StateHasher, World};
@@ -46,6 +47,14 @@ pub struct SimCtx {
     pub terrains: Arc<crate::terrain::Terrains>,
     /// The triangle meshes of the `MeshCollider`s in the world that have been read (empty, and costing nothing, without any).
     pub meshes: Arc<crate::meshcol::MeshStore>,
+    /// What the physics step keeps from one tick to the next (the grid of the colliders that never move). Derived data, never part of the state.
+    pub physics: crate::physics::PhysicsCache,
+    /// Use the simple reference physics step instead of the fast one (they give the same bits; this is for tests and benchmarks).
+    pub reference_physics: bool,
+    /// What the contact solver remembers between ticks (taken from the simulation for the tick and given back; see `contact_memory`). State, unlike `physics`.
+    pub contact_memory: crate::contact_memory::ContactMemory,
+    /// Which bodies sleep (taken from the simulation for the tick and given back; see `physics/sleep.rs`).
+    pub sleep: crate::physics::SleepState,
 }
 
 impl SimCtx {
@@ -76,6 +85,12 @@ pub struct Recording {
     /// How many ticks were stepped while recording. Usually `final_tick - start_tick`, but a game that loads a saved game from inside (`game.load`) goes back in time:
     /// the replay must step as often as the game did, not up to a tick number.
     pub steps: u64,
+    /// What the contact solver remembered when the recording began (nothing for a recording that starts from a scene file; see `contact_memory`).
+    pub start_contacts: crate::contact_memory::ContactMemory,
+    /// What the physics step remembered of sleeping when the recording began (nothing for a recording that starts from a scene file).
+    pub start_sleep: crate::physics::SleepState,
+    /// The creatures that were alive when the recording began.
+    pub start_creatures: crate::creatures::Creatures,
     /// What the game asked the files for while it was recorded (`game.probe`, `game.load`), in order: the replay is given the same answers, whatever the files say by then.
     pub reads: Vec<RecordedRead>,
 }
@@ -108,7 +123,7 @@ pub struct StepProfile {
 }
 
 impl StepProfile {
-    fn add(&mut self, name: &str, ms: f64) {
+    pub(crate) fn add(&mut self, name: &str, ms: f64) {
         let s = self.stages.entry(name.to_string()).or_default();
         s.total_ms += ms;
         s.max_ms = s.max_ms.max(ms);
@@ -125,12 +140,25 @@ pub struct Checkpoint {
     nav: crate::nav::NavState,
     bt: std::collections::BTreeMap<u64, (u64, Vec<f32>)>,
     stamp: u64,
+    contact_memory: crate::contact_memory::ContactMemory,
+    sleep: crate::physics::SleepState,
+    creatures: crate::creatures::Creatures,
 }
 
 impl Checkpoint {
     /// The tick the simulation was at: the next `step` after rewinding to this checkpoint runs this tick.
     pub fn tick(&self) -> u64 {
         self.tick
+    }
+}
+
+/// The reads of provider-made models that are running on other threads (see `Sim::load_meshes`): a copy of the simulation starts with none, and asks again.
+#[derive(Default)]
+struct MeshJobs(std::collections::HashMap<String, std::sync::mpsc::Receiver<std::result::Result<crate::meshcol::CollisionMesh, String>>>);
+
+impl Clone for MeshJobs {
+    fn clone(&self) -> Self {
+        MeshJobs::default()
     }
 }
 
@@ -165,12 +193,26 @@ pub struct Sim {
     pub mesh_errors: std::collections::BTreeMap<String, String>,
     /// What each model file looked like when it was read (modified time, length), to notice that it changed.
     mesh_stamps: std::collections::BTreeMap<String, (Option<std::time::SystemTime>, u64)>,
+    /// The models a provider makes (a city block's collision shell) that are being read on another thread: the tick never waits for the parsing and the BVH of a model that is 30 to 140 ms of work (the stutter of walking through a streamed city).
+    mesh_jobs: MeshJobs,
     /// Set it to `Some(Default::default())` and every tick adds the time of its stages (not part of the state).
     pub profile: Option<StepProfile>,
+    /// What the physics step keeps between ticks (derived from the world and checked against it every tick; a clone starts with an empty one).
+    pub physics: crate::physics::PhysicsCache,
+    /// Run the simple reference physics step instead of the fast one (same results; for tests and benchmarks).
+    pub reference_physics: bool,
+    /// What the contact solver remembers from one tick to the next (the impulses of the contact points; see `contact_memory`). State: it is cloned, checkpointed, hashed and recorded, and emptied by `clear`.
+    pub contact_memory: crate::contact_memory::ContactMemory,
+    /// Which bodies sleep and how long the others have lain still (see `physics/sleep.rs`). State: cloned, checkpointed, hashed when there is any, recorded, emptied by `clear`.
+    pub sleep: crate::physics::SleepState,
+    /// The evolved creatures that are alive (see `creatures`). State: cloned, checkpointed, hashed when there is any, recorded, emptied by `clear`.
+    pub creatures: crate::creatures::Creatures,
     systems: Vec<SystemEntry>,
     recording: Option<Recording>,
     /// While a recording is replayed: the answers the files gave the game the first time (`Recording::reads`), handed out in order.
     replay_reads: Option<std::collections::VecDeque<RecordedRead>>,
+    /// The worker threads the character controller walks capsules on (made when there are many capsules).
+    walk_pool: crate::character::WalkPool,
 }
 
 impl Sim {
@@ -178,7 +220,7 @@ impl Sim {
     pub fn new(seed: u64) -> Sim {
         let mut world = World::new();
         register_standard_components(&mut world);
-        let mut sim = Sim { world, tick: 0, dt: 1.0 / 60.0, seed, rng: Rng::new(seed), threads: default_threads(), scripts: ScriptSet::default(), nav: Default::default(), contacts: Vec::new(), char_contacts: Vec::new(), events: Vec::new(), asset_root: None, heightfields: Arc::default(), terrain_errors: Default::default(), meshes: Arc::default(), mesh_errors: Default::default(), mesh_stamps: Default::default(), profile: None, systems: Vec::new(), recording: None, replay_reads: None };
+        let mut sim = Sim { world, tick: 0, dt: 1.0 / 60.0, seed, rng: Rng::new(seed), threads: default_threads(), scripts: ScriptSet::default(), nav: Default::default(), contacts: Vec::new(), char_contacts: Vec::new(), events: Vec::new(), asset_root: None, heightfields: Arc::default(), terrain_errors: Default::default(), meshes: Arc::default(), mesh_errors: Default::default(), mesh_stamps: Default::default(), mesh_jobs: Default::default(), profile: None, physics: Default::default(), reference_physics: false, contact_memory: Default::default(), sleep: Default::default(), creatures: Default::default(), systems: Vec::new(), recording: None, replay_reads: None, walk_pool: Default::default() };
         sim.add_system("ui", systems::ui);
         sim.add_system("wander", systems::wander);
         sim.add_system("particles", systems::particles);
@@ -205,6 +247,19 @@ impl Sim {
         let rng: Vec<Json> = self.rng.state().iter().map(|v| Json::str(format!("{v:016x}"))).collect();
         j.set("save", Json::obj([("tick", Json::from(self.tick as i64)), ("seed", Json::from(self.seed as i64)), ("rng", Json::Arr(rng))]));
         j
+    }
+
+    /// Compile every graph system again against the components of the world as it is now: after a saved world was loaded under systems that were compiled for another world (a save made by an older version of the scene may
+    /// lack custom components that the systems name: that is an error here, and not a stale component number that panics later).
+    pub fn recompile_systems(&mut self) -> Result<()> {
+        let defs = self.scripts.defs_json();
+        if let Some(list) = defs.as_array() {
+            for (i, d) in list.iter().enumerate() {
+                let sys = graph::compile_with(&mut self.world, d, self.scripts.plugin_root.as_deref(), self.scripts.wasm.as_ref()).map_err(|e| e.at(format!("systems[{i}]")))?;
+                self.scripts.put(sys);
+            }
+        }
+        Ok(())
     }
 
     /// Replace the world with a saved game (`save_json`). An error leaves everything as it was.
@@ -385,6 +440,9 @@ impl Sim {
         self.char_contacts.clear();
         self.events.clear();
         self.recording = None;
+        self.contact_memory.clear();
+        self.sleep.clear();
+        self.creatures.clear();
     }
 
     pub fn add_system(&mut self, name: &str, f: impl Fn(&mut World, &mut SimCtx) + Send + Sync + 'static) {
@@ -418,13 +476,14 @@ impl Sim {
         }
         stage!("terrain loading", self.load_terrains());
         stage!("mesh loading", self.load_meshes());
+        self.prune_procedural_meshes();
         // slow motion, pause and fast forward: the resource `time.scale` (default 1, 0 to 8) multiplies the length of every step; at 0 nothing moves
         // but graph systems and the interface still run, so a pause menu can unpause
         let dt = self.dt * self.world.resource("time.scale").filter(|s| s.is_finite()).unwrap_or(1.0).clamp(0.0, 8.0) as f32;
         // bodies that float are pushed up by the water before the physics step moves them (a world without a `Buoyant` pays for one query)
         stage!("buoyancy", crate::water::Water::buoyancy(&mut self.world, &self.heightfields, dt));
         stage!("floaters", crate::floaters::step(&mut self.world, &self.heightfields, dt, &mut self.scripts.events));
-        let mut ctx = SimCtx { tick: self.tick, threads: self.threads, gravity: [0.0, -9.8, 0.0], contacts: Vec::new(), dt, seed: self.seed, rng: self.rng.clone(), terrains: self.heightfields.clone(), meshes: self.meshes.clone() };
+        let mut ctx = SimCtx { tick: self.tick, threads: self.threads, gravity: [0.0, -9.8, 0.0], contacts: Vec::new(), dt, seed: self.seed, rng: self.rng.clone(), terrains: self.heightfields.clone(), meshes: self.meshes.clone(), physics: self.physics.share(), reference_physics: self.reference_physics, contact_memory: std::mem::take(&mut self.contact_memory), sleep: std::mem::take(&mut self.sleep) };
         for s in &self.systems {
             match prof.as_mut() {
                 Some(p) => {
@@ -435,11 +494,17 @@ impl Sim {
                 None => (s.run)(&mut self.world, &mut ctx),
             }
         }
+        self.contact_memory = std::mem::take(&mut ctx.contact_memory);
+        self.sleep = std::mem::take(&mut ctx.sleep);
         self.rng = ctx.rng;
         self.contacts = std::mem::take(&mut ctx.contacts);
+        // helicopters (after the physics step has moved and bumped them): the rotors' lift, the attitude the stick asks for, the noise and the crash
+        stage!("helicopters", crate::helicopter::step(&mut self.world, ctx.gravity, dt, &self.heightfields, &self.meshes, &mut self.scripts.events));
         // what the characters touched at the end of the last tick (`CharacterMotion.report_contacts`) is handed to this tick's graph systems like any contact
         self.contacts.append(&mut self.char_contacts);
         stage!("event resources", crate::gameplay::publish_events(&mut self.world, &self.events, self.tick));
+        // (key bindings first: the keys Esc, Enter and Backspace are used up by the interface widgets of a tick, so a key that is waited for must be seen before them; a click is the one the widgets saw in the tick before)
+        stage!("key bindings", crate::rebind::update(&mut self.world));
         stage!("input actions", crate::gameplay::actions(&mut self.world));
         stage!("interface widgets", crate::ui_kit::update(&mut self.world, self.tick, self.dt));
         stage!("graph systems (all)", graph::run_all(&mut self.world, &mut self.scripts, &self.contacts, self.tick, dt, self.seed, self.threads));
@@ -452,15 +517,40 @@ impl Sim {
         // navigation agents choose their walk (after the graph systems, which may give them targets), then characters walk with this
         // tick's input, then attached entities follow their parents after everything else has moved them
         stage!("navigation", crate::nav::step(&mut self.world, &mut self.nav, dt, &self.heightfields, &self.meshes));
-        stage!("characters", {
-            self.char_contacts = crate::character::step(&mut self.world, dt, &self.heightfields, &self.meshes);
+        // (the controller times its three parts too while profiling: "characters: obstacles", "characters: grid", "characters: walking")
+        match prof.as_mut() {
+            Some(p) => {
+                let t = std::time::Instant::now();
+                self.char_contacts = crate::character::step(&mut self.world, dt, &self.heightfields, &self.meshes, Some(&mut *p), &mut self.walk_pool, self.threads);
+                p.add("characters", t.elapsed().as_secs_f64() * 1e3);
+            }
+            None => self.char_contacts = crate::character::step(&mut self.world, dt, &self.heightfields, &self.meshes, None, &mut self.walk_pool, self.threads),
+        }
+        // evolved creatures sense, think and walk (and their parts follow)
+        stage!("creatures", {
+            let scale = self.world.resource("time.scale").filter(|s| s.is_finite()).unwrap_or(1.0) as f32;
+            crate::creatures::step(&mut self.world, &mut self.creatures, &self.heightfields, self.asset_root.as_deref(), scale);
         });
         // the waves' clock, and `InWater` on the characters that now stand in a water body
         stage!("water", {
             crate::water::Water::waves(&mut self.world, dt);
             crate::water::Water::swimmers(&mut self.world, &self.heightfields);
         });
-        stage!("gameplay blocks", crate::gameplay::update(&mut self.world, &mut self.scripts, self.tick, dt, &self.heightfields, &self.meshes));
+        // (the blocks time themselves too while profiling: "gameplay weapons::update" and so on)
+        match prof.as_mut() {
+            Some(p) => {
+                let t = std::time::Instant::now();
+                crate::gameplay::update(&mut self.world, &mut self.scripts, self.tick, dt, &self.heightfields, &self.meshes, Some(&mut *p));
+                p.add("gameplay blocks", t.elapsed().as_secs_f64() * 1e3);
+            }
+            None => crate::gameplay::update(&mut self.world, &mut self.scripts, self.tick, dt, &self.heightfields, &self.meshes, None),
+        }
+        stage!("traversal", crate::traversal::update(&mut self.world, self.asset_root.as_deref(), dt));
+        stage!("motion matching", crate::motionmatch::update(&mut self.world, self.asset_root.as_deref(), dt));
+        // (the switches motion matching made after `animate` ran are noticed now, so that this tick's picture already has its inertialization offset)
+        stage!("inertia", crate::inertia::notice(&mut self.world));
+        // feet on the ground: the model follows the ground under its feet and the pins of its legs are put (after the clip and its time are known)
+        stage!("feet on the ground", crate::footik::update(&mut self.world, self.asset_root.as_deref(), &self.heightfields, &self.meshes, dt));
         stage!("hierarchy", systems::hierarchy(&mut self.world));
         let tick = self.tick;
         self.events.extend(self.scripts.events.drain(..).map(|(name, uid, pos)| Event { tick, name, uid, pos }));
@@ -543,8 +633,45 @@ impl Sim {
         if syms.is_empty() {
             return;
         }
-        for name in self.terrain_names(syms) {
+        let names = self.terrain_names(syms);
+        let provider = crate::procgen::provider();
+        for name in names.iter() {
+            let name = name.clone();
             let loaded = self.meshes.by_name.contains_key(&name);
+            // a model a provider makes: made in the background (the tick never waits), never read again while it is used
+            if let Some(p) = provider.as_ref().filter(|p| p.claims(&name)) {
+                if !loaded {
+                    if !p.file_ready(&name) {
+                        p.prefetch_file(&name);
+                        continue;
+                    }
+                    // read and parsed on another thread: asked for once, the result is picked up by a later tick
+                    let job = self.mesh_jobs.0.entry(name.clone()).or_insert_with(|| {
+                        let (tx, rx) = std::sync::mpsc::channel();
+                        let (root, name) = (root.clone(), name.clone());
+                        std::thread::spawn(move || {
+                            let _ = tx.send(crate::meshcol::CollisionMesh::read(&root, &name));
+                        });
+                        rx
+                    });
+                    match job.try_recv() {
+                        Ok(Ok(m)) => {
+                            self.mesh_jobs.0.remove(&name);
+                            Arc::make_mut(&mut self.meshes).by_name.insert(name.clone(), Arc::new(m));
+                            self.mesh_errors.remove(&name);
+                        }
+                        Ok(Err(e)) => {
+                            self.mesh_jobs.0.remove(&name);
+                            self.mesh_errors.insert(name, e);
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                            self.mesh_jobs.0.remove(&name);
+                        }
+                    }
+                }
+                continue;
+            }
             if loaded && self.tick % MESH_RECHECK != 0 {
                 continue;
             }
@@ -578,6 +705,23 @@ impl Sim {
         }
     }
 
+    /// Forget the collision meshes a provider made that no collider uses any more (a city streams past: nothing else would ever let them go). Every 600 ticks.
+    pub fn prune_procedural_meshes(&mut self) {
+        if self.tick % 600 != 0 {
+            return;
+        }
+        let Some(p) = crate::procgen::provider() else { return };
+        let used: std::collections::BTreeSet<String> = self.used_meshes().into_iter().collect();
+        let stale: Vec<String> = self.meshes.by_name.keys().filter(|k| p.claims(k) && !used.contains(*k)).cloned().collect();
+        if !stale.is_empty() {
+            let m = Arc::make_mut(&mut self.meshes);
+            for k in stale {
+                m.by_name.remove(&k);
+                self.mesh_errors.remove(&k);
+            }
+        }
+    }
+
     /// Hash of everything that decides the future: the world, the tick and the RNG state.
     pub fn state_hash(&self) -> u64 {
         let mut h = StateHasher::default();
@@ -600,6 +744,16 @@ impl Sim {
         }
         self.scripts.hash_into(&mut h);
         self.nav.hash_into(&mut h);
+        // (a world whose rich bodies touch nothing has no memory, and the hash it always had)
+        if !self.contact_memory.is_empty() {
+            self.contact_memory.hash_into(&mut h);
+        }
+        if !self.sleep.is_empty() {
+            self.sleep.hash_into(&mut h);
+        }
+        if !self.creatures.is_empty() {
+            self.creatures.fold(&mut |w| h.u64(w));
+        }
         h.finish()
     }
 
@@ -626,7 +780,7 @@ impl Sim {
     /// prefabs, the settings), what is derived (contacts, heightmaps read from files) and what only leaves the game (events, the recording),
     /// so it costs about half of `clone()` and, unlike it, can be taken on every tick. Rollback netcode keeps one per tick.
     pub fn checkpoint(&self) -> Checkpoint {
-        Checkpoint { tick: self.tick, world: self.world.clone(), rng: self.rng.clone(), nav: self.nav.clone(), bt: self.scripts.bt.clone(), stamp: self.script_stamp() }
+        Checkpoint { tick: self.tick, world: self.world.clone(), rng: self.rng.clone(), nav: self.nav.clone(), bt: self.scripts.bt.clone(), stamp: self.script_stamp(), contact_memory: self.contact_memory.clone(), sleep: self.sleep.clone(), creatures: self.creatures.clone() }
     }
 
     /// Put the simulation back exactly as it was when `c` was taken: the state hash is the same as it was then, and stepping on gives the
@@ -641,6 +795,9 @@ impl Sim {
         self.rng = c.rng.clone();
         self.nav = c.nav.clone();
         self.scripts.bt = c.bt.clone();
+        self.contact_memory = c.contact_memory.clone();
+        self.sleep = c.sleep.clone();
+        self.creatures = c.creatures.clone();
         self.scripts.events.clear();
         self.contacts.clear();
         self.char_contacts.clear();
@@ -687,6 +844,9 @@ impl Sim {
             final_tick: self.tick,
             final_hash: 0,
             steps: 0,
+            start_contacts: self.contact_memory.clone(),
+            start_sleep: self.sleep.clone(),
+            start_creatures: self.creatures.clone(),
             reads: Vec::new(),
         });
         Ok(())
@@ -720,6 +880,9 @@ impl Sim {
         sim.seed = rec.seed;
         sim.dt = rec.dt;
         sim.rng = Rng::from_state(rec.start_rng);
+        sim.contact_memory = rec.start_contacts.clone();
+        sim.sleep = rec.start_sleep.clone();
+        sim.creatures = rec.start_creatures.clone();
         sim.replay_reads = Some(rec.reads.iter().cloned().collect());
         let mut next = 0usize;
         for _ in 0..rec.steps {
@@ -756,6 +919,7 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<Animator>().expect("standard component");
     world.register_native::<CharacterBody>().expect("standard component");
     world.register_native::<NavAgent>().expect("standard component");
+    world.register_native::<crate::components::NavLimits>().expect("standard component");
     world.register_native::<Ui>().expect("standard component");
     world.register_native::<Particle>().expect("standard component");
     world.register_native::<LocalTransform>().expect("standard component");
@@ -775,6 +939,7 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<Terrain>().expect("standard component");
     world.register_native::<crate::components::Joint>().expect("standard component");
     world.register_native::<crate::components::InputMap>().expect("standard component");
+    world.register_native::<crate::components::KeyBind>().expect("standard component");
     world.register_native::<crate::components::StateMachine>().expect("standard component");
     world.register_native::<crate::components::Tween>().expect("standard component");
     world.register_native::<crate::components::CameraRig>().expect("standard component");
@@ -793,6 +958,7 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::SceneSwitch>().expect("standard component");
     world.register_native::<crate::components::Persist>().expect("standard component");
     world.register_native::<crate::components::HeightFog>().expect("standard component");
+    world.register_native::<crate::components::Weather>().expect("standard component");
     world.register_native::<crate::components::ParticleModules>().expect("standard component");
     world.register_native::<crate::components::CameraView>().expect("standard component");
     world.register_native::<crate::components::Dialogue>().expect("standard component");
@@ -809,13 +975,75 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::PostFx>().expect("standard component");
     world.register_native::<crate::components::BehaviorTree>().expect("standard component");
     world.register_native::<crate::components::HitPoints>().expect("standard component");
+    world.register_native::<crate::components::Team>().expect("standard component");
+    world.register_native::<crate::components::Weapon>().expect("standard component");
+    world.register_native::<crate::components::Bullet>().expect("standard component");
+    world.register_native::<crate::components::Noisy>().expect("standard component");
+    world.register_native::<crate::components::Perception>().expect("standard component");
+    world.register_native::<crate::components::Searchlight>().expect("standard component");
+    world.register_native::<crate::components::Exposure>().expect("standard component");
+    world.register_native::<crate::components::Vitals>().expect("standard component");
+    world.register_native::<crate::components::Heat>().expect("standard component");
+    world.register_native::<crate::components::Director>().expect("standard component");
+    world.register_native::<crate::escalation::Escalation>().expect("standard component");
+    world.register_native::<crate::gear::WornTell>().expect("standard component");
+    world.register_native::<crate::gear::WornPart>().expect("standard component");
+    world.register_native::<crate::stomp::Stomp>().expect("standard component");
+    world.register_native::<crate::walker::Pursuit>().expect("standard component");
+    world.register_native::<crate::walker::Cannon>().expect("standard component");
+    world.register_native::<crate::walker::Hitbox>().expect("standard component");
+    world.register_native::<crate::events::WorldEvents>().expect("standard component");
+    world.register_native::<crate::events::WorldEvent>().expect("standard component");
+    world.register_native::<crate::events::AirDrop>().expect("standard component");
+    world.register_native::<crate::components::Hackable>().expect("standard component");
+    world.register_native::<crate::components::Hacker>().expect("standard component");
+    world.register_native::<crate::components::LootTable>().expect("standard component");
+    world.register_native::<crate::components::LootContainer>().expect("standard component");
+    world.register_native::<crate::components::LootDrop>().expect("standard component");
+    world.register_native::<crate::components::NetPlayer>().expect("standard component");
+    world.register_native::<crate::components::NetPuppet>().expect("standard component");
+    world.register_native::<crate::components::NetEntity>().expect("standard component");
+    world.register_native::<crate::components::NetAvatar>().expect("standard component");
+    world.register_native::<crate::components::NetHost>().expect("standard component");
+    world.register_native::<crate::components::NetContainer>().expect("standard component");
+    world.register_native::<crate::components::NetConnect>().expect("standard component");
+    world.register_native::<crate::components::NetChat>().expect("standard component");
+    world.register_native::<crate::components::NetParty>().expect("standard component");
+    world.register_native::<crate::components::Equipment>().expect("standard component");
+    world.register_native::<crate::blast::Explosive>().expect("standard component");
+    world.register_native::<crate::blast::Thrower>().expect("standard component");
+    world.register_native::<crate::blast::Resist>().expect("standard component");
+    world.register_native::<crate::building::Upgrader>().expect("standard component");
+    world.register_native::<crate::lock::CodeLock>().expect("standard component");
+    world.register_native::<crate::lock::Keypad>().expect("standard component");
+    world.register_native::<crate::depth::Repairer>().expect("standard component");
+    world.register_native::<crate::depth::RaidAlarm>().expect("standard component");
+    world.register_native::<crate::depth::Striker>().expect("standard component");
+    world.register_native::<crate::components::BuildRules>().expect("standard component");
+    world.register_native::<crate::components::BuildTool>().expect("standard component");
+    world.register_native::<crate::components::BuildPiece>().expect("standard component");
+    world.register_native::<crate::components::BuildSocket>().expect("standard component");
+    world.register_native::<crate::components::BuildUpkeep>().expect("standard component");
+    world.register_native::<crate::components::Helicopter>().expect("standard component");
+    world.register_native::<crate::components::FlyAgent>().expect("standard component");
+    world.register_native::<crate::components::Stealth>().expect("standard component");
+    world.register_native::<crate::components::Interactable>().expect("standard component");
+    world.register_native::<crate::components::Door>().expect("standard component");
+    world.register_native::<crate::components::Interactor>().expect("standard component");
+    world.register_native::<crate::components::Respawn>().expect("standard component");
+    world.register_native::<crate::components::SpawnPoint>().expect("standard component");
     world.register_native::<crate::components::StreamZone>().expect("standard component");
+    world.register_native::<crate::components::StreamAnchor>().expect("standard component");
+    world.register_native::<crate::components::ProcGrid>().expect("standard component");
+    world.register_native::<crate::components::GridZone>().expect("standard component");
     world.register_native::<crate::components::EmitterFx>().expect("standard component");
     world.register_native::<crate::components::ParticleFx>().expect("standard component");
     world.register_native::<crate::components::Spline>().expect("standard component");
     world.register_native::<crate::components::PathFollower>().expect("standard component");
     world.register_native::<crate::components::Timeline>().expect("standard component");
     world.register_native::<crate::components::UiSlider>().expect("standard component");
+    world.register_native::<crate::components::UiPlot>().expect("standard component");
+    world.register_native::<crate::components::UiPlotBar>().expect("standard component");
     world.register_native::<crate::components::UiToggle>().expect("standard component");
     world.register_native::<crate::components::UiInput>().expect("standard component");
     world.register_native::<crate::components::UiLayout>().expect("standard component");
@@ -827,6 +1055,15 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::SpawnedBy>().expect("standard component");
     world.register_native::<crate::components::PrefabSpawner>().expect("standard component");
     world.register_native::<crate::components::TimeOfDay>().expect("standard component");
+    world.register_native::<crate::inventory::ItemTable>().expect("standard component");
+    world.register_native::<crate::inventory::Inventory>().expect("standard component");
+    world.register_native::<crate::inventory::InvSlot>().expect("standard component");
+    world.register_native::<crate::inventory::InvCard>().expect("standard component");
+    world.register_native::<crate::motionmatch::MotionMatcher>().expect("standard component");
+    world.register_native::<crate::inertia::Inertia>().expect("standard component");
+    world.register_native::<crate::traversal::Traversable>().expect("standard component");
+    world.register_native::<crate::traversal::Traversal>().expect("standard component");
+    world.register_native::<crate::footik::FootIk>().expect("standard component");
     world.register_native::<RigidBody>().expect("standard component");
     world.register_native::<PhysicsSettings>().expect("standard component");
     world.register_native::<AngularVelocity>().expect("standard component");
@@ -857,6 +1094,10 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::InWater>().expect("standard component");
     world.register_native::<crate::components::Buoyant>().expect("standard component");
     world.register_native::<crate::components::Floater>().expect("standard component");
+    world.register_native::<crate::components::Creature>().expect("standard component");
+    world.register_native::<crate::components::CreaturePart>().expect("standard component");
+    world.register_native::<crate::components::Food>().expect("standard component");
+    world.register_native::<crate::components::FoodSpot>().expect("standard component");
     world.register_native::<crate::components::WaterFlow>().expect("standard component");
     world.register_native::<crate::components::Swimmable>().expect("standard component");
     world.register_native::<crate::components::MaterialExt>().expect("standard component");
@@ -877,6 +1118,19 @@ pub fn register_standard_components(world: &mut World) {
     world.register_native::<crate::components::Shadows>().expect("standard component");
     world.register_native::<crate::components::Atmosphere>().expect("standard component");
     world.register_native::<crate::components::WaterLook>().expect("standard component");
+    // (at the end, so that no component number of the ones above changes)
+    world.register_native::<crate::components::JointMotor>().expect("standard component");
+    world.register_native::<crate::components::JointCone>().expect("standard component");
+    world.register_native::<crate::components::PhysicsSleep>().expect("standard component");
+    world.register_native::<crate::components::JointSpring>().expect("standard component");
+    world.register_native::<crate::components::Controls>().expect("standard component");
+    world.register_native::<crate::components::Seat>().expect("standard component");
+    world.register_native::<crate::components::Seated>().expect("standard component");
+    world.register_native::<crate::components::Loadout>().expect("standard component");
+    world.register_native::<crate::inventory::Station>().expect("standard component");
+    world.register_native::<crate::components::Lighting>().expect("standard component");
+    world.register_native::<crate::components::MacroVary>().expect("standard component");
+    world.register_native::<crate::components::ParticleSystem>().expect("standard component");
 }
 
 impl RecordedRead {
@@ -899,6 +1153,12 @@ impl RecordedRead {
 impl Recording {
     pub fn to_json(&self) -> Json {
         let mut out = self.to_json_base();
+        if !self.start_sleep.is_empty() {
+            out.set("start_sleep", self.start_sleep.to_json());
+        }
+        if !self.start_contacts.is_empty() {
+            out.set("start_contacts", self.start_contacts.to_json());
+        }
         if !self.reads.is_empty() {
             out.set("reads", Json::arr(self.reads.iter().map(RecordedRead::to_json)));
         }
@@ -954,6 +1214,16 @@ impl Recording {
             final_hash: hex(j.get("final_hash"))?,
             // recordings written before `steps` existed never went back in time
             steps: j.get("steps").and_then(|v| v.as_u64()).unwrap_or(final_tick.saturating_sub(start_tick)),
+            start_contacts: match j.get("start_contacts") {
+                Some(c) => ContactMemory::from_json(c).ok_or_else(|| bad("start_contacts is not what a recording writes"))?,
+                None => ContactMemory::default(),
+            },
+            start_sleep: match j.get("start_sleep") {
+                Some(s) => crate::physics::SleepState::from_json(s).ok_or_else(|| bad("start_sleep is not what a recording writes"))?,
+                None => Default::default(),
+            },
+            // (the creatures that were alive are not written to files: a recording read from a file starts without them, and a creature that is in its scene is made again from the scene)
+            start_creatures: Default::default(),
             reads: j.get("reads").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(RecordedRead::from_json).collect()).unwrap_or_default(),
         })
     }

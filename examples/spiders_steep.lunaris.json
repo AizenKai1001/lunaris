@@ -1,0 +1,436 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Sky"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.12,
+      0.28,
+      0.58
+     ],
+     "sky_horizon": [
+      0.7,
+      0.78,
+      0.9
+     ],
+     "ground": [
+      0.2,
+      0.2,
+      0.22
+     ],
+     "clouds": 0.3,
+     "fog": 0.004,
+     "fog_color": [
+      0.7,
+      0.76,
+      0.86
+     ],
+     "bloom": 0.2,
+     "ssao": 1.0,
+     "shadow_distance": 60
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      -0.35,
+      -0.2,
+      0.77
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.95,
+      0.85
+     ],
+     "intensity": 3.6
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Floor"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      80,
+      1,
+      80
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "plane",
+     "color": [
+      0.3,
+      0.36,
+      0.24,
+      1
+     ],
+     "shininess": 4,
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Title"
+    },
+    "Text": {
+     "value": "evolved spiders free-climb ramps (lunaris-creature)",
+     "pos": [
+      0.02,
+      0.03
+     ],
+     "size": 0.035,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "shadow": true
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      -2.0,
+      1.4,
+      5.5
+     ],
+     "rot": [
+      0.0,
+      -0.15,
+      0.0,
+      0.99
+     ]
+    },
+    "Camera": {
+     "fov_y": 52,
+     "far": 300,
+     "clear": [
+      0.05,
+      0.06,
+      0.09,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 40,
+   "components": {
+    "Name": {
+     "value": "Ramp 0"
+    },
+    "Transform": {
+     "pos": [
+      1.5020815280171311,
+      1.0606601717798214,
+      -3.0
+     ],
+     "rot": [
+      0,
+      0,
+      0.3826834323650898,
+      0.9238795325112867
+     ],
+     "scale": [
+      3.2,
+      0.2,
+      2.4
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.58,
+      0.52,
+      0.46,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Lure 0"
+    },
+    "Transform": {
+     "pos": [
+      1.0424621202458748,
+      1.0960155108391487,
+      -3.0
+     ],
+     "scale": [
+      0.2,
+      0.2,
+      0.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.2,
+      1.0,
+      0.35,
+      1
+     ],
+     "emissive": 1.5
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Spider 0"
+    },
+    "Transform": {
+     "pos": [
+      -1.2,
+      0.0,
+      -3.0
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_nn.json",
+     "genome": 0,
+     "body_seed": 3,
+     "target": 10
+    }
+   }
+  },
+  {
+   "uid": 41,
+   "components": {
+    "Name": {
+     "value": "Ramp 1"
+    },
+    "Transform": {
+     "pos": [
+      1.2996375025905729,
+      1.2532856272272823,
+      0.0
+     ],
+     "rot": [
+      0,
+      0,
+      0.4617486132350339,
+      0.8870108331782217
+     ],
+     "scale": [
+      3.2,
+      0.2,
+      2.4
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.58,
+      0.52,
+      0.46,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Lure 1"
+    },
+    "Transform": {
+     "pos": [
+      0.8408613561841118,
+      1.208291766663451,
+      0.0
+     ],
+     "scale": [
+      0.2,
+      0.2,
+      0.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.2,
+      1.0,
+      0.35,
+      1
+     ],
+     "emissive": 1.5
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Spider 1"
+    },
+    "Transform": {
+     "pos": [
+      -1.2,
+      0.0,
+      0.0
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_nn.json",
+     "genome": 1,
+     "body_seed": 8,
+     "target": 11
+    }
+   }
+  },
+  {
+   "uid": 42,
+   "components": {
+    "Name": {
+     "value": "Ramp 2"
+    },
+    "Transform": {
+     "pos": [
+      0.9412014913996609,
+      1.4693061789248865,
+      3.0
+     ],
+     "rot": [
+      0,
+      0,
+      0.573576436351046,
+      0.8191520442889918
+     ],
+     "scale": [
+      3.2,
+      0.2,
+      2.4
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.58,
+      0.52,
+      0.46,
+      1
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Lure 2"
+    },
+    "Transform": {
+     "pos": [
+      0.5097030311268923,
+      1.307105442853098,
+      3.0
+     ],
+     "scale": [
+      0.2,
+      0.2,
+      0.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.2,
+      1.0,
+      0.35,
+      1
+     ],
+     "emissive": 1.5
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Spider 2"
+    },
+    "Transform": {
+     "pos": [
+      -1.2,
+      0.0,
+      3.0
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_nn.json",
+     "genome": 2,
+     "body_seed": 13,
+     "target": 12
+    }
+   }
+  }
+ ]
+}

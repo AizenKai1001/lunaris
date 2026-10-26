@@ -1,0 +1,270 @@
+{
+ "lunaris": 1,
+ "entities": [
+  {
+   "uid": 1,
+   "components": {
+    "Name": {
+     "value": "Sky"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.12,
+      0.28,
+      0.58
+     ],
+     "sky_horizon": [
+      0.7,
+      0.78,
+      0.9
+     ],
+     "ground": [
+      0.2,
+      0.2,
+      0.22
+     ],
+     "clouds": 0.3,
+     "fog": 0.004,
+     "fog_color": [
+      0.7,
+      0.76,
+      0.86
+     ],
+     "bloom": 0.2,
+     "ssao": 1.0,
+     "shadow_distance": 60
+    }
+   }
+  },
+  {
+   "uid": 2,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      -0.35,
+      -0.2,
+      0.77
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "color": [
+      1.0,
+      0.95,
+      0.85
+     ],
+     "intensity": 3.6
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Hills"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.31604199569311137,
+      0
+     ]
+    },
+    "Terrain": {
+     "heightmap": "spider_hills.png",
+     "size": [
+      30.0,
+      30.0
+     ],
+     "height": 0.6962871407604501,
+     "color": [
+      0.42,
+      0.55,
+      0.3,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Prey"
+    },
+    "Transform": {
+     "pos": [
+      3.0,
+      0.22251006944349097,
+      1.0
+     ],
+     "scale": [
+      0.24,
+      0.24,
+      0.24
+     ]
+    },
+    "Velocity": {
+     "lin": [
+      0.25,
+      0,
+      0.1
+     ]
+    },
+    "Wander": {
+     "strength": 0.5
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.2,
+      1.0,
+      0.35,
+      1
+     ],
+     "emissive": 1.2
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Spider A"
+    },
+    "Transform": {
+     "pos": [
+      -2.0,
+      -0.12633242477672452,
+      -1.5
+     ],
+     "rot": [
+      0,
+      0.2588,
+      0,
+      0.9659
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_nn.json",
+     "genome": 0,
+     "body_seed": 3,
+     "target": 10
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Spider B"
+    },
+    "Transform": {
+     "pos": [
+      -1.0,
+      0.11297037078265013,
+      2.5
+     ],
+     "rot": [
+      0,
+      -0.5,
+      0,
+      0.866
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_nn.json",
+     "genome": 1,
+     "body_seed": 8,
+     "target": 10
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Spider C"
+    },
+    "Transform": {
+     "pos": [
+      1.5,
+      0.027462893870585647,
+      -3.0
+     ],
+     "rot": [
+      0,
+      0.9659,
+      0,
+      0.2588
+     ]
+    },
+    "Creature": {
+     "brain": "spider_brain_nn.json",
+     "genome": 2,
+     "body_seed": 13,
+     "target": 10
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Camera"
+    },
+    "Transform": {
+     "pos": [
+      -5.5,
+      3.0,
+      7.0
+     ],
+     "rot": [
+      -0.17,
+      -0.3,
+      -0.05,
+      0.94
+     ]
+    },
+    "Camera": {
+     "fov_y": 52,
+     "far": 300,
+     "clear": [
+      0.05,
+      0.06,
+      0.09,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Title"
+    },
+    "Text": {
+     "value": "evolved spiders walk to the ball (lunaris-creature)",
+     "pos": [
+      0.02,
+      0.03
+     ],
+     "size": 0.035,
+     "color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "shadow": true
+    }
+   }
+  }
+ ]
+}

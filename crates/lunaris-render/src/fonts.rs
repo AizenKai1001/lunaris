@@ -80,7 +80,7 @@ impl Page {
 
     fn texture(&mut self) -> Arc<Texture> {
         if self.snapshot.is_none() {
-            self.snapshot = Some(Arc::new(Texture { width: PAGE, height: PAGE, texels: self.texels.clone(), heights: None }));
+            self.snapshot = Some(Arc::new(Texture { width: PAGE, height: PAGE, texels: crate::texture::Texels::F32(self.texels.clone()), heights: None }));
         }
         self.snapshot.clone().expect("just made")
     }
@@ -239,7 +239,7 @@ mod tests {
         // its texels are white with some coverage somewhere
         let covered = (0..h.h).any(|r| (0..h.w).any(|c| {
             let (tx, ty) = (((h.uv[0] * PAGE as f32) as u32) + c, ((h.uv[1] * PAGE as f32) as u32) + r);
-            h.tex.texels[(ty * PAGE + tx) as usize][3] > 0.5
+            h.tex.texels.get((ty * PAGE + tx) as usize)[3] > 0.5
         }));
         assert!(covered);
         // the same letter twice makes the same slot: one more letter does not make a new page

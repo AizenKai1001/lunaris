@@ -10,6 +10,7 @@
 //! and two friction impulses (never more than the friction coefficient times the normal one). Nothing is remembered from one tick to the
 //! next (a snapshot has to continue exactly like the run it was taken from), so it takes more rounds than the plain contacts do.
 use crate::components::Joint;
+use crate::contact_memory::{self, ContactMemory};
 use crate::hull_contact::{capsule_poly, corners_under, poly_poly, sphere_poly, Poly};
 use crate::meshcol::PlacedMesh;
 use crate::meshcol_shapes::MeshPt;
@@ -44,6 +45,31 @@ impl Default for Rot {
 
 /// Rounds of the velocity solver for contacts and joints that rotate.
 pub const ITERATIONS: usize = 20;
+/// The most rounds the contact and joint solver goes through when there are few rows to solve, and the number of row visits it may spend in one tick: a
+/// stack of turning boxes needs rounds in proportion to its height (a tower of ten collapsed at 20 rounds and stands at 160), and a few contact points
+/// make a round cheap, while a world with thousands of them falls back to `ITERATIONS`. It depends only on how many rows there are, so it is the same on
+/// every machine and for any number of threads.
+pub const MAX_ITERATIONS: usize = 160;
+const ROW_VISITS: usize = 20_000;
+
+/// How many rounds to solve `rows` contact points and `pins` joints in: `ROW_VISITS` shared among them (a joint costs about three rows), between
+/// `ITERATIONS` and `MAX_ITERATIONS`.
+pub fn rounds_for(rows: usize, pins: usize) -> usize {
+    (ROW_VISITS / (rows + 3 * pins).max(1)).clamp(ITERATIONS, MAX_ITERATIONS)
+}
+
+/// A fixed number of solver rounds for the worlds with joints (0 = the automatic number of `rounds_for`): see `physics::set_fixed_rounds`.
+pub static FIXED_ROUNDS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// `rounds_for` for the reference step, which is the one that solves joints: with a fixed number set (and joints in the world) that number, without the early stop.
+pub fn rounds_for_joints(rows: usize, pins: usize) -> usize {
+    let fixed = FIXED_ROUNDS.load(std::sync::atomic::Ordering::Relaxed);
+    if fixed > 0 && pins > 0 {
+        fixed
+    } else {
+        rounds_for(rows, pins)
+    }
+}
 /// The spin of a body never exceeds this (radians per second): a faster one turns more in a step than the contacts can follow.
 pub const MAX_SPIN: f32 = 60.0;
 /// Contact points of two boxes that are this close above each other still count (the solver only stops them closing in).
@@ -842,6 +868,81 @@ pub(crate) fn catch_up(bodies: &mut [Body], st: &Statics) {
     }
 }
 
+// ------------------------------------------------------------------------------------------------ fast bodies and static colliders
+
+/// Continuous collision for everything that moves. A dynamic ball, box or capsule that moved more than its own size in the last tick (a shot, a
+/// thrown crate, a ball dropped from a height) may have crossed a thin wall or floor between two ticks, where no contact could see it. Before the
+/// contacts are found, the path of each such body (from where it was a tick ago to where it is) is tried, with its real shape, against the solid
+/// colliders that never move and that are near the path (`near` fills the list: the caller knows where they are kept): if it touches one, the first
+/// moment it does is found (tests a body size apart, then halving) and the answer is `(index, position at that moment)`. The caller puts the body
+/// there and leaves its velocity alone, so the contacts then stop it or bounce it with its real speed, against the side it came from. A body that
+/// already touched the thing a tick ago is left to the contacts. Each body is looked at on its own and only its own position changes, so the answer
+/// does not depend on the order of the bodies or of the colliders. `v0` holds the velocities the bodies had before this tick's forces (the ones that moved
+/// them). Meshes have their own test (`catch_up`); two moving bodies are not looked at.
+pub(crate) fn tunnel_fixes(bodies: &[Body], v0: &[V3], near: &mut dyn FnMut(&Body, V3, V3, &mut Vec<Body>), st: &Statics) -> Vec<(usize, V3)> {
+    let mut fixes = Vec::new();
+    let mut cand: Vec<Body> = Vec::new();
+    for (i, b) in bodies.iter().enumerate() {
+        if b.inv_mass == 0.0 || b.trigger || b.spins {  // (a spinning ball has its own forward-looking test, `sweep_ahead`)
+            continue;
+        }
+        let size = match b.shape {
+            Shape::Sphere(r) | Shape::Capsule(r, _) => r,
+            Shape::Box(h) | Shape::Obb(h) => h[0].min(h[1]).min(h[2]),
+            Shape::Hull(_) | Shape::Terrain(..) | Shape::Mesh(_) => continue,
+        };
+        // (`v0` is the velocity before this tick's forces: the one the movement stage moved the body with, so `pos - step` is where it really was)
+        let step = mul(v0[i], st.dt);
+        let travel2 = dot(step, step);
+        if !(size > 0.0) || !(travel2 > size * size) || !travel2.is_finite() {
+            continue; // (a body that moves less than its size is seen by the contacts; so is nonsense)
+        }
+        let start = sub(b.pos, step);
+        let (mut lo, mut hi) = ([0.0f32; 3], [0.0f32; 3]);
+        for a in 0..3 {
+            lo[a] = start[a].min(b.pos[a]) - b.extent(a);
+            hi[a] = start[a].max(b.pos[a]) + b.extent(a);
+        }
+        cand.clear();
+        near(b, lo, hi, &mut cand);
+        if cand.is_empty() {
+            continue;
+        }
+        let tests = ((travel2.sqrt() / size).ceil().min(64.0) as usize).max(2);
+        let mut probe = b.clone();
+        let mut best = 1.0f32;
+        for other in &cand {
+            if touches(&mut probe, start, step, 0.0, other, st) {
+                continue; // touching it a tick ago: the contacts deal with that one
+            }
+            let mut clear = 0.0f32;
+            // (every collider is tried on its own, to the end: stopping early at the best time found so far would make the answer depend on the
+            // order the colliders come in, which differs between the reference and the grid)
+            for j in 1..=tests {
+                let t = j as f32 / tests as f32;
+                if touches(&mut probe, start, step, t, other, st) {
+                    let (mut a, mut c) = (clear, t);
+                    for _ in 0..10 {
+                        let m = 0.5 * (a + c);
+                        if touches(&mut probe, start, step, m, other, st) {
+                            c = m;
+                        } else {
+                            a = m;
+                        }
+                    }
+                    best = best.min(c);
+                    break;
+                }
+                clear = t;
+            }
+        }
+        if best < 1.0 {
+            fixes.push((i, add(start, mul(step, best))));
+        }
+    }
+    fixes
+}
+
 // ------------------------------------------------------------------------------------------------ fast balls
 
 /// Is the ball (`probe`, moved to `start + step * t`) touching `other`?
@@ -941,6 +1042,17 @@ pub struct Row {
     jn: f32,
     j1: f32,
     j2: f32,
+    /// Started from what the pair's contact had a tick ago (`apply_memory`), so the guess from the weights leaves it alone.
+    warm: bool,
+    /// One over the effective masses of `t1`, `t2` and `n` (0 where a mass is 0): what an impulse is divided by to give the change of speed.
+    rcp: [f32; 3],
+    /// For the three directions (`t1`, `t2`, `n`): the arm of each body crossed with the direction (the speed of a point is the body's velocity plus its spin
+    /// dotted with that), and what an impulse along the direction does to the body's spin per unit of impulse (the inverse inertia applied to it). Worked out once
+    /// when the row is made, because the arms and the inertia do not change while the rounds go on, and each visit of the row then needs dot products only.
+    ca: [V3; 3],
+    cb: [V3; 3],
+    wa: [V3; 3],
+    wb: [V3; 3],
 }
 
 /// Two different bodies of the list, both mutable.
@@ -990,9 +1102,13 @@ pub fn prepare_row(bodies: &[Body], a: usize, b: usize, pt: &Pt, dt: f32) -> Row
     let (ra, rb) = (sub(pt.p, ba.pos), sub(pt.p, bb.pos));
     let n = pt.n;
     let (t1, t2) = basis(n);
-    let effective = |d: V3| -> f32 {
-        let (xa, xb) = (cross(ra, d), cross(rb, d));
-        let k = ba.inv_mass + bb.inv_mass + dot(xa, world_inv_i(ba, xa)) + dot(xb, world_inv_i(bb, xb));
+    let dirs = [t1, t2, n];
+    let ca = dirs.map(|d| cross(ra, d));
+    let cb = dirs.map(|d| cross(rb, d));
+    let wa = ca.map(|x| world_inv_i(ba, x));
+    let wb = cb.map(|x| world_inv_i(bb, x));
+    let effective = |k: usize| -> f32 {
+        let k = ba.inv_mass + bb.inv_mass + dot(ca[k], wa[k]) + dot(cb[k], wb[k]);
         if k > 1.0e-12 {
             1.0 / k
         } else {
@@ -1002,7 +1118,9 @@ pub fn prepare_row(bodies: &[Body], a: usize, b: usize, pt: &Pt, dt: f32) -> Row
     let vn = dot(sub(point_vel(bb, rb), point_vel(ba, ra)), n);
     let e = if -vn < BOUNCE_THRESHOLD { 0.0 } else { ba.restitution.max(bb.restitution) };
     let target = if pt.depth < 0.0 { pt.depth / dt } else { -e * vn.min(0.0) };
-    Row { a, b, ra, rb, n, t1, t2, mass_n: effective(n), mass_1: effective(t1), mass_2: effective(t2), target, mu: (ba.friction * bb.friction).sqrt(), jn: 0.0, j1: 0.0, j2: 0.0 }
+    let (mass_n, mass_1, mass_2) = (effective(2), effective(0), effective(1));
+    let rcp = |m: f32| if m > 0.0 { 1.0 / m } else { 0.0 };
+    Row { a, b, ra, rb, n, t1, t2, mass_n, mass_1, mass_2, rcp: [rcp(mass_1), rcp(mass_2), rcp(mass_n)], ca, cb, wa, wb, target, mu: (ba.friction * bb.friction).sqrt(), jn: 0.0, j1: 0.0, j2: 0.0, warm: false }
 }
 
 /// A first guess for the impulses of the contacts that hold things up, made from the weights alone (the solver remembers nothing from the
@@ -1081,6 +1199,9 @@ pub fn warm_start(bodies: &mut [Body], rows: &mut [Row], gravity: V3, dt: f32) {
         let upper_is_b = p.above == rows[p.first].b;
         let push = if upper_is_b { need } else { neg(need) };
         for r in &mut rows[p.first..p.first + p.count] {
+            if r.warm {
+                continue; // it starts from what it had a tick ago
+            }
             let limit = r.mu * jn;
             r.jn = jn;
             r.j1 = dot(push, r.t1).max(-limit).min(limit);
@@ -1092,25 +1213,121 @@ pub fn warm_start(bodies: &mut [Body], rows: &mut [Row], gravity: V3, dt: f32) {
     }
 }
 
-pub fn solve_row(bodies: &mut [Body], r: &mut Row) {
+/// Start the rows from what the contacts of the same pairs ended with in the last tick (`old`, see `contact_memory`): a point that is still where it was
+/// gets its normal impulse and its friction impulse back (the friction projected onto the new tangents and kept within the cone), applied once to the
+/// bodies, so the rounds that follow only correct what changed. Rows of one pair follow each other; the pair's bodies come in uid order, which is
+/// how the memory is keyed.
+pub fn apply_memory(bodies: &mut [Body], rows: &mut [Row], old: &ContactMemory) {
+    if old.is_empty() || rows.is_empty() {
+        return;
+    }
+    let (mut used, mut hits): (Vec<bool>, Vec<Option<usize>>) = (Vec::new(), Vec::new());
+    let mut i = 0;
+    while i < rows.len() {
+        let (a, b) = (rows[i].a, rows[i].b);
+        let mut j = i + 1;
+        while j < rows.len() && rows[j].a == a && rows[j].b == b {
+            j += 1;
+        }
+        if let Some(prev) = old.find(bodies[a].uid, bodies[b].uid) {
+            let run = &rows[i..j];
+            contact_memory::match_points(prev, bodies[a].axes(), run.len(), |k| (run[k].ra, run[k].n), &mut used, &mut hits);
+            for (r, h) in rows[i..j].iter_mut().zip(&hits) {
+                let Some(k) = *h else { continue };
+                let p = &prev[k];
+                let limit = r.mu * p.jn;
+                r.warm = true;
+                r.jn = p.jn;
+                r.j1 = dot(p.f, r.t1).max(-limit).min(limit);
+                r.j2 = dot(p.f, r.t2).max(-limit).min(limit);
+                let total = add(add(mul(r.n, r.jn), mul(r.t1, r.j1)), mul(r.t2, r.j2));
+                let (ba, bb) = pair_mut(bodies, r.a, r.b);
+                impulse(ba, bb, r.ra, r.rb, total);
+            }
+        }
+        i = j;
+    }
+}
+
+/// What the solver ended with, for the next tick (`apply_memory`): every contact point that pushes (a point with no normal impulse has nothing to remember),
+/// kept in the frame of the first body of its pair. Call it after the rounds and before anything moves a body.
+pub fn collect_memory(bodies: &[Body], rows: &[Row]) -> ContactMemory {
+    let mut m = ContactMemory::default();
+    let mut i = 0;
+    while i < rows.len() {
+        let (a, b) = (rows[i].a, rows[i].b);
+        let mut j = i + 1;
+        while j < rows.len() && rows[j].a == a && rows[j].b == b {
+            j += 1;
+        }
+        m.begin_pair(bodies[a].uid, bodies[b].uid);
+        for r in &rows[i..j] {
+            if r.jn > 0.0 {
+                m.push_point(contact_memory::Point { local: contact_memory::to_local(bodies[a].axes(), r.ra), n: r.n, jn: r.jn, f: add(mul(r.t1, r.j1), mul(r.t2, r.j2)) });
+            }
+        }
+        m.drop_empty_pair();
+        i = j;
+    }
+    m
+}
+
+/// How little a round of the solver may change the speed at any contact point (metres per second) for the rounds to stop: past this a further round would change
+/// nothing that could be seen (a tenth of a millimetre per second), and, the rows being solved in a fixed order, it would only repeat itself.
+pub const SETTLED: f32 = 1.0e-4;
+/// The rounds also stop when a round changes the speeds by less than this share of what the first round changed them by (a tenth of a percent): a falling chain
+/// of dominoes needs no more than that, a stack at rest, whose first round changes next to nothing, goes on to `SETTLED`.
+pub const SETTLED_REL: f32 = 1.0e-3;
+
+/// One visit of a contact point. Returns by how much it changed the speed at the point (for the impulse `l` along a direction with effective mass `m`, the speed
+/// changes by `l / m`), the largest of the three directions.
+pub fn solve_row(bodies: &mut [Body], r: &mut Row) -> f32 {
     let (ba, bb) = pair_mut(bodies, r.a, r.b);
+    let (ia, ib) = (ba.inv_mass, bb.inv_mass);
+    // (the velocities and spins are kept in locals for the three visits and written back once)
+    let (mut va, mut vb, mut wa, mut wb) = (ba.vel, bb.vel, ba.w(), bb.w());
+    // an impulse `l` along direction `k` (`d`): minus on body a, plus on body b
+    macro_rules! push {
+        ($k:expr, $d:expr, $l:expr) => {{
+            let l = $l;
+            va = sub(va, mul($d, l * ia));
+            vb = add(vb, mul($d, l * ib));
+            wa = sub(wa, mul(r.wa[$k], l));
+            wb = add(wb, mul(r.wb[$k], l));
+        }};
+    }
+    // the speed of the point on body b relative to the one on body a, along direction `k` (`d`)
+    macro_rules! speed {
+        ($k:expr, $d:expr) => {
+            dot(sub(vb, va), $d) + dot(wb, r.cb[$k]) - dot(wa, r.ca[$k])
+        };
+    }
     // friction first (the normal impulse of the last round limits it), then the contact itself, which matters more
     let limit = r.mu * r.jn;
-    let vt = dot(sub(point_vel(bb, r.rb), point_vel(ba, r.ra)), r.t1);
+    let vt = speed!(0, r.t1);
     let new = (r.j1 - vt * r.mass_1).max(-limit).min(limit);
-    let l = new - r.j1;
+    let l1 = new - r.j1;
     r.j1 = new;
-    impulse(ba, bb, r.ra, r.rb, mul(r.t1, l));
-    let vt = dot(sub(point_vel(bb, r.rb), point_vel(ba, r.ra)), r.t2);
+    push!(0, r.t1, l1);
+    let vt = speed!(1, r.t2);
     let new = (r.j2 - vt * r.mass_2).max(-limit).min(limit);
-    let l = new - r.j2;
+    let l2 = new - r.j2;
     r.j2 = new;
-    impulse(ba, bb, r.ra, r.rb, mul(r.t2, l));
-    let vn = dot(sub(point_vel(bb, r.rb), point_vel(ba, r.ra)), r.n);
+    push!(1, r.t2, l2);
+    let vn = speed!(2, r.n);
     let new = (r.jn + (r.target - vn) * r.mass_n).max(0.0);
     let l = new - r.jn;
     r.jn = new;
-    impulse(ba, bb, r.ra, r.rb, mul(r.n, l));
+    push!(2, r.n, l);
+    ba.vel = va;
+    bb.vel = vb;
+    if let Some(s) = ba.rot.as_deref_mut() {
+        s.w = wa;
+    }
+    if let Some(s) = bb.rot.as_deref_mut() {
+        s.w = wb;
+    }
+    (l1.abs() * r.rcp[0]).max(l2.abs() * r.rcp[1]).max(l.abs() * r.rcp[2])
 }
 
 // ------------------------------------------------------------------------------------------------ ball-and-socket joints and hinges
@@ -1142,6 +1359,25 @@ pub struct Pin {
     axis_mass: f32,
     acc_lo: f32,
     acc_hi: f32,
+    /// A hinge motor: the speed it aims for (the spin of `b` relative to `a` about the axis, so minus the speed of the joint's body), the largest
+    /// impulse it may give in one tick, and what it has given so far.
+    motor: Option<(f32, f32)>,
+    acc_motor: f32,
+    /// A hinge spring as a soft constraint on the relative spin about the axis: its `gamma` (the softness), the `bias` that pulls the angle towards its target, the
+    /// effective mass (including the softness) and the impulse so far. `spring_on` says that there is one.
+    spring_on: bool,
+    spring_gamma: f32,
+    spring_bias: f32,
+    spring_mass: f32,
+    acc_spring: f32,
+    /// A swing limit: the largest angle between the axis in `a` and the axis in `b`, the direction the angle is growing about, how far apart the two
+    /// axes are now, the effective mass about that direction, and the impulse so far. `cone_on` says that the angle is big enough to have a direction.
+    cone: Option<f32>,
+    cone_n: V3,
+    cone_theta: f32,
+    cone_mass: f32,
+    acc_cone: f32,
+    cone_on: bool,
 }
 
 /// The angle (radians) that body `b` has turned about the hinge axis relative to body `a`, since the joint was bound.
@@ -1157,7 +1393,7 @@ fn hinge_angle(qa: [f32; 4], qb: [f32; 4], rest: [f32; 4], local_axis: V3) -> f3
 }
 
 /// Set up the joint of body `a` to body `b` for this tick; binds it to the two bodies the first time (`rest` all zero).
-pub fn make_pin(bodies: &[Body], a: usize, b: usize, j: &Joint, dt: f32) -> Option<Pin> {
+pub fn make_pin(bodies: &[Body], a: usize, b: usize, j: &Joint, motor: Option<(f32, f32)>, cone: Option<f32>, spring: Option<(f32, f32, f32)>, dt: f32) -> Option<Pin> {
     let finite = |v: &[f32]| v.iter().all(|x| x.is_finite());
     if !(finite(&j.anchor) && finite(&j.axis) && finite(&j.limit) && finite(&j.local_a) && finite(&j.local_b) && finite(&j.local_axis) && finite(&j.rest)) {
         return None;
@@ -1184,7 +1420,7 @@ pub fn make_pin(bodies: &[Body], a: usize, b: usize, j: &Joint, dt: f32) -> Opti
         }
     }
     let kinv = inv3(k)?;
-    let mut p = Pin { a, b, hinge, local_a, local_b, local_axis, rest, fresh, dt, ra, rb, kinv, u: [0.0, 1.0, 0.0], t1: [1.0, 0.0, 0.0], t2: [0.0, 0.0, 1.0], kang: [[0.0; 2]; 2], ang_ok: false, bias: [0.0; 2], limit: None, theta: 0.0, axis_mass: 0.0, acc_lo: 0.0, acc_hi: 0.0 };
+    let mut p = Pin { a, b, hinge, local_a, local_b, local_axis, rest, fresh, dt, ra, rb, kinv, u: [0.0, 1.0, 0.0], t1: [1.0, 0.0, 0.0], t2: [0.0, 0.0, 1.0], kang: [[0.0; 2]; 2], ang_ok: false, bias: [0.0; 2], limit: None, theta: 0.0, axis_mass: 0.0, acc_lo: 0.0, acc_hi: 0.0, motor: None, acc_motor: 0.0, spring_on: false, spring_gamma: 0.0, spring_bias: 0.0, spring_mass: 0.0, acc_spring: 0.0, cone: None, cone_n: [0.0, 1.0, 0.0], cone_theta: 0.0, cone_mass: 0.0, acc_cone: 0.0, cone_on: false };
     if hinge {
         // the axis seen from body a, and from body b (which has turned as the rest pose says); the two must stay the same line
         let u = unit_or(rotate(ba.axes(), local_axis), [0.0, 1.0, 0.0]);
@@ -1204,25 +1440,62 @@ pub fn make_pin(bodies: &[Body], a: usize, b: usize, j: &Joint, dt: f32) -> Opti
         p.u = u;
         p.t1 = t1;
         p.t2 = t2;
+        let am = dot(u, add(world_inv_i(ba, u), world_inv_i(bb, u)));
+        p.axis_mass = if am > 1.0e-12 { 1.0 / am } else { 0.0 };
         if j.limit[0] < j.limit[1] {
             // (the limits are for the angle of the body relative to its target; `theta` is the other way round)
             p.limit = Some((-j.limit[1], -j.limit[0]));
             p.theta = hinge_angle(ba.q(), bb.q(), rest, local_axis);
-            let am = dot(u, add(world_inv_i(ba, u), world_inv_i(bb, u)));
-            p.axis_mass = if am > 1.0e-12 { 1.0 / am } else { 0.0 };
+        }
+        if let Some((speed, torque)) = motor {
+            if speed.is_finite() && torque.is_finite() && torque > 0.0 {
+                p.motor = Some((-speed, torque * dt));
+            }
+        }
+        if let Some((k, c, target)) = spring {
+            // (`theta` is the angle of `b` relative to `a`, the other way round from the angle the spring is given in)
+            let soft = dt * (c + dt * k);
+            if k.is_finite() && c.is_finite() && target.is_finite() && k >= 0.0 && c >= 0.0 && k + c > 0.0 && soft > 0.0 {
+                let theta = hinge_angle(ba.q(), bb.q(), rest, local_axis);
+                let gamma = 1.0 / soft;
+                let inv_mass = am + gamma;
+                p.spring_on = true;
+                p.spring_gamma = gamma;
+                p.spring_bias = (theta + target) * dt * k * gamma;
+                p.spring_mass = if inv_mass > 1.0e-12 { 1.0 / inv_mass } else { 0.0 };
+            }
+        }
+    } else if let Some(angle) = cone.filter(|a| a.is_finite() && *a > 0.0 && *a < std::f32::consts::PI) {
+        // a ball-and-socket with a swing limit: the axis as body a has it and as body b has it (which has turned as the rest pose says)
+        let ua = unit_or(rotate(ba.axes(), local_axis), [0.0, 1.0, 0.0]);
+        let ub = unit_or(rotate(bb.axes(), rotate(&axes_of(quat_conj(rest)), local_axis)), [0.0, 1.0, 0.0]);
+        let cr = cross(ua, ub);
+        let sn = dot(cr, cr).sqrt();
+        p.cone = Some(angle);
+        if sn > 1.0e-4 {
+            let n = mul(cr, 1.0 / sn);
+            let am = dot(n, add(world_inv_i(ba, n), world_inv_i(bb, n)));
+            p.cone_n = n;
+            p.cone_theta = crate::detmath::atan2(sn as f64, dot(ua, ub) as f64) as f32;
+            p.cone_mass = if am > 1.0e-12 { 1.0 / am } else { 0.0 };
+            p.cone_on = true;
         }
     }
     Some(p)
 }
 
-pub fn solve_pin(bodies: &mut [Body], p: &mut Pin) {
+/// One visit of a ball-and-socket or a hinge. Returns how much it changed the speeds (the speed between its pivot points and the spin across the axis that it
+/// corrected, and what the motor, the spring, the limits and the swing limit added: an impulse over the effective mass it acts on), which `solve_row` has the
+/// counterpart of.
+pub fn solve_pin(bodies: &mut [Body], p: &mut Pin) -> f32 {
     let (ba, bb) = pair_mut(bodies, p.a, p.b);
     // the two pivot points move together
     let vrel = sub(point_vel(bb, p.rb), point_vel(ba, p.ra));
     let imp = mat_vec(&p.kinv, neg(vrel));
     impulse(ba, bb, p.ra, p.rb, imp);
+    let mut off = dot(vrel, vrel).sqrt();
     if !p.hinge {
-        return;
+        return off.max(solve_cone(bodies, p));
     }
     // the two bodies turn about the axis only: no relative spin about the two directions across it
     if p.ang_ok {
@@ -1230,6 +1503,24 @@ pub fn solve_pin(bodies: &mut [Body], p: &mut Pin) {
         let (r1, r2) = (p.bias[0] - dot(wrel, p.t1), p.bias[1] - dot(wrel, p.t2));
         let (l1, l2) = (p.kang[0][0] * r1 + p.kang[0][1] * r2, p.kang[1][0] * r1 + p.kang[1][1] * r2);
         turn(ba, bb, add(mul(p.t1, l1), mul(p.t2, l2)));
+        off = off.max(r1.abs()).max(r2.abs());
+    }
+    if let Some((target, max_impulse)) = p.motor {
+        // the motor: the relative spin about the axis goes towards its target, with the impulse of one tick limited (and, over the rounds, summed)
+        let spin = dot(sub(bb.w(), ba.w()), p.u);
+        let new = (p.acc_motor + (target - spin) * p.axis_mass).clamp(-max_impulse, max_impulse);
+        let l = new - p.acc_motor;
+        p.acc_motor = new;
+        turn(ba, bb, mul(p.u, l));
+        off = off.max(spin_change(l, p.axis_mass));
+    }
+    if p.spring_on {
+        // the spring: a soft constraint on the relative spin about the axis (Box2D's formulation: the softness `gamma` and a bias that pulls the angle in)
+        let spin = dot(sub(bb.w(), ba.w()), p.u);
+        let l = -p.spring_mass * (spin + p.spring_bias + p.spring_gamma * p.acc_spring);
+        p.acc_spring += l;
+        turn(ba, bb, mul(p.u, l));
+        off = off.max(spin_change(l, p.axis_mass));
     }
     if let Some((lo, hi)) = p.limit {
         // the angle may not leave [lo, hi]: a one-sided limit on the relative spin about the axis, which lets the angle close in on
@@ -1242,6 +1533,7 @@ pub fn solve_pin(bodies: &mut [Body], p: &mut Pin) {
         let l = new - p.acc_lo;
         p.acc_lo = new;
         turn(ba, bb, mul(p.u, l));
+        off = off.max(spin_change(l, p.axis_mass));
         let c_hi = hi - p.theta;
         let target = if c_hi >= 0.0 { -c_hi / dt } else { -JOINT_BIAS * c_hi / dt };
         let spin = dot(sub(bb.w(), ba.w()), p.u);
@@ -1249,7 +1541,38 @@ pub fn solve_pin(bodies: &mut [Body], p: &mut Pin) {
         let l = new - p.acc_hi;
         p.acc_hi = new;
         turn(ba, bb, mul(p.u, -l));
+        off = off.max(spin_change(l, p.axis_mass));
     }
+    off
+}
+
+/// How much an angular impulse `l` changes the spin about an axis whose effective mass is `mass` (0: no change that counts).
+#[inline]
+fn spin_change(l: f32, mass: f32) -> f32 {
+    if mass > 0.0 {
+        l.abs() / mass
+    } else {
+        0.0
+    }
+}
+
+/// The swing limit of a ball-and-socket (see `Pin::cone`), called by `solve_pin` for a joint that is not a hinge.
+fn solve_cone(bodies: &mut [Body], p: &mut Pin) -> f32 {
+    let Some(angle) = p.cone else { return 0.0 };
+    if !p.cone_on {
+        return 0.0;
+    }
+    let (ba, bb) = pair_mut(bodies, p.a, p.b);
+    // the angle between the two axes grows at the rate of the relative spin about `cone_n`: it may close in on the limit and no further
+    // (and is pushed back when it is already past)
+    let c = angle - p.cone_theta;
+    let target = if c >= 0.0 { c / p.dt } else { JOINT_BIAS * c / p.dt };
+    let spin = dot(sub(bb.w(), ba.w()), p.cone_n);
+    let new = (p.acc_cone + (spin - target) * p.cone_mass).max(0.0);
+    let l = new - p.acc_cone;
+    p.acc_cone = new;
+    turn(ba, bb, mul(p.cone_n, -l));
+    spin_change(l, p.cone_mass)
 }
 
 /// Pull the two pivot points together (once per tick, after the velocities are solved, like the contacts).

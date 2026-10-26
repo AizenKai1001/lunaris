@@ -282,3 +282,342 @@ fn agents_with_avoidance_pass_each_other_and_without_it_walk_through() {
     assert!(closest > 0.7, "with avoidance they keep apart: {closest}");
     assert_eq!((a, b), (2, 2), "and both get there");
 }
+
+#[test]
+fn a_target_with_no_way_is_not_searched_for_over_the_whole_of_a_world_wider_than_300_m() {
+    // a streamed city: a wall 994 m long with a gap at each end, a start and a goal on its two sides 10 m apart. The first search (the box round the two points) finds no way; the second look over the whole world is only for a small level
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-0.5,0],"scale":[1000,1,1000]},"Collider":{"shape":1}}"#);
+    wall(&mut s, 2, 5.0, -497.0, 497.0);
+    let r = path(&mut s, [0.0, 0.0, 0.0], [10.0, 0.0, 0.0]);
+    assert!(matches!(r, Err(NavError::NoPath(_))), "no way within the box, and a world of a kilometre is not searched whole: {r:?}");
+    // the same wall in a world of 100 m (the existing behaviour for a small level): the way round the end is found by the second look
+    let mut t = floor();
+    wall(&mut t, 2, 5.0, -47.0, 47.0);
+    let r = path(&mut t, [0.0, 0.0, 0.0], [10.0, 0.0, 0.0]).expect("a small world is searched whole");
+    assert!(r.length > 90.0, "round the end of the wall: {}", r.length);
+}
+
+// ------------------------------------------------------------------------------------------------------------- limits for crowds
+
+/// `n` walkers in a row that all ask for a path in the same tick.
+fn crowd(s: &mut Sim, first: u64, n: u64) {
+    for i in 0..n {
+        spawn(s, first + i, &format!(r#"{{"Transform":{{"pos":[{},0,0]}},"CharacterBody":{{}},"NavAgent":{{"target":[0,0,20],"active":true,"speed":4}}}}"#, i as f32 * 2.0 - 4.0));
+    }
+}
+
+fn planned(s: &Sim, uid: u64) -> bool {
+    s.nav.paths.contains_key(&uid)
+}
+
+fn who_has_a_path(s: &Sim, uids: &[u64]) -> Vec<u64> {
+    uids.iter().copied().filter(|u| planned(s, *u)).collect()
+}
+
+#[test]
+fn nav_limits_ration_the_searches_to_a_few_a_tick_and_the_one_that_asked_first_goes_first() {
+    // no limits: everybody that asks has a path after one tick
+    let mut free = floor();
+    crowd(&mut free, 100, 5);
+    free.step();
+    assert_eq!(who_has_a_path(&free, &[100, 101, 102, 103, 104]).len(), 5);
+    // two a tick: the others keep asking (their request stays on) and are served in the next ticks
+    let mut s = floor();
+    spawn(&mut s, 50, r#"{"NavLimits":{"searches_per_tick":2,"min_replan":0}}"#);
+    crowd(&mut s, 100, 5);
+    s.step();
+    assert_eq!(who_has_a_path(&s, &[100, 101, 102, 103, 104]), [100, 101]);
+    assert!(agent(&s, 102).active && agent(&s, 102).status == 0, "still waiting for its turn");
+    s.step();
+    assert_eq!(who_has_a_path(&s, &[100, 101, 102, 103, 104]), [100, 101, 102, 103]);
+    s.step();
+    assert_eq!(who_has_a_path(&s, &[100, 101, 102, 103, 104]).len(), 5);
+    assert!(!agent(&s, 104).active, "the request is answered");
+    // first come, first served: with one search a tick, an agent with a LOW uid that asks late waits behind the ones that asked before it
+    let mut q = floor();
+    spawn(&mut q, 50, r#"{"NavLimits":{"searches_per_tick":1,"min_replan":0}}"#);
+    crowd(&mut q, 100, 4);
+    q.step();
+    assert_eq!(who_has_a_path(&q, &[99, 100, 101, 102, 103]), [100]);
+    spawn(&mut q, 99, r#"{"Transform":{"pos":[0,0,3]},"CharacterBody":{},"NavAgent":{"target":[0,0,20],"active":true,"speed":4}}"#);
+    for expect in [vec![99u64, 100, 101], vec![99, 100, 101, 102], vec![99, 100, 101, 102, 103]] {
+        q.step();
+        let got = who_has_a_path(&q, &[99, 100, 101, 102, 103]);
+        // 99 asked last: it is served after the four that asked before it
+        assert!(!got.contains(&99) || got.len() == 5, "agent 99 was served before the agents that asked earlier: {got:?} (wanted something like {expect:?})");
+    }
+    q.step();
+    assert_eq!(who_has_a_path(&q, &[99, 100, 101, 102, 103]).len(), 5, "everybody was served in the end");
+}
+
+#[test]
+fn nav_limits_keep_an_agent_that_asks_every_tick_to_one_search_in_the_least_time() {
+    let count_plans = |limits: &str| -> usize {
+        let mut s = floor();
+        if !limits.is_empty() {
+            spawn(&mut s, 50, limits);
+        }
+        walker(&mut s, "[0,0,40]");
+        let e = s.world.entity(100).unwrap();
+        let mut plans = 0;
+        for _ in 0..90 {
+            s.world.get_mut::<NavAgent>(e).unwrap().active = true; // a caller that asks again at every tick
+            s.step();
+            if !agent(&s, 100).active {
+                plans += 1;
+            }
+        }
+        plans
+    };
+    assert_eq!(count_plans(""), 90, "without limits every request is a search");
+    // half a second at 60 ticks a second: a search at tick 1, 31, 61 (and the 91st is not reached)
+    let limited = count_plans(r#"{"NavLimits":{"searches_per_tick":0,"min_replan":0.5}}"#);
+    assert!((3..=4).contains(&limited), "{limited} searches in 1.5 s with a least time of 0.5 s");
+}
+
+#[test]
+fn a_search_limited_in_distance_walks_a_far_target_in_parts_and_still_arrives() {
+    let mut s = floor();
+    spawn(&mut s, 50, r#"{"NavLimits":{"searches_per_tick":2,"min_replan":0,"max_distance":25}}"#);
+    // 90 m to go on a floor 100 m long
+    spawn(&mut s, 100, r#"{"Transform":{"pos":[0,0,-45]},"CharacterBody":{},"NavAgent":{"target":[0,0,45],"active":true,"speed":6}}"#);
+    s.step();
+    let first = s.nav.paths.get(&100).expect("a path").points.last().copied().unwrap();
+    assert!((first[2] + 45.0 - 25.0).abs() < 1.5 && first[2] < -19.0, "the first search ends about 25 m on, not at the target: {first:?}");
+    assert_eq!(agent(&s, 100).status, 1);
+    let mut arrived = false;
+    for _ in 0..2400 {
+        s.step();
+        if agent(&s, 100).status == 2 {
+            arrived = true;
+            break;
+        }
+    }
+    let p = pos(&s, 100);
+    assert!(arrived, "never arrived: {p:?}, {:?}", agent(&s, 100));
+    assert!(((p[0]).powi(2) + (p[2] - 45.0).powi(2)).sqrt() < 0.6, "arrived at {p:?}");
+    // the same journey without a limit is one search
+    let mut free = floor();
+    spawn(&mut free, 100, r#"{"Transform":{"pos":[0,0,-45]},"CharacterBody":{},"NavAgent":{"target":[0,0,45],"active":true,"speed":6}}"#);
+    free.step();
+    assert!(free.nav.paths.get(&100).unwrap().points.last().unwrap()[2] > 40.0);
+}
+
+#[test]
+fn limited_navigation_is_deterministic_and_comes_back_from_a_copy() {
+    let build = || {
+        let mut s = floor();
+        spawn(&mut s, 50, r#"{"NavLimits":{"searches_per_tick":2,"min_replan":0.2,"max_distance":30}}"#);
+        wall(&mut s, 60, 5.0, -5.0, 5.0);
+        crowd(&mut s, 100, 7);
+        s
+    };
+    let (mut a, mut b) = (build(), build());
+    a.step_n(120);
+    b.step_n(40);
+    let mut c = b.clone();
+    b.step_n(80);
+    c.step_n(80);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert_eq!(b.state_hash(), c.state_hash(), "a copy of the simulation carries the waiting list");
+}
+
+// ------------------------------------------------------------------------------------------------------------- the grid is worked out lazily: the same paths as a grid cut whole
+
+/// A building of triangles: four walls and a roof, every face cut into `n` by `n` squares.
+fn shell_mesh(side: f32, height: f32, n: usize) -> crate::meshcol::CollisionMesh {
+    let mut verts: Vec<[f32; 3]> = Vec::new();
+    let mut tris: Vec<[u32; 3]> = Vec::new();
+    let mut face = |o: [f32; 3], u: [f32; 3], v: [f32; 3]| {
+        let base = verts.len() as u32;
+        for j in 0..=n {
+            for i in 0..=n {
+                let (a, b) = (i as f32 / n as f32, j as f32 / n as f32);
+                verts.push([o[0] + u[0] * a + v[0] * b, o[1] + u[1] * a + v[1] * b, o[2] + u[2] * a + v[2] * b]);
+            }
+        }
+        let w = n as u32 + 1;
+        for j in 0..n as u32 {
+            for i in 0..n as u32 {
+                let p = base + j * w + i;
+                tris.push([p, p + 1, p + w]);
+                tris.push([p + 1, p + w + 1, p + w]);
+            }
+        }
+    };
+    face([0.0, 0.0, 0.0], [side, 0.0, 0.0], [0.0, height, 0.0]);
+    face([0.0, 0.0, side], [side, 0.0, 0.0], [0.0, height, 0.0]);
+    face([0.0, 0.0, 0.0], [0.0, 0.0, side], [0.0, height, 0.0]);
+    face([side, 0.0, 0.0], [0.0, 0.0, side], [0.0, height, 0.0]);
+    face([0.0, height, 0.0], [side, 0.0, 0.0], [0.0, 0.0, side]);
+    crate::meshcol::CollisionMesh::new(verts, tris).unwrap()
+}
+
+/// A scene with every kind of thing a search meets: a floor, walls and a stair of boxes, a raised platform with a link to the ground, a spherical obstacle, and a town of
+/// 16 triangle shells; and 150 searches over it by agents of three sizes. Everything about every path, bit for bit, is hashed.
+fn path_fingerprint() -> u64 {
+    path_fingerprint_keeping(false)
+}
+
+/// The same, with the agents' searches keeping their cells (`NavParams.keep`) or not.
+fn path_fingerprint_keeping(keep: bool) -> u64 {
+    let mut s = floor();
+    wall(&mut s, 2, 10.0, -20.0, 8.0);
+    wall(&mut s, 3, -15.0, -8.0, 30.0);
+    for i in 0..5 {
+        spawn(&mut s, 10 + i, &format!(r#"{{"Transform":{{"pos":[30,{},{}],"scale":[3,{},2]}},"Collider":{{"shape":1}}}}"#, 0.2 * (i + 1) as f32 - 0.5 + 0.1, -4.0 + i as f32 * 2.0, 0.4 * (i + 1) as f32));
+    }
+    spawn(&mut s, 20, r#"{"Transform":{"pos":[-30,1.0,-30],"scale":[8,0.5,8]},"Collider":{"shape":1}}"#);
+    spawn(&mut s, 21, r#"{"Transform":{"pos":[-20,0,-30]},"NavLink":{"from":[-3,0,0],"to":[-8,1.25,0],"two_way":true}}"#);
+    spawn(&mut s, 22, r#"{"Transform":{"pos":[0,1,20]},"Collider":{"shape":0,"size":[4,4,4]}}"#);
+    std::sync::Arc::make_mut(&mut s.meshes).by_name.insert("shell".to_string(), std::sync::Arc::new(shell_mesh(10.0, 8.0, 6)));
+    for gz in 0..4 {
+        for gx in 0..4 {
+            spawn(&mut s, 100 + gz * 4 + gx, &format!(r#"{{"Transform":{{"pos":[{},0,{}]}},"MeshCollider":{{"mesh":"shell"}}}}"#, -45.0 + gx as f32 * 22.0, -45.0 + gz as f32 * 22.0));
+        }
+    }
+    let mut state = 0x2545_F491_4F6C_DD1Du64;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 40) as f32 / (1u64 << 24) as f32
+    };
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    let mut eat = |v: u64| {
+        h ^= v;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    };
+    for k in 0..150 {
+        let (radius, height, step) = [(0.4, 1.8, 0.4), (0.8, 2.2, 0.5), (0.25, 1.0, 0.3)][k % 3];
+        let params = NavParams { radius, height, step_height: step, keep, ..NavParams::default() };
+        let from = [next() * 90.0 - 45.0, 0.0, next() * 90.0 - 45.0];
+        let to = [next() * 90.0 - 45.0, 0.0, next() * 90.0 - 45.0];
+        match nav::find_path_with(&mut s.world, from, to, params, &s.heightfields, &s.meshes) {
+            Ok(r) => {
+                eat(1);
+                eat(r.points.len() as u64);
+                for p in &r.points {
+                    for v in p {
+                        eat(v.to_bits() as u64);
+                    }
+                }
+                for j in &r.jumps {
+                    eat(j.map(|a| a[0].to_bits() as u64 ^ (a[1].to_bits() as u64) << 32).unwrap_or(7));
+                }
+                eat(r.length.to_bits() as u64);
+                eat(r.exact as u64);
+                eat(r.searched as u64);
+                eat(r.cell.to_bits() as u64);
+            }
+            Err(e) => {
+                eat(2);
+                for b in e.code().bytes() {
+                    eat(b as u64);
+                }
+            }
+        }
+    }
+    h
+}
+
+#[test]
+fn cells_kept_between_searches_give_exactly_the_paths_of_cells_worked_out_fresh() {
+    nav::keep_cells(false);
+    let fresh = path_fingerprint_keeping(true);
+    assert_eq!(nav::kept_cells(), 0, "nothing is kept while it is off");
+    nav::keep_cells(true);
+    let first = path_fingerprint_keeping(true);
+    assert!(nav::kept_cells() > 1000, "the searches left their cells behind: {}", nav::kept_cells());
+    // (the second run finds most of its cells made already)
+    let second = path_fingerprint_keeping(true);
+    // and a search that does not ask for it keeps nothing and leaves the corner of its box as the corner of its window
+    nav::keep_cells(true);
+    let before = nav::kept_cells();
+    let _ = path_fingerprint_keeping(false);
+    assert_eq!(nav::kept_cells(), before, "a search without `keep` leaves no cells");
+    assert_eq!(fresh, first, "kept or fresh, the same paths");
+    assert_eq!(first, second, "and the same again over the cells that were kept");
+}
+
+#[test]
+fn a_wall_built_after_a_search_is_not_walked_through_by_the_next_one() {
+    nav::keep_cells(true);
+    let mut s = floor();
+    let kept = NavParams { keep: true, ..NavParams::default() };
+    let path = |s: &mut Sim, from: [f32; 3], to: [f32; 3]| find_path(&mut s.world, from, to, kept);
+    let before = path(&mut s, [0.0, 0.0, 0.0], [20.0, 0.0, 0.0]).unwrap();
+    assert!(before.length < 20.5, "straight: {}", before.length);
+    let kept = nav::kept_cells();
+    assert!(kept > 10, "{kept}");
+    // a wall across the way, built after the cells were kept
+    wall(&mut s, 2, 10.0, -6.0, 6.0);
+    let after = path(&mut s, [0.0, 0.0, 0.0], [20.0, 0.0, 0.0]).unwrap();
+    assert!(after.length > 24.0, "round the wall, not through it: {}", after.length);
+    assert!(after.points.iter().all(|p| !(p[0] > 9.4 && p[0] < 10.6 && p[2].abs() < 6.0)), "{:?}", after.points);
+    // and taking it away again gives the straight way back
+    s.apply(&Command::Despawn { uid: 2 }).unwrap();
+    let gone = path(&mut s, [0.0, 0.0, 0.0], [20.0, 0.0, 0.0]).unwrap();
+    assert!(gone.length < 20.5, "straight again: {}", gone.length);
+}
+
+#[test]
+fn the_lazy_grid_gives_the_paths_of_a_grid_cut_whole() {
+    let fingerprint = path_fingerprint();
+    eprintln!("nav path fingerprint: {fingerprint:016x}");
+    // recorded 2026-10-25 from the grid that was cut whole over the window (before cells were worked out lazily): every path, jump, length, search count and error is the same
+    const EXPECTED: u64 = 0x14d88eabbaded9d4;
+    if EXPECTED != 0 {
+        assert_eq!(fingerprint, EXPECTED, "the paths over the fixed scene changed");
+    }
+}
+
+/// A closed square room of walls 9 m a side round the place (x, 0, 0), a target that no agent can reach.
+fn closed_room(s: &mut Sim, x: f32) {
+    spawn(s, 20, &format!(r#"{{"Transform":{{"pos":[{x},1.5,5],"scale":[10,3,1]}},"Collider":{{"shape":1}}}}"#));
+    spawn(s, 21, &format!(r#"{{"Transform":{{"pos":[{x},1.5,-5],"scale":[10,3,1]}},"Collider":{{"shape":1}}}}"#));
+    wall(s, 22, x - 5.0, -5.5, 5.5);
+    wall(s, 23, x + 5.0, -5.5, 5.5);
+}
+
+#[test]
+fn an_agent_whose_search_found_no_way_waits_before_it_asks_again() {
+    let plans = |limits: &str| -> usize {
+        let mut s = floor();
+        closed_room(&mut s, 20.0);
+        spawn(&mut s, 50, limits);
+        walker(&mut s, "[20,0,0]");
+        let e = s.world.entity(100).unwrap();
+        let mut plans = 0;
+        for _ in 0..60 {
+            s.world.get_mut::<NavAgent>(e).unwrap().active = true; // the autopilot of a chaser asks again at every tick
+            s.step();
+            if !agent(&s, 100).active {
+                plans += 1;
+            }
+        }
+        plans
+    };
+    let every = plans(r#"{"NavLimits":{"searches_per_tick":0,"min_replan":0,"blocked_wait":0}}"#);
+    assert!(every >= 55, "with no wait every request is a (failing) search: {every}");
+    let waiting = plans(r#"{"NavLimits":{"searches_per_tick":0,"min_replan":0,"blocked_wait":2.0}}"#);
+    assert_eq!(waiting, 1, "one failing search, then two seconds of waiting (its request stays on): {waiting}");
+}
+
+#[test]
+fn a_search_may_be_capped_so_that_a_failure_costs_a_few_cells() {
+    let mut s = floor();
+    closed_room(&mut s, 20.0);
+    let mut msg = |cap: usize| match nav::find_path_capped(&mut s.world, [0.0, 0.0, 0.0], [20.0, 0.0, 0.0], NavParams::default(), &s.heightfields, &s.meshes, None, cap) {
+        Err(NavError::NoPath(m)) => m,
+        other => panic!("a closed room has no way in: {other:?}"),
+    };
+    let whole = msg(0);
+    assert!(whole.contains("searched") && !whole.contains("gave up"), "{whole}");
+    let capped = msg(100);
+    assert!(capped.contains("gave up after 100 cells"), "{capped}");
+    // a way that exists and needs fewer cells than the cap is found as ever
+    let r = nav::find_path_capped(&mut s.world, [0.0, 0.0, 0.0], [10.0, 0.0, 0.0], NavParams::default(), &s.heightfields, &s.meshes, None, 2000);
+    assert!(r.is_ok(), "{r:?}");
+}

@@ -1,22 +1,45 @@
 //! The Project panel, in Unity's two-column layout: the folders of the workspace on the left, what is in the chosen folder as tiles on the right.
 use crate::icons::{self, Icon};
-use crate::state::{Studio, Template};
+use crate::state::Studio;
 use crate::theme;
+use crate::thumbs::Thumbs;
 use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, Sense, Stroke, StrokeKind, Vec2};
 use lunaris_json::Json;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
+/// What is being dragged out of the Project panel (the egui drag-and-drop payload): the file's path in the workspace and its kind (`model`, `texture`, `sound`). The scene view takes it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AssetDrag {
+    pub path: String,
+    pub kind: String,
+}
+
+impl AssetDrag {
+    /// The file's name without its folders.
+    pub fn name(&self) -> &str {
+        self.path.rsplit('/').next().unwrap_or(&self.path)
+    }
+}
+
 #[derive(Default)]
 pub struct ProjectUi {
     folder: String,
     filter: String,
+    /// Show only files of this kind (`scene`, `model`, `texture`, `sound`), from every folder; empty: all.
+    kind_filter: String,
     loaded: Option<Instant>,
     files: Vec<(String, String, u64)>,
     pub selected: Option<String>,
     pub open_scene: Option<String>,
     closed: HashSet<String>,
+    thumbs: Option<Thumbs>,
+    /// Where each tile was drawn last frame (for tests).
+    tile_rects: Vec<(String, egui::Rect)>,
 }
+
+/// The kinds of file the Project panel can be narrowed to (the `files` tool's kinds), with what the menu says.
+const KINDS: [(&str, &str); 5] = [("", "All types"), ("scene", "Scenes"), ("model", "Models"), ("texture", "Pictures"), ("sound", "Sounds")];
 
 fn icon_of(kind: &str) -> Icon {
     match kind {
@@ -41,6 +64,28 @@ fn human(b: u64) -> String {
 impl ProjectUi {
     pub fn reload(&mut self) {
         self.loaded = None;
+    }
+
+    /// How many picture thumbnails are ready (for tests).
+    pub fn thumbs_ready(&self) -> usize {
+        self.thumbs.as_ref().map_or(0, |t| t.ready())
+    }
+
+    /// Open a folder of the workspace (for tests).
+    #[cfg(test)]
+    pub fn set_folder(&mut self, folder: &str) {
+        self.folder = folder.to_string();
+    }
+
+    /// Narrow the panel to one kind of file (for tests).
+    #[cfg(test)]
+    pub fn set_kind_filter(&mut self, kind: &str) {
+        self.kind_filter = kind.to_string();
+    }
+
+    /// The middle of the tile of the file at `path`, as drawn last frame (for tests).
+    pub fn tile_center(&self, path: &str) -> Option<egui::Pos2> {
+        self.tile_rects.iter().find(|(p, _)| p == path).map(|(_, r)| r.center())
     }
 
     fn load(&mut self, studio: &mut Studio) {
@@ -83,6 +128,10 @@ impl ProjectUi {
 
     pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio) {
         self.load(studio);
+        let ctx = ui.ctx().clone();
+        if self.thumbs.is_none() {
+            self.thumbs = Some(Thumbs::new(studio.opts.root.clone()));
+        }
         let folders = self.folders();
         let tree_w = 190.0;
         ui.horizontal_top(|ui| {
@@ -159,19 +208,28 @@ impl ProjectUi {
                         if ui.small_button("Refresh").clicked() {
                             self.loaded = None;
                         }
-                        ui.add(egui::TextEdit::singleline(&mut self.filter).hint_text("Search").desired_width(160.0));
+                        crate::chrome::search_box(ui, &mut self.filter, "Search", 160.0);
+                        let shown = KINDS.iter().find(|(k, _)| *k == self.kind_filter).map_or("All types", |(_, l)| *l);
+                        egui::ComboBox::from_id_salt("project-kind").selected_text(shown).width(96.0).show_ui(ui, |ui| {
+                            for (k, label) in KINDS {
+                                ui.selectable_value(&mut self.kind_filter, k.to_string(), label);
+                            }
+                        });
                     });
                 });
                 ui.add_space(2.0);
                 let filter = self.filter.to_lowercase();
+                // a search or a type looks in every folder, and shows files only
+                let searching = !filter.is_empty() || !self.kind_filter.is_empty();
                 let mut open: Option<String> = None;
                 let mut go: Option<String> = None;
+                let mut count = 0usize;
                 egui::ScrollArea::vertical().id_salt("project-files").auto_shrink([false, false]).show(ui, |ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                     ui.horizontal_wrapped(|ui| {
                         // sub-folders first
                         let mut items: Vec<(String, String, String, u64)> = Vec::new(); // (display, path, kind, bytes)
-                        if filter.is_empty() {
+                        if !searching {
                             for f in &folders {
                                 let parent = f.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
                                 if !f.is_empty() && parent == self.folder {
@@ -182,17 +240,24 @@ impl ProjectUi {
                         for (p, kind, bytes) in &self.files {
                             let dir = p.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
                             let name = p.rsplit('/').next().unwrap_or(p);
-                            if filter.is_empty() {
+                            if !searching {
                                 if dir != self.folder {
                                     continue;
                                 }
-                            } else if !p.to_lowercase().contains(&filter) {
+                            } else if (!filter.is_empty() && !p.to_lowercase().contains(&filter)) || (!self.kind_filter.is_empty() && *kind != self.kind_filter) {
                                 continue;
                             }
                             items.push((name.to_string(), p.clone(), kind.clone(), *bytes));
                         }
+                        self.tile_rects.clear();
+                        count = items.len();
                         for (name, path, kind, bytes) in items {
-                            let (rect, resp) = ui.allocate_exact_size(Vec2::new(78.0, 86.0), Sense::click());
+                            let (rect, resp) = ui.allocate_exact_size(Vec2::new(78.0, 86.0), Sense::click_and_drag());
+                            self.tile_rects.push((path.clone(), rect));
+                            // a model, a picture or a sound can be dragged into the scene view
+                            if resp.drag_started() && matches!(kind.as_str(), "model" | "texture" | "sound") {
+                                egui::DragAndDrop::set_payload(&ctx, AssetDrag { path: path.clone(), kind: kind.clone() });
+                            }
                             let sel = self.selected.as_deref() == Some(path.as_str());
                             if sel {
                                 ui.painter().rect_filled(rect, CornerRadius::same(2), theme::SELECT);
@@ -201,13 +266,32 @@ impl ProjectUi {
                             }
                             let tile = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.min.y + 32.0), Vec2::splat(54.0));
                             ui.painter().rect_filled(tile, CornerRadius::same(2), if sel { Color32::from_rgb(34, 70, 104) } else { theme::FIELD });
-                            let icon = if kind == "folder" { Icon::Folder } else { icon_of(&kind) };
-                            icons::draw(ui.painter(), tile.shrink(10.0), icon, icon.tint());
+                            // the colour bar under a thumbnail says what kind of asset it is (Unreal draws one under every asset)
+                            if let Some(bar) = match kind.as_str() {
+                                "model" => Some(Color32::from_rgb(0, 184, 204)),
+                                "texture" => Some(Color32::from_rgb(209, 66, 66)),
+                                "sound" => Some(Color32::from_rgb(232, 157, 45)),
+                                "scene" => Some(Color32::from_rgb(70, 130, 230)),
+                                _ => None,
+                            } {
+                                ui.painter().rect_filled(egui::Rect::from_min_max(egui::pos2(tile.min.x, tile.max.y - 3.0), tile.max), CornerRadius::ZERO, bar);
+                            }
+                            // a picture shows itself, a model a small picture of itself and a sound its waveform (fitted into the tile), everything else its icon
+                            let thumb = if kind == "texture" || kind == "model" || kind == "sound" { self.thumbs.as_mut().and_then(|t| t.get(&ctx, &path, bytes)).map(|t| (t.id(), t.size_vec2())) } else { None };
+                            if let Some((id, size)) = thumb {
+                                let inner = tile.shrink(3.0);
+                                let k = (inner.width() / size.x.max(1.0)).min(inner.height() / size.y.max(1.0));
+                                let fitted = egui::Rect::from_center_size(inner.center(), size * k);
+                                ui.painter().image(id, fitted, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+                            } else {
+                                let icon = if kind == "folder" { Icon::Folder } else { icon_of(&kind) };
+                                icons::draw(ui.painter(), tile.shrink(10.0), icon, icon.tint());
+                            }
                             let galley = ui.painter().layout(name.clone(), FontId::proportional(12.0), if sel { theme::TEXT_BRIGHT } else { theme::TEXT }, 74.0);
                             let h = galley.size().y.min(30.0);
                             let at = egui::pos2(rect.center().x - galley.size().x.min(74.0) / 2.0, rect.min.y + 62.0);
                             ui.painter().with_clip_rect(egui::Rect::from_min_size(egui::pos2(rect.min.x, rect.min.y + 60.0), Vec2::new(78.0, h + 2.0))).galley(at, galley, theme::TEXT);
-                            if !filter.is_empty() {
+                            if searching {
                                 resp.clone().on_hover_text(&path);
                             } else if bytes > 0 {
                                 resp.clone().on_hover_text(format!("{path}\n{}", human(bytes)));
@@ -228,15 +312,15 @@ impl ProjectUi {
                                     ui.close();
                                 }
                                 if kind == "model" && ui.button("Add to the scene").clicked() {
-                                    if let Some(uid) = studio.spawn_template(Template::Empty, [0.0, 0.0, 0.0]) {
-                                        let _ = studio.try_call("add_component", Json::obj([("uid", Json::from(uid as i64)), ("component", Json::str("MeshRenderer")), ("value", Json::obj([("mesh", Json::str(path.clone()))]))]));
-                                    }
+                                    studio.add_model(&path, [0.0, 0.0, 0.0]);
+                                    ui.close();
+                                }
+                                if kind == "model" && ui.button("Paint with this model").clicked() {
+                                    studio.brush = Some(crate::paint::Brush::new(crate::paint::BrushItem::Model(path.clone())));
                                     ui.close();
                                 }
                                 if kind == "sound" && ui.button("Add as an Audio Source").clicked() {
-                                    if let Some(uid) = studio.spawn_template(Template::AudioSource, [0.0, 0.0, 0.0]) {
-                                        studio.set(uid, "AudioSource", Json::obj([("file", Json::str(path.clone())), ("voice", Json::str(""))]), None);
-                                    }
+                                    studio.add_sound(&path, [0.0, 0.0, 0.0]);
                                     ui.close();
                                 }
                                 if kind == "texture" && studio.selection.is_some() && ui.button("Use on the selected mesh").clicked() {
@@ -249,6 +333,8 @@ impl ProjectUi {
                         }
                     });
                 });
+                // the item count, bottom left (Unreal: "67 items")
+                ui.painter().text(ui.max_rect().left_bottom() + Vec2::new(8.0, -4.0), Align2::LEFT_BOTTOM, format!("{count} items"), FontId::proportional(11.5), theme::TEXT_DIM);
                 if let Some(p) = go {
                     self.folder = p;
                 }
@@ -257,6 +343,10 @@ impl ProjectUi {
                 }
             });
         });
+        // what is being dragged hangs at the pointer
+        if let Some(a) = egui::DragAndDrop::payload::<AssetDrag>(&ctx) {
+            crate::chrome::drag_chip(&ctx, a.name());
+        }
         let _ = StrokeKind::Inside;
     }
 }

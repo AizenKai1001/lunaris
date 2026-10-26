@@ -34,7 +34,8 @@ impl Engine {
         stages.sort_by(|x, y| y.1.total_ms.total_cmp(&x.1.total_ms).then(x.0.cmp(y.0)));
         let rows: Vec<Json> = stages
             .iter()
-            .take(40)
+            // every stage that ran (about sixty with the gameplay blocks): cutting the list at 40 dropped the quiet stages by the luck of the timings, and the quiet ones are what a person is looking for when something is not running
+            .take(120)
             .map(|(name, s)| {
                 Json::obj([
                     ("stage", Json::str((*name).clone())),

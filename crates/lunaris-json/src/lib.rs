@@ -178,8 +178,40 @@ impl From<f64> for Json {
 }
 impl From<f32> for Json {
     fn from(v: f32) -> Self {
-        Json::Float(v as f64)
+        Json::Float(f32_value(v))
     }
+}
+
+/// The number to put in a `Json::Float` for the `f32` `x`: the `f64` nearest to the **shortest decimal text that reads back as `x`**. `0.1f32` is `0.1` (printed "0.1"), not the
+/// widened `0.10000000149011612` that `x as f64` gives, which is what a scene file, a tool's answer and a person reading either would otherwise see for every position and colour.
+/// Nothing is lost: the reader turns a number into an `f32` by `as f32` on the `f64` it parsed, and this checks that this gives `x` again before it answers (it falls back to the widened
+/// value, which always does, when no short text does). Not a number or infinite: unchanged.
+pub fn f32_value(x: f32) -> f64 {
+    let wide = x as f64;
+    if !x.is_finite() || x == 0.0 {
+        return wide;
+    }
+    // a few decimals are enough for almost everything a scene holds: try 0, 1, 2, ... places (m and 10^k are exact, so `m / 10^k` is the f64 nearest to the decimal text)
+    const POW10: [f64; 10] = [1.0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9];
+    let a = wide.abs();
+    if (1e-4..1e7).contains(&a) {
+        for p in POW10 {
+            let m = (wide * p).round();
+            if m.abs() < 9.0e15 {
+                let y = m / p;
+                if y as f32 == x {
+                    return y;
+                }
+            }
+        }
+    }
+    // very small, very large, or more than nine decimals: Rust's shortest text for the f32, read back as an f64
+    if let Ok(y) = format!("{x:e}").parse::<f64>() {
+        if y as f32 == x {
+            return y;
+        }
+    }
+    wide
 }
 impl From<&str> for Json {
     fn from(v: &str) -> Self {
@@ -695,6 +727,48 @@ fn write_string(out: &mut String, s: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_f32_is_written_as_the_shortest_text_that_reads_back_as_the_same_f32() {
+        // the numbers people type come out as they were typed
+        for (x, text) in [(0.1f32, "0.1"), (0.25, "0.25"), (3.5, "3.5"), (12.375, "12.375"), (-0.001, "-0.001"), (123.456, "123.456"), (1.0, "1"), (100.0, "100"), (0.3, "0.3"), (1e-10, "0.0000000001"), (2.5e8, "250000000")] {
+            let j = Json::from(x);
+            assert_eq!(j.to_string_compact().unwrap(), text, "{x}");
+            assert_eq!(parse(text).unwrap().as_f64().unwrap() as f32, x);
+        }
+        // and the widened value was the long one
+        assert_eq!(Json::Float(0.1f32 as f64).to_string_compact().unwrap(), "0.10000000149011612");
+        // exactly the same f32 comes back for any bit pattern: a few million of them, written, parsed and narrowed again
+        let mut s = 0x9E37_79B9_7F4A_7C15u64;
+        let mut shorter = 0usize;
+        let mut total = 0usize;
+        for i in 0..3_000_000u32 {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            // a third of the numbers are anywhere in the f32 range, the rest are what a scene holds (a few digits, a modest size)
+            let x = match i % 3 {
+                0 => f32::from_bits((s >> 32) as u32),
+                1 => ((s >> 20) as i32 % 2_000_000) as f32 / 1000.0,
+                _ => ((s >> 11) as f64 / (1u64 << 53) as f64 * 200.0 - 100.0) as f32,
+            };
+            if !x.is_finite() {
+                continue;
+            }
+            let text = Json::from(x).to_string_compact().unwrap();
+            let back = parse(&text).unwrap().as_f64().unwrap() as f32;
+            assert_eq!(back.to_bits(), x.to_bits(), "{x:e} written as {text}");
+            total += 1;
+            if text.len() < Json::Float(x as f64).to_string_compact().unwrap().len() {
+                shorter += 1;
+            }
+        }
+        assert!(shorter * 10 > total * 6, "most numbers are shorter: {shorter} of {total}");
+        // not a number and infinity stay as they are
+        assert!(f32_value(f32::NAN).is_nan());
+        assert_eq!(f32_value(f32::INFINITY), f64::INFINITY);
+        assert_eq!(f32_value(-0.0).to_bits(), (-0.0f64).to_bits());
+    }
 
     #[test]
     fn parses_scalars_and_containers() {

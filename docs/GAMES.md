@@ -106,6 +106,36 @@ Parts of it that any 3D game can copy:
 - **Interface.** A `UiScale` keeps it 16:9; the HUD, the compass (names pinned to the camera's yaw), the minimap (a `CameraView` of the whole island drawn once), the quest log, a `Dialogue` with Maren, the pause menu and the settings (a `UiSlider` for the mouse and for `bus.music.volume` / `bus.sfx.volume`, a button that cycles the `LanguageList`), English and German in `examples/caldera/lang/`.
 - **Tests.** Twelve playtests (`examples/tests/caldera_*.test.json`, all replay to the same hash): title to island; a bot that follows the engine's own `path` over the terrain to a shard; combat; night; swimming; the orbit camera against the beacon tower; death; saving and Continue; the boss; the win; talking; pause and settings.
 
+## Hands-off play: a window somebody else plays
+
+`lunaris play scene.json --hands-off --control run.txt --pos 1920,100` opens a window that a program plays: nothing the keyboard, mouse or pads of the machine do reaches the game (the pointer is never hidden or held, Esc does not quit, the window does not take the focus when it opens), and every picture the player reads `run.txt` and plays what it says. Use it to show a game to somebody who is playing something else on the same computer. The file is one directive a line, `#` begins a comment, and a file that names no key means every key is up:
+
+```
+keys w,shift,space       the keys and mouse buttons (mouse_left, mouse_right) held down
+look 120 -40             mouse motion in pixels a second (input.mouse_dx, input.mouse_dy), until the file says otherwise
+mouse 0.5 0.5            the pointer (0..1 across the picture)
+tap space 7              a key pressed for four pictures each time the number after it changes
+quit                     closes the window
+```
+
+Write the file in one piece (write a temporary file and rename it over `run.txt`). `--pos X,Y` is where the window's top left goes on the desktop; `--hands-off` alone (no file) is a window nobody plays. A program that embeds the player calls `play::set_remote` before `run`.
+
+## Live control: an AI plays the running game
+
+`lunaris play scene.json --hands-off --api 7777` opens the window and a port on this machine (127.0.0.1 only) that speaks the same newline-delimited JSON-RPC as `lunaris serve` (the MCP protocol: `initialize`, `tools/list`, `tools/call`, also in batches), with every tool of the engine (`lunaris tools`): `get` and `query` read the world as it is, `raycast`, `nearby`, `path` and `render` look, `input` presses the keys (`{"values": {"w": true, "shift": true}}`, `mouse_dx` turns the camera), `set` and `spawn` change anything, a teleport included. A request is answered between two pictures, on the thread that plays the game, so it never sees a half-played tick; the game goes on at 60 ticks a second (a `step` request adds ticks). Nobody's keyboard is involved with `--hands-off`, so a person can play something else on the machine while the window shows the AI's game.
+
+```
+lunaris play scenes/game.lunaris.json --hands-off --api 7777 --fps unlimited --pos 2240,156
+lunaris serve --connect 127.0.0.1:7777          # the same port as a stdio MCP server, for a client that launches its servers
+lunaris play scenes/game.lunaris.json --hidden --frames 100000000 --api 7777    # no window at all: the game in real time for tests and for machines with no display
+```
+
+The Lunaris game (the project folder) has the client of a character, `agent.py` (a script of the game's tools folder): `Agent.state()` (position, velocity, the clip it plays, whether it climbs, where the camera looks), `hold("w", "shift")`, `goto(x, z)` (steers, and presses Space at what blocks it: the traversal system hurdles, vaults, mantles and climbs), `teleport`, `run(policy)` (a loop that asks a function for the keys `hz` times a second: an AI's brain) and `call(tool, **args)` for the rest. `python tools/agent.py demo` runs the course of obstacles.
+
+`--fps N` caps the pictures a second and `--fps unlimited` lets the window draw as fast as the machine can (it implies `--novsync`; the simulation stays at 60 ticks a second and the pictures are drawn between ticks).
+
+`--title NAME` is the name in the window's title bar in front of the scene's path (`Lunaris - scenes/game.lunaris.json - tick ...` when it is not given): a game puts its own name there so that its window, the task bar and a screen recording say what it is. A program that embeds the player calls `play::set_title` before `run`.
+
 ## Making levels: `generate_map`
 
 A level does not have to be drawn by hand. `generate_map {uid, mode, seed, width, height}` makes one from a seed and writes it into the `Tilemap` of entity `uid` (size and `data`; undoable). Without a `uid` it only returns the grid as `data`. Floor cells are `floor` (default 0), rock cells `wall` (default 1, so `autotile` can draw the edges of the rock next; -1 leaves a number empty). The generators use their own seeded integer-only random numbers, not the simulation's, so a seed is the same level on every machine and calling the tool never changes the state of a game it does not write into.

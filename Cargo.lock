@@ -1167,6 +1167,7 @@ version = "0.0.1"
 dependencies = [
  "lunaris-api",
  "lunaris-audio",
+ "lunaris-citygen",
  "lunaris-ecs",
  "lunaris-gpu",
  "lunaris-json",
@@ -1199,6 +1200,21 @@ version = "0.0.1"
 dependencies = [
  "lewton",
  "puremp3",
+]
+
+[[package]]
+name = "lunaris-citygen"
+version = "0.0.1"
+dependencies = [
+ "lunaris-json",
+ "lunaris-sim",
+]
+
+[[package]]
+name = "lunaris-creature"
+version = "0.0.1"
+dependencies = [
+ "lunaris-json",
 ]
 
 [[package]]
@@ -1248,6 +1264,7 @@ name = "lunaris-net"
 version = "0.0.1"
 dependencies = [
  "lunaris-api",
+ "lunaris-ecs",
  "lunaris-json",
  "lunaris-sim",
 ]
@@ -1279,6 +1296,7 @@ dependencies = [
 name = "lunaris-sim"
 version = "0.0.1"
 dependencies = [
+ "lunaris-creature",
  "lunaris-ecs",
  "lunaris-json",
 ]

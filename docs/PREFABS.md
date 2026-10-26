@@ -47,7 +47,7 @@ Prefabs are part of the engine state: they are saved with the scene, recorded an
         { "spawn_prefab": "Bullet", "at": [{"get": "Transform.pos[0]"}, 1, {"get": "Transform.pos[2]"}], "velocity": [0, 0, -30] } ] } ] }
 ```
 
-`spawn_prefab` takes `at` and `velocity` (three expressions each: the root's `Transform.pos` and `Velocity.lin`) and `with` (`{"Health": {"hp": {"add": [{"get": "Gun.level"}, 3]}}}`, expressions for scalar fields of the root's components). Like `spawn` it is queued and applied after the system has visited every entity, in the order of the issuing entities' uids, so the result is the same on any thread count; a replay re-derives the spawns, nothing extra is recorded. A missing prefab is the system's `last_error` (the world keeps running). `examples/orchard.lunaris.json` has a spawner that rains balls onto the trees.
+`spawn_prefab` takes `at` and `velocity` (three expressions each: the root's `Transform.pos` and `Velocity.lin`) and `with` (`{"Health": {"hp": {"add": [{"get": "Gun.level"}, 3]}}}`, expressions for the fields of the root's components: a scalar, or an array of expressions for an array field such as `Decal.normal` or `Transform.rot`: `{"Decal": {"normal": [0, 1, 0]}}`, at most 64 elements, replacing the whole field). Like `spawn` it is queued and applied after the system has visited every entity, in the order of the issuing entities' uids, so the result is the same on any thread count; a replay re-derives the spawns, nothing extra is recorded. A missing prefab is the system's `last_error` (the world keeps running). `examples/orchard.lunaris.json` has a spawner that rains balls onto the trees.
 
 ## Why this exists
 

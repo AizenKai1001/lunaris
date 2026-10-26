@@ -10,6 +10,7 @@ use crate::components::{AngularVelocity, Collider, Floater, Lifetime, Particles,
 use crate::physics::Shape;
 use crate::physics_rot as rot;
 use crate::terrain::Terrains;
+use std::sync::Arc;
 use crate::water::PlacedWater;
 use lunaris_ecs::World;
 
@@ -34,34 +35,133 @@ pub fn fast_sin(x: f32) -> f32 {
     0.225 * (y * y.abs() - y) + y
 }
 
-/// The waves the renderers draw (`wave_height` in `scene.wgsl`): four sines of different directions and lengths that travel with `phase`.
+// OCEAN BEGIN (the table is made by tools/gen_ocean.py; edit the script, not the numbers)
+/// The waves that move the mesh and the bodies that float (`ocean_disp` in `scene.wgsl`, sampled from a JONSWAP spectrum): for each its direction as (cos, sin), the wave number as a multiple of the
+/// peak's, its amplitude as a multiple of the significant height, and its phase.
+const OCEAN_V: [[f32; 5]; 25] = [
+    [0.80000067, 0.59999911, 0.434, 0.0098440602, 4.6819227],
+    [0.86382524, -0.50379158, 0.532, 0.016177173, 1.3359719],
+    [0.37230102, 0.92811204, 0.6156, 0.079437833, 5.3992607],
+    [0.93620625, 0.35145107, 0.69255, 0.047628978, 0.93006218],
+    [-0.3175663, 0.94823607, 0.765225, 0.069579758, 1.2793331],
+    [0.70856986, 0.70564067, 0.83235, 0.089447417, 0.56733557],
+    [0.98205244, 0.18860806, 0.89745, 0.11370389, 4.2140777],
+    [0.42955694, 0.90303977, 0.960175, 0.12170799, 0.31715633],
+    [0.83990278, 0.54273688, 1.019875, 0.13608808, 6.078139],
+    [0.99041328, -0.13813595, 1.081375, 0.051608111, 1.6928003],
+    [0.62616969, 0.77968681, 1.14995, 0.085739014, 6.2577439],
+    [0.93953627, 0.3424494, 1.22625, 0.012438399, 1.296134],
+    [0.13752948, 0.99049767, 1.310625, 0.043114563, 5.7680196],
+    [0.76754506, 0.640995, 1.40965, 0.036587199, 6.2137731],
+    [0.99999962, -0.00087576157, 1.5246, 0.029372964, 4.9825238],
+    [0.42210992, 0.90654466, 1.6632, 0.095919031, 3.6480765],
+    [0.90322141, 0.4291749, 1.8348, 0.10702956, 6.2732576],
+    [0.46565571, -0.88496596, 2.0433, 0.0039202489, 1.3549507],
+    [0.62208369, 0.78295075, 2.3079, 0.0127442, 1.0680043],
+    [0.99923144, 0.03919851, 2.6533, 0.04217132, 5.9529851],
+    [-0.078472099, 0.99691631, 3.0927, 0.079070814, 0.2895483],
+    [0.83207906, 0.55465704, 3.66, 0.071612728, 1.204931],
+    [0.71563773, -0.69847165, 4.4, 0.063075106, 4.3558],
+    [0.22241715, 0.9749516, 5.39, 0.046099261, 3.4653057],
+    [0.99444185, 0.10528726, 6.615, 0.026652314, 3.3905129],
+];
+/// The sum of the amplitudes (a multiple of the significant height): the surface never stands higher than this above its level.
+const OCEAN_AMP_SUM: f32 = 1.49077;
+/// The domain warp (`ocean_warp` in `scene.wgsl`): for each of two slow sines, its direction, its wave number (per peak length) and its phase; the waves are evaluated at a point bent by them, up to `OCEAN_WARP_AMP` peak lengths.
+const OCEAN_WARP: [[f32; 4]; 2] = [[0.83, -0.557, 1.1855067, 1.3], [0.37, 0.929, 1.6110732, 4.1]];
+const OCEAN_WARP_AMP: f32 = 0.2;
+/// The sum of amplitude times wave number (`OCEAN_SK` in `scene.wgsl`): how steep the sea can get, which bounds the sideways pull of the waves.
+const OCEAN_SK: f32 = 2.6168607;
+// OCEAN END
+
+/// The waves the renderers draw (`ocean_disp` in `scene.wgsl`): the waves of the spectrum with the speeds of deep water, each a Gerstner wave, so that the points of the surface also move sideways towards
+/// the crests. Everything about a surface that does not depend on the place is worked out once, here.
 #[derive(Clone, Copy)]
 struct Wave {
-    height: f32,
-    k: f32,
-    phase: f32,
+    /// per wave: the wave vector (x, z), the phase at the origin (the wave's own phase minus its speed times the clock), the amplitude
+    c: [[f32; 4]; OCEAN_V.len()],
+    /// per wave: how far the sideways pull moves a point per unit of the sine
+    pull: [[f32; 2]; OCEAN_V.len()],
+    reach: f32,
+    /// the domain warp: for each slow sine the wave vector (x, z) and the phase, and the size of the bend in metres
+    warp: [[f32; 3]; 2],
+    bend: f32,
+    /// the significant height and the peak wave length (for the shoaling)
+    hs: f32,
+    len: f32,
 }
 
 impl Wave {
     fn new(height: f32, length: f32, phase: f32) -> Option<Wave> {
-        (height > 0.0 && height.is_finite() && length.is_finite() && phase.is_finite()).then(|| Wave { height: height.min(10.0), k: 6.283_185_3 / length.max(0.2), phase })
+        if !(height > 0.0 && height.is_finite() && length.is_finite() && phase.is_finite()) {
+            return None;
+        }
+        let height = height.min(10.0);
+        let kp = 6.283_185_3 / length.max(0.2);
+        // all of the sideways pull, unless the sea is so steep that it would fold everywhere (`ocean_chop`)
+        let lam = (0.85 / (height * kp * OCEAN_SK).max(1.0e-4)).min(1.0);
+        let mut c = [[0.0; 4]; OCEAN_V.len()];
+        let mut pull = [[0.0; 2]; OCEAN_V.len()];
+        for (i, w) in OCEAN_V.iter().enumerate() {
+            let k = kp * w[2];
+            let a = height * w[3];
+            c[i] = [k * w[0], k * w[1], w[4] - (9.81 * k).sqrt() * phase, a];
+            pull[i] = [lam * a * w[0], lam * a * w[1]];
+        }
+        let warp = [0, 1].map(|i| [OCEAN_WARP[i][0] * OCEAN_WARP[i][2] / length.max(0.2), OCEAN_WARP[i][1] * OCEAN_WARP[i][2] / length.max(0.2), OCEAN_WARP[i][3]]);
+        Some(Wave { c, pull, reach: height * OCEAN_AMP_SUM, warp, bend: OCEAN_WARP_AMP * length.max(0.2), hs: height, len: length.max(0.2) })
     }
 
-    /// How far the surface is above or below its level at (x, z).
+    /// The point the waves are evaluated at for the point that rests at (x, z): bent by two slow sines (`ocean_warp`).
     #[inline]
+    fn bent(&self, x: f32, z: f32) -> (f32, f32) {
+        let a = fast_sin(self.warp[0][0] * x + self.warp[0][1] * z + self.warp[0][2]);
+        let b = fast_sin(self.warp[1][0] * x + self.warp[1][1] * z + self.warp[1][2]);
+        (x + self.bend * a, z + self.bend * b)
+    }
+
+    /// How far the surface is above or below its level at (x, z): the sideways pull is undone first (the point that now stands at (x, z) rested at (x, z) plus the pull), then the heights are summed.
+    #[inline]
+    #[allow(dead_code)]
     fn at(&self, x: f32, z: f32) -> f32 {
-        let (k, p) = (self.k, self.phase);
-        let mut s = fast_sin((x * 0.8 + z * 0.6) * k + p);
-        s += 0.6 * fast_sin((x * -0.5 + z * 0.85) * k * 1.7 + p * 1.3 + 1.7);
-        s += 0.35 * fast_sin((x * 0.95 + z * -0.3) * k * 2.9 + p * 1.9 + 4.1);
-        s += 0.2 * fast_sin((x * -0.2 + z * -0.98) * k * 4.3 + p * 2.4 + 2.2);
-        s * self.height * 0.4
+        self.at_scaled(x, z, 1.0)
+    }
+
+    /// The same with every wave's height (and pull) scaled by `f`: the sea in shallow water (`shoal`).
+    #[inline]
+    fn at_scaled(&self, x: f32, z: f32, f: f32) -> f32 {
+        const HALF_PI: f32 = 1.570_796_4;
+        let (qx, qz) = self.bent(x, z);
+        let (mut rx, mut rz) = (x, z);
+        for (c, p) in self.c.iter().zip(self.pull.iter()) {
+            let s = fast_sin(c[0] * qx + c[1] * qz + c[2]) * f;
+            rx += p[0] * s;
+            rz += p[1] * s;
+        }
+        let (qx, qz) = self.bent(rx, rz);
+        let mut h = 0.0;
+        for c in self.c.iter() {
+            h += c[3] * fast_sin(c[0] * qx + c[1] * qz + c[2] + HALF_PI);
+        }
+        h * f
     }
 
     /// The highest the waves ever stand above the level.
     fn reach(&self) -> f32 {
-        self.height * 0.4 * 2.15
+        self.reach
     }
+}
+
+
+/// How much of its height the sea keeps over water `depth` metres deep (`ocean_shoal` in `scene.wgsl`): the height of a wave grows as the depth to the power minus one quarter once the depth is less than half the wave length
+/// (Green's law), and the significant height cannot stay above half the depth (the surf zone saturates; the waves break): so 1 in deep water, a little more as the sea shoals, then falling to nothing at the waterline.
+pub(crate) fn shoal(depth: f32, hs: f32, length: f32) -> f32 {
+    let d = depth.max(0.0);
+    if d >= 0.6 * length {
+        return 1.0;
+    }
+    let grow = (0.5 * length / d.max(0.1)).clamp(1.0, 8.0).sqrt().sqrt();
+    (hs * grow).min(0.5 * d) / hs.max(1.0e-4)
 }
 
 enum Kind<'a> {
@@ -83,6 +183,8 @@ struct Surface<'a> {
     flat: bool,
     wave: Option<Wave>,
     flow: [f32; 2],
+    /// The terrains under the sea, when its waves shoal over them (a sheet at the level of the sea that has a `WaterLook`, as in the renderer).
+    floors: Option<Arc<Vec<crate::terrain::Ground>>>,
 }
 
 impl Surface<'_> {
@@ -105,7 +207,13 @@ impl Surface<'_> {
             Kind::Picture(p) => p.surface(x, z)?,
         };
         Some(match self.wave {
-            Some(w) if waves > 0.0 => base + w.at(x, z) * waves,
+            Some(w) if waves > 0.0 => {
+                let f = match &self.floors {
+                    Some(fl) => shoal(fl.iter().find_map(|g| g.placed().surface(x, z)).map_or(1000.0, |y| self.level - y), w.hs, w.len),
+                    None => 1.0,
+                };
+                base + w.at_scaled(x, z, f) * waves
+            }
             _ => base,
         })
     }
@@ -116,13 +224,22 @@ fn surfaces<'a>(world: &mut World, fields: &'a Terrains) -> Vec<Surface<'a>> {
     let mut found: Vec<(u64, Surface<'a>)> = Vec::new();
     let mut sheets: Vec<(u64, V3, Water)> = Vec::new();
     let _ = world.for_each_uid::<(&Water, &Transform), _>(|_, uid, (w, t)| sheets.push((uid, t.pos, *w)));
+    // the sea: the lowest sheet that has a look, and the terrains under it (the waves of every sheet at its level shoal over them, as in the renderer)
+    let sea_level = sheets.iter().filter(|(uid, _, _)| world.entity(*uid).is_some_and(|e| world.get::<crate::components::WaterLook>(e).is_some())).min_by_key(|(uid, _, _)| *uid).map(|(_, pos, _)| pos[1]);
+    let grounds = if sea_level.is_some() { crate::terrain::grounds(world, fields) } else { Vec::new() };
+    let floors = if grounds.is_empty() { None } else { Some(Arc::new(grounds)) };
     for (uid, pos, w) in sheets {
         if !(pos.iter().all(|v| v.is_finite()) && w.size[0].is_finite() && w.size[1].is_finite()) {
             continue;
         }
         let wave = Wave::new(w.wave_height, w.wave_length, w.phase);
-        let top = pos[1] + wave.map_or(0.0, |w| w.reach());
-        found.push((uid, Surface { kind: Kind::Sheet, centre: [pos[0], pos[2]], half: [w.size[0].abs() * 0.5, w.size[1].abs() * 0.5], level: pos[1], top, flat: true, wave, flow: [0.0; 2] }));
+        let floors_here = match (sea_level, &floors) {
+            (Some(l), Some(f)) if wave.is_some() && (pos[1] - l).abs() < 0.05 => Some(f.clone()),
+            _ => None,
+        };
+        // (over shallows the waves grow by up to 1.7 before they break)
+        let top = pos[1] + wave.map_or(0.0, |w| w.reach()) * if floors_here.is_some() { 1.7 } else { 1.0 };
+        found.push((uid, Surface { kind: Kind::Sheet, centre: [pos[0], pos[2]], half: [w.size[0].abs() * 0.5, w.size[1].abs() * 0.5], level: pos[1], top, flat: true, wave, flow: [0.0; 2], floors: floors_here }));
     }
     if !fields.is_empty() {
         for (uid, pos, w) in crate::water::bodies(world, fields) {
@@ -130,7 +247,7 @@ fn surfaces<'a>(world: &mut World, fields: &'a Terrains) -> Vec<Surface<'a>> {
             let placed = PlacedWater::new(field, pos, &w);
             let wave = Wave::new(w.wave_height, w.wave_length, w.phase);
             let top = placed.base + placed.relief.max(0.0) + wave.map_or(0.0, |w| w.reach());
-            found.push((uid, Surface { kind: Kind::Picture(placed), centre: placed.centre, half: [placed.size[0] * 0.5, placed.size[1] * 0.5], level: placed.base, top, flat: false, wave, flow: [0.0; 2] }));
+            found.push((uid, Surface { kind: Kind::Picture(placed), centre: placed.centre, half: [placed.size[0] * 0.5, placed.size[1] * 0.5], level: placed.base, top, flat: false, wave, flow: [0.0; 2], floors: None }));
         }
     }
     found.sort_by_key(|f| f.0);
@@ -429,4 +546,97 @@ fn spray(world: &mut World, at: V3, speed: f32, width: f32, uid: u64) {
 
 fn s_max(t: &Transform) -> f32 {
     t.scale[0].abs().max(t.scale[1].abs()).max(t.scale[2].abs())
+}
+
+#[cfg(test)]
+mod ocean_tests {
+    use super::*;
+
+    /// The surface by the book, in double precision: the point that rests at u stands at u + D(u) (the Gerstner displacement), at the height h(u); to find the height at a place, find the u that stands there.
+    fn exact(height: f64, length: f64, phase: f64, pull: f64, x: f64, z: f64) -> f64 {
+        let kp = std::f64::consts::TAU / length;
+        let lam = (0.85 / (height * kp * OCEAN_SK as f64)).min(1.0) * pull;
+        let wave = |u: [f64; 2]| -> ([f64; 2], f64) {
+            let bend = OCEAN_WARP_AMP as f64 * length;
+            let ph = |i: usize| (OCEAN_WARP[i][0] as f64 * u[0] + OCEAN_WARP[i][1] as f64 * u[1]) * OCEAN_WARP[i][2] as f64 / length + OCEAN_WARP[i][3] as f64;
+            let u = [u[0] + bend * ph(0).sin(), u[1] + bend * ph(1).sin()];
+            let (mut d, mut h) = ([0.0, 0.0], 0.0);
+            for w in OCEAN_V.iter() {
+                let (dx, dz, m, a, ph) = (w[0] as f64, w[1] as f64, w[2] as f64, w[3] as f64 * height, w[4] as f64);
+                let k = kp * m;
+                let th = k * (dx * u[0] + dz * u[1]) - (9.81 * k).sqrt() * phase + ph;
+                h += a * th.cos();
+                d[0] -= lam * a * dx * th.sin();
+                d[1] -= lam * a * dz * th.sin();
+            }
+            (d, h)
+        };
+        let mut u = [x, z];
+        for _ in 0..40 {
+            let (d, _) = wave(u);
+            u = [x - d[0], z - d[1]];
+        }
+        wave(u).1
+    }
+
+    fn samples(w: &Wave, extent: f32, step: f32) -> Vec<f32> {
+        let n = (extent / step) as i32;
+        let mut out = Vec::new();
+        for i in 0..n {
+            for j in 0..n {
+                out.push(w.at(i as f32 * step - extent * 0.5, j as f32 * step - extent * 0.5));
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn the_sea_has_the_wave_height_its_spectrum_says() {
+        // Hs = 4 sqrt(m0): the standard deviation of the surface is a quarter of the significant wave height
+        for (hs, len) in [(0.5f32, 14.0f32), (2.0, 40.0), (4.0, 90.0)] {
+            let w = Wave::new(hs, len, 3.0).unwrap();
+            let h = samples(&w, 1200.0, 4.0);
+            let mean = h.iter().sum::<f32>() / h.len() as f32;
+            let var = h.iter().map(|v| (v - mean) * (v - mean)).sum::<f32>() / h.len() as f32;
+            let est = 4.0 * var.sqrt();
+            assert!((est - hs).abs() < 0.1 * hs, "Hs {hs} length {len}: the surface says {est}");
+            assert!(h.iter().all(|v| v.abs() <= w.reach() + 1e-3), "never above the reach");
+        }
+    }
+
+    #[test]
+    fn the_sea_runs_downwind() {
+        // a little later the heights at a point further along the wind equal the heights now at the first point (the peak of the energy goes at c = sqrt(g / k))
+        let early = Wave::new(2.0, 40.0, 0.0).unwrap();
+        let late = Wave::new(2.0, 40.0, 0.5).unwrap();
+        let c_peak = (9.81f32 * 40.0 / std::f32::consts::TAU).sqrt();
+        let dir = [0.6435f32.cos(), 0.6435f32.sin()];
+        let (mut moved, mut stayed) = (0.0f32, 0.0f32);
+        for i in 0..400 {
+            let (x, z) = (i as f32 * 3.1 - 600.0, i as f32 * 1.7 - 300.0);
+            let now = early.at(x, z);
+            moved += (late.at(x + dir[0] * c_peak * 0.5, z + dir[1] * c_peak * 0.5) - now).powi(2);
+            stayed += (late.at(x, z) - now).powi(2);
+        }
+        assert!(moved < 0.6 * stayed, "the surface moves with the wind: moved {moved} stayed {stayed}");
+    }
+
+    #[test]
+    fn the_copy_in_the_simulation_agrees_with_the_waves_by_the_book() {
+        let (hs, len, phase) = (1.5f32, 30.0f32, 7.3f32);
+        let w = Wave::new(hs, len, phase).unwrap();
+        let (mut worst, mut err_pulled, mut err_straight) = (0.0f64, 0.0f64, 0.0f64);
+        for i in 0..300 {
+            let (x, z) = (i as f64 * 5.37 - 800.0, i as f64 * 3.11 - 400.0);
+            let here = w.at(x as f32, z as f32) as f64;
+            let e = exact(hs as f64, len as f64, phase as f64, 1.0, x, z);
+            worst = worst.max((here - e).abs());
+            err_pulled += (here - e).abs();
+            // the same sea without the sideways pull: the copy must be nearer to the one that has it
+            err_straight += (here - exact(hs as f64, len as f64, phase as f64, 0.0, x, z)).abs();
+        }
+        // fast_sin is within 0.0011 of the sine, and the sideways pull is undone with one step (not to convergence)
+        assert!(worst < 0.05 * hs as f64, "worst difference {worst} for Hs {hs}");
+        assert!(err_pulled < 0.5 * err_straight, "the copy follows the choppy sea: {err_pulled} against {err_straight} for the straight one");
+    }
 }

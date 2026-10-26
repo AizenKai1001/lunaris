@@ -96,7 +96,7 @@ F = "f32"
 COMPONENTS = {
     "Hero": [("ready", F), ("cd", F)],
     "Enemy": [("alert", F), ("damage", F), ("chase", F), ("idle", F), ("wander", F), ("worth", F)],
-    "Coin": [], "Key": [], "Heart": [], "Door": [], "Exit": [], "Wall": [],
+    "Coin": [], "Key": [], "Heart": [], "DoorMark": [], "Exit": [], "Wall": [],
     "Fader": [("t", F), ("out", F), ("leaving", F), ("target", F), ("fired", F)],
     "SwitchId": [("n", F)],
     "PauseUi": [], "PauseButton": [("kind", F)], "HudHp": [], "HurtFlash": [], "SlashFx": [("t", F)], "FxPool": [("kind", F)], "Npc": [], "TalkHint": [],
@@ -520,7 +520,7 @@ system heart_pickup on_contact a(Hero, HitPoints) b(Heart, Transform) order 33 {
 }
 
 /// The locked door opens for a hero that has a key, and takes it.
-system door_open on_contact a(Hero) b(Door, Transform) order 34 {
+system door_open on_contact a(Hero) b(DoorMark, Transform) order 34 {
     if $keys > 0 {
         $keys -= 1;
         $score += 25;
@@ -658,7 +658,7 @@ def build_level(cfg):
     w, h = cfg["size"]
     enemy = ENEMIES[cfg["enemy"]]
     call("reset", {"seed": 1})
-    define_components(["Hero", "Enemy", "Coin", "Key", "Heart", "Door", "Exit", "Wall", "Fader", "SwitchId", "PauseUi", "PauseButton", "HudHp", "HurtFlash", "SlashFx", "FxPool", "Hint", "Banner", "ShakeCam", "ThemeTrack", "DepthsTrack", "Npc", "TalkHint"])
+    define_components(["Hero", "Enemy", "Coin", "Key", "Heart", "DoorMark", "Exit", "Wall", "Fader", "SwitchId", "PauseUi", "PauseButton", "HudHp", "HurtFlash", "SlashFx", "FxPool", "Hint", "Banner", "ShakeCam", "ThemeTrack", "DepthsTrack", "Npc", "TalkHint"])
 
     # ---- the level: first look at seeds until one has a chokepoint for a door, then make it for real, dress it and make it solid
     chosen = None
@@ -730,7 +730,7 @@ def build_level(cfg):
           Sprite={"size": [1, 1], "texture": f"{D}/items.png", "sheet": [8, 1], "frame": 7})
     spawn(1011, "Exit glow", Transform={"pos": [ex, ey, 0.3]}, Particles={"count": 1, "lifetime": 100, "looping": True, "prewarm": True, "speed_range": [0, 0], "size": [3.2, 3.2], "color": [0.5, 0.6, 1, 0.3], "color_end": [0.5, 0.6, 1, 0.3], "additive": True, "texture": "soft"})
     dx, dy, _ = at(door)
-    spawn(1020, "Door", Door={}, Transform={"pos": [dx, dy, 0]}, Collider={"shape": 1, "size": [1, 1, 1]},
+    spawn(1020, "Door", DoorMark={}, Transform={"pos": [dx, dy, 0]}, Collider={"shape": 1, "size": [1, 1, 1]},
           Sprite={"size": [1, 1], "texture": f"{D}/items.png", "sheet": [8, 1], "frame": 6})
     kx, ky, _ = at(key)
     spawn(1021, "Key", Key={}, Transform={"pos": [kx, ky, -0.02]}, Collider={"shape": 0, "size": [0.7, 0.7, 0.7], "trigger": True},

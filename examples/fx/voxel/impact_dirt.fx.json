@@ -1,0 +1,51 @@
+{
+  "name": "impact dirt (voxel)",
+  "bounds": 4,
+  "budget": 120,
+  "emitters": [
+    {
+      "name": "chips",
+      "space": "world",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": [6, 10]}]},
+      "init": {
+        "life": [0.5, 1.1],
+        "speed": [2, 6],
+        "spread": 62,
+        "size": [0.03, 0.06],
+        "spin": [-720, 720],
+        "color": [0.38, 0.28, 0.2, 1],
+        "color_jitter": 0.18
+      },
+      "update": {
+        "gravity": [0, -9.8, 0],
+        "drag": 0.15,
+        "collide": {
+          "mode": "bounce",
+          "bounce": 0.35,
+          "friction": 0.45,
+          "world": true,
+          "planes": [{"normal": [0, 1, 0], "d": 0, "relative": true}]
+        }
+      },
+      "curves": {"alpha": [[0, 1], [0.8, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube"}
+    },
+    {
+      "name": "dust",
+      "space": "world",
+      "loop": false,
+      "spawn": {"bursts": [{"time": 0, "count": [2, 4]}]},
+      "init": {
+        "life": [0.4, 0.8],
+        "speed": [0.5, 1.8],
+        "spread": 55,
+        "size": [0.06, 0.1],
+        "color": [0.45, 0.36, 0.28, 0.55]
+      },
+      "update": {"gravity": [0, -0.4, 0], "drag": 2.2},
+      "curves": {"size": [[0, 0.7], [1, 2.6]], "alpha": [[0, 1], [1, 0]]},
+      "render": {"type": "solid", "solid": "cube", "blend": "alpha"}
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "muzzle flash",
+  "bounds": 4,
+  "budget": 120,
+  "emitters": [
+    {
+      "name": "flash",
+      "space": "local",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": 1 }] },
+      "init": { "life": [0.05, 0.07], "size": [0.35, 0.5], "rotation": [0, 360], "color": [1, 0.85, 0.5, 1] },
+      "curves": { "size": [[0, 0.5], [0.4, 1], [1, 0.8]], "alpha": [[0, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "add", "light": { "intensity": 14, "range": 9, "max": 1, "color": [1, 0.75, 0.4] } }
+    },
+    {
+      "name": "sparks",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": [5, 9] }] },
+      "init": { "life": [0.12, 0.3], "speed": [8, 18], "direction": [0, 0, -1], "spread": 22, "size": [0.015, 0.03], "color": [1, 0.8, 0.4, 1] },
+      "update": { "gravity": [0, -9.8, 0], "drag": 1.5 },
+      "curves": { "alpha": [[0, 1], [1, 0]] },
+      "render": { "texture": "circle", "blend": "add", "facing": "velocity", "stretch": 0.03 }
+    },
+    {
+      "name": "smoke",
+      "space": "world",
+      "loop": false,
+      "spawn": { "bursts": [{ "time": 0, "count": [2, 3] }] },
+      "init": { "life": [0.6, 1.1], "speed": [0.4, 1.4], "direction": [0, 0, -1], "spread": 25, "size": [0.08, 0.14], "color": [0.55, 0.55, 0.55, 0.35] },
+      "update": { "gravity": [0, 0.3, 0], "drag": 1.4 },
+      "curves": { "size": [[0, 1], [1, 4]], "alpha": [[0, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "alpha" }
+    }
+  ]
+}

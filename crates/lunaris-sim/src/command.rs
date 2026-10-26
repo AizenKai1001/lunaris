@@ -53,8 +53,10 @@ fn snapshot_entity(world: &World, uid: u64) -> Result<Vec<(String, Json)>> {
 
 pub fn apply(world: &mut World, scripts: &mut ScriptSet, cmd: &Command) -> Result<Applied> {
     let r = apply_one(world, scripts, cmd);
-    if r.is_ok() {
-        crate::systems::hierarchy(world); // attached entities follow their parents right away, so nothing ever looks stale
+    // attached entities follow their parents right away, so nothing ever looks stale; a command that touches no entity (a resource, a prefab's definition) cannot have moved anything, and a graph system that sets resources
+    // every tick (a clock, a HUD, the keys) would otherwise pay for placing every child of the world each time (80 microseconds in a city, for each number)
+    if r.is_ok() && !matches!(cmd, Command::SetResource { .. } | Command::DefinePrefab { .. } | Command::RemovePrefab { .. }) {
+        crate::systems::hierarchy(world);
     }
     r
 }
@@ -112,7 +114,7 @@ fn apply_one(world: &mut World, scripts: &mut ScriptSet, cmd: &Command) -> Resul
             let name = sys.name.clone();
             let inverse = match scripts.put(sys) {
                 Some(prev) => {
-                    let mut d = prev.def.clone();
+                    let mut d: Json = (*prev.def).clone();
                     d.set("enabled", Json::Bool(prev.enabled));
                     Command::DefineSystem { def: d }
                 }
@@ -122,7 +124,7 @@ fn apply_one(world: &mut World, scripts: &mut ScriptSet, cmd: &Command) -> Resul
         }
         Command::RemoveSystem { name } => {
             let prev = scripts.remove(name).ok_or_else(|| no_system(scripts, name))?;
-            let mut d = prev.def.clone();
+            let mut d: Json = (*prev.def).clone();
             d.set("enabled", Json::Bool(prev.enabled));
             Ok(Applied { executed: cmd.clone(), inverse: Some(vec![Command::DefineSystem { def: d }]), uid: None })
         }

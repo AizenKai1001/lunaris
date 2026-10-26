@@ -4,6 +4,18 @@ use lunaris_sim::detmath;
 use crate::texture::Texture;
 use std::sync::{Arc, OnceLock};
 
+/// How a mesh gets coarser versions of itself for when it is far off (the GPU renderer's high qualities).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum LodMode {
+    /// Coarser levels, and the finest is never drawn when it has more triangles than the base budget (a model: a photographed tree of 800,000 triangles is drawn with 150,000 at the most, however near the camera is).
+    #[default]
+    Full,
+    /// Coarser levels with no budget (the ground: a terrain tile has millions of triangles and is near the camera in part).
+    Ground,
+    /// No coarser levels: the whole mesh is drawn at every distance.
+    Whole,
+}
+
 #[derive(Clone, Debug)]
 pub struct Mesh {
     pub pos: Vec<V3>,
@@ -18,11 +30,30 @@ pub struct Mesh {
     pub tex: Option<Arc<Texture>>,
     /// The skeleton and animation clips of an imported model that has them; `pos` and `nrm` are then the rest pose.
     pub rig: Option<Arc<crate::rig::Rig>>,
+    /// The normal map of an imported model's material (the GPU renderer's high qualities use it, as a `PbrMaps.normal`).
+    pub normal_tex: Option<Arc<Texture>>,
+    /// The metallic-roughness map of an imported material (roughness in green, metallic in blue, occlusion in red when there is one: the renderer's `arm`).
+    pub arm_tex: Option<Arc<Texture>>,
+    /// glTF `alphaMode` `MASK` (and `BLEND`, shown the same way): where the base colour texture's alpha is below this the surface is not there (leaves, fences, hair cards). 0 = opaque.
+    pub alpha_cutoff: f32,
+    /// How the GPU renderer gives the mesh coarser levels of detail (see `LodMode`).
+    pub lod: LodMode,
+    /// A model whose materials differ in more than a colour (two textures; a normal map on some of them; a cut-out leaf next to opaque bark) is also given as one mesh per material: the renderers draw
+    /// these instead of the whole, which stays whole for the physics, the rays and the bounds. Empty for everything else.
+    pub parts: Vec<Arc<Mesh>>,
+    /// Solid volumes inside the model that hide what is behind them (`asset.extras.lunaris_occluders` of a glTF file): each is a prism with a four-cornered footprint, `[x0, z0, x1, z1, x2, z2, x3, z3, y_bottom, y_top]` in the
+    /// model's own space. The GPU renderer's software occlusion culling draws them into a small depth picture and leaves out the objects that lie wholly behind them.
+    pub occluders: Vec<[f32; 10]>,
+    /// For a model drawn in pieces: one mesh of all the pieces that are not cut out (made when the model is imported), which the GPU renderer draws instead of those pieces in the passes that need only depth (see `SceneMesh::depth_role`).
+    pub depth_whole: Option<Arc<Mesh>>,
+    /// glTF `emissiveFactor` (its luminance) of the material of a piece of a model: with the entity's `MeshRenderer.emissive` it makes a piece glow by itself (the lit windows of a block: the entity's `emissive` says how much,
+    /// and only the pieces that have a factor glow). 0 for a piece that does not.
+    pub emissive_factor: f32,
 }
 
 impl Mesh {
-    fn new() -> Mesh {
-        Mesh { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::new(), tex: None, rig: None }
+    pub(crate) fn new() -> Mesh {
+        Mesh { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::new(), tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Full, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 }
     }
 
     /// A flat face with the given normal and in-plane axes (`u` cross `v` must equal `n`), half-extent `h`, lifted `lift` along
@@ -137,7 +168,8 @@ pub const BUILTIN_NAMES: [&str; 5] = ["cube", "sphere", "plane", "cylinder", "qu
 static MESHES: OnceLock<Vec<(&'static str, Mesh)>> = OnceLock::new();
 
 pub fn builtin(name: &str) -> Option<&'static Mesh> {
-    let all = MESHES.get_or_init(|| vec![("cube", cube()), ("sphere", sphere()), ("plane", plane()), ("cylinder", cylinder()), ("quad", quad())]);
+    // (the built-in shapes are small and drawn whole at every distance)
+    let all = MESHES.get_or_init(|| vec![("cube", cube()), ("sphere", sphere()), ("plane", plane()), ("cylinder", cylinder()), ("quad", quad())].into_iter().map(|(n, mut m)| { m.lod = LodMode::Whole; (n, m) }).collect());
     all.iter().find(|(n, _)| *n == name).map(|(_, m)| m)
 }
 

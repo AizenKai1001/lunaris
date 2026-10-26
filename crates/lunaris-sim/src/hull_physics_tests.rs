@@ -202,11 +202,11 @@ fn hulls_collide_with_boxes_balls_capsules_and_each_other_and_none_of_them_sinks
     }
     for (k, uid) in (2u64..=7).enumerate() {
         let (p, v) = (pos(&s, uid), lin(&s, uid));
-        // (the ball may roll far away: a ball on a floor has no rolling resistance)
-        let room = if uid == 5 { 60.0 } else { 6.0 };
+        // (the ball and the capsule may roll far away: nothing on a floor has rolling resistance)
+        let room = if uid == 5 || uid == 6 { 60.0 } else { 6.0 };
         assert!(p.iter().all(|c| c.is_finite()) && p[1] > 0.0 && p[1] < 3.0 && p[0].abs() < room && p[2].abs() < room, "body {uid} at {p:?}");
         assert!(lowest[k] > -0.01, "body {uid} went into the floor: {}", lowest[k]);
-        assert!(len(v) < if uid == 5 { 4.0 } else { 0.3 }, "body {uid} settles: {v:?}");
+        assert!(len(v) < if uid == 5 || uid == 6 { 4.0 } else { 0.3 }, "body {uid} settles: {v:?}");
     }
     // nobody stands inside another: the hulls are at least their inner radius apart
     for (a, b) in [(2u64, 3u64), (2, 4), (3, 4)] {

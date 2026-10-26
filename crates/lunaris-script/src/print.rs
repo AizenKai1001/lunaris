@@ -248,7 +248,10 @@ fn fields(v: &Json) -> Option<String> {
         if !is_ident(k) {
             return None;
         }
-        parts.push(format!("{k}: {}", expr(e, 0)));
+        match e {
+            Json::Arr(items) => parts.push(format!("{k}: [{}]", items.iter().map(|x| expr(x, 0)).collect::<Vec<_>>().join(", "))),
+            _ => parts.push(format!("{k}: {}", expr(e, 0))),
+        }
     }
     Some(format!("{{ {} }}", parts.join(", ")))
 }

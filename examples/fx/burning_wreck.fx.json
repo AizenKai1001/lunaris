@@ -1,0 +1,47 @@
+{
+  "name": "burning wreck",
+  "bounds": 14,
+  "budget": 1500,
+  "lod": { "near": 40, "far": 120 },
+  "emitters": [
+    {
+      "name": "fire",
+      "space": "local",
+      "max": 300,
+      "spawn": { "rate": 90, "shape": { "type": "box", "half": [1.1, 0.1, 0.6] } },
+      "init": { "life": [0.5, 1.1], "speed": [0.8, 2], "spread": 14, "size": [0.5, 0.9], "rotation": [0, 360], "spin": [-40, 40], "color": [1, 0.55, 0.15, 1] },
+      "update": { "gravity": [0, 1.5, 0], "drag": 0.7, "noise": { "strength": 3, "scale": 0.7, "speed": 0.9 } },
+      "curves": {
+        "size": [[0, 0.5], [0.3, 1], [1, 0.15]],
+        "alpha": [[0, 0], [0.1, 0.9], [0.6, 0.5], [1, 0]],
+        "color": [[0, [1, 0.9, 0.55, 1]], [0.4, [1, 0.5, 0.12, 1]], [1, [0.4, 0.07, 0.02, 1]]]
+      },
+      "render": { "texture": "soft", "blend": "add", "soft": 0.4, "light": { "intensity": 7, "range": 16, "max": 3 } }
+    },
+    {
+      "name": "smoke",
+      "space": "world",
+      "max": 400,
+      "spawn": { "rate": 30, "shape": { "type": "box", "half": [0.9, 0.1, 0.5] } },
+      "init": { "life": [4, 8], "speed": [0.8, 1.8], "spread": 15, "size": [0.9, 1.5], "spin": [-18, 18], "color": [0.07, 0.07, 0.08, 0.7], "inherit_velocity": 0.8 },
+      "update": { "gravity": [0, 1.3, 0], "drag": 0.35, "wind": [0.5, 0, 0.15], "noise": { "strength": 1.4, "scale": 2.2, "speed": 0.25 } },
+      "curves": { "size": [[0, 0.5], [1, 4.2]], "alpha": [[0, 0], [0.1, 1], [1, 0]] },
+      "render": { "texture": "soft", "blend": "alpha", "soft": 1, "sort": true }
+    },
+    {
+      "name": "sparks",
+      "space": "world",
+      "max": 120,
+      "spawn": { "rate": 6, "shape": { "type": "box", "half": [0.9, 0.1, 0.5] } },
+      "init": { "life": [0.8, 1.8], "speed": [2, 6], "spread": 40, "size": [0.015, 0.03], "color": [1, 0.7, 0.3, 1] },
+      "update": {
+        "gravity": [0, -4, 0],
+        "drag": 0.3,
+        "noise": { "strength": 3, "scale": 0.8, "speed": 0.5 },
+        "collide": { "mode": "bounce", "world": true, "bounce": 0.3, "friction": 0.4, "planes": [{ "normal": [0, 1, 0], "d": 0, "relative": true }] }
+      },
+      "curves": { "alpha": [[0, 1], [0.8, 0.8], [1, 0]] },
+      "render": { "texture": "circle", "blend": "add", "facing": "velocity", "stretch": 0.04 }
+    }
+  ]
+}

@@ -312,7 +312,7 @@ unsafe fn write_scalar(ty: FieldType, v: &Json, dst: *mut u8, strings: &mut Stri
 unsafe fn read_scalar(ty: FieldType, src: *const u8, strings: &StringTable) -> Json {
     unsafe {
         match ty {
-            FieldType::F32 => Json::Float(src.cast::<f32>().read() as f64),
+            FieldType::F32 => Json::Float(lunaris_json::f32_value(src.cast::<f32>().read())),
             FieldType::F64 => Json::Float(src.cast::<f64>().read()),
             FieldType::I32 => Json::Int(src.cast::<i32>().read() as i64),
             FieldType::U32 => Json::Int(src.cast::<u32>().read() as i64),
@@ -433,6 +433,40 @@ impl ComponentInfo {
     }
 }
 
+/// One step of hashing an entity's components, worked out once per archetype by `World::state_hash` instead of once per entity: a constant word (the number of
+/// components, a component's name) or a run of values read from one column. Feeding the hasher with these gives exactly the words that `ComponentInfo::hash_into` and
+/// `StateHasher::bytes` give, so the hash does not change.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum HashOp {
+    Word(u64),
+    Run { col: usize, offset: usize, ty: FieldType, count: usize },
+}
+
+impl ComponentInfo {
+    /// Append the steps that hash this component, which lives in column `col` of its archetype: its name as `StateHasher::bytes` feeds it, then its fields (neighbouring
+    /// fields of one type that follow each other in memory become one run).
+    pub(crate) fn push_hash_ops(&self, col: usize, ops: &mut Vec<HashOp>) {
+        let name = self.name.as_bytes();
+        ops.push(HashOp::Word(name.len() as u64));
+        for chunk in name.chunks(8) {
+            let mut w = [0u8; 8];
+            w[..chunk.len()].copy_from_slice(chunk);
+            ops.push(HashOp::Word(u64::from_le_bytes(w)));
+        }
+        for f in &self.fields {
+            let count = f.count as usize;
+            if let Some(HashOp::Run { col: c, offset, ty, count: n }) = ops.last_mut() {
+                // (a string needs its text, so it is never merged)
+                if *c == col && *ty == f.ty && *ty != FieldType::Str && *offset + *n * ty.size() == f.offset {
+                    *n += count;
+                    continue;
+                }
+            }
+            ops.push(HashOp::Run { col, offset: f.offset, ty: f.ty, count });
+        }
+    }
+}
+
 /// Fast, portable 64-bit state hasher (integer mixing only, so it gives the same answer on every platform).
 #[derive(Clone, Debug)]
 pub struct StateHasher {
@@ -445,19 +479,44 @@ impl Default for StateHasher {
     }
 }
 
+/// One step of the hash on a bare state: the loop that hashes a whole world keeps the state in a local (a register) instead of behind a `&mut StateHasher`, because
+/// every step waits for the one before it and a round trip through memory in each would make the chain twice as long.
+#[inline(always)]
+pub(crate) fn mix_word(h: u64, x: u64) -> u64 {
+    (h.rotate_left(23) ^ x).wrapping_mul(0x9FB2_1C65_1E98_DF25).wrapping_add(0x6A09_E667_F3BC_C909)
+}
+
+/// `StateHasher::bytes` on a bare state.
+#[inline]
+pub(crate) fn mix_bytes(mut h: u64, b: &[u8]) -> u64 {
+    h = mix_word(h, b.len() as u64);
+    for chunk in b.chunks(8) {
+        let mut w = [0u8; 8];
+        w[..chunk.len()].copy_from_slice(chunk);
+        h = mix_word(h, u64::from_le_bytes(w));
+    }
+    h
+}
+
 impl StateHasher {
     #[inline]
     pub fn u64(&mut self, x: u64) {
-        self.h = (self.h.rotate_left(23) ^ x).wrapping_mul(0x9FB2_1C65_1E98_DF25).wrapping_add(0x6A09_E667_F3BC_C909);
+        self.h = mix_word(self.h, x);
     }
 
     pub fn bytes(&mut self, b: &[u8]) {
-        self.u64(b.len() as u64);
-        for chunk in b.chunks(8) {
-            let mut w = [0u8; 8];
-            w[..chunk.len()].copy_from_slice(chunk);
-            self.u64(u64::from_le_bytes(w));
-        }
+        self.h = mix_bytes(self.h, b);
+    }
+
+    /// The state itself, to hash a long run in a local and put it back with `set_raw`.
+    #[inline]
+    pub(crate) fn raw(&self) -> u64 {
+        self.h
+    }
+
+    #[inline]
+    pub(crate) fn set_raw(&mut self, h: u64) {
+        self.h = h;
     }
 
     pub fn finish(&self) -> u64 {

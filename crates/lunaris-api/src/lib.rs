@@ -13,6 +13,7 @@ mod check;
 mod engine;
 mod gpu;
 mod render_tools;
+mod ui_audit_tool;
 mod saves;
 mod scatter;
 mod terrain_layers;
@@ -36,6 +37,32 @@ mod export_tests;
 #[cfg(test)]
 mod layers_tests;
 #[cfg(test)]
+mod physics_joint_check_tests;
+#[cfg(test)]
+mod building_check_tests;
+#[cfg(test)]
+mod events_check_tests;
+#[cfg(test)]
+mod helicopter_check_tests;
+#[cfg(test)]
+mod walker_check_tests;
+#[cfg(test)]
+mod seats_check_tests;
+#[cfg(test)]
+mod loadout_check_tests;
+#[cfg(test)]
+mod inventory_publish_check_tests;
+#[cfg(test)]
+mod respawn_check_tests;
+#[cfg(test)]
+mod raiding_check_tests;
+#[cfg(test)]
+mod gameserver_check_tests;
+#[cfg(test)]
+mod flyagent_check_tests;
+#[cfg(test)]
+mod interact_check_tests;
+#[cfg(test)]
 mod vehicle_tests;
 #[cfg(test)]
 mod mesh_tests;
@@ -43,6 +70,8 @@ mod mesh_tests;
 mod saves_tests;
 #[cfg(test)]
 mod script_tests;
+#[cfg(test)]
+mod trace_tests;
 #[cfg(test)]
 mod terrain_tests;
 #[cfg(test)]
@@ -59,6 +88,8 @@ mod draw_order_tests;
 mod dogfood3d_tests;
 #[cfg(test)]
 mod language_tests;
+#[cfg(test)]
+mod rebind_tests;
 #[cfg(test)]
 mod menus_tests;
 #[cfg(test)]

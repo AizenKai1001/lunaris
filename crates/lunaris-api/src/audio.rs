@@ -30,7 +30,7 @@ use std::sync::{Arc, Mutex};
 /// A sound file bigger than this is refused (the decoder expands it to 32-bit floats).
 const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 /// At most this many new voices from events per update (a burst of identical events makes one).
-const MAX_EVENT_VOICES: usize = 8;
+const MAX_EVENT_VOICES: usize = 12;
 const MAX_WARNINGS: usize = 24;
 
 /// How the director models the room. The defaults suit most games; they are knobs for taste, not for correctness.
@@ -68,13 +68,21 @@ pub struct Stats {
 }
 
 struct FileDef {
-    file: String,
+    /// The files this event can sound like (`SoundFile.file` split on lines and `|`); empty: the built-in voice.
+    files: Vec<String>,
     volume: f32,
     pitch: f32,
+    pitch_var: f32,
+    volume_var: f32,
     spatial: bool,
     range: f32,
     near: f32,
+    /// The one played last (so that a pick never repeats it).
+    last: usize,
 }
+
+/// How many sound files a frame decodes ahead of their first use (`Director::preload`).
+const PRELOAD_PER_FRAME: usize = 2;
 
 struct Live {
     id: VoiceId,
@@ -145,6 +153,10 @@ pub struct Director {
     forward: V3,
     dirty: bool,
     worker: Option<Worker>,
+    /// The files that the definitions name and nothing has decoded yet (a few a frame, so that the first gunshot does not wait for its file).
+    preload: Vec<String>,
+    /// A small generator for the variation of sounds (output only: never part of the simulation).
+    rng: u64,
 }
 
 fn rotate(q: [f32; 4], v: V3) -> V3 {
@@ -223,7 +235,19 @@ impl Director {
             forward: [0.0, 0.0, -1.0],
             dirty: false,
             worker: None,
+            preload: Vec::new(),
+            rng: 0x9E37_79B9_7F4A_7C15,
         }
+    }
+
+    /// A number in 0..1 (xorshift64*; it only varies what is heard).
+    fn next_unit(&mut self) -> f32 {
+        let mut x = self.rng;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.rng = x;
+        ((x.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 40) as f32) / (1u64 << 24) as f32
     }
 
     /// Trace in a background thread from now on (what the live player does); the first moments of a new sound are still traced at once,
@@ -269,10 +293,19 @@ impl Director {
         for f in files {
             let name = world.strings().get(f.name.0).to_string();
             if !name.is_empty() {
-                let file = world.strings().get(f.file.0).to_string();
-                self.files.insert(name, FileDef { file, volume: f.volume, pitch: f.pitch, spatial: f.spatial, range: f.range, near: f.near });
+                let text = world.strings().get(f.file.0).to_string();
+                let files: Vec<String> = text.split(|c| c == '\n' || c == '|').map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect();
+                let (pitch_var, volume_var) = (f.pitch_var.clamp(0.0, 1.0), f.volume_var.clamp(0.0, 1.0));
+                self.files.insert(name, FileDef { files, volume: f.volume, pitch: f.pitch, pitch_var, volume_var, spatial: f.spatial, range: f.range, near: f.near, last: usize::MAX });
             }
         }
+        // what is named and not decoded yet is decoded ahead, a few files a frame
+        let mut want: Vec<String> = self.files.values().flat_map(|d| d.files.iter().cloned()).collect();
+        want.sort();
+        want.dedup();
+        want.retain(|f| !self.clips.contains_key(f));
+        want.reverse();
+        self.preload = want;
         // a voice that was synthesised from an older definition must be made again
         self.clips.retain(|k, _| !k.starts_with("voice:"));
         // the mixer buses
@@ -373,13 +406,29 @@ impl Director {
             let shape = if c.shape == 0 {
                 Shape::Sphere { center, radius: 0.5 * fin(c.size[0]).abs() * sc[0].max(sc[1]).max(sc[2]) }
             } else {
-                Shape::Box { center, half: [0.5 * fin(c.size[0]).abs() * sc[0], 0.5 * fin(c.size[1]).abs() * sc[1], 0.5 * fin(c.size[2]).abs() * sc[2]] }
+                let half = [0.5 * fin(c.size[0]).abs() * sc[0], 0.5 * fin(c.size[1]).abs() * sc[1], 0.5 * fin(c.size[2]).abs() * sc[2]];
+                // a box that is turned (a building's wall in a round city) is traced as the turned box it is; one that is not stays an axis-aligned one
+                let q = [fin(t.rot[0]), fin(t.rot[1]), fin(t.rot[2]), fin(t.rot[3])];
+                let ql = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
+                if ql > 1e-6 && (q[0].abs() + q[1].abs() + q[2].abs()) / ql > 1e-4 {
+                    let q = [q[0] / ql, q[1] / ql, q[2] / ql, q[3] / ql];
+                    Shape::Obb { center, half, axes: [rotate(q, [1.0, 0.0, 0.0]), rotate(q, [0.0, 1.0, 0.0]), rotate(q, [0.0, 0.0, 1.0])] }
+                } else {
+                    Shape::Box { center, half }
+                }
             };
             match shape {
                 Shape::Box { center, half } => {
                     (0..3).for_each(|i| {
                         mix(center[i]);
                         mix(half[i]);
+                    });
+                }
+                Shape::Obb { center, half, axes } => {
+                    (0..3).for_each(|i| {
+                        mix(center[i]);
+                        mix(half[i]);
+                        (0..3).for_each(|k| mix(axes[k][i]));
                     });
                 }
                 Shape::Sphere { center, radius } => {
@@ -439,29 +488,57 @@ impl Director {
         self.bus_duck = next;
     }
 
-    fn params_for(def: &FileDef, pos: Option<V3>) -> Params {
-        Params { volume: def.volume, pitch: def.pitch, looped: false, spatial: if def.spatial { pos.map(|p| Spatial { pos: p, range: def.range, near: def.near }) } else { None } }
+    fn params_for(def: &FileDef, pos: Option<V3>, vary: (f32, f32)) -> Params {
+        // vary: two numbers in 0..1 that turn into the pitch and volume factors `1 +- var`
+        let (pf, vf) = (1.0 + def.pitch_var * (vary.0 * 2.0 - 1.0), 1.0 + def.volume_var * (vary.1 * 2.0 - 1.0));
+        Params { volume: def.volume * vf, pitch: def.pitch * pf, looped: false, spatial: if def.spatial { pos.map(|p| Spatial { pos: p, range: def.range, near: def.near }) } else { None } }
     }
 
-    fn start_event_voice(&mut self, world: &mut World, root: &std::path::Path, e: &Event) {
-        let label = match self.files.get(&e.name) {
-            Some(d) if !d.file.is_empty() => d.file.clone(),
-            _ => format!("voice:{}", e.name),
+    /// Which of the files of the definition `name` an event plays now: a random one that is not the last, or the only one.
+    fn pick_file(&mut self, name: &str) -> Option<String> {
+        let roll = self.next_unit();
+        let def = self.files.get_mut(name)?;
+        let n = def.files.len();
+        if n == 0 {
+            return None;
+        }
+        let k = if n == 1 {
+            0
+        } else if def.last < n {
+            // one of the others
+            let r = ((roll * (n - 1) as f32) as usize).min(n - 2);
+            if r >= def.last { r + 1 } else { r }
+        } else {
+            ((roll * n as f32) as usize).min(n - 1)
+        };
+        def.last = k;
+        Some(def.files[k].clone())
+    }
+
+    fn start_event_voice(&mut self, world: &mut World, root: &std::path::Path, e: &Event) -> bool {
+        if self.files.get(&e.name).is_some_and(|d| d.volume <= 0.0) {
+            return false;
+        }
+        let vary = (self.next_unit(), self.next_unit());
+        let picked = self.pick_file(&e.name);
+        let label = match &picked {
+            Some(f) => f.clone(),
+            None => format!("voice:{}", e.name),
         };
         // what the event sounds like: a recorded file, a synthesised voice made spatial by a SoundFile without a file, or the plain voice
-        let (clip, params) = match self.files.get(&e.name) {
-            Some(def) if !def.file.is_empty() => {
-                let (file, params) = (def.file.clone(), Director::params_for(def, e.pos));
+        let (clip, params) = match (self.files.get(&e.name), picked) {
+            (Some(def), Some(file)) => {
+                let params = Director::params_for(def, e.pos, vary);
                 match self.file_clip(root, &file) {
                     Some(c) => (c, params),
-                    None => return,
+                    None => return false,
                 }
             }
-            Some(def) => {
-                let params = Director::params_for(def, e.pos);
+            (Some(def), None) => {
+                let params = Director::params_for(def, e.pos, vary);
                 (self.voice_clip(&e.name), params)
             }
-            None => (self.voice_clip(&e.name), Params::default()),
+            (None, _) => (self.voice_clip(&e.name), Params::default()),
         };
         let (voice_bus, gain) = self.bus_gain(world, &label);
         let mut params = params;
@@ -473,6 +550,7 @@ impl Director {
             *self.stats.started.entry(e.name.clone()).or_insert(0) += 1;
             self.live.push(Live { id, pos: spatial.map(|s| s.pos).unwrap_or([0.0; 3]), spatial: spatial.is_some(), bus: voice_bus });
         }
+        started.is_some()
     }
 
     fn sync_sources(&mut self, engine: &mut Engine) {
@@ -572,6 +650,14 @@ impl Director {
         self.forward = forward;
         self.lock().set_listener(listener);
         self.collect_results();
+        for _ in 0..PRELOAD_PER_FRAME {
+            match self.preload.pop() {
+                Some(f) => {
+                    let _ = self.file_clip(&root, &f);
+                }
+                None => break,
+            }
+        }
         self.update_ducking();
         self.sync_sources(engine);
         self.sync_music(engine);
@@ -591,8 +677,10 @@ impl Director {
                 continue;
             }
             seen.push((&e.name, e.pos));
-            self.start_event_voice(&mut engine.sim.world, &root, e);
-            started += 1;
+            // (an event that sounds like nothing, `volume` 0, takes no voice and does not count against the number a frame)
+            if self.start_event_voice(&mut engine.sim.world, &root, e) {
+                started += 1;
+            }
         }
         self.live.retain(|l| self.mixer.lock().unwrap_or_else(|p| p.into_inner()).is_playing(l.id));
         if self.config.enabled && (self.dirty || self.frame % self.config.interval.max(1) == 0) {
@@ -689,7 +777,7 @@ impl Director {
 // ------------------------------------------------------------------------------------------------------------------ tools
 
 fn v3_json(v: V3) -> Json {
-    Json::arr(v.iter().map(|x| Json::from(*x as f64)))
+    Json::arr(v.iter().map(|x| Json::from(*x)))
 }
 
 fn round(x: f32, places: i32) -> f64 {
@@ -863,5 +951,62 @@ impl Engine {
             out.set("bytes", Json::from(bytes.len()));
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod variant_tests {
+    use super::*;
+
+    fn director_with(names: &[(&str, &[&str])]) -> Director {
+        let mut d = Director::new(Arc::new(Mutex::new(Mixer::new())));
+        for (name, files) in names {
+            d.files.insert(
+                name.to_string(),
+                FileDef { files: files.iter().map(|f| f.to_string()).collect(), volume: 1.0, pitch: 1.0, pitch_var: 0.0, volume_var: 0.0, spatial: true, range: 40.0, near: 2.0, last: usize::MAX },
+            );
+        }
+        d
+    }
+
+    #[test]
+    fn an_event_with_several_files_never_plays_the_same_one_twice_in_a_row_and_uses_them_all() {
+        let mut d = director_with(&[("step", &["a.ogg", "b.ogg", "c.ogg"]), ("door", &["door.ogg"]), ("none", &[])]);
+        let mut seen = std::collections::BTreeSet::new();
+        let mut last = String::new();
+        for _ in 0..300 {
+            let f = d.pick_file("step").unwrap();
+            assert_ne!(f, last, "the same file twice in a row");
+            seen.insert(f.clone());
+            last = f;
+        }
+        assert_eq!(seen.len(), 3, "every file is used: {seen:?}");
+        for _ in 0..10 {
+            assert_eq!(d.pick_file("door").unwrap(), "door.ogg");
+        }
+        assert!(d.pick_file("none").is_none() && d.pick_file("unknown").is_none(), "no files: the built-in voice");
+    }
+
+    #[test]
+    fn pitch_and_volume_vary_inside_their_limits_and_not_at_all_when_zero() {
+        let mut def = FileDef { files: vec!["a.ogg".into()], volume: 2.0, pitch: 1.0, pitch_var: 0.1, volume_var: 0.25, spatial: false, range: 40.0, near: 2.0, last: usize::MAX };
+        let lo = Director::params_for(&def, None, (0.0, 0.0));
+        let hi = Director::params_for(&def, None, (1.0, 1.0));
+        let mid = Director::params_for(&def, None, (0.5, 0.5));
+        assert!((lo.pitch - 0.9).abs() < 1e-5 && (hi.pitch - 1.1).abs() < 1e-5 && (mid.pitch - 1.0).abs() < 1e-5);
+        assert!((lo.volume - 1.5).abs() < 1e-5 && (hi.volume - 2.5).abs() < 1e-5 && (mid.volume - 2.0).abs() < 1e-5);
+        def.pitch_var = 0.0;
+        def.volume_var = 0.0;
+        let p = Director::params_for(&def, None, (0.0, 1.0));
+        assert!((p.pitch - 1.0).abs() < 1e-6 && (p.volume - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_random_numbers_stay_inside_zero_to_one_and_move() {
+        let mut d = director_with(&[]);
+        let v: Vec<f32> = (0..1000).map(|_| d.next_unit()).collect();
+        assert!(v.iter().all(|x| (0.0..1.0).contains(x)));
+        let mean = v.iter().sum::<f32>() / v.len() as f32;
+        assert!((mean - 0.5).abs() < 0.06, "mean {mean}");
     }
 }

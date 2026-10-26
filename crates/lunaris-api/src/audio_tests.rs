@@ -403,3 +403,15 @@ fn a_music_player_crossfades_through_its_playlist_and_pauses_and_skips_on_comman
     assert!(r.get("warnings").unwrap().as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains("nope.wav")), "{r:?}");
 }
 
+#[test]
+fn an_event_whose_sound_file_has_volume_zero_makes_no_sound_and_takes_no_voice() {
+    let mut e = engine();
+    room(&mut e);
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"pos":[4,0,0]}}}"#);
+    emitter(&mut e, 4.0, "shot", None);
+    // with no SoundFile the event would play the built-in voice; a SoundFile with volume 0 says it sounds like nothing
+    call(&mut e, "spawn", r#"{"components":{"SoundFile":{"name":"shot","file":"","volume":0}}}"#);
+    let r = call(&mut e, "record_audio", r#"{"ticks":120}"#);
+    assert!(r.get("voices_started").unwrap().get("shot").is_none(), "{}", r.to_string_lossy());
+    assert!(r.get("silent") == Some(&Json::Bool(true)), "{}", r.to_string_lossy());
+}

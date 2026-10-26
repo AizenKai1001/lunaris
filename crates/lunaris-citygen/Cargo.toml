@@ -1,0 +1,13 @@
+[package]
+name = "lunaris-citygen"
+description = "A procedural city: streets, lots and buildings (facades with real window reveals, frames, balconies, roofs) written as glTF cells that use photographed PBR material pictures. Depends on lunaris-json and, for the procedural provider, lunaris-sim."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lunaris-json = { path = "../lunaris-json" }
+lunaris-sim = { path = "../lunaris-sim" }
+
+[lints]
+workspace = true

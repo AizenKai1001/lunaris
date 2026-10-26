@@ -69,7 +69,7 @@
       "fields": []
     },
     {
-      "name": "Door",
+      "name": "DoorMark",
       "doc": "",
       "fields": []
     },
@@ -6209,7 +6209,6 @@
           ],
           "trigger": false
         },
-        "Door": {},
         "Name": {
           "value": "Door"
         },
@@ -6249,7 +6248,8 @@
             1,
             1
           ]
-        }
+        },
+        "DoorMark": {}
       }
     },
     {
@@ -13646,7 +13646,7 @@
           "Hero"
         ],
         "b": [
-          "Door",
+          "DoorMark",
           "Transform"
         ]
       },

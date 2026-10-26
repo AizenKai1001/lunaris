@@ -7,8 +7,14 @@
 //! URIs) and relative files inside the workspace; PNG textures; the first skin (joints, inverse bind matrices, `JOINTS_0` and
 //! `WEIGHTS_0`) and every animation of translation, rotation and scale (linear, step and cubic spline) of its joints, kept in a
 //! `Rig` (see `rig.rs`; the mesh itself is skinned to the rest pose). Not supported (reported as warnings, the rest still loads):
-//! more than one skin, morph targets, animation of anything but joints, sparse accessors, texture transforms, alpha
-//! blending.
+//! more than one skin, morph targets, animation of anything but joints, sparse accessors, texture transforms.
+//!
+//! Materials: the base colour factor is a vertex colour and the base colour texture the mesh's texture. A model whose materials
+//! differ in more than a colour (two base textures; a normal map or a metallic-roughness map on any; an alpha cut-out) is also
+//! split into one mesh per distinct material (`Mesh::parts`, not for skinned models); a model with a single such material carries
+//! its normal map, metallic-roughness map and cut-out on the mesh itself. `alphaMode` `MASK` cuts at `alphaCutoff` and `BLEND` is
+//! shown as a cut-out at 0.5; a two-sided cut-out gets its triangles doubled facing the other way (opaque two-sided meshes are
+//! left alone: their back faces are never seen).
 use crate::math::*;
 use crate::mesh::Mesh;
 use crate::rig::{decompose, Clip, Interp, Joint, Path as AnimPath, Rig, Track};
@@ -24,6 +30,95 @@ const MAX_DEPTH: usize = 64;
 pub struct Imported {
     pub mesh: Mesh,
     pub warnings: Vec<String>,
+}
+
+/// What of a glTF material the renderer uses (the colour factor is not in it: it rides on the vertices).
+#[derive(Clone, PartialEq, Eq)]
+struct MatKey {
+    /// Image indices.
+    base: Option<usize>,
+    normal: Option<usize>,
+    arm: Option<usize>,
+    /// The bits of the alpha cut-off (0 = opaque).
+    cutoff: u32,
+    double: bool,
+    /// The bits of the luminance of `emissiveFactor` (0 = none).
+    emissive: u32,
+}
+
+/// The triangles `a..b` of the index list belong to a primitive of this material.
+struct PrimRange {
+    a: usize,
+    b: usize,
+    key: MatKey,
+}
+
+/// A mesh of only the triangles in `ranges` of `src`'s index list, with the vertices they use renumbered.
+fn subset(src: &Mesh, ranges: &[(usize, usize)]) -> Mesh {
+    let mut map = vec![u32::MAX; src.pos.len()];
+    let mut m = Mesh::new();
+    for &(a, b) in ranges {
+        for &i in &src.idx[a..b] {
+            let v = i as usize;
+            if map[v] == u32::MAX {
+                map[v] = m.pos.len() as u32;
+                m.pos.push(src.pos[v]);
+                m.nrm.push(src.nrm[v]);
+                m.uv.push(src.uv[v]);
+                m.col.push(src.col[v]);
+                m.texw.push(src.texw[v]);
+            }
+            m.idx.push(map[v]);
+        }
+    }
+    m
+}
+
+/// Add a copy of every triangle facing the other way, with the normals turned round (a leaf seen from behind).
+fn make_two_sided(m: &mut Mesh) {
+    let n = m.pos.len();
+    for i in 0..n {
+        let nrm = m.nrm[i];
+        m.pos.push(m.pos[i]);
+        m.nrm.push([-nrm[0], -nrm[1], -nrm[2]]);
+        m.uv.push(m.uv[i]);
+        m.col.push(m.col[i]);
+        m.texw.push(m.texw[i]);
+    }
+    let tris: Vec<[u32; 3]> = m.idx.chunks_exact(3).map(|t| [t[0], t[1], t[2]]).collect();
+    for t in tris {
+        m.idx.extend_from_slice(&[n as u32 + t[0], n as u32 + t[2], n as u32 + t[1]]);
+    }
+}
+
+/// Where the pictures that a model names as files may come from instead of being read and decoded again (a cache that already has them): it is given the name of the file, relative to the
+/// model's folder (a plain relative name: no `..`, no absolute path, no drive letter) and returns the picture, or `None` to have the model read it itself.
+pub type ImageResolver<'a> = &'a mut dyn FnMut(&str) -> Option<Arc<Texture>>;
+
+/// The picture of image `img` of the document (a bufferView of the file, or a file beside it).
+fn load_image(doc: &Doc, dir: Option<&Path>, img: usize, resolver: &mut Option<ImageResolver>) -> Result<Arc<Texture>, String> {
+    let image = doc.arr("images").get(img).ok_or("the texture's image does not exist")?;
+    if image.get("bufferView").is_none() {
+        if let (Some(uri), Some(res)) = (image.get("uri").and_then(|u| u.as_str()), resolver.as_mut()) {
+            if !uri.starts_with("data:") {
+                let plain = safe_join(Path::new(""), uri)?;
+                if let Some(t) = res(&plain.to_string_lossy().replace('\\', "/")) {
+                    return Ok(t);
+                }
+            }
+        }
+    }
+    let data = if let Some(view) = image.get("bufferView").and_then(|v| v.as_u64()) {
+        let v = doc.arr("bufferViews").get(view as usize).ok_or("the image's bufferView does not exist")?;
+        let buf = doc.buffers.get(v.get("buffer").and_then(|b| b.as_u64()).unwrap_or(0) as usize).ok_or("the image's buffer does not exist")?;
+        let off = v.get("byteOffset").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        let len = v.get("byteLength").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        buf.get(off..off + len).ok_or("the image reaches past its buffer")?.to_vec()
+    } else {
+        load_uri(image.get("uri").and_then(|u| u.as_str()).ok_or("the image has neither a bufferView nor a uri")?, dir)?
+    };
+    // a PNG or a JPEG (told apart by their first bytes)
+    Texture::from_image_bytes(&data).map(Arc::new)
 }
 
 fn b64_decode(s: &str) -> Result<Vec<u8>, String> {
@@ -262,17 +357,36 @@ fn build_rig(doc: &Doc<'_>, si: usize, node_world: &[Option<M4>], parent_node: &
     };
     let mut order: Vec<usize> = (0..joints.len()).collect();
     order.sort_by_key(|&j| (depth_of(j), j));
+    // the nodes that hold the skeleton: what an animation does to them is the clip's root motion
+    let mut skeleton_parents: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    for (j, &ni) in joint_nodes.iter().enumerate() {
+        if joints[j].parent.is_none() {
+            let mut up = parent_node.get(ni).copied().flatten();
+            let mut guard = 0;
+            while let Some(p) = up {
+                skeleton_parents.insert(p);
+                up = parent_node.get(p).copied().flatten();
+                guard += 1;
+                if guard > 1000 {
+                    break;
+                }
+            }
+        }
+    }
     // the animations
     let mut clips: Vec<Clip> = Vec::new();
     for (ai, anim) in doc.arr("animations").iter().enumerate() {
         let name = anim.get("name").and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| format!("clip{ai}"));
         let samplers = anim.get("samplers").and_then(|v| v.as_array()).unwrap_or(&[]);
         let mut tracks: Vec<Track> = Vec::new();
+        let mut root_tracks: Vec<Track> = Vec::new();
         let mut duration = 0.0f32;
         for ch in anim.get("channels").and_then(|v| v.as_array()).unwrap_or(&[]) {
             let target = ch.get("target");
             let node = target.and_then(|t| t.get("node")).and_then(|v| v.as_u64()).map(|n| n as usize);
-            let Some(&joint) = node.and_then(|n| node_to_joint.get(&n)) else {
+            let joint_found = node.and_then(|n| node_to_joint.get(&n)).copied();
+            let is_root = joint_found.is_none() && node.map_or(false, |n| skeleton_parents.contains(&n));
+            let Some(joint) = joint_found.or(if is_root { Some(0) } else { None }) else {
                 warnings.push(format!("animation `{name}` moves something that is not a joint of the skeleton: skipped"));
                 continue;
             };
@@ -303,10 +417,25 @@ fn build_rig(doc: &Doc<'_>, si: usize, node_world: &[Option<M4>], parent_node: &
                 continue;
             }
             duration = duration.max(*times.last().unwrap_or(&0.0));
-            tracks.push(Track { joint, path, interp, times, values });
+            if is_root {
+                root_tracks.push(Track { joint: 0, path, interp, times, values });
+            } else {
+                tracks.push(Track { joint, path, interp, times, values });
+            }
+        }
+        // a clip starts at time 0: exporters that begin an animation one frame in (Blender's glTF export of a clip imported from FBX does) would otherwise hold the first pose for that frame and
+        // make a looping clip stutter once a cycle
+        let start = tracks.iter().chain(root_tracks.iter()).filter_map(|t| t.times.first().copied()).fold(f32::INFINITY, f32::min);
+        if start.is_finite() && start > 0.0 {
+            for t in tracks.iter_mut().chain(root_tracks.iter_mut()) {
+                for x in t.times.iter_mut() {
+                    *x = (*x - start).max(0.0);
+                }
+            }
+            duration = (duration - start).max(0.0);
         }
         if !tracks.is_empty() {
-            clips.push(Clip { name, duration, tracks });
+            clips.push(Clip { name, duration, tracks, root: root_tracks });
         }
     }
     Ok(Rig { joints, order, clips, bind_pos: mesh.pos.clone(), bind_nrm: mesh.nrm.clone(), vj, vw })
@@ -314,6 +443,11 @@ fn build_rig(doc: &Doc<'_>, si: usize, node_world: &[Option<M4>], parent_node: &
 
 /// Parse a `.glb` (binary) or `.gltf` (JSON) file. `dir` is the folder external files are resolved in (None: embedded data only).
 pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
+    import_with(bytes, dir, None)
+}
+
+/// As `import`, with a `resolver` that may supply the pictures the model names as files (so that a picture the workspace has already loaded is not decoded a second time).
+pub fn import_with(bytes: &[u8], dir: Option<&Path>, mut resolver: Option<ImageResolver>) -> Result<Imported, String> {
     if bytes.len() > MAX_FILE {
         return Err(format!("the model is larger than the {} MB limit", MAX_FILE >> 20));
     }
@@ -375,8 +509,11 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
         roots.extend((0..nodes.len()).filter(|&i| !is_child[i]));
     }
 
-    let mut out = Mesh { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::new(), tex: None, rig: None };
+    let mut out = Mesh::new();
     let mut texture_choice: Option<usize> = None; // image index
+    let mut prim_ranges: Vec<PrimRange> = Vec::new();
+    let mut texture_notes: Vec<String> = Vec::new();
+    let mut warned_blend = false;
     // the node tree as it is walked (the skeleton needs where each node stands), and the skinning data of every vertex
     let mut node_world: Vec<Option<M4>> = vec![None; nodes.len()];
     let mut parent_node: Vec<Option<usize>> = vec![None; nodes.len()];
@@ -462,7 +599,29 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
             // material: base colour factor (linear) and the first base colour texture
             let mut factor = [1.0f32; 3];
             let mut prim_image: Option<usize> = None;
+            let mut key = MatKey { base: None, normal: None, arm: None, cutoff: 0, double: false, emissive: 0 };
+            let image_of = |t: &Json| -> Option<usize> { t.get("index").and_then(|v| v.as_u64()).and_then(|t| doc.arr("textures").get(t as usize)).and_then(|t| t.get("source")).and_then(|v| v.as_u64()).map(|i| i as usize) };
             if let Some(mat) = prim.get("material").and_then(|v| v.as_u64()).and_then(|m| doc.arr("materials").get(m as usize)) {
+                key.normal = mat.get("normalTexture").and_then(&image_of);
+                key.arm = mat.get("pbrMetallicRoughness").and_then(|p| p.get("metallicRoughnessTexture")).and_then(&image_of);
+                key.double = mat.get("doubleSided").and_then(|v| v.as_bool()).unwrap_or(false);
+                if let Some(e) = mat.get("emissiveFactor").and_then(|v| v.as_array()).filter(|e| e.len() >= 3) {
+                    let c = |i: usize| e[i].as_f64().unwrap_or(0.0) as f32;
+                    // (a negative factor is the window mode of the GPU renderer: the texture's alpha is the glass and the shader lights some of the windows when the object's `emissive` is up)
+                    let lum = (0.2126 * c(0) + 0.7152 * c(1) + 0.0722 * c(2)).clamp(-1.0, 1.0);
+                    key.emissive = if lum.abs() > 0.01 { lum.to_bits() } else { 0 };
+                }
+                match mat.get("alphaMode").and_then(|v| v.as_str()).unwrap_or("OPAQUE") {
+                    "MASK" => key.cutoff = (mat.get("alphaCutoff").and_then(|v| v.as_f64()).unwrap_or(0.5) as f32).clamp(0.01, 1.0).to_bits(),
+                    "BLEND" => {
+                        key.cutoff = 0.5f32.to_bits();
+                        if !warned_blend {
+                            warned_blend = true;
+                            warnings.push("a material uses alpha blending: it is shown as a cut-out at 0.5".to_string());
+                        }
+                    }
+                    _ => {}
+                }
                 if let Some(pbr) = mat.get("pbrMetallicRoughness") {
                     if let Some(f) = pbr.get("baseColorFactor").and_then(|v| v.as_array()).filter(|f| f.len() >= 3) {
                         factor = [f[0].as_f64().unwrap_or(1.0) as f32, f[1].as_f64().unwrap_or(1.0) as f32, f[2].as_f64().unwrap_or(1.0) as f32];
@@ -470,6 +629,7 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
                     if let Some(t) = pbr.get("baseColorTexture").and_then(|t| t.get("index")).and_then(|v| v.as_u64()) {
                         if let Some(img) = doc.arr("textures").get(t as usize).and_then(|t| t.get("source")).and_then(|v| v.as_u64()) {
                             prim_image = Some(img as usize);
+                            key.base = Some(img as usize);
                             if texture_choice.is_none() {
                                 texture_choice = Some(img as usize);
                             }
@@ -479,7 +639,7 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
             }
             let textured = prim_image.is_some() && prim_image == texture_choice;
             if prim_image.is_some() && !textured {
-                warnings.push(format!("mesh {mi} primitive {pi}: a model shows one texture; this primitive's own texture is shown as its plain colour"));
+                texture_notes.push(format!("mesh {mi} primitive {pi}: a model shows one texture; this primitive's own texture is shown as its plain colour"));
             }
             let base = out.pos.len() as u32;
             // indices (triangle list, strip or fan)
@@ -567,6 +727,9 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
                     out.idx.extend_from_slice(&[base + tri[0], base + tri[1], base + tri[2]]);
                 }
             }
+            if !skinned {
+                prim_ranges.push(PrimRange { a: idx_start, b: out.idx.len(), key });
+            }
             if flat {
                 // the originals were only the source of the per-triangle copies: drop them and renumber the triangles
                 let n = n as u32;
@@ -601,24 +764,121 @@ pub fn import(bytes: &[u8], dir: Option<&Path>) -> Result<Imported, String> {
         }
     }
     // ---- the texture, if any
+    let mut images: std::collections::HashMap<usize, Option<Arc<Texture>>> = std::collections::HashMap::new();
+    let mut load = |img: usize, warnings: &mut Vec<String>| -> Option<Arc<Texture>> {
+        images
+            .entry(img)
+            .or_insert_with(|| match load_image(&doc, dir, img, &mut resolver) {
+                Ok(t) => Some(t),
+                Err(e) => {
+                    warnings.push(format!("texture skipped: {e}"));
+                    None
+                }
+            })
+            .clone()
+    };
     if let Some(img) = texture_choice {
-        let loaded: Result<Texture, String> = (|| {
-            let image = doc.arr("images").get(img).ok_or("the texture's image does not exist")?;
-            let data = if let Some(view) = image.get("bufferView").and_then(|v| v.as_u64()) {
-                let v = doc.arr("bufferViews").get(view as usize).ok_or("the image's bufferView does not exist")?;
-                let buf = doc.buffers.get(v.get("buffer").and_then(|b| b.as_u64()).unwrap_or(0) as usize).ok_or("the image's buffer does not exist")?;
-                let off = v.get("byteOffset").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
-                let len = v.get("byteLength").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
-                buf.get(off..off + len).ok_or("the image reaches past its buffer")?.to_vec()
-            } else {
-                load_uri(image.get("uri").and_then(|u| u.as_str()).ok_or("the image has neither a bufferView nor a uri")?, dir)?
-            };
-            // a PNG or a JPEG (told apart by their first bytes)
-            Texture::from_image_bytes(&data)
-        })();
-        match loaded {
-            Ok(t) => out.tex = Some(Arc::new(t)),
-            Err(e) => warnings.push(format!("texture skipped: {e}")),
+        out.tex = load(img, &mut warnings);
+    }
+    // ---- the materials that differ in more than a colour
+    let mut distinct: Vec<MatKey> = Vec::new();
+    for r in &prim_ranges {
+        if !distinct.contains(&r.key) {
+            distinct.push(r.key.clone());
+        }
+    }
+    let mut split = false;
+    if out.rig.is_none() && !distinct.is_empty() {
+        let bases = distinct.iter().filter_map(|k| k.base).collect::<std::collections::BTreeSet<_>>().len();
+        let maps = distinct.iter().any(|k| k.normal.is_some() || k.arm.is_some() || k.cutoff != 0 || k.emissive != 0);
+        if distinct.len() >= 2 && (bases >= 2 || maps) {
+            split = true;
+            for k in &distinct {
+                let ranges: Vec<(usize, usize)> = prim_ranges.iter().filter(|r| r.key == *k).map(|r| (r.a, r.b)).collect();
+                let mut part = subset(&out, &ranges);
+                part.tex = k.base.and_then(|i| load(i, &mut warnings));
+                part.texw = vec![if part.tex.is_some() { 1.0 } else { 0.0 }; part.pos.len()];
+                part.normal_tex = k.normal.and_then(|i| load(i, &mut warnings));
+                part.arm_tex = k.arm.and_then(|i| load(i, &mut warnings));
+                part.alpha_cutoff = f32::from_bits(k.cutoff);
+                part.emissive_factor = f32::from_bits(k.emissive);
+                if part.emissive_factor < 0.0 {
+                    // a window-mode part (far walls): the alpha of its picture is the glass, not a cut-out. A texture weight of 1 makes the shader discard where the alpha is below a half (a wall would vanish and only its windows
+                    // be left), so the weight is a hair below it: the picture still counts in full for the colour
+                    part.texw = vec![if part.tex.is_some() { 0.99 } else { 0.0 }; part.pos.len()];
+                }
+                if part.alpha_cutoff > 0.0 && k.double {
+                    make_two_sided(&mut part);
+                }
+                out.parts.push(Arc::new(part));
+            }
+        } else if distinct.len() == 1 {
+            let k = &distinct[0];
+            out.normal_tex = k.normal.and_then(|i| load(i, &mut warnings));
+            out.arm_tex = k.arm.and_then(|i| load(i, &mut warnings));
+            out.alpha_cutoff = f32::from_bits(k.cutoff);
+            if out.alpha_cutoff > 0.0 && k.double {
+                // the whole stays as the physics reads it (the same triangles, once); what is drawn is a copy with the triangles doubled
+                let mut part = subset(&out, &[(0, out.idx.len())]);
+                part.tex = out.tex.clone();
+                part.normal_tex = out.normal_tex.clone();
+                part.arm_tex = out.arm_tex.clone();
+                part.alpha_cutoff = out.alpha_cutoff;
+                make_two_sided(&mut part);
+                out.parts.push(Arc::new(part));
+            }
+        }
+    }
+    if !split {
+        warnings.extend(texture_notes);
+    }
+    // `asset.extras.lunaris_lod`: "whole" keeps the GPU renderer from making coarser versions of the model (a city tile with its pictures packed in one atlas: merging vertices smears the picture; such a
+    // file brings its own coarser versions as other files), "ground" lets it have them without the base budget
+    let mode = match json.get("asset").and_then(|a| a.get("extras")).and_then(|e| e.get("lunaris_lod")).and_then(|v| v.as_str()) {
+        Some("whole") => Some(crate::mesh::LodMode::Whole),
+        Some("ground") => Some(crate::mesh::LodMode::Ground),
+        _ => None,
+    };
+    // a model of three or more pieces: one more mesh of the pieces that are not cut out, for the passes that need only depth (a city block of ninety materials is then one draw in each shadow map, not ninety)
+    {
+        let solid: Vec<&Arc<Mesh>> = out.parts.iter().filter(|p| p.alpha_cutoff == 0.0).collect();
+        if out.rig.is_none() && solid.len() >= 3 {
+            let mut merged = Mesh::new();
+            for p in solid {
+                let base = merged.pos.len() as u32;
+                merged.pos.extend_from_slice(&p.pos);
+                merged.nrm.extend_from_slice(&p.nrm);
+                merged.uv.extend_from_slice(&p.uv);
+                merged.col.extend_from_slice(&p.col);
+                merged.texw.extend_from_slice(&p.texw);
+                merged.idx.extend(p.idx.iter().map(|i| i + base));
+            }
+            merged.lod = out.lod;
+            out.depth_whole = Some(Arc::new(merged));
+        }
+    }
+    // `asset.extras.lunaris_occluders`: [[x0, z0, x1, z1, x2, z2, x3, z3, y_bottom, y_top], ...], the solid volumes of the model (see `Mesh::occluders`); the first drawn piece carries them too, so that an object that is drawn in pieces gives them once
+    if let Some(list) = json.get("asset").and_then(|a| a.get("extras")).and_then(|e| e.get("lunaris_occluders")).and_then(|v| v.as_array()) {
+        for item in list.iter().take(4096) {
+            if let Some(nums) = item.as_array() {
+                let v: Vec<f32> = nums.iter().filter_map(|x| x.as_f64()).map(|x| x as f32).collect();
+                if v.len() == 10 && v.iter().all(|x| x.is_finite()) {
+                    let mut a = [0.0f32; 10];
+                    a.copy_from_slice(&v);
+                    out.occluders.push(a);
+                }
+            }
+        }
+        if let Some(first) = out.parts.first_mut().and_then(Arc::get_mut) {
+            first.occluders = out.occluders.clone();
+        }
+    }
+    if let Some(m) = mode {
+        out.lod = m;
+        for p in out.parts.iter_mut() {
+            if let Some(part) = Arc::get_mut(p) {
+                part.lod = m;
+            }
         }
     }
     Ok(Imported { mesh: out, warnings })
@@ -717,5 +977,78 @@ mod tests {
         assert!(safe_join(Path::new("/w"), "models/a.bin").is_ok());
         assert!(safe_join(Path::new("/w"), "../a.bin").is_err());
         assert!(safe_join(Path::new("/w"), "/etc/passwd").is_err());
+    }
+
+    fn png_uri(rgba: [u8; 4]) -> String {
+        let data: Vec<u8> = (0..4).flat_map(|_| rgba).collect();
+        format!("data:image/png;base64,{}", b64(&crate::frame::encode_png(2, 2, &data).unwrap()))
+    }
+
+    /// Two triangles, each its own primitive (no normals: they get flat ones), with the given materials, textures and images.
+    fn two_triangles(materials: &str, textures: &str, images: &str) -> String {
+        let bin = le_f32(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0]);
+        format!(
+            r#"{{"asset":{{"version":"2.0"}},"scene":0,"scenes":[{{"nodes":[0]}}],"nodes":[{{"mesh":0}}],
+            "meshes":[{{"primitives":[{{"attributes":{{"POSITION":0}},"material":0}},{{"attributes":{{"POSITION":1}},"material":1}}]}}],
+            "materials":[{materials}],"textures":[{textures}],"images":[{images}],
+            "buffers":[{{"byteLength":{},"uri":"data:application/octet-stream;base64,{}"}}],
+            "bufferViews":[{{"buffer":0,"byteOffset":0,"byteLength":36}},{{"buffer":0,"byteOffset":36,"byteLength":36}}],
+            "accessors":[{{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"}},{{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"}}]}}"#,
+            bin.len(),
+            b64(&bin)
+        )
+    }
+
+    #[test]
+    fn materials_that_differ_in_more_than_a_colour_make_one_mesh_each_and_a_cut_out_is_two_sided() {
+        let images = format!(r#"{{"uri":"{}"}},{{"uri":"{}"}},{{"uri":"{}"}}"#, png_uri([255, 0, 0, 255]), png_uri([0, 255, 0, 255]), png_uri([128, 128, 255, 255]));
+        let textures = r#"{"source":0},{"source":1},{"source":2}"#;
+        // bark: a texture and a normal map; leaf: another texture, cut out at 0.3, two-sided
+        let materials = r#"{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}},"normalTexture":{"index":2}},
+            {"pbrMetallicRoughness":{"baseColorTexture":{"index":1},"metallicRoughnessTexture":{"index":2}},"alphaMode":"MASK","alphaCutoff":0.3,"doubleSided":true}"#;
+        let m = import(two_triangles(materials, textures, &images).as_bytes(), None).unwrap();
+        assert!(m.warnings.is_empty(), "{:?}", m.warnings);
+        let whole = &m.mesh;
+        assert_eq!(whole.idx.len(), 6, "the whole stays whole (two triangles) for the physics and the rays");
+        assert_eq!(whole.parts.len(), 2, "one mesh per material");
+        let (bark, leaf) = (&whole.parts[0], &whole.parts[1]);
+        assert!(bark.tex.is_some() && bark.normal_tex.is_some() && bark.arm_tex.is_none() && bark.alpha_cutoff == 0.0);
+        assert_eq!(bark.idx.len(), 3, "an opaque material is not doubled");
+        assert!(leaf.tex.is_some() && leaf.arm_tex.is_some() && leaf.normal_tex.is_none());
+        assert!((leaf.alpha_cutoff - 0.3).abs() < 1e-6);
+        assert_eq!(leaf.idx.len(), 6, "the cut-out is drawn from both sides");
+        assert_eq!(leaf.pos.len(), 6);
+        assert!(bark.texw.iter().all(|&w| w == 1.0) && leaf.texw.iter().all(|&w| w == 1.0));
+        for k in 0..3 {
+            assert_eq!(leaf.nrm[3 + k], [-leaf.nrm[k][0], -leaf.nrm[k][1], -leaf.nrm[k][2]], "the back copy faces the other way");
+        }
+        assert!(!Arc::ptr_eq(bark.tex.as_ref().unwrap(), leaf.tex.as_ref().unwrap()), "each part has its own picture");
+    }
+
+    #[test]
+    fn a_single_material_with_maps_and_a_cut_out_carries_them_on_the_mesh_and_plain_models_are_as_before() {
+        let images = format!(r#"{{"uri":"{}"}},{{"uri":"{}"}}"#, png_uri([255, 0, 0, 255]), png_uri([128, 128, 255, 255]));
+        let textures = r#"{"source":0},{"source":1}"#;
+        let one = r#"{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}},"normalTexture":{"index":1},"alphaMode":"BLEND"}"#;
+        let m = import(two_triangles(&format!("{one},{one}"), textures, &images).as_bytes(), None).unwrap();
+        assert!(m.mesh.parts.is_empty(), "the same material twice is one material");
+        assert!(m.mesh.tex.is_some() && m.mesh.normal_tex.is_some());
+        assert_eq!(m.mesh.alpha_cutoff, 0.5);
+        assert!(m.warnings.iter().any(|w| w.contains("alpha blending")), "{:?}", m.warnings);
+        // a two-sided cut-out: the whole is untouched (physics reads it), the drawn copy has both sides
+        let sided = r#"{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}},"alphaMode":"MASK","doubleSided":true}"#;
+        let m = import(two_triangles(&format!("{sided},{sided}"), textures, &images).as_bytes(), None).unwrap();
+        assert_eq!(m.mesh.idx.len(), 6, "the whole is as the file says");
+        assert_eq!(m.mesh.parts.len(), 1);
+        assert_eq!(m.mesh.parts[0].idx.len(), 12, "the drawn copy has each triangle twice");
+        assert!(m.mesh.parts[0].tex.is_some() && m.mesh.parts[0].alpha_cutoff == 0.5);
+        // two materials that differ only in colour (one of them textured): the old way, one mesh, the texture weighed per vertex
+        let a = r#"{"pbrMetallicRoughness":{"baseColorTexture":{"index":0},"baseColorFactor":[1,1,1,1]}}"#;
+        let b = r#"{"pbrMetallicRoughness":{"baseColorFactor":[0,0,1,1]}}"#;
+        let m = import(two_triangles(&format!("{a},{b}"), textures, &images).as_bytes(), None).unwrap();
+        assert!(m.mesh.parts.is_empty() && m.mesh.normal_tex.is_none() && m.mesh.alpha_cutoff == 0.0);
+        assert!(m.mesh.tex.is_some());
+        assert_eq!((m.mesh.texw[0], m.mesh.texw[3]), (1.0, 0.0));
+        assert_eq!(m.mesh.col[3], [0.0, 0.0, 1.0]);
     }
 }

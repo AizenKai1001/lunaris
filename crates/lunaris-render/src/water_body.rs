@@ -60,7 +60,7 @@ pub fn build_mesh(field: &Heightfield, w: &WaterBody) -> Option<Mesh> {
     if idx.is_empty() {
         return None;
     }
-    Some(Mesh { pos, nrm, uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None })
+    Some(Mesh { pos, nrm, uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Full, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 })
 }
 
 #[cfg(test)]

@@ -279,6 +279,45 @@ fn state_hash_ignores_storage_order_but_sees_every_value() {
 }
 
 #[test]
+fn the_state_hash_of_the_per_archetype_plan_is_the_one_of_the_field_by_field_way() {
+    let mut w = World::new();
+    let label = parse_component_def(&parse(r#"{"name":"Label","fields":[{"name":"text","type":"str"},{"name":"n","type":"f64"},{"name":"k","type":"i64"},{"name":"u","type":"u32"},{"name":"on","type":"bool"}]}"#).unwrap()).unwrap();
+    let lid = w.register_dynamic(&label.0, &label.1, &label.2).unwrap();
+    let words = ["", "a", "eight", "exactly8", "longer than eight bytes"].map(|s| w.strings_mut().intern(s));
+    // an empty world, then entities in many archetypes: one component, two, a mix of every field type, a marker without data, a string component, despawns and resources
+    assert_eq!(w.state_hash(), w.state_hash_reference());
+    for i in 0..60u32 {
+        let e = w.spawn();
+        if i % 2 == 0 {
+            w.insert(e, Pos { x: i as f32, y: 1.5, z: -2.0 }).unwrap();
+        }
+        if i % 3 == 0 {
+            w.insert(e, Vel { v: [i as f32, 0.25, -0.5] }).unwrap();
+        }
+        if i % 5 == 0 {
+            w.insert(e, Mixed { flag: i % 10 == 0, big: 1 << (i % 60), small: -(i as i32), name: Sym(words[(i % 5) as usize]), target: Uid(i as u64) }).unwrap();
+        }
+        if i % 7 == 0 {
+            w.insert(e, Marker {}).unwrap();
+        }
+        if i % 4 == 0 {
+            w.insert_json(e, lid, &parse(&format!(r#"{{"text":"{}","n":{}.5,"k":-{},"u":{},"on":true}}"#, "x".repeat((i % 11) as usize), i, i, i)).unwrap()).unwrap();
+        }
+    }
+    assert_eq!(w.state_hash(), w.state_hash_reference());
+    for uid in [3u64, 10, 11, 30] {
+        let e = w.entity(uid).unwrap();
+        w.despawn(e);
+    }
+    w.set_resource("score", Some(12.5)).unwrap();
+    w.set_resource("lives", Some(3.0)).unwrap();
+    assert_eq!(w.state_hash(), w.state_hash_reference());
+    let e = w.entity(21).unwrap(); // uid 21 is the 21st spawn (i = 20): it has a Pos
+    w.get_mut::<Pos>(e).unwrap().x += 1.0;
+    assert_eq!(w.state_hash(), w.state_hash_reference());
+}
+
+#[test]
 fn scene_json_round_trips_with_dynamic_components_and_strings() {
     let mut w = World::new();
     let name = parse_component_def(&parse(r#"{"name":"Label","fields":[{"name":"text","type":"str"}]}"#).unwrap()).unwrap();
@@ -391,4 +430,228 @@ fn many_entities_survive_churn() {
             assert_eq!(v.v[0], x);
         }
     }
+}
+
+#[test]
+fn a_query_finds_the_same_archetypes_as_looking_at_every_one_even_with_more_components_than_a_mask_has_bits() {
+    // (90 components: the archetypes' masks have 64 bits, so some components share one, which may only make a query look closer, never miss an archetype)
+    let mut w = World::new();
+    let cids: Vec<ComponentId> = (0..90)
+        .map(|i| {
+            let def = parse(&format!(r#"{{"name":"C{i}","fields":[{{"name":"v","type":"u32"}}]}}"#)).unwrap();
+            let (name, doc, specs) = parse_component_def(&def).unwrap();
+            w.register_dynamic(&name, &doc, &specs).unwrap()
+        })
+        .collect();
+    let mut seed = 0x2545_F491_4F6C_DD1Du64;
+    let mut next = move |n: usize| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        (seed >> 33) as usize % n
+    };
+    let one = parse(r#"{"v": 1}"#).unwrap();
+    let mut made = Vec::new();
+    for _ in 0..600 {
+        let k = 1 + next(6);
+        let mut set: Vec<usize> = (0..k).map(|_| next(90)).collect();
+        set.sort_unstable();
+        set.dedup();
+        let comps: Vec<(ComponentId, &Json)> = set.iter().map(|&i| (cids[i], &one)).collect();
+        made.push(w.spawn_json(None, &comps).unwrap());
+    }
+    // (some entities go away, so that archetypes are empty and a query must not count them)
+    for e in made.iter().step_by(7) {
+        assert!(w.despawn(*e));
+    }
+    let by_looking = |w: &World, with: &[ComponentId], without: &[ComponentId]| -> Vec<usize> {
+        (0..w.archetypes().len())
+            .filter(|&i| {
+                let a = &w.archetypes()[i];
+                let Some(&e) = a.entities().first() else { return false };
+                let have = w.components_of(e);
+                with.iter().all(|c| have.contains(c)) && without.iter().all(|c| !have.contains(c))
+            })
+            .collect()
+    };
+    let mut nonempty = 0;
+    for _ in 0..3000 {
+        let with: Vec<ComponentId> = (0..1 + next(3)).map(|_| cids[next(90)]).collect();
+        let without: Vec<ComponentId> = (0..next(3)).map(|_| cids[next(90)]).collect();
+        let found = w.matching_archetypes(&with, &without);
+        assert_eq!(found, by_looking(&w, &with, &without), "with {with:?} without {without:?}");
+        assert_eq!(w.chunks(&with, &without, 3), w.chunks_of(&found, 3));
+        if !found.is_empty() {
+            nonempty += 1;
+        }
+    }
+    assert!(nonempty > 300, "the queries find something often enough to mean something: {nonempty}");
+}
+
+#[test]
+fn a_bundle_spawn_is_the_same_world_as_spawning_component_by_component() {
+    let mut a = World::new();
+    let mut b = World::new();
+    for i in 0..40 {
+        let p = Pos { x: i as f32, y: 1.0, z: 2.0 };
+        let v = Vel { v: [i as f32, 0.5, 0.0] };
+        a.spawn_bundle((p, v, Marker {})).unwrap();
+        // a different order of the same components in the tuple must land in the same archetype with the same values
+        b.spawn_bundle((Marker {}, v, p)).unwrap();
+    }
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert_eq!(a.archetype_count(), 2, "the empty archetype and one for the three components");
+    let mut c = World::new();
+    for i in 0..40 {
+        let e = c.spawn();
+        c.insert(e, Pos { x: i as f32, y: 1.0, z: 2.0 }).unwrap();
+        c.insert(e, Vel { v: [i as f32, 0.5, 0.0] }).unwrap();
+        c.insert(e, Marker {}).unwrap();
+    }
+    assert_eq!(a.state_hash(), c.state_hash(), "same uids, same values, same components");
+    let mut sum = 0.0;
+    a.for_each::<(&Pos, &Vel), _>(|_, (p, v)| sum += p.x + v.v[0]).unwrap();
+    assert_eq!(sum, 2.0 * (0..40).sum::<i32>() as f32);
+}
+
+#[test]
+fn a_batch_spawn_is_the_same_as_a_loop_and_reuses_freed_slots() {
+    let mut a = World::new();
+    let mut b = World::new();
+    // free a few slots first so the batch has to reuse them (the loop reuses them in the same order)
+    let tmp_a: Vec<Entity> = (0..5).map(|_| a.spawn()).collect();
+    let tmp_b: Vec<Entity> = (0..5).map(|_| b.spawn()).collect();
+    for (&x, &y) in tmp_a.iter().zip(&tmp_b) {
+        a.despawn(x);
+        b.despawn(y);
+    }
+    let made = a.spawn_batch((0..100).map(|i| (Pos { x: i as f32, ..Pos::default() }, Vel::default()))).unwrap();
+    assert_eq!(made.len(), 100);
+    for i in 0..100 {
+        b.spawn_bundle((Pos { x: i as f32, ..Pos::default() }, Vel::default())).unwrap();
+    }
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert!(made.iter().all(|&e| a.is_alive(e)));
+    assert_eq!(a.get::<Pos>(made[7]).unwrap().x, 7.0);
+    assert_eq!(a.len(), 100);
+}
+
+#[test]
+fn a_bundle_with_the_same_component_twice_is_rejected_and_changes_nothing() {
+    let mut w = World::new();
+    let err = w.spawn_bundle((Pos::default(), Pos::default())).unwrap_err();
+    assert_eq!(err.code, "duplicate_component");
+    assert_eq!(w.len(), 0);
+    assert!(w.spawn_batch((0..3).map(|_| (Vel::default(), Vel::default()))).is_err());
+    assert_eq!(w.len(), 0);
+}
+
+#[test]
+fn adding_and_removing_components_keeps_every_value_with_its_entity() {
+    let mut w = World::new();
+    let ents = w.spawn_batch((0..64).map(|i| (Pos { x: i as f32, ..Pos::default() }, Vel { v: [i as f32 * 2.0, 0.0, 0.0] }))).unwrap();
+    for (i, &e) in ents.iter().enumerate() {
+        if i % 3 == 0 {
+            w.insert(e, Marker {}).unwrap();
+        }
+        if i % 5 == 0 {
+            w.remove_typed::<Vel>(e).unwrap();
+        }
+        if i % 7 == 0 {
+            w.insert(e, Mixed { big: i as u64, ..Mixed::default() }).unwrap();
+        }
+    }
+    for (i, &e) in ents.iter().enumerate() {
+        assert_eq!(w.get::<Pos>(e).unwrap().x, i as f32);
+        assert_eq!(w.get::<Vel>(e).map(|v| v.v[0]), if i % 5 == 0 { None } else { Some(i as f32 * 2.0) });
+        assert_eq!(w.get::<Marker>(e).is_some(), i % 3 == 0);
+        assert_eq!(w.get::<Mixed>(e).map(|m| m.big), if i % 7 == 0 { Some(i as u64) } else { None });
+    }
+}
+
+#[test]
+fn a_for_each_without_the_uid_and_one_with_it_visit_the_same_entities_in_the_same_order() {
+    let mut w = World::new();
+    w.spawn_batch((0..30).map(|i| (Pos { x: i as f32, ..Pos::default() },))).unwrap();
+    let mut plain = Vec::new();
+    w.for_each::<(&Pos,), _>(|e, (p,)| plain.push((e, p.x))).unwrap();
+    let mut with_uid = Vec::new();
+    w.for_each_uid::<(&Pos,), _>(|e, uid, (p,)| {
+        assert_eq!(w_uid_check(uid), uid);
+        with_uid.push((e, p.x));
+    })
+    .unwrap();
+    assert_eq!(plain, with_uid);
+    assert_eq!(plain.len(), 30);
+}
+
+fn w_uid_check(uid: u64) -> u64 {
+    assert_ne!(uid, 0, "uids start at 1");
+    uid
+}
+
+#[test]
+fn the_uid_table_finds_dense_uids_sparse_uids_and_reused_slots() {
+    let mut w = World::new();
+    // sequential uids (the dense array), then one far beyond it (the hash map), then more sequential ones
+    let a: Vec<Entity> = (0..100).map(|_| w.spawn()).collect();
+    let far = w.spawn_uid(5_000_000_000).unwrap();
+    let huge = w.spawn_uid(u64::MAX / 2).unwrap();
+    let b: Vec<Entity> = (0..20).map(|_| w.spawn()).collect();
+    for e in a.iter().chain(&b).chain([&far, &huge]) {
+        let uid = w.uid_of(*e).unwrap();
+        assert_eq!(w.entity(uid), Some(*e), "uid {uid}");
+    }
+    assert_eq!(w.entity(5_000_000_000), Some(far));
+    assert_eq!(w.entity(0), None);
+    assert_eq!(w.entity(123_456), None);
+    // a uid that was in the hash map and lies inside the array once the array has grown past it is still found
+    let mut v = World::new();
+    v.spawn_uid(200).unwrap(); // beyond the slack of an empty array: hash map
+    for _ in 0..300 {
+        v.spawn(); // next_uid is 201 on: sequential, dense
+    }
+    let e200 = v.entity(200).expect("uid 200 is still found");
+    assert_eq!(v.uid_of(e200), Some(200));
+    assert!(v.spawn_uid(200).is_err(), "it is still taken");
+    assert!(v.despawn(e200));
+    assert_eq!(v.entity(200), None);
+    assert!(v.spawn_uid(200).is_ok(), "and free again after the despawn");
+    // despawn frees the uid; a slot reused by another entity does not answer to the old uid, and the new handle has a new generation
+    let first = a[0];
+    let old_uid = w.uid_of(first).unwrap();
+    assert!(w.despawn(first));
+    assert_eq!(w.entity(old_uid), None);
+    let again = w.spawn();
+    assert_eq!(again.index, first.index, "the slot is reused");
+    assert_ne!(again.generation, first.generation);
+    assert_eq!(w.entity(w.uid_of(again).unwrap()), Some(again));
+    assert!(!w.is_alive(first));
+    // a clone has its own table
+    let mut c = w.clone();
+    let extra = c.spawn();
+    assert_eq!(c.entity(c.uid_of(extra).unwrap()), Some(extra));
+    assert_eq!(w.entity(c.uid_of(extra).unwrap()), None, "the original did not see it");
+}
+
+#[test]
+fn uids_a_little_apart_stay_in_the_array_and_uids_far_apart_do_not_blow_it_up() {
+    let mut w = World::new();
+    // 1000 entities, every uid 10 apart: within the slack, found
+    for k in 1..=1000u64 {
+        w.spawn_uid(k * 10).unwrap();
+    }
+    for k in 1..=1000u64 {
+        assert!(w.entity(k * 10).is_some());
+        assert!(w.entity(k * 10 + 1).is_none());
+    }
+    // 1000 entities a million apart: found, and the array did not grow to a billion entries
+    let mut s = World::new();
+    for k in 1..=1000u64 {
+        s.spawn_uid(k * 1_000_000).unwrap();
+    }
+    for k in 1..=1000u64 {
+        assert!(s.entity(k * 1_000_000).is_some());
+    }
+    assert!(s.uid_table_len() < 100, "the dense array is {} entries", s.uid_table_len());
 }

@@ -10,7 +10,7 @@ use crate::mesh::{builtin, Mesh};
 use crate::terrain_layers::SplatLayers;
 use crate::texture::{Texture, TextureCache};
 use lunaris_ecs::{EcsError, Result, World};
-use lunaris_sim::components::{Water, AnimLayers, Animator, Camera, DrawLayer, Environment, Joint, Light, Localization, MeshRenderer, Sprite, Terrain, CameraView, Decal, Ik, Parallax, Particles, Text, TextFont, Tilemap, Transform, Ui, UiAnchor, UiEdge, UiStyle};
+use lunaris_sim::components::{Water, AnimLayers, Animator, Camera, DrawLayer, Environment, Joint, Light, Localization, MeshRenderer, Sprite, Terrain, CameraView, Decal, Ik, Parallax, Particles, ParticleSystem, Text, TextFont, Tilemap, Transform, Ui, UiAnchor, UiEdge, UiStyle};
 use lunaris_sim::detmath;
 use std::sync::Arc;
 
@@ -81,6 +81,23 @@ struct Vtx {
     tw: f32,
 }
 
+/// A vertex on the screen: what the triangle stage needs of its clip position (the reciprocal of w, the position in pixels, the depth), worked out once per vertex instead of once per triangle that uses it.
+/// `near_ok` says the vertex is on the right side of the near plane (a triangle with all three needs no clipping).
+#[derive(Clone, Copy)]
+struct Proj {
+    s: [f64; 2],
+    z: f64,
+    iw: f64,
+    near_ok: bool,
+}
+
+/// Projects a clip position onto a picture of `w` x `h` pixels (f64, as the edge functions are).
+#[inline]
+fn project(c: &[f32; 4], w: f64, h: f64) -> Proj {
+    let inv = 1.0 / c[3] as f64;
+    Proj { s: [(c[0] as f64 * inv * 0.5 + 0.5) * w, (1.0 - (c[1] as f64 * inv * 0.5 + 0.5)) * h], z: c[2] as f64 * inv, iw: inv, near_ok: c[2] + c[3] >= 0.0 }
+}
+
 fn lerp_v(a: &Vtx, b: &Vtx, t: f32) -> Vtx {
     let l = |x: f32, y: f32| x + (y - x) * t;
     Vtx {
@@ -133,7 +150,7 @@ enum Shade<'a> {
     /// `uv` is the part of the texture to show: (u0, v0, du, dv), v counted from the bottom.
     Sprite { color: [f32; 4], tex: Option<&'a Texture>, uv: [f32; 4] },
     /// A particle cloud: colour from the vertices, opacity from the vertex texture weight, the picture (bilinear) on top.
-    Particle { tex: Option<&'a Texture>, additive: bool },
+    Particle { tex: Option<&'a Texture>, additive: bool, nearest: bool },
 }
 
 /// A band of rows `y0..y1` of the picture (the buffers hold only those rows). `h` is the height of the whole picture.
@@ -192,15 +209,22 @@ fn owns_edge(ax: f64, ay: f64, bx: f64, by: f64) -> bool {
 #[allow(clippy::too_many_arguments)]
 fn raster_triangle(t: &mut Target<'_>, v: [Vtx; 3], shade: &Shade, lights: &[LightData], eye: V3, id: u64, cull_back: bool, write_depth: bool) {
     let (w, h) = (t.w as f64, t.h as f64);
-    let mut s = [[0.0f64; 2]; 3];
-    let mut z = [0.0f64; 3];
-    let mut iw = [0.0f64; 3];
-    for i in 0..3 {
-        let c = v[i].clip;
-        let inv = 1.0 / c[3] as f64;
-        iw[i] = inv;
-        s[i] = [(c[0] as f64 * inv * 0.5 + 0.5) * w, (1.0 - (c[1] as f64 * inv * 0.5 + 0.5)) * h];
-        z[i] = c[2] as f64 * inv;
+    let p = [project(&v[0].clip, w, h), project(&v[1].clip, w, h), project(&v[2].clip, w, h)];
+    raster_projected(t, [&v[0], &v[1], &v[2]], p, shade, lights, eye, id, cull_back, write_depth);
+}
+
+/// The triangle stage for a triangle whose vertices are on the screen already (`p[i]` is `project` of `v[i]`'s clip position).
+#[allow(clippy::too_many_arguments)]
+fn raster_projected(t: &mut Target<'_>, v: [&Vtx; 3], p: [Proj; 3], shade: &Shade, lights: &[LightData], eye: V3, id: u64, cull_back: bool, write_depth: bool) {
+    let (w, h) = (t.w as f64, t.h as f64);
+    let s = [p[0].s, p[1].s, p[2].s];
+    let z = [p[0].z, p[1].z, p[2].z];
+    let iw = [p[0].iw, p[1].iw, p[2].iw];
+    // the rows of this band the triangle touches (none: nothing to draw, whatever its area or facing)
+    let min_y = (s[0][1].min(s[1][1]).min(s[2][1]).floor().max(0.0) as usize).max(t.y0);
+    let max_y = (s[0][1].max(s[1][1]).max(s[2][1]).ceil().min(h) as usize).min(t.y1);
+    if min_y >= max_y {
+        return;
     }
     let mut area = edge(s[0][0], s[0][1], s[1][0], s[1][1], s[2][0], s[2][1]);
     if area == 0.0 || !area.is_finite() {
@@ -220,8 +244,6 @@ fn raster_triangle(t: &mut Target<'_>, v: [Vtx; 3], shade: &Shade, lights: &[Lig
     let (x0, y0, x1, y1, x2, y2) = (s[i0][0], s[i0][1], s[i1][0], s[i1][1], s[i2][0], s[i2][1]);
     let min_x = x0.min(x1).min(x2).floor().max(0.0) as usize;
     let max_x = (x0.max(x1).max(x2).ceil().min(w) as usize).min(t.w);
-    let min_y = (y0.min(y1).min(y2).floor().max(0.0) as usize).max(t.y0);
-    let max_y = (y0.max(y1).max(y2).ceil().min(h) as usize).min(t.y1);
     let own = [owns_edge(x1, y1, x2, y2), owns_edge(x2, y2, x0, y0), owns_edge(x0, y0, x1, y1)];
     let inv_area = 1.0 / area;
     for py in min_y..max_y {
@@ -248,7 +270,7 @@ fn raster_triangle(t: &mut Target<'_>, v: [Vtx; 3], shade: &Shade, lights: &[Lig
             let (p0, p1, p2) = (b0 * iw[i0], b1 * iw[i1], b2 * iw[i2]);
             let norm = 1.0 / (p0 + p1 + p2);
             let (q0, q1, q2) = ((p0 * norm) as f32, (p1 * norm) as f32, (p2 * norm) as f32);
-            let (va, vb, vc) = (&v[i0], &v[i1], &v[i2]);
+            let (va, vb, vc) = (v[i0], v[i1], v[i2]);
             match shade {
                 Shade::Lit { color, shininess, emissive, tex, vcol, uv_scale, splat } => {
                     let world = [q0 * va.world[0] + q1 * vb.world[0] + q2 * vc.world[0], q0 * va.world[1] + q1 * vb.world[1] + q2 * vc.world[1], q0 * va.world[2] + q1 * vb.world[2] + q2 * vc.world[2]];
@@ -296,9 +318,9 @@ fn raster_triangle(t: &mut Target<'_>, v: [Vtx; 3], shade: &Shade, lights: &[Lig
                         t.depth[idx] = depth;
                     }
                 }
-                Shade::Particle { tex, additive } => {
+                Shade::Particle { tex, additive, nearest } => {
                     let uv = [q0 * va.uv[0] + q1 * vb.uv[0] + q2 * vc.uv[0], q0 * va.uv[1] + q1 * vb.uv[1] + q2 * vc.uv[1]];
-                    let texel = tex.map(|t| t.sample_ui(uv[0], 1.0 - uv[1], true)).unwrap_or([1.0, 1.0, 1.0, 1.0]);
+                    let texel = tex.map(|t| t.sample_ui(uv[0], 1.0 - uv[1], !*nearest)).unwrap_or([1.0, 1.0, 1.0, 1.0]);
                     let a = (q0 * va.tw + q1 * vb.tw + q2 * vc.tw) * texel[3];
                     if a <= 0.0 {
                         continue;
@@ -313,8 +335,8 @@ fn raster_triangle(t: &mut Target<'_>, v: [Vtx; 3], shade: &Shade, lights: &[Lig
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn draw_mesh(t: &mut Target<'_>, mesh: &Mesh, model: &M4, view_proj: &M4, shade: &Shade, lights: &[LightData], eye: V3, id: u64, cull_back: bool) {
+/// The vertex stage of a mesh: every vertex moved to clip space and to the world, its normal turned (the same numbers wherever and however often it is done).
+fn transform_mesh(mesh: &Mesh, model: &M4, view_proj: &M4, w: f64, h: f64) -> (Vec<Vtx>, Vec<Proj>) {
     let mvp = view_proj.mul(model);
     let nm = model.normal_matrix();
     let verts: Vec<Vtx> = (0..mesh.pos.len())
@@ -325,8 +347,39 @@ fn draw_mesh(t: &mut Target<'_>, mesh: &Mesh, model: &M4, view_proj: &M4, shade:
             Vtx { clip: mvp.mul_v4([p[0], p[1], p[2], 1.0]), world: model.transform_point(p), nrm: wn, uv: mesh.uv[i], col: mesh.col.get(i).copied().unwrap_or([1.0, 1.0, 1.0]), tw: mesh.texw.get(i).copied().unwrap_or(1.0) }
         })
         .collect();
+    let proj = verts.iter().map(|v| project(&v.clip, w, h)).collect();
+    (verts, proj)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_mesh(t: &mut Target<'_>, mesh: &Mesh, model: &M4, view_proj: &M4, shade: &Shade, lights: &[LightData], eye: V3, id: u64, cull_back: bool) {
+    let (verts, proj) = transform_mesh(mesh, model, view_proj, t.w as f64, t.h as f64);
+    draw_triangles(t, mesh, &verts, &proj, shade, lights, eye, id, cull_back);
+}
+
+/// The triangle stage of a mesh whose vertices are done: clip, then draw what falls on the rows of the target.
+#[allow(clippy::too_many_arguments)]
+fn draw_triangles(t: &mut Target<'_>, mesh: &Mesh, verts: &[Vtx], proj: &[Proj], shade: &Shade, lights: &[LightData], eye: V3, id: u64, cull_back: bool) {
+    let write_depth = matches!(shade, Shade::Lit { .. });
+    let (band_top, band_bottom) = (t.y0 as f64, t.y1 as f64);
     for tri in mesh.idx.chunks(3) {
-        let v = [verts[tri[0] as usize], verts[tri[1] as usize], verts[tri[2] as usize]];
+        let (ia, ib, ic) = (tri[0] as usize, tri[1] as usize, tri[2] as usize);
+        let p = [proj[ia], proj[ib], proj[ic]];
+        if p[0].near_ok && p[1].near_ok && p[2].near_ok {
+            // nothing to clip: the rows of this band first (a triangle that does not reach them costs three loads and four comparisons), then the rejects of the view volume, then the triangle
+            let (lo, hi) = (p[0].s[1].min(p[1].s[1]).min(p[2].s[1]), p[0].s[1].max(p[1].s[1]).max(p[2].s[1]));
+            if hi.ceil() <= band_top || lo.floor() >= band_bottom {
+                continue;
+            }
+            let v = [&verts[ia], &verts[ib], &verts[ic]];
+            let outside = |f: &dyn Fn(&Vtx) -> bool| v.iter().all(|a| f(a));
+            if outside(&|a| a.clip[0] > a.clip[3]) || outside(&|a| a.clip[0] < -a.clip[3]) || outside(&|a| a.clip[1] > a.clip[3]) || outside(&|a| a.clip[1] < -a.clip[3]) || outside(&|a| a.clip[2] > a.clip[3]) {
+                continue;
+            }
+            raster_projected(t, v, p, shade, lights, eye, id, cull_back, write_depth);
+            continue;
+        }
+        let v = [verts[ia], verts[ib], verts[ic]];
         // quick reject: all three vertices outside the same side of the view volume
         let outside = |f: &dyn Fn(&Vtx) -> bool| v.iter().all(f);
         if outside(&|a| a.clip[0] > a.clip[3]) || outside(&|a| a.clip[0] < -a.clip[3]) || outside(&|a| a.clip[1] > a.clip[3]) || outside(&|a| a.clip[1] < -a.clip[3]) || outside(&|a| a.clip[2] > a.clip[3]) {
@@ -334,7 +387,7 @@ fn draw_mesh(t: &mut Target<'_>, mesh: &Mesh, model: &M4, view_proj: &M4, shade:
         }
         let (poly, n) = clip_near(v);
         for k in 1..n.saturating_sub(1) {
-            raster_triangle(t, [poly[0], poly[k], poly[k + 1]], shade, lights, eye, id, cull_back, matches!(shade, Shade::Lit { .. }));
+            raster_triangle(t, [poly[0], poly[k], poly[k + 1]], shade, lights, eye, id, cull_back, write_depth);
         }
     }
 }
@@ -530,7 +583,7 @@ fn tile_key(m: &Tilemap, data: &str) -> u64 {
 
 /// One quad per non-empty cell, in the map's local XY plane, centred on the origin, with the uv of its tile baked in.
 fn tilemap_mesh(m: &Tilemap, data: &str) -> Mesh {
-    let mut mesh = Mesh { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::new(), tex: None, rig: None };
+    let mut mesh = Mesh { pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), col: Vec::new(), texw: Vec::new(), idx: Vec::new(), tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Full, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 };
     let (w, h) = (m.size[0].min(1024) as usize, m.size[1].min(1024) as usize);
     let tile = m.tile;
     if w == 0 || h == 0 || !tile.is_finite() || w * h > 262_144 {
@@ -566,7 +619,7 @@ struct Draw<'a> {
 enum DrawKind<'a> {
     Mesh { mesh: &'a Mesh, model: M4, color: V3, shininess: u32, emissive: f32, tex: Option<&'a Texture>, uv_scale: [f32; 2], splat: Option<&'a SplatLayers> },
     Sprite { mesh: &'a Mesh, model: M4, color: [f32; 4], tex: Option<&'a Texture>, uv: [f32; 4] },
-    Particles { mesh: &'a Mesh, tex: Option<&'a Texture>, additive: bool },
+    Particles { mesh: &'a Mesh, tex: Option<&'a Texture>, additive: bool, nearest: bool },
     Text { text: String, tx: Text, clip: Option<[f32; 4]> },
     Rect(&'a SceneRect),
 }
@@ -607,10 +660,10 @@ fn screen_rows(mesh: &Mesh, mvp: &M4, height: usize) -> Option<(i64, i64)> {
     Some((y_min.floor().clamp(-1e9, 1e9) as i64 - 2, y_max.ceil().clamp(-1e9, 1e9) as i64 + 2))
 }
 
-/// Draw everything that touches the rows of this band, in order.
+/// Draw everything that touches the rows of this band, in order. `pre[i]` holds the vertices of draw `i` when they were done once for all the bands (`transform_draws`); without them the band does them itself.
 #[allow(clippy::too_many_arguments)]
-fn draw_band(t: &mut Target<'_>, draws: &[Draw<'_>], view_proj: &M4, lights: &[LightData], eye: V3, ss: usize, final_height: usize) {
-    for d in draws {
+fn draw_band(t: &mut Target<'_>, draws: &[Draw<'_>], pre: &[Option<(Vec<Vtx>, Vec<Proj>)>], view_proj: &M4, lights: &[LightData], eye: V3, ss: usize, final_height: usize) {
+    for (i, d) in draws.iter().enumerate() {
         if let Some((a, b)) = d.rows {
             if b <= t.y0 as i64 || a >= t.y1 as i64 {
                 continue;
@@ -619,15 +672,24 @@ fn draw_band(t: &mut Target<'_>, draws: &[Draw<'_>], view_proj: &M4, lights: &[L
         match &d.kind {
             DrawKind::Mesh { mesh, model, color, shininess, emissive, tex, uv_scale, splat } => {
                 let shade = Shade::Lit { color: *color, shininess: *shininess, emissive: *emissive, tex: tex.or(mesh.tex.as_deref()), vcol: !mesh.col.is_empty(), uv_scale: *uv_scale, splat: *splat };
-                draw_mesh(t, mesh, model, view_proj, &shade, lights, eye, d.uid, true);
+                match &pre[i] {
+                    Some((v, p)) => draw_triangles(t, mesh, v, p, &shade, lights, eye, d.uid, true),
+                    None => draw_mesh(t, mesh, model, view_proj, &shade, lights, eye, d.uid, true),
+                }
             }
             DrawKind::Sprite { mesh, model, color, tex, uv } => {
                 let shade = Shade::Sprite { color: *color, tex: *tex, uv: *uv };
-                draw_mesh(t, mesh, model, view_proj, &shade, lights, eye, d.uid, false);
+                match &pre[i] {
+                    Some((v, p)) => draw_triangles(t, mesh, v, p, &shade, lights, eye, d.uid, false),
+                    None => draw_mesh(t, mesh, model, view_proj, &shade, lights, eye, d.uid, false),
+                }
             }
-            DrawKind::Particles { mesh, tex, additive } => {
-                let shade = Shade::Particle { tex: *tex, additive: *additive };
-                draw_mesh(t, mesh, &M4::identity(), view_proj, &shade, lights, eye, d.uid, false);
+            DrawKind::Particles { mesh, tex, additive, nearest } => {
+                let shade = Shade::Particle { tex: *tex, additive: *additive, nearest: *nearest };
+                match &pre[i] {
+                    Some((v, p)) => draw_triangles(t, mesh, v, p, &shade, lights, eye, d.uid, false),
+                    None => draw_mesh(t, mesh, &M4::identity(), view_proj, &shade, lights, eye, d.uid, false),
+                }
             }
             DrawKind::Text { text, tx, clip } => draw_text(t, d.uid, text, tx, *clip, ss, final_height),
             DrawKind::Rect(r) => {
@@ -635,6 +697,123 @@ fn draw_band(t: &mut Target<'_>, draws: &[Draw<'_>], view_proj: &M4, lights: &[L
                 draw_shape(t, r, th);
             }
         }
+    }
+}
+
+/// The most vertices `transform_draws` keeps at once (a vertex is 64 bytes and its screen position 40: this is about 210 MB); a picture with more lets every band do its own.
+const PRETRANSFORM_MAX_VERTICES: usize = 2_000_000;
+
+/// The vertex stage of every mesh draw that is on the picture, done once on up to `threads` threads instead of once in every band the draw touches (a mesh that spans several bands was moved
+/// again in each). The numbers are the same ones `draw_mesh` would make, so the picture does not change. `None` for draws that are not meshes or are off the picture, and for all of them when
+/// the picture holds more vertices than `PRETRANSFORM_MAX_VERTICES`.
+fn transform_draws(draws: &[Draw<'_>], view_proj: &M4, rw: usize, rh: usize, threads: usize) -> Vec<Option<(Vec<Vtx>, Vec<Proj>)>> {
+    fn part<'a>(d: &Draw<'a>, rh: usize) -> Option<(&'a Mesh, M4)> {
+        if d.rows.is_some_and(|(a, b)| b <= 0 || a >= rh as i64) {
+            return None;
+        }
+        match &d.kind {
+            DrawKind::Mesh { mesh, model, .. } | DrawKind::Sprite { mesh, model, .. } => Some((*mesh, *model)),
+            DrawKind::Particles { mesh, .. } => Some((*mesh, M4::identity())),
+            _ => None,
+        }
+    }
+    let total: usize = draws.iter().filter_map(|d| part(d, rh)).map(|(m, _)| m.pos.len()).sum();
+    if total > PRETRANSFORM_MAX_VERTICES {
+        return draws.iter().map(|_| None).collect();
+    }
+    let slots: Vec<std::sync::Mutex<Option<(Vec<Vtx>, Vec<Proj>)>>> = draws.iter().map(|_| std::sync::Mutex::new(None)).collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let work = || loop {
+        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let Some(d) = draws.get(i) else { break };
+        if let Some((mesh, model)) = part(d, rh) {
+            *slots[i].lock().unwrap() = Some(transform_mesh(mesh, &model, view_proj, rw as f64, rh as f64));
+        }
+    };
+    if threads <= 1 || total < 20_000 {
+        work();
+    } else {
+        std::thread::scope(|scope| {
+            for _ in 0..threads {
+                scope.spawn(work);
+            }
+        });
+    }
+    slots.into_iter().map(|m| m.into_inner().unwrap()).collect()
+}
+
+/// How a skinned model is posed for this picture: what the gather stage worked out for one entity (the clips, the layers, the goals); the vertices are done afterwards, together with every other model's.
+enum PoseJob {
+    Pose { clip: Option<usize>, time: f32, looping: bool },
+    Blend { from: (Option<usize>, f32), to: (Option<usize>, f32), looping: bool, w: f32 },
+    Layers { stack: Vec<crate::rig::PoseLayer> },
+    LayersIk { stack: Vec<crate::rig::PoseLayer>, goals: Vec<crate::rig::IkGoal> },
+}
+
+/// The number of threads the posing of a picture's models may use, for tests that compare the threaded and the single threaded picture (0 = decide by the cores and the number of models).
+pub static POSE_THREADS_OVERRIDE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// The joint matrices of a pose (what `Rig::skin` moves the vertices with).
+fn matrices_one(rig: &crate::rig::Rig, job: &PoseJob) -> Vec<M4> {
+    match job {
+        PoseJob::Pose { clip, time, looping } => rig.skin_matrices(*clip, *time, *looping),
+        PoseJob::Blend { from, to, looping, w } => rig.skin_matrices_blend(*from, *to, *looping, *w),
+        PoseJob::Layers { stack } => rig.skin_matrices_layers(stack),
+        PoseJob::LayersIk { stack, goals } => rig.skin_matrices_ik(stack, goals),
+    }
+}
+
+fn pose_one(base: &Mesh, job: &PoseJob) -> Mesh {
+    let rig = base.rig.as_ref().expect("a model that is posed has a rig");
+    rig.skin(base, &matrices_one(rig, job))
+}
+
+/// `f(0)` to `f(n - 1)`, on up to `threads` threads (0 means the number of cores, at most 8; nothing is spawned for fewer than three), in order.
+fn par_map<T: Send>(n: usize, f: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    use std::sync::atomic::Ordering;
+    let forced = POSE_THREADS_OVERRIDE.load(Ordering::Relaxed);
+    let cores = std::thread::available_parallelism().map_or(1, |c| c.get()).min(8);
+    // (starting a thread costs some tens of microseconds: a picture with a model or two is done on the calling thread)
+    let threads = if forced != 0 { forced } else if n < 3 { 1 } else { cores };
+    let threads = threads.min(n);
+    if threads <= 1 {
+        return (0..n).map(f).collect();
+    }
+    let slots: Vec<std::sync::Mutex<Option<T>>> = (0..n).map(|_| std::sync::Mutex::new(None)).collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                if i >= n {
+                    break;
+                }
+                let value = f(i);
+                *slots[i].lock().expect("a pose thread panicked") = Some(value);
+            });
+        }
+    });
+    slots.into_iter().map(|s| s.into_inner().expect("a pose thread panicked").expect("every model was posed")).collect()
+}
+
+/// Pose the skinned models of the picture. Each is a pure function of the model and what the gather stage asked for, so the models are shared out over the cores (a crowd of armed mannequins costs about 0.3 ms
+/// of one core each, docs/20-puppet-lod.md); the picture is the same whatever the number of threads. The entities hold the rest pose until this puts the posed copy in. With `on_card` the vertices are not moved here:
+/// each model gets its joint matrices (`MeshRef::Skinned`) and the renderer's card does the rest.
+fn pose_models(scene_meshes: &mut [SceneMesh], jobs: Vec<(usize, u64, PoseJob)>, on_card: bool) {
+    if jobs.is_empty() {
+        return;
+    }
+    let bases: Vec<Arc<Mesh>> = jobs.iter().map(|(i, _, _)| scene_meshes[*i].mesh.get_arc().clone()).collect();
+    if on_card {
+        let matrices = par_map(jobs.len(), |i| matrices_one(bases[i].rig.as_ref().expect("a model that is posed has a rig"), &jobs[i].2));
+        for (((i, key, _), base), m) in jobs.iter().zip(bases).zip(matrices) {
+            scene_meshes[*i].mesh = MeshRef::Skinned { key: *key, base, matrices: Arc::new(m) };
+        }
+        return;
+    }
+    let posed = par_map(jobs.len(), |i| pose_one(&bases[i], &jobs[i].2));
+    for ((i, key, _), mesh) in jobs.iter().zip(posed) {
+        scene_meshes[*i].mesh = MeshRef::Dynamic { key: *key, mesh: Arc::new(mesh) };
     }
 }
 
@@ -646,19 +825,34 @@ pub enum MeshRef {
     /// A model posed for this picture (an animated, skinned model): new every frame, so a renderer must not cache it by address.
     /// `key` is the entity's uid, which a renderer can use to reuse the buffers it filled for the same entity last time.
     Dynamic { key: u64, mesh: Arc<Mesh> },
+    /// A skinned model whose pose is left to the card (`gather_scene_with`, GPU skinning): `base` is the model in its rest pose and `matrices` the joint matrices of the pose (`Rig::skin_matrices` and its kin), which
+    /// the renderer moves the vertices with itself. `key` is the entity's uid, as for `Dynamic`. Nothing that reads vertices (the reference renderer) may be given one.
+    Skinned { key: u64, base: Arc<Mesh>, matrices: Arc<Vec<M4>> },
 }
 
 impl MeshRef {
+    /// The mesh as a shared pointer (a model that waits to be posed holds its rest pose).
+    fn get_arc(&self) -> &Arc<Mesh> {
+        match self {
+            MeshRef::Shared(m) => m,
+            MeshRef::Dynamic { mesh, .. } => mesh,
+            MeshRef::Skinned { base, .. } => base,
+            MeshRef::Builtin(_) => unreachable!("a built-in shape is not posed"),
+        }
+    }
+
     pub fn get(&self) -> &Mesh {
         match self {
             MeshRef::Builtin(m) => m,
             MeshRef::Shared(m) => m,
             MeshRef::Dynamic { mesh, .. } => mesh,
+            MeshRef::Skinned { base, .. } => base,
         }
     }
 }
 
 /// A lit 3D mesh to draw.
+#[derive(Clone)]
 pub struct SceneMesh {
     /// Water (GPU high qualities): wave height, wave length, phase.
     pub water: Option<[f32; 3]>,
@@ -692,6 +886,15 @@ pub struct SceneMesh {
     pub pbr: Option<MeshPbr>,
     /// `MaterialExt`: clear coat strength and roughness, sheen, subsurface strength and colour (all 0 to 1); only the GPU renderer's high qualities use it.
     pub ext: Option<[f32; 7]>,
+    /// `MacroVary`: strength, scale in metres, colour lean, roughness variation; only the GPU renderer's high qualities use it.
+    pub vary: Option<[f32; 4]>,
+    /// A painted terrain's own colour picture (`Terrain.texture`): the GPU renderer's high qualities take the colour of the ground from it (and the fine detail from the layers' photographs, as a ratio to their average), so far away the ground is the picture's.
+    pub macro_tex: Option<Arc<Texture>>,
+    /// 0: drawn as it is. 1: the whole of a model that is drawn in pieces (one mesh for each material), standing in for the pieces in the passes that need only depth (the shadows, the early depth pass, the id picture): the GPU
+    /// renderer draws it there and not in the colour pass; the reference renderer does not draw it. 2: one of those pieces: left out of the depth-only passes (the whole is drawn there instead), drawn in the colour pass.
+    pub depth_role: u8,
+    /// For a piece (role 2): the whole that stands in for it in the depth-only passes. The piece waits until the whole is on the card, so that the colour pass never has pieces whose depth is missing.
+    pub depth_cover: Option<Arc<Mesh>>,
 }
 
 /// The pictures of a `PbrMaps` component, loaded as data (not as colours).
@@ -729,6 +932,12 @@ pub struct SceneParticles {
     pub mesh: MeshRef,
     pub tex: Option<Arc<Texture>>,
     pub additive: bool,
+    /// The picture is sampled without smoothing (pixel art: a particle system's `filter: nearest`).
+    pub nearest: bool,
+    /// An emitter the card simulates (`simulate: gpu`, GPU renderer only): the steps to take and the numbers it needs. `mesh` is then empty and the card fills the vertices of the cloud itself.
+    pub gpu: Option<Arc<crate::fx_sim::GpuEmitterJob>>,
+    /// Soft particles (the GPU renderer's high qualities): the pictures fade out over this many metres in front of the surface behind them (0: they do not). Only particle systems ask for it.
+    pub soft: f32,
     /// `None`: drawn after every layer, in entity order (a cloud without a `DrawLayer`). `Some(k)`: the cloud has a `DrawLayer` and is
     /// drawn among the layers, after the first `k` of `Scene::layers` and before the rest; the clouds with a slot come last in
     /// `Scene::particles`, in the order they are drawn (so slots never go down).
@@ -879,6 +1088,10 @@ pub struct EnvData {
     pub dof: f32,
     pub focus: f32,
     pub focus_range: f32,
+    /// How hard it rains (0..1): a streak layer over the finished picture in the GPU renderer.
+    pub rain: f32,
+    /// How wet the world is (0..1): flat surfaces darker and glossy, in puddles.
+    pub wet: f32,
     /// `PostFx`: light shafts, motion blur, film grain, contrast and tint.
     pub shafts: f32,
     pub motion_blur: f32,
@@ -893,6 +1106,8 @@ pub struct EnvData {
     pub gi: [f32; 4],
     /// `Shadows.softness` (0 = the plain filter).
     pub shadow_soft: f32,
+    /// `Lighting`: fill rgb, bounce, lamp falloff, lamp core, shadow distance (0 = the Environment's), on (0/1), how many point lights cast shadows. All off without the component (two shadowed lights).
+    pub lighting: [f32; 9],
     /// `Atmosphere`: on (0/1), turbidity, rayleigh, mie_g, intensity, haze glow. The sky colours below are then these, in the linear working space.
     pub atmo: [f32; 6],
     pub atmo_linear: Option<[V3; 3]>,
@@ -919,7 +1134,7 @@ impl EnvData {
         let c = [clear[0], clear[1], clear[2]];
         let mix = |a: V3, b: V3, t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
         let sky = mix(c, [0.52, 0.55, 0.62], 0.7);
-        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], volumetrics: [0.0; 8], gi: [0.0; 4], shadow_soft: 0.0, atmo: [0.0; 6], atmo_linear: None, grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
+        EnvData { explicit: false, sky: false, sky_top: sky, sky_horizon: scale(sky, 0.95), ground: scale(sky, 0.55), ambient: 1.0, exposure: 1.0, clouds: 0.0, fog: 0.0, fog_color: c, shadows: true, shadow_distance: 80.0, ssao: if flat_2d { 0.0 } else { 0.7 }, bloom: if flat_2d { 0.0 } else { 0.2 }, bloom_threshold: 1.0, vignette: if flat_2d { 0.0 } else { 0.15 }, saturation: 1.0, tonemap: 0, dof: 0.0, focus: 10.0, focus_range: 4.0, rain: 0.0, wet: 0.0, shafts: 0.0, motion_blur: 0.0, grain: 0.0, contrast: 1.0, tint: [1.0; 3], lens: [0.0, 1.0, 0.0, 0.0, 1.0, 0.0], volumetrics: [0.0; 8], gi: [0.0; 4], shadow_soft: 0.0, lighting: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0], atmo: [0.0; 6], atmo_linear: None, grade_a: [0.0; 4], grade_b: [1.0, 1.0, 1.0, 0.0], grade_c: [1.0, 1.0, 1.0, 0.0], fade: [0.0; 4], hfog: [0.0; 3], auto_exposure: None, ssr: None, lens_flare: None }
     }
 
     fn from_component(e: &Environment) -> EnvData {
@@ -947,6 +1162,8 @@ impl EnvData {
             dof: nz(e.dof, 0.0, 1.0),
             focus: nz(e.focus, 0.1, 100_000.0),
             focus_range: nz(e.focus_range, 0.0, 100_000.0),
+            rain: 0.0,
+            wet: 0.0,
             shafts: 0.0,
             motion_blur: 0.0,
             grain: 0.0,
@@ -956,6 +1173,7 @@ impl EnvData {
             volumetrics: [0.0; 8],
             gi: [0.0; 4],
             shadow_soft: 0.0,
+            lighting: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0],
             atmo: [0.0; 6],
             atmo_linear: None,
             grade_a: [0.0; 4],
@@ -986,6 +1204,58 @@ pub struct GrassBlades {
 
 /// How many blades one instance of a bundle holds.
 pub const BLADES_PER_BUNDLE: u32 = 4;
+
+/// The weight of one layer of a painted terrain as a picture (a `Heightfield` of at most 1024 x 1024 samples over the same ground as the splat map), made once and kept (for a while: what no picture has asked for in four thousand calls
+/// is let go): a grass field with `mask_layer` reads it to grow only on that layer. With `defer` it is made on another thread and the answer is `None` until it is done.
+fn splat_mask(sl: &SplatLayers, channel: usize, defer: bool) -> Option<Arc<lunaris_sim::terrain::Heightfield>> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    enum State {
+        Ready(Arc<lunaris_sim::terrain::Heightfield>),
+        Pending(crate::bg::Pending<Arc<lunaris_sim::terrain::Heightfield>>),
+    }
+    struct Entry {
+        /// Keeps the map's address (the key) from being used for another one.
+        _splat: Arc<crate::terrain_layers::Splat>,
+        state: State,
+        last: u64,
+    }
+    static CACHE: OnceLock<Mutex<(u64, HashMap<(usize, usize), Entry>)>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new((0, HashMap::new())));
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    let (calls, map) = &mut *guard;
+    *calls += 1;
+    let now = *calls;
+    if map.len() > 16 {
+        map.retain(|_, e| now - e.last < 4096);
+    }
+    let key = (Arc::as_ptr(&sl.splat) as usize, channel);
+    let entry = map.entry(key).or_insert_with(|| {
+        let (splat, layers) = (sl.splat.clone(), sl.layers.len());
+        let build = move || {
+            let (cols, rows) = (splat.cols.clamp(2, 1024), splat.rows.clamp(2, 1024));
+            let mut samples = Vec::with_capacity(cols * rows);
+            for j in 0..rows {
+                for i in 0..cols {
+                    let w = splat.weights(i as f32 / (cols - 1) as f32, j as f32 / (rows - 1) as f32, layers)[channel.min(3)];
+                    samples.push((w.clamp(0.0, 1.0) * 65535.0) as u16);
+                }
+            }
+            Arc::new(lunaris_sim::terrain::Heightfield::new(cols, rows, samples).expect("a mask of the splat map's size"))
+        };
+        Entry { _splat: sl.splat.clone(), state: if defer { State::Pending(crate::bg::Pool::shared().spawn(build)) } else { State::Ready(build()) }, last: now }
+    });
+    entry.last = now;
+    if let State::Pending(p) = &entry.state {
+        if let Some(h) = p.try_take() {
+            entry.state = State::Ready(h);
+        }
+    }
+    match &entry.state {
+        State::Ready(h) => Some(h.clone()),
+        State::Pending(_) => None,
+    }
+}
 
 /// A bundle of `BLADES_PER_BUNDLE` blades, each a ribbon of `pairs` pairs of vertices and a tip: a vertex has `pos` = (side -1 or 1, or 0 at the tip; height along the blade 0 to 1; which blade of the bundle), `uv` = (side as 0..1, height).
 /// The shape is made in the vertex shader (`vs_grass`); the numbers here only say which vertex is which. The same bundle is shared by every field (made once).
@@ -1018,13 +1288,15 @@ pub fn blade_bundle(pairs: u32) -> Arc<Mesh> {
                 idx.extend_from_slice(&[last, last + 1, last + 2]);
             }
             let n = pos.len();
-            Arc::new(Mesh { pos, nrm: vec![[0.0, 0.0, 1.0]; n], uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None })
+            Arc::new(Mesh { pos, nrm: vec![[0.0, 0.0, 1.0]; n], uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Full, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 })
         })
         .clone()
 }
 
 pub struct SceneGrass {
     pub uid: u64,
+    /// `mask_layer`: the weight of that layer of the terrain's paint over the ground, so that the blades grow only on it.
+    pub mask: Option<Arc<lunaris_sim::terrain::Heightfield>>,
     /// `Some`: the field is made of single blades and `mesh` is only a placeholder.
     pub blades: Option<GrassBlades>,
     pub heights: Arc<lunaris_sim::terrain::Heightfield>,
@@ -1041,6 +1313,13 @@ pub struct SceneGrass {
     pub color_b: V3,
     pub seed: f32,
     pub patch_size: f32,
+}
+
+/// The ground under the sea (a terrain's picture of heights, placed): the GPU renderer's water reads its depth from it, so that the waves shoal and break where it is shallow.
+pub struct SceneFloor {
+    pub heights: Arc<lunaris_sim::terrain::Heightfield>,
+    pub pos: V3,
+    pub terrain: Terrain,
 }
 
 /// A `ReflectionProbe`: where it stands, half the size of its box of influence and the size of the pictures it captures.
@@ -1072,16 +1351,100 @@ pub struct Scene {
     pub probes: Vec<SceneProbe>,
     /// The grass fields, lowest uid first (only the GPU renderer's high qualities use them).
     pub grass: Vec<SceneGrass>,
+    /// The terrains, lowest uid first, when the picture has a sea (only the GPU renderer's high qualities use them).
+    pub floors: Vec<SceneFloor>,
     pub warnings: Vec<String>,
 }
 
 /// Collect the camera, lights, meshes, layers and texts for a picture of `opts.width` x `opts.height`. Models and textures are loaded
 /// here (they need the caches); problems that do not stop the picture (an unknown mesh name) become warnings.
+/// Ask the file cache for the files that the `StreamZone`s near `eye` will need when they load (`StreamZone.prefetch`, `StreamZone.assets`).
+fn prefetch_streamed(world: &mut World, textures: &mut TextureCache, eye: V3) -> Result<()> {
+    use crate::loader::Kind;
+    let mut wanted: Vec<_> = Vec::new();
+    world.for_each_uid::<(&lunaris_sim::components::StreamZone, &Transform), _>(|_, _, (z, t)| {
+        if z.loaded || !(z.prefetch > 0.0) || z.assets.0 == 0 {
+            return;
+        }
+        let d = ((eye[0] - t.pos[0]).powi(2) + (eye[2] - t.pos[2]).powi(2)).sqrt();
+        // (a zone with a height limit is read ahead only a little above or below it: the floors of a tower are many, the ones near the camera are few)
+        if z.vertical > 0.0 && (eye[1] - t.pos[1]).abs() > z.vertical + (z.prefetch * 0.1).min(3.0) {
+            return;
+        }
+        if d <= z.radius + z.prefetch && d >= z.min_radius - z.prefetch {
+            wanted.push(z.assets.0);
+        }
+    })?;
+    let texts: Vec<String> = wanted.into_iter().map(|id| world.strings().get(id).to_string()).collect();
+    for text in texts {
+        for line in text.lines() {
+            let (kind, name) = match line.trim().split_once(char::is_whitespace) {
+                Some(("texture", n)) => (Kind::Texture, n.trim()),
+                Some(("model", n)) => (Kind::Model, n.trim()),
+                Some(("heights", n)) => (Kind::Heights, n.trim()),
+                Some(("splat", n)) => (Kind::Splat, n.trim()),
+                _ => continue,
+            };
+            textures.prefetch(kind, name);
+        }
+    }
+    Ok(())
+}
+
+/// Sort entries by the uid in their first field. A list that is already in order is left alone; otherwise the order is worked out on small (uid, place) pairs and the big entries are moved once (sorting twenty-five thousand
+/// meshes with their transforms in place moves them fifteen times).
+fn sort_by_uid<A, B>(v: &mut Vec<(u64, A, B)>) {
+    if v.windows(2).all(|w| w[0].0 <= w[1].0) {
+        return;
+    }
+    let mut order: Vec<(u64, u32)> = v.iter().enumerate().map(|(i, e)| (e.0, i as u32)).collect();
+    order.sort_unstable();
+    let mut taken: Vec<Option<(u64, A, B)>> = v.drain(..).map(Some).collect();
+    v.extend(order.iter().map(|&(_, i)| taken[i as usize].take().expect("each place is used once")));
+}
+
+/// What the name of a mesh means in this picture: a built-in shape, or a model file (read, or still being read on another thread). Worked out once for each name, not once for each object that has it.
+struct ResolvedName {
+    name: String,
+    builtin: Option<&'static Mesh>,
+    is_model: bool,
+    /// The model is asked for when the first visible object that has it comes up.
+    asked: bool,
+    model: Option<Arc<Mesh>>,
+    /// Still being read: objects that have it stay out of the picture, without a warning.
+    waiting: bool,
+}
+
+/// A hasher for keys that are small numbers (names are numbered by the world's string table).
+#[derive(Default)]
+struct IdHasher(u64);
+
+impl std::hash::Hasher for IdHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 = (self.0 ^ *b as u64).wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    fn write_u32(&mut self, n: u32) {
+        self.0 = (n as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
 pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &RenderOptions) -> Result<Scene> {
+    gather_scene_with(world, textures, opts, false)
+}
+
+/// `gather_scene`; with `skin_on_card` the animated models of the scene come as `MeshRef::Skinned` (a rest pose and joint matrices) and not as posed copies: for a renderer that skins on the card (the GPU renderer).
+pub fn gather_scene_with(world: &mut World, textures: &mut TextureCache, opts: &RenderOptions, skin_on_card: bool) -> Result<Scene> {
     // the pictures of `CameraView`s first (not while drawing one)
     if !textures.nested {
+        textures.begin_frame();
         crate::views::update(world, textures, opts.threads)?;
     }
+    let gather_a = crate::Timed::new(|| "gather: collect the entities".to_string());
     // ---- gather (sorted by uid so the picture never depends on storage order)
     let mut cams: Vec<(u64, Camera, Transform)> = Vec::new();
     world.for_each_uid::<(&Camera, &Transform), _>(|_, uid, (c, t)| cams.push((uid, *c, *t)))?;
@@ -1091,7 +1454,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     lights_raw.sort_by_key(|c| c.0);
     let mut meshes_raw: Vec<(u64, MeshRenderer, Transform)> = Vec::new();
     world.for_each_uid::<(&MeshRenderer, &Transform), _>(|_, uid, (m, t)| meshes_raw.push((uid, *m, *t)))?;
-    meshes_raw.sort_by_key(|c| c.0);
+    sort_by_uid(&mut meshes_raw);
     let mut sprites_raw: Vec<(u64, Sprite, Transform)> = Vec::new();
     world.for_each_uid::<(&Sprite, &Transform), _>(|_, uid, (s, t)| sprites_raw.push((uid, *s, *t)))?;
     sprites_raw.sort_by_key(|c| c.0);
@@ -1122,21 +1485,39 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     tilemaps_raw.sort_by_key(|c| c.0);
     // inverse kinematics goals by the entity of the model they bend: (goal entity, goal, where it is)
     let mut ik_by_skin: std::collections::BTreeMap<u64, Vec<(u64, Ik, V3)>> = std::collections::BTreeMap::new();
-    world.for_each_uid::<(&Ik, &Transform), _>(|_, uid, (g, t)| {
-        if g.active && g.weight > 0.0 && g.skin.0 != 0 {
-            ik_by_skin.entry(g.skin.0).or_default().push((uid, *g, t.pos));
+    let mut ik_raw: Vec<(lunaris_ecs::Entity, u64, Ik, V3)> = Vec::new();
+    world.for_each_uid::<(&Ik, &Transform), _>(|e, uid, (g, t)| {
+        if g.active && g.weight > 0.0 {
+            ik_raw.push((e, uid, *g, t.pos));
         }
     })?;
+    for (e, uid, g, pos) in ik_raw {
+        // (a goal with no `skin` bends the model it is a child of: a prefab can carry its own goals, whose uids are not known when it is written)
+        let skin = if g.skin.0 != 0 { g.skin.0 } else { world.get::<lunaris_sim::components::Parent>(e).map_or(0, |p| p.target.0) };
+        if skin != 0 {
+            ik_by_skin.entry(skin).or_default().push((uid, g, pos));
+        }
+    }
     for goals in ik_by_skin.values_mut() {
-        goals.sort_by_key(|g| g.0);
+        // (turns first, then looks, then reaches and pins, each in uid order: a spine that is turned after a hand reached would take the hand off its target)
+        goals.sort_by_key(|g| (match g.1.kind { 3 => 0u8, 1 => 1, _ => 2 }, g.0));
     }
     // things fixed to a joint of a model, by the entity of the model: (the thing, what it asks for)
     let mut attachers_by_skin: std::collections::BTreeMap<u64, Vec<(u64, lunaris_sim::components::BoneAttach)>> = std::collections::BTreeMap::new();
-    world.for_each_uid::<(&lunaris_sim::components::BoneAttach, &MeshRenderer), _>(|_, uid, (a, _)| {
-        if a.target.0 != 0 && a.target.0 != uid {
-            attachers_by_skin.entry(a.target.0).or_default().push((uid, *a));
+    let mut attach_raw: Vec<(lunaris_ecs::Entity, u64, lunaris_sim::components::BoneAttach)> = Vec::new();
+    // (a thing that is not drawn needs no place, and its model would be posed one more time for nothing: worn gear that is off is such a thing)
+    world.for_each_uid::<(&lunaris_sim::components::BoneAttach, &MeshRenderer), _>(|e, uid, (a, m)| {
+        if m.visible {
+            attach_raw.push((e, uid, *a))
         }
     })?;
+    for (e, uid, a) in attach_raw {
+        // (an attachment with no `target` is fixed to the model it is a child of, like an `Ik` goal with no `skin`: a prefab can carry its own, whose uids are not known when it is written)
+        let target = if a.target.0 != 0 { a.target.0 } else { world.get::<lunaris_sim::components::Parent>(e).map_or(0, |p| p.target.0) };
+        if target != 0 && target != uid {
+            attachers_by_skin.entry(target).or_default().push((uid, a));
+        }
+    }
     let attached: std::collections::BTreeSet<u64> = attachers_by_skin.values().flat_map(|l| l.iter().map(|a| a.0)).collect();
     // where each such thing is in this picture (filled while the models are posed; the things are drawn after the models)
     let mut attach_world: std::collections::BTreeMap<u64, M4> = std::collections::BTreeMap::new();
@@ -1149,6 +1530,14 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     let mut ext_raw: std::collections::BTreeMap<u64, lunaris_sim::components::MaterialExt> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&lunaris_sim::components::MaterialExt,), _>(|_, uid, (e,)| {
         ext_raw.insert(uid, *e);
+    })?;
+    let mut vary_raw: std::collections::BTreeMap<u64, [f32; 4]> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&lunaris_sim::components::MacroVary,), _>(|_, uid, (v,)| {
+        let f = |x: f32| if x.is_finite() { x.clamp(0.0, 1.0) } else { 0.0 };
+        let q = [f(v.strength), if v.scale.is_finite() { v.scale.clamp(0.5, 2000.0) } else { 24.0 }, f(v.tint), f(v.rough)];
+        if q[0] > 0.0 || q[2] > 0.0 || q[3] > 0.0 {
+            vary_raw.insert(uid, q);
+        }
     })?;
     let mut pbr_raw: std::collections::BTreeMap<u64, lunaris_sim::components::PbrMaps> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&lunaris_sim::components::PbrMaps,), _>(|_, uid, (p,)| {
@@ -1164,6 +1553,10 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     world.for_each_uid::<(&Animator,), _>(|_, uid, (a,)| {
         animators_raw.insert(uid, *a);
     })?;
+    let mut inertia_raw: std::collections::BTreeMap<u64, lunaris_sim::inertia::Inertia> = std::collections::BTreeMap::new();
+    world.for_each_uid::<(&lunaris_sim::inertia::Inertia,), _>(|_, uid, (i,)| {
+        inertia_raw.insert(uid, *i);
+    })?;
     let mut texts_raw: Vec<(u64, Text)> = Vec::new();
     world.for_each_uid::<(&Text,), _>(|_, uid, (t,)| texts_raw.push((uid, *t)))?;
     texts_raw.sort_by_key(|c| c.0);
@@ -1174,6 +1567,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     world.for_each_uid::<(&Environment,), _>(|_, uid, (e,)| envs_raw.push((uid, *e)))?;
     envs_raw.sort_by_key(|c| c.0);
 
+    drop(gather_a);
+    let gather_b = crate::Timed::new(|| "gather: camera, lights".to_string());
     // ---- camera
     let mut warnings: Vec<String> = Vec::new();
     let cam = match &opts.view {
@@ -1214,6 +1609,10 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     if !(cam.near > 0.0 && cam.far > cam.near) && cam.ortho.is_none() {
         return Err(EcsError::new("bad_camera", "a perspective camera needs 0 < near < far").at("camera"));
     }
+    // the files of the streamed pieces of the world that are about to come into range are read now, on other threads (not while drawing a view inside a picture)
+    if !textures.nested {
+        prefetch_streamed(world, textures, cam.pos)?;
+    }
     let mut env = match envs_raw.first() {
         Some((_, e)) => EnvData::from_component(e),
         None => EnvData::derived(cam.clear, meshes_raw.iter().all(|(_, m, _)| !m.visible)),
@@ -1235,6 +1634,18 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         world.for_each_uid::<(&lunaris_sim::components::Shadows,), _>(|_, uid, (x,)| sh.push((uid, *x)))?;
         if let Some((_, x)) = sh.into_iter().filter(|x| x.1.enabled).min_by_key(|x| x.0) {
             env.shadow_soft = if x.softness.is_finite() { x.softness.clamp(0.0, 0.5) } else { 0.0 };
+        }
+    }
+    {
+        let mut li: Vec<(u64, lunaris_sim::components::Lighting)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::Lighting,), _>(|_, uid, (x,)| li.push((uid, *x)))?;
+        if let Some((_, x)) = li.into_iter().filter(|x| x.1.enabled).min_by_key(|x| x.0) {
+            let nz = |v: f32, lo: f32, hi: f32, d: f32| if v.is_finite() { v.clamp(lo, hi) } else { d };
+            env.lighting = [nz(x.fill[0], 0.0, 4.0, 0.0), nz(x.fill[1], 0.0, 4.0, 0.0), nz(x.fill[2], 0.0, 4.0, 0.0), nz(x.bounce, 0.0, 2.0, 0.0), nz(x.lamp_falloff, 0.0, 1.0, 0.0), nz(x.lamp_core, 0.01, 1.0, 0.12), nz(x.shadow_distance, 0.0, 2000.0, 0.0), 1.0, (x.point_shadows.min(4)) as f32];
+            // the sun's softness is the `Shadows` component's when the world has one (read below, after this), else this one's
+            if env.shadow_soft <= 0.0 {
+                env.shadow_soft = nz(x.softness, 0.0, 0.5, 0.0);
+            }
         }
     }
     {
@@ -1270,6 +1681,15 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             env.grade_b = [nz(g.gamma[0], 0.1, 4.0, 1.0), nz(g.gamma[1], 0.1, 4.0, 1.0), nz(g.gamma[2], 0.1, 4.0, 1.0), nz(g.tint_shift, -1.0, 1.0, 0.0)];
             env.grade_c = [nz(g.gain[0], 0.0, 8.0, 1.0), nz(g.gain[1], 0.0, 8.0, 1.0), nz(g.gain[2], 0.0, 8.0, 1.0), 0.0];
             env.fade = [nz(g.fade[0], 0.0, 1.0, 0.0), nz(g.fade[1], 0.0, 1.0, 0.0), nz(g.fade[2], 0.0, 1.0, 0.0), nz(g.fade[3], 0.0, 1.0, 0.0)];
+        }
+    }
+    {
+        let mut found: Vec<(u64, lunaris_sim::components::Weather)> = Vec::new();
+        world.for_each_uid::<(&lunaris_sim::components::Weather,), _>(|_, uid, (w,)| found.push((uid, *w)))?;
+        if let Some((_, w)) = found.into_iter().min_by_key(|x| x.0) {
+            let nz = |v: f32| if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 };
+            env.rain = nz(w.rain);
+            env.wet = nz(w.wet);
         }
     }
     {
@@ -1355,39 +1775,56 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         all_lights = lights.clone();
     }
 
+    drop(gather_b);
+    let gather_c = crate::Timed::new(|| "gather: meshes and models".to_string());
     // ---- what to draw, in drawing order: meshes by uid, sprites and tile maps far to near, then text
     // models and textures are loaded here (they need the caches)
-    let mut model_cache: std::collections::HashMap<String, Option<Arc<Mesh>>> = std::collections::HashMap::new();
+    let mut resolved: Vec<ResolvedName> = Vec::new();
+    let mut by_sym: std::collections::HashMap<u32, u32, std::hash::BuildHasherDefault<IdHasher>> = Default::default();
     let mut lods: std::collections::BTreeMap<u64, lunaris_sim::components::Lod> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&lunaris_sim::components::Lod,), _>(|_, uid, (l,)| {
         lods.insert(uid, *l);
     })?;
     let mut hidden: Vec<bool> = Vec::with_capacity(meshes_raw.len());
-    let mut mesh_names: Vec<String> = Vec::with_capacity(meshes_raw.len());
+    // which of `resolved` each object's mesh name is (u32::MAX: it is not asked for)
+    let mut mesh_names: Vec<u32> = Vec::with_capacity(meshes_raw.len());
+    let g_names = crate::Timed::new(|| "gather: names and models of the meshes".to_string());
     for (uid, m, tr) in &meshes_raw {
-        let mut name = world.strings().get(m.mesh.0).to_string();
+        let mut sym = m.mesh.0;
         let mut hide = false;
-        if let Some(l) = lods.get(uid) {
-            // level of detail: by the distance from the camera to the entity
-            let d = ((tr.pos[0] - cam.pos[0]).powi(2) + (tr.pos[1] - cam.pos[1]).powi(2) + (tr.pos[2] - cam.pos[2]).powi(2)).sqrt();
-            if l.cull > 0.0 && d > l.cull {
-                hide = true;
-            } else {
-                let pick = |sym: lunaris_ecs::Sym| world.strings().get(sym.0).to_string();
-                if d >= l.distance2 && l.mesh2.0 != 0 {
-                    name = pick(l.mesh2);
+        if !lods.is_empty() {
+            if let Some(l) = lods.get(uid) {
+                // level of detail: by the distance from the camera to the entity
+                let d = ((tr.pos[0] - cam.pos[0]).powi(2) + (tr.pos[1] - cam.pos[1]).powi(2) + (tr.pos[2] - cam.pos[2]).powi(2)).sqrt();
+                if l.cull > 0.0 && d > l.cull {
+                    hide = true;
+                } else if d >= l.distance2 && l.mesh2.0 != 0 {
+                    sym = l.mesh2.0;
                 } else if d >= l.distance1 && l.mesh1.0 != 0 {
-                    name = pick(l.mesh1);
+                    sym = l.mesh1.0;
                 }
             }
         }
-        hidden.push(hide);
-        if m.visible && builtin(&name).is_none() && is_model_name(&name) && !model_cache.contains_key(&name) {
-            let loaded = textures.model(&name);
-            model_cache.insert(name.clone(), loaded);
+        let ri = *by_sym.entry(sym).or_insert_with(|| {
+            let name = world.strings().get(sym).to_string();
+            let builtin = builtin(&name);
+            let is_model = builtin.is_none() && is_model_name(&name);
+            resolved.push(ResolvedName { name, builtin, is_model, asked: false, model: None, waiting: false });
+            resolved.len() as u32 - 1
+        });
+        let r = &mut resolved[ri as usize];
+        if m.visible && r.is_model && !r.asked {
+            // (a model that is still being read on another thread gives `None` and waiting: its objects stay out of the picture until it is here, without a warning)
+            r.asked = true;
+            r.model = textures.model(&r.name);
+            r.waiting = r.model.is_none() && textures.async_jobs && textures.waiting_for(crate::loader::Kind::Model, &r.name);
         }
-        mesh_names.push(name);
+        hide |= m.visible && r.waiting;
+        hidden.push(hide);
+        mesh_names.push(ri);
     }
+    drop(g_names);
+    let g_layers = crate::Timed::new(|| "gather: layers, decals and tile maps".to_string());
     let quad = builtin("quad").expect("quad exists");
     // sprites and tile maps are layers drawn far to near on top of the 3D scene
     enum Layer {
@@ -1466,15 +1903,21 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         layer_tex.push(if name.is_empty() { None } else { Some(textures.get(&name)) });
     }
 
+    drop(g_layers);
     let mut scene_meshes: Vec<SceneMesh> = Vec::new();
+    let g_scene = crate::Timed::new(|| "gather: the scene's meshes".to_string());
+    let mut pose_jobs: Vec<(usize, u64, PoseJob)> = Vec::new();
     for pass in 0..2 {
-    for (((uid, m, tr), name), hide) in meshes_raw.iter().zip(&mesh_names).zip(&hidden) {
+    for (((uid, m, tr), ri), hide) in meshes_raw.iter().zip(&mesh_names).zip(&hidden) {
         if !m.visible || *hide || attached.contains(uid) != (pass == 1) {
             continue;
         }
-        let mesh = match builtin(name) {
+        let resolved_name = &resolved[*ri as usize];
+        let name: &str = &resolved_name.name;
+        let mut pending: Option<PoseJob> = None;
+        let mesh = match resolved_name.builtin {
             Some(b) => MeshRef::Builtin(b),
-            None => match model_cache.get(name).and_then(|m| m.clone()) {
+            None => match resolved_name.model.clone() {
                 // an animated model: pose its skeleton for this picture
                 Some(shared) if shared.rig.is_some() && animators_raw.contains_key(uid) => {
                     let rig = shared.rig.as_ref().expect("checked");
@@ -1502,21 +1945,35 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                                 continue;
                             };
                             let pole = (ik.pole.0 != 0).then(|| world.entity(ik.pole.0).and_then(|e| world.get::<Transform>(e)).map(|t| inv.transform_point(t.pos))).flatten();
-                            let kind = if ik.kind == 1 { IkKind::Look { axis: ik.axis, max_angle: if ik.max_angle.is_finite() { ik.max_angle } else { 80.0 } } } else { IkKind::Reach };
-                            goals.push(IkGoal { joint, kind, target: inv.transform_point(*gpos), pole, weight: ik.weight.min(1.0) });
+                            let kind = match ik.kind {
+                                1 => IkKind::Look { axis: ik.axis, max_angle: if ik.max_angle.is_finite() { ik.max_angle } else { 80.0 } },
+                                3 => IkKind::Turn { axis: ik.axis, degrees: ik.angle },
+                                _ => IkKind::Reach,
+                            };
+                            // a pin: its directions (given in the world) in the model's space
+                            let pin = (ik.kind == 2).then(|| {
+                                let dir = |v: [f32; 3]| inv.transform_dir(v);
+                                let n2 = (ik.axis2.iter().any(|x| *x != 0.0)).then(|| dir(ik.axis2));
+                                crate::rig::IkPin { n1: dir(ik.axis), n2, one_sided: ik.one_sided }
+                            });
+                            goals.push(IkGoal { joint, kind, target: inv.transform_point(*gpos), pin, pole, weight: ik.weight.min(1.0) });
                         }
                     }
+                    // inertialization: the clips the animator has switched through lately, blended by offsets that decay (instead of a crossfade)
+                    let chain: Option<crate::rig::InertiaChain> = inertia_raw.get(uid).and_then(|ch| inertia_chain(world.strings(), rig, &a, ch));
                     // extra clips laid over the base (blend trees and layers): the base (a crossfade, if one is running) first, then each extra clip
-                    let mesh = if anim_layers_raw.contains_key(uid) || !goals.is_empty() || attachers_by_skin.contains_key(uid) {
+                    let mesh = if anim_layers_raw.contains_key(uid) || !goals.is_empty() || attachers_by_skin.contains_key(uid) || chain.is_some() {
                         use crate::rig::PoseLayer;
                         let mut stack: Vec<PoseLayer> = Vec::new();
-                        if a.blend < 1.0 {
+                        if chain.is_some() {
+                            stack.push(PoseLayer { clip, time: a.time, looping: a.looping, weight: 1.0, root: None, inertia: chain });
+                        } else if a.blend < 1.0 {
                             let prev_name = world.strings().get(a.prev_clip.0).to_string();
                             let prev = if prev_name.is_empty() { (!rig.clips.is_empty()).then_some(0) } else { rig.clip_index(&prev_name) };
-                            stack.push(PoseLayer { clip: prev, time: a.prev_time, looping: a.looping, weight: 1.0, root: None });
-                            stack.push(PoseLayer { clip, time: a.time, looping: a.looping, weight: a.blend, root: None });
+                            stack.push(PoseLayer { clip: prev, time: a.prev_time, looping: a.looping, weight: 1.0, root: None, inertia: None });
+                            stack.push(PoseLayer { clip, time: a.time, looping: a.looping, weight: a.blend, root: None, inertia: None });
                         } else {
-                            stack.push(PoseLayer { clip, time: a.time, looping: a.looping, weight: 1.0, root: None });
+                            stack.push(PoseLayer { clip, time: a.time, looping: a.looping, weight: 1.0, root: None, inertia: None });
                         }
                         let base_len = clip.map_or(0.0, |c| rig.clips[c].duration);
                         let extras: Vec<(u32, f32, u32, f32, bool)> = anim_layers_raw.get(uid).map(|l| vec![(l.clip_b.0, l.weight_b, l.root_b.0, l.time_b, l.sync_b), (l.clip_c.0, l.weight_c, l.root_c.0, l.time_c, l.sync_c)]).unwrap_or_default();
@@ -1542,7 +1999,7 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                                 continue;
                             }
                             let t = if sync && base_len > 0.0 { a.time / base_len * rig.clips[ci].duration } else { time };
-                            stack.push(PoseLayer { clip: Some(ci), time: t, looping: a.looping, weight, root });
+                            stack.push(PoseLayer { clip: Some(ci), time: t, looping: a.looping, weight, root, inertia: None });
                         }
                         if let Some(list) = attachers_by_skin.get(uid) {
                             let worlds = rig.joint_worlds(&stack, &goals);
@@ -1563,18 +2020,20 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                             }
                         }
                         if goals.is_empty() {
-                            rig.pose_layers(&shared, &stack)
+                            PoseJob::Layers { stack }
                         } else {
-                            rig.pose_layers_ik(&shared, &stack, &goals)
+                            PoseJob::LayersIk { stack, goals }
                         }
                     } else if a.blend < 1.0 {
                         let prev_name = world.strings().get(a.prev_clip.0).to_string();
                         let prev = if prev_name.is_empty() { (!rig.clips.is_empty()).then_some(0) } else { rig.clip_index(&prev_name) };
-                        rig.pose_blend(&shared, (prev, a.prev_time), (clip, a.time), a.looping, a.blend)
+                        PoseJob::Blend { from: (prev, a.prev_time), to: (clip, a.time), looping: a.looping, w: a.blend }
                     } else {
-                        rig.pose(&shared, clip, a.time, a.looping)
+                        PoseJob::Pose { clip, time: a.time, looping: a.looping }
                     };
-                    MeshRef::Dynamic { key: *uid, mesh: Arc::new(mesh) }
+                    // (the models of the picture are posed together, on every core, once the loop is over: until then the entity holds the rest pose)
+                    pending = Some(mesh);
+                    MeshRef::Dynamic { key: *uid, mesh: shared.clone() }
                 }
                 Some(shared) => MeshRef::Shared(shared),
                 None => {
@@ -1600,7 +2059,9 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let tex_name = world.strings().get(m.texture.0).to_string();
         let tex = if tex_name.is_empty() { None } else { Some(textures.get(&tex_name)) };
         let uv_scale = if m.uv_scale[0].is_finite() && m.uv_scale[1].is_finite() { m.uv_scale } else { [1.0, 1.0] };
-        scene_meshes.push(SceneMesh {
+        let sm = SceneMesh {
+            depth_role: 0,
+            depth_cover: None,
             water: None,
             water_look: None,
             sway: sways_raw.get(uid).map(|w| [w.amount.clamp(-5.0, 5.0), if w.extent.is_finite() { w.extent.max(0.1) } else { 3.0 }, w.phase + w.offset]),
@@ -1618,10 +2079,12 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             tex,
             uv_scale,
             splat: None,
+            macro_tex: None,
             ext: ext_raw.get(uid).filter(|e| e.clearcoat > 0.0 || e.sheen > 0.0 || e.subsurface > 0.0).map(|e| {
                 let f = |v: f32, lo: f32| if v.is_finite() { v.clamp(lo, 1.0) } else { lo };
                 [f(e.clearcoat, 0.0), f(e.clearcoat_roughness, 0.02), f(e.sheen, 0.0), f(e.subsurface, 0.0), f(e.subsurface_color[0], 0.0), f(e.subsurface_color[1], 0.0), f(e.subsurface_color[2], 0.0)]
             }),
+            vary: vary_raw.get(uid).copied(),
             pbr: pbr_raw.get(uid).and_then(|p| {
                 let name_n = world.strings().get(p.normal.0).to_string();
                 let name_a = world.strings().get(p.arm.0).to_string();
@@ -1632,9 +2095,49 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                 let fin = |v: f32, hi: f32| if v.is_finite() { v.clamp(0.0, hi) } else { 1.0 };
                 Some(MeshPbr { normal: (!name_n.is_empty()).then(|| textures.get(&name_n)), arm: (!name_a.is_empty()).then(|| textures.get(&name_a)), disp: (!name_h.is_empty()).then(|| textures.get(&name_h)), height_scale: fin(p.height_scale, 0.3), normal_strength: fin(p.normal_strength, 4.0), ao_strength: fin(p.ao_strength, 1.0), roughness_scale: fin(p.roughness_scale, 4.0), untile: p.untile })
             }),
-        });
+        };
+        // a model whose materials differ in more than a colour is drawn as one mesh per material (unless the entity names a texture of its own, which replaces them all)
+        let whole = match &sm.mesh {
+            MeshRef::Shared(a) if sm.tex.is_none() && !a.parts.is_empty() => Some(a.clone()),
+            _ => None,
+        };
+        match whole {
+            None => {
+                if let Some(job) = pending.take() {
+                    pose_jobs.push((scene_meshes.len(), *uid, job));
+                }
+                scene_meshes.push(sm)
+            }
+            Some(a) => {
+                // an opaque model that stays where its transform puts it and has no cut-out piece: its whole draws the shadows and the depth in one go, its pieces only the colour
+                let cover = a.depth_whole.clone().filter(|_| a.rig.is_none() && sm.splat.is_none() && sm.water.is_none() && sm.water_look.is_none() && sm.sway.is_none() && sm.alpha >= 0.999);
+                if let Some(w) = &cover {
+                    let mut depth = sm.clone();
+                    depth.mesh = MeshRef::Shared(w.clone());
+                    depth.depth_role = 1;
+                    scene_meshes.push(depth);
+                }
+                let glowing = a.parts.iter().any(|p| p.emissive_factor != 0.0);
+                for p in &a.parts {
+                    let mut part = sm.clone();
+                    part.mesh = MeshRef::Shared(p.clone());
+                    // a model with glowing pieces (lit windows): the entity's `emissive` is theirs alone, scaled by their own factor
+                    if glowing {
+                        part.emissive = sm.emissive * p.emissive_factor;
+                    }
+                    if cover.is_some() && p.alpha_cutoff == 0.0 {
+                        part.depth_role = 2;
+                        part.depth_cover = cover.clone();
+                    }
+                    scene_meshes.push(part);
+                }
+            }
+        }
     }
     }
+    pose_models(&mut scene_meshes, pose_jobs, skin_on_card);
+    drop(g_scene);
+    let g_water = crate::Timed::new(|| "gather: water".to_string());
     // the look of the water, by entity: deep colour is the water's own, the shallows' colour and the foam are the `WaterLook`'s
     let mut looks: std::collections::BTreeMap<u64, lunaris_sim::components::WaterLook> = std::collections::BTreeMap::new();
     world.for_each_uid::<(&lunaris_sim::components::WaterLook,), _>(|_, uid, (l,)| {
@@ -1659,6 +2162,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let mesh = textures.water_grid(n);
         let c = display_to_linear(w.color);
         scene_meshes.push(SceneMesh {
+            depth_role: 0,
+            depth_cover: None,
             water: if w.wave_height > 0.0 && w.wave_height.is_finite() { Some([w.wave_height.min(10.0), w.wave_length.max(0.2), w.phase]) } else { None },
             water_look: look_of(*uid),
             sway: None,
@@ -1678,6 +2183,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             splat: None,
             pbr: None,
             ext: None,
+            vary: None,
+            macro_tex: None,
         });
     }
     // water that follows a heightmap: the surface of the picture, see-through and rolling with waves in the GPU renderer's high qualities like a `Water` sheet
@@ -1692,6 +2199,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let Some(mesh) = textures.water_mesh(&name, w) else { continue };
         let c = display_to_linear(w.color);
         scene_meshes.push(SceneMesh {
+            depth_role: 0,
+            depth_cover: None,
             water: if w.wave_height > 0.0 && w.wave_height.is_finite() { Some([w.wave_height.min(10.0), w.wave_length.max(0.2), w.phase]) } else { None },
             water_look: look_of(*uid),
             sway: None,
@@ -1711,8 +2220,13 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             splat: None,
             pbr: None,
             ext: None,
+            vary: None,
+            macro_tex: None,
         });
     }
+    drop(g_water);
+    drop(gather_c);
+    let gather_d = crate::Timed::new(|| "gather: terrain".to_string());
     // terrain: the mesh of each heightmap, drawn like any model (the ground lies flat: the entity's rotation and scale are not used)
     for (uid, g, tr) in &terrains_raw {
         if !g.visible {
@@ -1724,14 +2238,23 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         }
         let Some(mesh) = textures.terrain_mesh(&name, g) else { continue };
         let c = display_to_linear(g.color);
+        // a splat map that is still being read (a game that is played reads what it needs on other threads): the ground waits for it rather than show up in the wrong paint
+        if let Some(l) = terrain_layers_raw.get(uid) {
+            let map = world.strings().get(l.splat.0).to_string();
+            if textures.async_jobs && !map.is_empty() && textures.splat(&map).is_none() && textures.waiting_for(crate::loader::Kind::Splat, &map) {
+                continue;
+            }
+        }
         // painted with layers (`TerrainLayers`): the splat map and the layers' textures take the place of the terrain's own texture, and the ground is drawn opaque
         let splat = terrain_layers_raw.get(uid).and_then(|l| {
             let (map, text) = (world.strings().get(l.splat.0).to_string(), world.strings().get(l.layers.0).to_string());
-            crate::terrain_layers::gather(textures, *uid, g.uv_scale, &map, &text, &mut warnings)
+            crate::terrain_layers::gather(textures, *uid, g.uv_scale, [g.size[0].abs(), g.size[1].abs()], l.photo, &map, &text, &mut warnings)
         });
         let tex_name = world.strings().get(g.texture.0).to_string();
         let tex = if tex_name.is_empty() || splat.is_some() { None } else { Some(textures.get(&tex_name)) };
         scene_meshes.push(SceneMesh {
+            depth_role: 0,
+            depth_cover: None,
             water: None,
             water_look: None,
             sway: None,
@@ -1748,9 +2271,11 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             bump: 0.0,
             tex,
             uv_scale: if g.uv_scale[0].is_finite() && g.uv_scale[1].is_finite() { g.uv_scale } else { [1.0, 1.0] },
+            macro_tex: if splat.is_some() && !tex_name.is_empty() { Some(textures.get(&tex_name)) } else { None },
             splat,
             pbr: None,
             ext: None,
+            vary: None,
         });
     }
     for (uid, j, from) in &cords {
@@ -1766,6 +2291,8 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         let rot = if n[1] < -0.9999 { [1.0, 0.0, 0.0, 0.0] } else { [n[2], 0.0, -n[0], 1.0 + n[1]] };
         let c = display_to_linear(j.color);
         scene_meshes.push(SceneMesh {
+            depth_role: 0,
+            depth_cover: None,
             water: None,
             water_look: None,
             sway: None,
@@ -1785,8 +2312,22 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             splat: None,
             pbr: None,
             ext: None,
+            vary: None,
+            macro_tex: None,
         });
     }
+    // the ground under the sea, for its depth
+    let mut floors: Vec<SceneFloor> = Vec::new();
+    if scene_meshes.iter().any(|m| m.water_look.is_some()) {
+        for (_, t, tr) in &terrains_raw {
+            let hname = world.strings().get(t.heightmap.0).to_string();
+            if let Some(heights) = textures.heightfield(&hname) {
+                floors.push(SceneFloor { heights, pos: tr.pos, terrain: *t });
+            }
+        }
+    }
+    drop(gather_d);
+    let gather_e = crate::Timed::new(|| "gather: grass".to_string());
     // grass: what grows where, found once here (the picture of the ground and the tuft model come from the caches)
     let mut grass: Vec<SceneGrass> = Vec::new();
     {
@@ -1798,7 +2339,9 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             if !g.enabled {
                 continue;
             }
-            let Some((_, t, tr)) = terrains_raw.iter().find(|(tu, _, _)| g.terrain.0 == 0 || *tu == g.terrain.0) else {
+            // `terrain` 0: the terrain on this very entity (a streamed cell is a prefab, whose entities cannot name each other), else the first terrain
+            let own = if g.terrain.0 == 0 { terrains_raw.iter().find(|(tu, _, _)| *tu == uid) } else { None };
+            let Some((tu, t, tr)) = own.or_else(|| terrains_raw.iter().find(|(tu, _, _)| g.terrain.0 == 0 || *tu == g.terrain.0)) else {
                 warnings.push(format!("entity {uid}: GrassField.terrain is not an entity with a Terrain"));
                 continue;
             };
@@ -1834,8 +2377,38 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             let tname = world.strings().get(g.texture.0).to_string();
             let tex = if tname.is_empty() { None } else { Some(textures.get(&tname)) };
             let lin = |c: [f32; 3]| [fin(c[0], 0.0, 4.0, 1.0), fin(c[1], 0.0, 4.0, 1.0), fin(c[2], 0.0, 4.0, 1.0)];
+            // the paint of the terrain is still being read (a game that is played reads what it needs on other threads): the grass waits for it, since it grows on one layer of it
+            if g.mask_layer >= 1 && blades.is_some() && textures.async_jobs {
+                if let Some(l) = terrain_layers_raw.get(tu) {
+                    let map = world.strings().get(l.splat.0).to_string();
+                    if !map.is_empty() && textures.splat(&map).is_none() && textures.waiting_for(crate::loader::Kind::Splat, &map) {
+                        continue;
+                    }
+                }
+            }
+            // the layer the grass grows on, from the terrain's paint (it needs one: without `TerrainLayers` there is no layer to grow on and the field covers the ground)
+            let mask = if g.mask_layer >= 1 && blades.is_some() {
+                let found = terrain_layers_raw.get(tu).and_then(|l| {
+                    let (map, text) = (world.strings().get(l.splat.0).to_string(), world.strings().get(l.layers.0).to_string());
+                    crate::terrain_layers::gather(textures, *tu, [1.0, 1.0], [t.size[0].abs(), t.size[1].abs()], l.photo, &map, &text, &mut warnings)
+                });
+                match found {
+                    Some(sl) if (g.mask_layer as usize) <= sl.layers.len() => match splat_mask(&sl, g.mask_layer as usize - 1, textures.async_jobs) {
+                        Some(m) => Some(m),
+                        // being made on another thread: the field waits for it (it grows on one layer of the paint)
+                        None => continue,
+                    },
+                    _ => {
+                        warnings.push(format!("entity {uid}: GrassField.mask_layer {} needs a TerrainLayers of that many layers on the terrain (the grass covers the whole ground)", g.mask_layer));
+                        None
+                    }
+                }
+            } else {
+                None
+            };
             grass.push(SceneGrass {
                 uid,
+                mask,
                 blades,
                 heights,
                 terrain_pos: tr.pos,
@@ -1880,9 +2453,23 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
         }
         None => Default::default(),
     };
-    let say = |label: String| if label.contains("{#") { crate::font::translate(&label, |k| table.get(k).cloned()) } else { label };
+    // `{key:ACTION}` in a text is what the keys of the game's `InputMap` are called now (docs/KEYBINDS.md)
+    let mut maps: Vec<(u64, u32)> = Vec::new();
+    world.for_each_uid::<(&lunaris_sim::components::InputMap,), _>(|_, uid, (m,)| maps.push((uid, m.bindings.0)))?;
+    let input_map = maps.iter().min_by_key(|m| m.0).map(|m| world.strings().get(m.1).to_string()).unwrap_or_default();
+    let say = |label: String| {
+        let label = if label.contains("{key:") { lunaris_sim::rebind::expand_keys(&input_map, &label) } else { label };
+        if label.contains("{#") {
+            crate::font::translate(&label, |k| table.get(k).cloned())
+        } else {
+            label
+        }
+    };
+    drop(gather_e);
+    let gather_f = crate::Timed::new(|| "gather: interface, particles, probes".to_string());
     // the on-screen interface: shapes (rectangles, rounded ones, gradients, pictures, the letters of TrueType text) and bitmap-font texts, in drawing order
     let (pw, ph) = (opts.width.max(1) as f32, opts.height.max(1) as f32);
+    let g_ui_maps = crate::Timed::new(|| "gather: interface, the maps of styles, fonts and edges".to_string());
     let mut styles: std::collections::BTreeMap<u64, UiStyle> = Default::default();
     world.for_each_uid::<(&UiStyle,), _>(|_, uid, (st,)| {
         styles.insert(uid, *st);
@@ -1910,10 +2497,15 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             edges.insert(uid, *e);
         })?;
     }
+    drop(g_ui_maps);
     // elements inside a scroll view are cut at its viewport
+    let g_ui_clips = crate::Timed::new(|| "gather: interface, the clip rectangles of scroll views".to_string());
     let clips = lunaris_sim::ui_kit3::clip_rects(world);
+    drop(g_ui_clips);
     // and what a `UiGroup` that is not shown hides
+    let g_ui_hidden = crate::Timed::new(|| "gather: interface, what groups hide".to_string());
     let hidden = lunaris_sim::ui_kit3::hidden_set(world);
+    drop(g_ui_hidden);
     // and the elements that are a sector of a circle instead of a bar
     let mut radials: std::collections::BTreeMap<u64, lunaris_sim::components::UiRadial> = Default::default();
     world.for_each_uid::<(&lunaris_sim::components::UiRadial,), _>(|_, uid, (r,)| {
@@ -1921,10 +2513,13 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     })?;
     let data = crate::ui::UiData { uis: &uis_raw, texts: &texts_raw, styles, fonts, anchors, views, scale, edges, clips, hidden, radials };
     // a picture drawn for a `CameraView` has no interface
+    let g_ui_draw = crate::Timed::new(|| "gather: interface, rectangles and texts".to_string());
     let (scene_rects, scene_texts) = if textures.nested { (Vec::new(), Vec::new()) } else { crate::ui::gather(world, textures, &view_proj, pw, ph, &data, &say) };
+    drop(g_ui_draw);
     let mut font_warnings = std::mem::take(&mut textures.fonts.warnings);
     textures.warnings.append(&mut font_warnings);
     // particle clouds: built for this camera
+    let g_clouds = crate::Timed::new(|| "gather: particle clouds".to_string());
     let mut clouds: Vec<(u64, Particles, Transform, lunaris_ecs::Entity)> = Vec::new();
     world.for_each_uid::<(&Particles, &Transform), _>(|e, uid, (p, t)| {
         if p.visible {
@@ -1933,10 +2528,14 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
     })?;
     clouds.sort_by_key(|c| c.0);
     let mut scene_particles: Vec<SceneParticles> = Vec::new();
-    if !clouds.is_empty() {
+    let basis = {
         let inv = view.inverse_affine();
-        let basis = crate::particles::CameraBasis { pos: cam.pos, forward: normalize(inv.transform_dir([0.0, 0.0, -1.0])), right: normalize(inv.transform_dir([1.0, 0.0, 0.0])), up: normalize(inv.transform_dir([0.0, 1.0, 0.0])) };
-        for (uid, p, tr, e) in &clouds {
+        crate::particles::CameraBasis { pos: cam.pos, forward: normalize(inv.transform_dir([0.0, 0.0, -1.0])), right: normalize(inv.transform_dir([1.0, 0.0, 0.0])), up: normalize(inv.transform_dir([0.0, 1.0, 0.0])) }
+    };
+    if !clouds.is_empty() {
+        // the textures and modules of every cloud first, then the particles of all of them together (`particles::build_many`), then each cloud's place among the layers
+        let mut prepared: Vec<(Arc<Texture>, lunaris_sim::particle_modules::Modules)> = Vec::with_capacity(clouds.len());
+        for (uid, p, _, e) in &clouds {
             let name = world.strings().get(p.texture.0).to_string();
             let tex = textures.get(if name.is_empty() { "soft" } else { &name });
             let modules = match world.get::<lunaris_sim::components::ParticleModules>(*e) {
@@ -1949,7 +2548,19 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                 }
                 None => Default::default(),
             };
-            let mesh = crate::particles::build_with(p, &modules, tr, &basis, opts.threads);
+            prepared.push((tex, modules));
+        }
+        // a cloud that lies wholly outside the picture is not built (its sphere, `particles::bound`, is outside the frustum)
+        let shown: Vec<usize> = (0..clouds.len())
+            .filter(|&k| crate::particles::bound(&clouds[k].1, &prepared[k].1, &clouds[k].2).is_none_or(|(c, r)| !crate::particles::outside(&view_proj, c, r)))
+            .collect();
+        let g_cloud = crate::Timed::new(|| format!("gather: the particles of {} clouds ({} outside the picture)", shown.len(), clouds.len() - shown.len()));
+        let jobs: Vec<crate::particles::Job> = shown.iter().map(|&k| crate::particles::Job { p: &clouds[k].1, m: &prepared[k].1, tr: &clouds[k].2 }).collect();
+        let meshes = crate::particles::build_many(&jobs, &basis, opts.threads);
+        drop(g_cloud);
+        let mut prepared: Vec<Option<(Arc<Texture>, lunaris_sim::particle_modules::Modules)>> = prepared.into_iter().map(Some).collect();
+        for (&k, mesh) in shown.iter().zip(meshes) {
+            let ((uid, p, tr, _), (tex, _)) = (&clouds[k], prepared[k].take().expect("each cloud once"));
             if mesh.pos.is_empty() {
                 continue;
             }
@@ -1958,15 +2569,116 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
                 let key = draw_key(*uid, tr);
                 (key, layer_keys.partition_point(|k| k.cmp_order(&key) == std::cmp::Ordering::Less))
             });
-            scene_particles.push(SceneParticles { uid: *uid, mesh: MeshRef::Dynamic { key: *uid, mesh: Arc::new(mesh) }, tex: Some(tex), additive: p.additive, slot: slot.map(|s| s.1), key: slot.map(|s| s.0) });
+            scene_particles.push(SceneParticles { uid: *uid, mesh: MeshRef::Dynamic { key: *uid, mesh: Arc::new(mesh) }, tex: Some(tex), additive: p.additive, nearest: false, gpu: None, soft: 0.0, slot: slot.map(|s| s.1), key: slot.map(|s| s.0) });
         }
-        // the clouds that stay on top of everything (in entity order, as ever) first, then the ones among the layers in drawing order
+    }
+    // particle systems (docs/FX.md): stepped up to their clocks for this picture (only those in view), then drawn like clouds, a layer for every emitter, and the lights of their particles
+    let mut fx_lights: Vec<LightData> = Vec::new();
+    {
+        let mut systems: Vec<(u64, ParticleSystem, Transform)> = Vec::new();
+        world.for_each_uid::<(&ParticleSystem, &Transform), _>(|_, uid, (p, t)| {
+            if p.visible {
+                systems.push((uid, *p, *t));
+            }
+        })?;
+        systems.sort_by_key(|s| s.0);
+        let frame = textures.frame();
+        let on_card = textures.fx_on_card;
+        let mut jobs: Vec<crate::fx_sim::FxJob> = Vec::new();
+        let mut wants_world: Vec<usize> = Vec::new();
+        let mut reach_box: Option<(V3, V3)> = None;
+        for (uid, p, tr) in &systems {
+            if !tr.pos.iter().all(|v| v.is_finite()) || !p.time.is_finite() {
+                continue;
+            }
+            let text = world.strings().get(p.effect.0).to_string();
+            let Ok((effect, key)) = textures.fx_effect(&text) else { continue };
+            let k = p.scale.max(1e-4) * tr.scale.iter().fold(0.0f32, |a, s| a.max(s.abs())).max(1e-4);
+            let radius = effect.radius() * k;
+            let distance = length(sub(tr.pos, cam.pos));
+            // out of the picture, or further than the effect is meant to be seen from: nothing is stepped or drawn (smoke that is still in the picture after its entity left it is)
+            let kept = textures.fx.get(*uid).and_then(|s| s.bounds);
+            let in_view = !crate::particles::outside(&view_proj, tr.pos, radius) || kept.is_some_and(|(c, r)| !crate::particles::outside(&view_proj, c, r));
+            if !in_view || (effect.lod_far > 0.0 && distance - radius > effect.lod_far && kept.is_none()) {
+                continue;
+            }
+            // the world's colliders round the system, for an emitter that collides with them (gathered once for all the systems that do, below)
+            if effect.emitters.iter().any(|e| e.update.collide.as_ref().is_some_and(|c| c.world)) {
+                let reach = radius + 4.0;
+                let (lo, hi) = (sub(tr.pos, [reach; 3]), add(tr.pos, [reach; 3]));
+                reach_box = Some(match reach_box {
+                    Some((l, h)) => ([l[0].min(lo[0]), l[1].min(lo[1]), l[2].min(lo[2])], [h[0].max(hi[0]), h[1].max(hi[1]), h[2].max(hi[2])]),
+                    None => (lo, hi),
+                });
+                wants_world.push(jobs.len());
+            }
+            jobs.push(crate::fx_sim::FxJob { uid: *uid, effect, key, time: p.time, seed: p.seed, scale: p.scale, intensity: p.intensity, quality: p.quality, tint: p.tint, tr: *tr, camera: cam.pos, frame, gpu: on_card, world: None });
+        }
+        // one gathering of the world's colliders for every system that bounces off them (a big box is the cached gathering of the static world: a pass over the colliders that checks nothing moved)
+        if let Some(reach) = reach_box {
+            let _g = crate::Timed::new(|| format!("gather: the colliders for the particles of {} systems", wants_world.len()));
+            let (meshes, terrains) = textures.world_solids();
+            let rw = Arc::new(lunaris_sim::vehicle_ray::RayWorld::gather(world, &terrains, &meshes, Some(reach)));
+            for &k in &wants_world {
+                jobs[k].world = Some(rw.clone());
+            }
+        }
+        let g_fx = crate::Timed::new(|| format!("gather: the particles of {} systems", jobs.len()));
+        textures.fx.advance_many(&jobs, opts.threads);
+        drop(g_fx);
+        let mut built: Vec<(u64, Vec<crate::fx_draw::FxLayer>)> = Vec::new();
+        let mut on_the_card: Vec<crate::fx_sim::GpuEmitterJob> = Vec::new();
+        for j in &jobs {
+            if let Some(sys) = textures.fx.get(j.uid) {
+                fx_lights.extend(crate::fx_draw::lights(sys));
+                built.push((j.uid, crate::fx_draw::build(sys, &basis, opts.threads)));
+                on_the_card.extend(sys.gpu_jobs(j.uid));
+            }
+        }
+        // the emitters the card simulates: a cloud with no mesh of its own here (the card fills it), drawn like the others
+        for g in on_the_card {
+            let r = &g.effect.emitters[g.emitter].render;
+            let tex = textures.get(if r.texture.is_empty() { "soft" } else { &r.texture });
+            let slot = draw_layers.contains_key(&g.uid).then(|| {
+                let tr = systems.iter().find(|s| s.0 == g.uid).map(|s| s.2).unwrap_or_default();
+                let key = draw_key(g.uid, &tr);
+                (key, layer_keys.partition_point(|k| k.cmp_order(&key) == std::cmp::Ordering::Less))
+            });
+            let (uid, key, additive, soft, nearest) = (g.uid, g.key, r.additive, r.soft, r.nearest);
+            scene_particles.push(SceneParticles { uid, mesh: MeshRef::Dynamic { key, mesh: Arc::new(Mesh::new()) }, tex: Some(tex), additive, nearest, gpu: Some(Arc::new(g)), soft, slot: slot.map(|s| s.1), key: slot.map(|s| s.0) });
+        }
+        for (uid, layers) in built {
+            for layer in layers {
+                let tex = textures.get(&layer.texture);
+                let slot = draw_layers.contains_key(&uid).then(|| {
+                    let tr = systems.iter().find(|s| s.0 == uid).map(|s| s.2).unwrap_or_default();
+                    let key = draw_key(uid, &tr);
+                    (key, layer_keys.partition_point(|k| k.cmp_order(&key) == std::cmp::Ordering::Less))
+                });
+                // (a key of its own for the card's copy of the mesh: the top bit keeps it apart from the entities' own)
+                let mesh_key = (1u64 << 63) | (uid.wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(17) ^ (layer.emitter as u64 + 1).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)) >> 1;
+                scene_particles.push(SceneParticles { uid, mesh: MeshRef::Dynamic { key: mesh_key, mesh: Arc::new(layer.mesh) }, tex: Some(tex), additive: layer.additive, nearest: layer.nearest, gpu: None, soft: layer.soft, slot: slot.map(|s| s.1), key: slot.map(|s| s.0) });
+            }
+        }
+        textures.fx.trim(frame, textures.trim_idle);
+    }
+    // the clouds and systems that stay on top of everything (in entity order, as ever) first, then the ones among the layers in drawing order
+    if !scene_particles.is_empty() {
         let (mut among, mut on_top): (Vec<SceneParticles>, Vec<SceneParticles>) = scene_particles.drain(..).partition(|p| p.slot.is_some());
         among.sort_by(|a, b| a.key.zip(b.key).map_or(std::cmp::Ordering::Equal, |(x, y)| x.cmp_order(&y)));
         on_top.append(&mut among);
         scene_particles = on_top;
     }
+    drop(g_clouds);
+    // the light of the particles that give some
+    for l in fx_lights {
+        if lights.len() < 16 {
+            lights.push(l);
+        }
+        all_lights.push(l);
+    }
     // reflection probes (GPU high qualities): by uid, the numbers made sane
+    let g_probes = crate::Timed::new(|| "gather: reflection probes".to_string());
     let mut probes: Vec<SceneProbe> = Vec::new();
     {
         let mut found: Vec<(u64, lunaris_sim::components::ReflectionProbe, Transform)> = Vec::new();
@@ -1980,7 +2692,13 @@ pub fn gather_scene(world: &mut World, textures: &mut TextureCache, opts: &Rende
             probes.push(SceneProbe { uid, pos: t.pos, half: [half(p.size[0]), half(p.size[1]), half(p.size[2])], resolution: p.resolution.clamp(16, 256) });
         }
     }
-    Ok(Scene { cam, view, proj, view_proj, lights, all_lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, probes, grass, warnings })
+    drop(g_probes);
+    drop(gather_f);
+    if !textures.nested {
+        // what no picture has asked for in the last `trim_idle` is let go (a world that streams its cells in and out would otherwise keep every cell it ever showed)
+        textures.trim(textures.trim_idle);
+    }
+    Ok(Scene { cam, view, proj, view_proj, lights, all_lights, meshes: scene_meshes, layers: scene_layers, particles: scene_particles, texts: scene_texts, rects: scene_rects, env, probes, grass, floors, warnings })
 }
 
 pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptions) -> Result<Frame> {
@@ -1994,6 +2712,7 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
     }
 
     // ---- gather (the same scene the GPU renderer draws)
+    textures.fx_on_card = false;
     let scene = gather_scene(world, textures, opts)?;
     let cam = &scene.cam;
     let view_proj = scene.view_proj;
@@ -2003,14 +2722,15 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
     let clear = [clear[0], clear[1], clear[2]];
     let mut draws: Vec<Draw<'_>> = Vec::new();
     let mvp_of = |model: &M4| view_proj.mul(model);
-    for m in &scene.meshes {
+    let t_list = crate::Timed::new(|| "render: the draw list".to_string());
+    for m in scene.meshes.iter().filter(|m| m.depth_role != 1) {
         let mesh = m.mesh.get();
         let rows = screen_rows(mesh, &mvp_of(&m.model), rh);
         draws.push(Draw { uid: m.uid, rows, kind: DrawKind::Mesh { mesh, model: m.model, color: m.color, shininess: m.shininess, emissive: m.emissive, tex: m.tex.as_deref(), uv_scale: m.uv_scale, splat: m.splat.as_deref() } });
     }
     fn cloud<'a>(p: &'a SceneParticles, view_proj: &M4, rh: usize) -> Draw<'a> {
         let mesh = p.mesh.get();
-        Draw { uid: p.uid, rows: screen_rows(mesh, view_proj, rh), kind: DrawKind::Particles { mesh, tex: p.tex.as_deref(), additive: p.additive } }
+        Draw { uid: p.uid, rows: screen_rows(mesh, view_proj, rh), kind: DrawKind::Particles { mesh, tex: p.tex.as_deref(), additive: p.additive, nearest: p.nearest } }
     }
     // the sprites and tile maps in drawing order, with the clouds that have a `DrawLayer` between them; the other clouds come after all of it
     let mut among = scene.particles.iter().filter(|p| p.slot.is_some()).peekable();
@@ -2035,9 +2755,21 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
         draws.push(Draw { uid: t.uid, rows: None, kind: DrawKind::Text { text: t.text.clone(), tx: t.tx, clip: t.clip } });
     }
 
+    drop(t_list);
+    let t_bands = crate::Timed::new(|| "render: the bands".to_string());
     // ---- draw: the picture is cut into bands of rows, each drawn independently (in parallel when threads > 1)
     let threads = opts.threads.clamp(1, 32);
-    let bands = if threads > 1 && rh >= 96 { (threads * 2).min(rh / 16).max(1) } else { 1 };
+    // the vertex stage of every mesh is done once, on all the threads, when there are several bands (a mesh that spans bands would be moved again in each); with that done, narrower bands balance the
+    // threads better (measured: 4 threads, 16 bands 15.0 ms against 22.9 with 8; 8 threads, 32 bands 11.5 ms), and without it (a picture of millions of vertices) two bands a thread stay the better choice
+    let several = threads > 1 && rh >= 96;
+    let pre = if several {
+        let _t = crate::Timed::new(|| "render: the vertices".to_string());
+        transform_draws(&draws, &view_proj, rw, rh, threads)
+    } else {
+        draws.iter().map(|_| None).collect()
+    };
+    let per_thread = if pre.iter().any(|p| p.is_some()) { 4 } else { 2 };
+    let bands = if several { (threads * per_thread).min(rh / 16).max(1) } else { 1 };
     let rows_per = rh.div_ceil(bands);
     let mut color = vec![[0.0f32; 3]; rw * rh]; // zeroed memory costs nothing here; every band fills its own rows below
     let mut depth_buf = vec![0.0f32; rw * rh];
@@ -2055,7 +2787,7 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
             c.fill(clear);
             d.fill(f32::INFINITY);
             let mut t = Target { w: rw, h: rh, y0, y1: (y0 + rows_per).min(rh), color: c, depth: d, ids: n };
-            draw_band(&mut t, &draws, &view_proj, lights, cam.pos, ss, opts.height as usize);
+            draw_band(&mut t, &draws, &pre, &view_proj, lights, cam.pos, ss, opts.height as usize);
         };
         if band_slices.len() == 1 {
             run_band(&band_slices[0]);
@@ -2072,6 +2804,8 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
             });
         }
     }
+    drop(t_bands);
+    let t_resolve = crate::Timed::new(|| "render: resolve".to_string());
     let target = FullTarget { color, depth: depth_buf, ids: id_buf };
     warnings.append(&mut textures.warnings);
 
@@ -2139,5 +2873,26 @@ pub fn render(world: &mut World, textures: &mut TextureCache, opts: &RenderOptio
             }
         });
     }
+    drop(t_resolve);
     Ok(Frame { width: opts.width, height: opts.height, rgba, ids, depth, view_proj, camera: cam.desc.clone(), warnings, info: Vec::new() })
+}
+
+/// The inertialization chain of an animator that has an `Inertia`, with the clips looked up in `rig` (`None` while the chain does not describe the clip the animator plays: the first picture of a scene).
+pub fn inertia_chain(strings: &lunaris_ecs::StringTable, rig: &crate::rig::Rig, a: &Animator, ch: &lunaris_sim::inertia::Inertia) -> Option<crate::rig::InertiaChain> {
+    use crate::rig::{InertiaChain, INERTIA_MAX};
+    let n = (ch.n as usize).min(INERTIA_MAX);
+    if n == 0 || ch.clip[n - 1] != a.clip.0 || !a.time.is_finite() {
+        return None;
+    }
+    let mut c = InertiaChain { n, clip: [None; INERTIA_MAX], t0: ch.t0, rate: ch.rate, gap: ch.gap, span: ch.len, looping: [false; INERTIA_MAX] };
+    for k in 0..INERTIA_MAX {
+        c.looping[k] = ch.looping[k] != 0;
+    }
+    for k in 0..n {
+        let nm = strings.get(ch.clip[k]);
+        c.clip[k] = if nm.is_empty() { (!rig.clips.is_empty()).then_some(0) } else { rig.clip_index(nm) };
+    }
+    let k = n - 1;
+    c.rate[k] = if c.gap[k] > 1.0e-5 { (a.time - c.t0[k]) / c.gap[k] } else { a.speed };
+    Some(c)
 }

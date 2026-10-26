@@ -12,6 +12,7 @@ mod chrome;
 mod code_edit;
 mod console;
 mod dialog;
+mod effects;
 mod gizmo;
 mod graph;
 mod hierarchy;
@@ -21,10 +22,18 @@ mod inspector;
 mod mathx;
 mod package;
 mod panels;
+mod paint;
+mod place;
+mod profiler;
 mod project;
+mod project_settings;
+#[cfg(test)]
+mod shot;
 mod script_ui;
+mod sequencer;
 mod state;
 mod theme;
+mod thumbs;
 mod ui_designer;
 mod viewport;
 mod vsc_defaults;
@@ -91,7 +100,12 @@ pub fn build_game(opts: &Options) -> Result<String, String> {
     let doc = studio.call("save_scene", lunaris_json::Json::Null)?;
     let json = doc.to_string_pretty().map_err(|e| e.to_string())?;
     let player = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(if cfg!(windows) { "lunaris-player.exe" } else { "lunaris-player" }))).filter(|p| p.is_file()).ok_or("lunaris-player is not next to the editor program (cargo build --release builds both)")?;
-    let b = package::build(&opts.root, &json, &scene_rel, &player, &target, &opts.quality)?;
+    // the project's settings (`project.lunaris.json`); a project without them is built at the quality asked for on the command line
+    let mut settings = project_settings::ProjectSettings::load(&opts.root);
+    if !opts.root.join(project_settings::FILE).is_file() {
+        settings.quality = opts.quality.clone();
+    }
+    let b = package::build(&opts.root, &json, &scene_rel, &player, &target, &settings)?;
     Ok(format!("built {} ({} files, {:.1} MB){}", b.exe.display(), b.files, b.bytes as f64 / 1e6, if b.missing.is_empty() { String::new() } else { format!("; could not copy: {}", b.missing.join(", ")) }))
 }
 

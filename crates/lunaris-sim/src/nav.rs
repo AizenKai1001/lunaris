@@ -8,7 +8,9 @@
 //! stairs, platforms and bridges all work, several levels per cell included. Neighbouring cells (eight directions, no cutting corners)
 //! are connected when the height difference is a step the agent can climb (`step_height`) or a drop it accepts (`max_drop`). A* with the
 //! octile distance finds the shortest path (ties are broken by node number, so the result never depends on anything but the world), and
-//! a line-of-sight pass over the grid removes the waypoints that were only there because of the cells.
+//! a line-of-sight pass over the grid removes the waypoints that were only there because of the cells. The data of a cell is worked out the first time the search looks at it (a search of
+//! a hundred nodes looks at a few hundred cells of a window that may have thirty thousand), from the solids, terrain and triangles over that cell, and is exactly what cutting the whole
+//! window into cells would have given it: the paths are the same, bit for bit, as those of a grid cut whole.
 //!
 //! **Terrain.** A solid `Terrain` adds a surface to every cell it covers: the height of the ground at the cell's centre, unless the ground
 //! there leans more than 50 degrees (the character controller's default `max_slope`), which is a cliff and not walkable. Gentle slopes are
@@ -29,13 +31,14 @@
 //! head) is an obstacle for the heights it occupies, grown sideways by the agent's radius like a box.
 //!
 //! Everything is `f32` with only `+ - * / sqrt` and integer costs for the search, in a fixed order: identical on every machine.
-use crate::components::{CharacterBody, Collider, NavAgent, NavAvoid, NavLink, NavObstacle, RigidBody, Transform, Velocity};
+use crate::components::{CharacterBody, Collider, NavAgent, NavAvoid, NavLimits, NavLink, NavObstacle, RigidBody, Transform, Velocity};
 use crate::layers::{Filter, Layers};
 use crate::meshcol::{Aabb, Instance, MeshStore, V3};
-use crate::terrain::{grounds, Ground, Terrains};
+use crate::terrain::{grounds, Ground, Placed, Terrains};
 use lunaris_ecs::{StateHasher, World};
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
+use std::rc::Rc;
 
 /// The most cells one search grid may have (the cell size grows, up to 8 times, to fit a big area).
 pub const MAX_CELLS: usize = 250_000;
@@ -51,11 +54,14 @@ pub struct NavParams {
     pub step_height: f32,
     pub max_drop: f32,
     pub cell: f32,
+    /// Keep the data of the cells between searches (see `KeptCells`): the window then starts on a lattice anchored at the world's origin, and the paths are those of that lattice. Off: the window starts at the corner of the box
+    /// between the two points, as it always did, and every search works its cells out afresh.
+    pub keep: bool,
 }
 
 impl Default for NavParams {
     fn default() -> NavParams {
-        NavParams { radius: 0.4, height: 1.8, step_height: 0.4, max_drop: 1.2, cell: 0.5 }
+        NavParams { radius: 0.4, height: 1.8, step_height: 0.4, max_drop: 1.2, cell: 0.5, keep: false }
     }
 }
 
@@ -232,185 +238,374 @@ fn clip_height(t: &[V3; 3], cx: f32, cz: f32, r: f32) -> Option<(f32, f32)> {
     Some((lo, hi))
 }
 
-/// The search grid: for every cell the heights of the surfaces an agent can stand on.
-struct Grid {
+/// How many surfaces of one cell have a node number: a node is `cell * NODES_PER_CELL + k`, `k` counting from the lowest surface of the cell (a cell with more surfaces than this, a
+/// tower of floors, has the highest ignored). The number only has to keep the *order* of the nodes (cell first, then height): the search breaks ties by node number, so the paths
+/// are the ones a grid numbered 0, 1, 2 ... in that order would give.
+const NODES_PER_CELL: usize = 32;
+
+/// What one cell holds: the heights of the surfaces an agent can stand on, the lowest first, and whether something solid stands in it.
+struct CellData {
+    heights: Vec<f32>,
+    occupied: bool,
+}
+
+/// The cells that the searches of this thread have worked out, kept for the next ones: the data of a cell is a function of the world's solids, ground and mesh levels and of the agent's size, not of the window a search
+/// happens to cut, and a city server runs sixty searches in the time a door swings, most of them over the same streets (the cells are most of what a search costs: 3 microseconds each, a few thousand a search). The world is
+/// recognised by a hash of its solids, grounds and levels (`world_signature`); when it differs from the hash the cells were made for, they are dropped. Windows are cut on a lattice of the cell size, so that the cell
+/// (i, j) of one search is the cell (i, j) of the next.
+struct KeptCells {
+    sig: u64,
+    /// The cell size and the agent's radius, height and step (the numbers a cell's data depends on), as bits.
+    key: [u32; 4],
+    cells: IdMap<u64, Rc<CellData>>,
+}
+
+thread_local! {
+    /// One set of cells for each size of agent (a few: a game has a handful of kinds), the oldest dropped.
+    static KEPT: std::cell::RefCell<Vec<KeptCells>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+thread_local! {
+    /// Off while a test compares the kept cells with fresh ones.
+    static KEEP_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Switch the keeping of cells between searches on or off (and drop what is kept): for the test that makes sure the paths are the same either way.
+#[cfg(test)]
+pub(crate) fn keep_cells(on: bool) {
+    KEEP_OFF.with(|k| k.set(!on));
+    KEPT.with(|k| k.borrow_mut().clear());
+}
+
+/// How many cells are kept now, over all sizes of agent (for tests).
+#[cfg(test)]
+pub(crate) fn kept_cells() -> usize {
+    KEPT.with(|k| k.borrow().iter().map(|e| e.cells.len()).sum())
+}
+
+/// The most cells kept for one size of agent (a city of a few kilometres at half a metre has a few million; this is the working set of the streets that are walked).
+const MAX_KEPT: usize = 600_000;
+/// The most sizes of agent that have cells kept.
+const MAX_KEPT_SETS: usize = 4;
+
+/// A hash of what the cells' data is made of.
+fn world_signature(all: &[Solid], ground: &[Ground], level: &[Instance]) -> u64 {
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    let mut eat = |v: u64| {
+        h = (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
+        h ^= h >> 29;
+    };
+    eat(all.len() as u64);
+    for s in all {
+        for v in s.lo.iter().chain(s.hi.iter()) {
+            eat(v.to_bits() as u64);
+        }
+        eat(s.is_box as u64);
+    }
+    eat(ground.len() as u64);
+    for g in ground {
+        let p = g.placed();
+        let (lo, hi) = p.y_range();
+        eat(g.uid);
+        for v in [p.centre[0], p.centre[1], p.size[0], p.size[1], lo, hi] {
+            eat(v.to_bits() as u64);
+        }
+    }
+    eat(level.len() as u64);
+    for m in level {
+        eat(m.uid);
+        for v in m.placed.bounds.lo.iter().chain(m.placed.bounds.hi.iter()) {
+            eat(v.to_bits() as u64);
+        }
+        eat(m.placed.verts.len() as u64);
+        eat(std::sync::Arc::as_ptr(&m.placed) as usize as u64);
+    }
+    h
+}
+
+/// A hasher for the maps of cells and nodes, which are never walked in order: the keys are small whole numbers, mixed by one multiplication.
+#[derive(Default)]
+struct IdHasher(u64);
+
+impl std::hash::Hasher for IdHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 = (self.0 ^ *b as u64).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    fn write_u32(&mut self, i: u32) {
+        self.0 = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+    fn write_usize(&mut self, i: usize) {
+        self.0 = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
+type IdMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<IdHasher>>;
+
+/// The inclusive range of cells (along one axis of a grid with `n` cells starting at `origin`) that `lo..hi` reaches.
+fn cell_range(lo: f32, hi: f32, origin: f32, cell: f32, n: usize) -> (usize, usize) {
+    let a = (((lo - origin) / cell).floor() as i64).clamp(0, n as i64 - 1) as usize;
+    let b = (((hi - origin) / cell).floor() as i64).clamp(0, n as i64 - 1) as usize;
+    (a, b)
+}
+
+/// The search grid: a window of square cells over the ground, each with the heights of the surfaces an agent can stand on. **The data of a cell is worked out the first time the
+/// search looks at it**, from the solids, the terrain and the mesh triangles over it: a search that visits a hundred nodes looks at a few hundred cells of a window that may have thirty
+/// thousand, and cutting every triangle of the whole window into the cells it covers (what a grid used to be built from) was most of the cost of a search in a city. A cell's data is
+/// exactly what the whole-window cut gave it, so paths and every number that depends on them are unchanged.
+struct Grid<'a> {
     cell: f32,
     x0: f32,
     z0: f32,
     nx: usize,
     nz: usize,
-    /// `start[c]..start[c + 1]` indexes `height` and `node_cell` for cell `c`; a node is one surface of one cell.
-    start: Vec<u32>,
-    height: Vec<f32>,
-    node_cell: Vec<u32>,
-    /// Cells with a solid mass above the local ground (a wall, a tree): nothing can step off a ledge across them.
-    occupied: Vec<bool>,
+    /// The solids that reach the window, each with the inclusive range of cells it reaches: (solid, ixa, ixb, iza, izb).
+    solids: Vec<(&'a Solid, usize, usize, usize, usize)>,
+    /// The same for terrains.
+    ground: Vec<(Placed<'a>, usize, usize, usize, usize)>,
+    meshes: &'a [Instance],
+    bounds: [f32; 4],
+    /// The height of one flat floor under everything, when the start is not standing on any ground (see `build`).
+    flat: Option<f32>,
+    cells: IdMap<usize, Rc<CellData>>,
+    /// The cell (0, 0) of the window is the cell (`ix0`, `iz0`) of the lattice of this size over the world.
+    ix0: i64,
+    iz0: i64,
+    /// The hash of the world, which is what the kept cells are for, and whether this grid may use them (not with a flat floor made up for a start that stands on nothing).
+    sig: u64,
+    kept: bool,
     /// The `NavLink` edges: from node, to node, cost, speed and hop of the link.
     link_edges: BTreeMap<usize, Vec<(usize, u32, [f32; 2])>>,
     p: NavParams,
 }
 
-impl Grid {
-    fn build(solids: &[Solid], ground: &[Ground], meshes: &[Instance], bounds: [f32; 4], p: NavParams, start_at: [f32; 3]) -> Result<Grid, NavError> {
+impl<'a> Grid<'a> {
+    #[allow(clippy::too_many_arguments)]
+    fn build(solids: &'a [Solid], ground: &'a [Ground], meshes: &'a [Instance], bounds: [f32; 4], p: NavParams, start_at: [f32; 3], sig: u64) -> Result<Grid<'a>, NavError> {
         let [bx0, bz0, bx1, bz1] = bounds;
         let mut cell = p.cell;
-        let (nx, nz) = loop {
-            let nx = (((bx1 - bx0) / cell).ceil() as usize).max(1);
-            let nz = (((bz1 - bz0) / cell).ceil() as usize).max(1);
+        // (with `keep` the window starts on a line of the lattice of cells, wherever the two points are: see `KeptCells`; without it, at the corner of the box)
+        let (nx, nz, ix0, iz0, x0, z0) = loop {
+            let (ix0, iz0) = if p.keep { ((bx0 / cell).floor() as i64, (bz0 / cell).floor() as i64) } else { (0, 0) };
+            let (ox, oz) = if p.keep { (ix0 as f32 * cell, iz0 as f32 * cell) } else { (bx0, bz0) };
+            let nx = (((bx1 - ox) / cell).ceil() as usize).max(1);
+            let nz = (((bz1 - oz) / cell).ceil() as usize).max(1);
             if nx.saturating_mul(nz) <= MAX_CELLS {
-                break (nx, nz);
+                break (nx, nz, ix0, iz0, ox, oz);
             }
             cell *= 2.0;
             if cell > p.cell * 8.0 {
                 return Err(NavError::TooBig(format!("the area between the two points is {:.0} m by {:.0} m, too big to search ({} cells at the largest cell size, {:.1} m)", bx1 - bx0, bz1 - bz0, nx.saturating_mul(nz), cell)));
             }
         };
-        let mut tops: Vec<Vec<f32>> = vec![Vec::new(); nx * nz];
-        // what occupies a cell: the part of a solid right over it (`exact`), and the part of a solid whose growth by the agent's radius
-        // reaches it (`margin`): only a margin obstacle that rises higher than a step keeps an agent out
-        let mut exact: Vec<Vec<(f32, f32)>> = vec![Vec::new(); nx * nz];
-        let mut margin: Vec<Vec<(f32, f32)>> = vec![Vec::new(); nx * nz];
-        let range = |lo: f32, hi: f32, origin: f32, n: usize| -> (usize, usize) {
-            let a = (((lo - origin) / cell).floor() as i64).clamp(0, n as i64 - 1) as usize;
-            let b = (((hi - origin) / cell).floor() as i64).clamp(0, n as i64 - 1) as usize;
-            (a, b)
-        };
+        let mut reaching = Vec::new();
         for s in solids {
             // outside the grid altogether
             if s.hi[0] + p.radius < bx0 || s.lo[0] - p.radius > bx1 || s.hi[2] + p.radius < bz0 || s.lo[2] - p.radius > bz1 {
                 continue;
             }
-            let (ixa, ixb) = range(s.lo[0] - p.radius, s.hi[0] + p.radius, bx0, nx);
-            let (iza, izb) = range(s.lo[2] - p.radius, s.hi[2] + p.radius, bz0, nz);
-            for iz in iza..=izb {
-                let cz = bz0 + (iz as f32 + 0.5) * cell;
-                for ix in ixa..=ixb {
-                    let cx = bx0 + (ix as f32 + 0.5) * cell;
-                    let inside = cx >= s.lo[0] && cx <= s.hi[0] && cz >= s.lo[2] && cz <= s.hi[2];
-                    if inside {
-                        exact[iz * nx + ix].push((s.lo[1], s.hi[1]));
-                        if s.is_box {
-                            tops[iz * nx + ix].push(s.hi[1]);
-                        }
-                    } else if cx >= s.lo[0] - p.radius && cx <= s.hi[0] + p.radius && cz >= s.lo[2] - p.radius && cz <= s.hi[2] + p.radius {
-                        margin[iz * nx + ix].push((s.lo[1], s.hi[1]));
-                    }
-                }
-            }
+            let (ixa, ixb) = cell_range(s.lo[0] - p.radius, s.hi[0] + p.radius, x0, cell, nx);
+            let (iza, izb) = cell_range(s.lo[2] - p.radius, s.hi[2] + p.radius, z0, cell, nz);
+            reaching.push((s, ixa, ixb, iza, izb));
         }
-        // the ground of terrains: the height under each cell's centre, where it is not a cliff
+        let mut grounds = Vec::new();
         for g in ground {
             let placed = g.placed();
             let half = [placed.size[0] * 0.5, placed.size[1] * 0.5];
             if placed.centre[0] + half[0] < bx0 || placed.centre[0] - half[0] > bx1 || placed.centre[1] + half[1] < bz0 || placed.centre[1] - half[1] > bz1 {
                 continue;
             }
-            let (ixa, ixb) = range(placed.centre[0] - half[0], placed.centre[0] + half[0], bx0, nx);
-            let (iza, izb) = range(placed.centre[1] - half[1], placed.centre[1] + half[1], bz0, nz);
-            for iz in iza..=izb {
-                let cz = bz0 + (iz as f32 + 0.5) * cell;
-                for ix in ixa..=ixb {
-                    let cx = bx0 + (ix as f32 + 0.5) * cell;
-                    let Some(h) = placed.surface(cx, cz) else { continue };
-                    if placed.normal(cx, cz)[1] >= TERRAIN_MIN_UP {
-                        tops[iz * nx + ix].push(h);
+            let (ixa, ixb) = cell_range(placed.centre[0] - half[0], placed.centre[0] + half[0], x0, cell, nx);
+            let (iza, izb) = cell_range(placed.centre[1] - half[1], placed.centre[1] + half[1], z0, cell, nz);
+            grounds.push((placed, ixa, ixb, iza, izb));
+        }
+        let mut grid = Grid { cell, x0, z0, nx, nz, solids: reaching, ground: grounds, meshes, bounds, flat: None, cells: IdMap::default(), ix0, iz0, sig, kept: false, link_edges: BTreeMap::new(), p };
+        // a start that is not standing on anything (a top-down game where the floor is only a picture) means one flat, open floor at the
+        // start's height: obstacles still block it
+        let standing = ((start_at[0] - x0) / cell >= 0.0 && (start_at[2] - z0) / cell >= 0.0)
+            .then(|| (((start_at[2] - z0) / cell) as usize, ((start_at[0] - x0) / cell) as usize))
+            .filter(|&(iz, ix)| iz < nz && ix < nx)
+            .is_some_and(|(iz, ix)| grid.raw_cell(iz * nx + ix).0.iter().any(|t| (t - start_at[1]).abs() <= 2.0 + p.step_height));
+        if !standing {
+            grid.flat = Some(start_at[1]);
+        }
+        // (the kept cells are for this size of agent and this world: another world's are dropped; a flat floor made up for this start is no part of the world)
+        if p.keep && grid.flat.is_none() && !KEEP_OFF.with(|k| k.get()) {
+            grid.kept = true;
+            let key = [cell.to_bits(), p.radius.to_bits(), p.height.to_bits(), p.step_height.to_bits()];
+            KEPT.with(|k| {
+                let mut k = k.borrow_mut();
+                match k.iter().position(|e| e.key == key) {
+                    Some(i) => {
+                        if k[i].sig != sig {
+                            k[i].sig = sig;
+                            k[i].cells.clear();
+                        }
+                    }
+                    None => {
+                        if k.len() >= MAX_KEPT_SETS {
+                            k.remove(0);
+                        }
+                        k.push(KeptCells { sig, key, cells: IdMap::default() });
                     }
                 }
+            });
+        }
+        Ok(grid)
+    }
+
+    /// What lies over cell `c`, before it is turned into surfaces: the tops that can be stood on, the part of solids right over the cell's centre (`exact`) and the part of solids
+    /// whose growth by the agent's radius reaches it (`margin`: only one that rises higher than a step keeps an agent out).
+    fn raw_cell(&self, c: usize) -> (Vec<f32>, Vec<(f32, f32)>, Vec<(f32, f32)>) {
+        let p = self.p;
+        let [bx0, bz0, bx1, bz1] = self.bounds;
+        let (ix, iz) = (c % self.nx, c / self.nx);
+        let (cx, cz) = (self.x0 + (ix as f32 + 0.5) * self.cell, self.z0 + (iz as f32 + 0.5) * self.cell);
+        let (mut tops, mut exact, mut margin) = (Vec::new(), Vec::new(), Vec::new());
+        for &(s, ixa, ixb, iza, izb) in &self.solids {
+            if ix < ixa || ix > ixb || iz < iza || iz > izb {
+                continue;
+            }
+            let inside = cx >= s.lo[0] && cx <= s.hi[0] && cz >= s.lo[2] && cz <= s.hi[2];
+            if inside {
+                exact.push((s.lo[1], s.hi[1]));
+                if s.is_box {
+                    tops.push(s.hi[1]);
+                }
+            } else if cx >= s.lo[0] - p.radius && cx <= s.hi[0] + p.radius && cz >= s.lo[2] - p.radius && cz <= s.hi[2] + p.radius {
+                margin.push((s.lo[1], s.hi[1]));
             }
         }
-        // the triangles of mesh colliders: walkable ones give surfaces, all of them give obstacles (see the module comment)
-        for m in meshes {
+        // the ground of terrains: the height under the cell's centre, where it is not a cliff
+        for (placed, ixa, ixb, iza, izb) in &self.ground {
+            if ix < *ixa || ix > *ixb || iz < *iza || iz > *izb {
+                continue;
+            }
+            let Some(h) = placed.surface(cx, cz) else { continue };
+            if placed.normal(cx, cz)[1] >= TERRAIN_MIN_UP {
+                tops.push(h);
+            }
+        }
+        // the triangles of mesh colliders: walkable ones give surfaces, all of them give obstacles (see the module comment). A triangle belongs to this cell when the cell is in the
+        // range its box, grown by the radius, reaches; the tree is asked for the triangles near the cell (a little more than needed), and that exact test decides
+        let slack = 0.5 * self.cell;
+        let reach = 0.5 * self.cell + p.radius + slack;
+        let region = Aabb { lo: [cx - reach, f32::NEG_INFINITY, cz - reach], hi: [cx + reach, f32::INFINITY, cz + reach] };
+        for m in self.meshes {
             let pm = &m.placed;
             if pm.bounds.hi[0] + p.radius < bx0 || pm.bounds.lo[0] - p.radius > bx1 || pm.bounds.hi[2] + p.radius < bz0 || pm.bounds.lo[2] - p.radius > bz1 {
                 continue;
             }
-            let region = Aabb { lo: [bx0 - p.radius, f32::NEG_INFINITY, bz0 - p.radius], hi: [bx1 + p.radius, f32::INFINITY, bz1 + p.radius] };
             for ti in pm.triangles_near(&region) {
                 let tri = pm.tri(ti);
-                let [a, b, c] = tri;
-                let (tx0, tx1) = (a[0].min(b[0]).min(c[0]), a[0].max(b[0]).max(c[0]));
-                let (tz0, tz1) = (a[2].min(b[2]).min(c[2]), a[2].max(b[2]).max(c[2]));
+                let [a, b, c3] = tri;
+                let (tx0, tx1) = (a[0].min(b[0]).min(c3[0]), a[0].max(b[0]).max(c3[0]));
+                let (tz0, tz1) = (a[2].min(b[2]).min(c3[2]), a[2].max(b[2]).max(c3[2]));
                 if tx1 + p.radius < bx0 || tx0 - p.radius > bx1 || tz1 + p.radius < bz0 || tz0 - p.radius > bz1 {
                     continue;
                 }
-                let (ixa, ixb) = range(tx0 - p.radius, tx1 + p.radius, bx0, nx);
-                let (iza, izb) = range(tz0 - p.radius, tz1 + p.radius, bz0, nz);
-                let n = tri_cross(a, b, c);
+                let (ixa, ixb) = cell_range(tx0 - p.radius, tx1 + p.radius, self.x0, self.cell, self.nx);
+                let (iza, izb) = cell_range(tz0 - p.radius, tz1 + p.radius, self.z0, self.cell, self.nz);
+                if ix < ixa || ix > ixb || iz < iza || iz > izb {
+                    continue;
+                }
+                let n = tri_cross(a, b, c3);
                 let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
                 let walkable = len > 0.0 && n[1] / len >= TERRAIN_MIN_UP;
                 // weights of a point over the triangle seen from above: positive inside; a triangle seen edge-on has no inside
-                let den = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
-                for iz in iza..=izb {
-                    let cz = bz0 + (iz as f32 + 0.5) * cell;
-                    for ix in ixa..=ixb {
-                        let cx = bx0 + (ix as f32 + 0.5) * cell;
-                        if den != 0.0 {
-                            let wa = ((b[2] - c[2]) * (cx - c[0]) + (c[0] - b[0]) * (cz - c[2])) / den;
-                            let wb = ((c[2] - a[2]) * (cx - c[0]) + (a[0] - c[0]) * (cz - c[2])) / den;
-                            let wc = 1.0 - wa - wb;
-                            if wa >= 0.0 && wb >= 0.0 && wc >= 0.0 {
-                                let y = wa * a[1] + wb * b[1] + wc * c[1];
-                                exact[iz * nx + ix].push((y, y));
-                                if walkable {
-                                    tops[iz * nx + ix].push(y);
-                                }
-                                continue;
-                            }
+                let den = (b[2] - c3[2]) * (a[0] - c3[0]) + (c3[0] - b[0]) * (a[2] - c3[2]);
+                if den != 0.0 {
+                    let wa = ((b[2] - c3[2]) * (cx - c3[0]) + (c3[0] - b[0]) * (cz - c3[2])) / den;
+                    let wb = ((c3[2] - a[2]) * (cx - c3[0]) + (a[0] - c3[0]) * (cz - c3[2])) / den;
+                    let wc = 1.0 - wa - wb;
+                    if wa >= 0.0 && wb >= 0.0 && wc >= 0.0 {
+                        let y = wa * a[1] + wb * b[1] + wc * c3[1];
+                        exact.push((y, y));
+                        if walkable {
+                            tops.push(y);
                         }
-                        // (a floor that can be walked on is not an obstacle beside the cells it covers, like the ground of a terrain)
-                        if !walkable {
-                            if let Some((y0, y1)) = clip_height(&tri, cx, cz, p.radius) {
-                                margin[iz * nx + ix].push((y0, y1));
-                            }
-                        }
+                        continue;
+                    }
+                }
+                // (a floor that can be walked on is not an obstacle beside the cells it covers, like the ground of a terrain)
+                if !walkable {
+                    if let Some((y0, y1)) = clip_height(&tri, cx, cz, p.radius) {
+                        margin.push((y0, y1));
                     }
                 }
             }
         }
-        // a start that is not standing on anything (a top-down game where the floor is only a picture) means one flat, open floor at the
-        // start's height: obstacles still block it
-        let standing = ((start_at[0] - bx0) / cell >= 0.0 && (start_at[2] - bz0) / cell >= 0.0)
-            .then(|| (((start_at[2] - bz0) / cell) as usize, ((start_at[0] - bx0) / cell) as usize))
-            .filter(|&(iz, ix)| iz < nz && ix < nx)
-            .is_some_and(|(iz, ix)| tops[iz * nx + ix].iter().any(|t| (t - start_at[1]).abs() <= 2.0 + p.step_height));
-        if !standing {
-            for t in tops.iter_mut() {
-                if !t.iter().any(|v| (v - start_at[1]).abs() < 0.01) {
-                    t.push(start_at[1]);
-                }
+        (tops, exact, margin)
+    }
+
+    /// The surfaces of cell `c` (worked out on the first look, then kept).
+    fn data(&mut self, c: usize) -> Rc<CellData> {
+        if let Some(d) = self.cells.get(&c) {
+            return d.clone();
+        }
+        // (the cell of the lattice that this is, and whether an earlier search has worked it out)
+        let lattice = (((self.ix0 + (c % self.nx) as i64) as i32 as u32 as u64) << 32) | ((self.iz0 + (c / self.nx) as i64) as i32 as u32 as u64);
+        let key = [self.cell.to_bits(), self.p.radius.to_bits(), self.p.height.to_bits(), self.p.step_height.to_bits()];
+        if self.kept {
+            let found = KEPT.with(|k| k.borrow().iter().find(|e| e.key == key && e.sig == self.sig).and_then(|e| e.cells.get(&lattice).cloned()));
+            if let Some(d) = found {
+                self.cells.insert(c, d.clone());
+                return d;
             }
         }
-        let mut start = Vec::with_capacity(nx * nz + 1);
-        let mut height = Vec::new();
-        let mut node_cell = Vec::new();
-        let mut occupied = vec![false; nx * nz];
-        for c in 0..nx * nz {
-            start.push(height.len() as u32);
-            let t = &mut tops[c];
-            t.sort_by(|a, b| a.total_cmp(b));
-            t.dedup_by(|a, b| (*a - *b).abs() < 0.01);
-            let lowest = t.first().copied().unwrap_or(f32::NEG_INFINITY);
-            occupied[c] = exact[c].iter().any(|&(_, b1)| b1 > lowest + p.step_height + 0.04);
-            for &top in t.iter() {
-                // standable: nothing but the surface itself intersects the agent's height above it
-                let free = !exact[c].iter().any(|&(b0, b1)| b0 < top + p.height && b1 > top + 0.04) && !margin[c].iter().any(|&(b0, b1)| b0 < top + p.height && b1 > top + p.step_height + 0.04);
-                if free {
-                    height.push(top);
-                    node_cell.push(c as u32);
-                }
+        let p = self.p;
+        let (mut tops, exact, margin) = self.raw_cell(c);
+        if let Some(y) = self.flat {
+            if !tops.iter().any(|v| (v - y).abs() < 0.01) {
+                tops.push(y);
             }
         }
-        start.push(height.len() as u32);
-        Ok(Grid { cell, x0: bx0, z0: bz0, nx, nz, start, height, node_cell, occupied, link_edges: BTreeMap::new(), p })
+        tops.sort_by(|a, b| a.total_cmp(b));
+        tops.dedup_by(|a, b| (*a - *b).abs() < 0.01);
+        let lowest = tops.first().copied().unwrap_or(f32::NEG_INFINITY);
+        let occupied = exact.iter().any(|&(_, b1)| b1 > lowest + p.step_height + 0.04);
+        let mut heights = Vec::new();
+        for &top in &tops {
+            // standable: nothing but the surface itself intersects the agent's height above it
+            let free = !exact.iter().any(|&(b0, b1)| b0 < top + p.height && b1 > top + 0.04) && !margin.iter().any(|&(b0, b1)| b0 < top + p.height && b1 > top + p.step_height + 0.04);
+            if free && heights.len() < NODES_PER_CELL {
+                heights.push(top);
+            }
+        }
+        let d = Rc::new(CellData { heights, occupied });
+        self.cells.insert(c, d.clone());
+        if self.kept {
+            KEPT.with(|k| {
+                if let Some(e) = k.borrow_mut().iter_mut().find(|e| e.key == key && e.sig == self.sig) {
+                    if e.cells.len() >= MAX_KEPT {
+                        e.cells.clear();
+                    }
+                    e.cells.insert(lattice, d.clone());
+                }
+            });
+        }
+        d
+    }
+
+    fn node_cell(node: usize) -> usize {
+        node / NODES_PER_CELL
+    }
+
+    fn height_of(&mut self, node: usize) -> f32 {
+        self.data(node / NODES_PER_CELL).heights[node % NODES_PER_CELL]
     }
 
     /// Add the edges of `NavLink`s whose ends are both on ground of this grid (within about one and a half metres of the link's end).
     fn add_links(&mut self, defs: &[LinkDef]) {
-        let reach = |g: &Grid, p: [f32; 3]| -> Option<usize> {
+        fn reach(g: &mut Grid, p: [f32; 3]) -> Option<usize> {
             let (n, _) = g.locate(p[0], p[2], p[1])?;
             let c = g.centre(n);
             ((c[0] - p[0]).powi(2) + (c[2] - p[2]).powi(2) <= 2.25).then_some(n)
-        };
+        }
         for d in defs {
             let (Some(a), Some(b)) = (reach(self, d.from), reach(self, d.to)) else { continue };
             if a == b {
@@ -425,13 +620,9 @@ impl Grid {
         }
     }
 
-    fn surfaces(&self, c: usize) -> std::ops::Range<usize> {
-        self.start[c] as usize..self.start[c + 1] as usize
-    }
-
-    fn centre(&self, node: usize) -> [f32; 3] {
-        let c = self.node_cell[node] as usize;
-        [self.x0 + ((c % self.nx) as f32 + 0.5) * self.cell, self.height[node], self.z0 + ((c / self.nx) as f32 + 0.5) * self.cell]
+    fn centre(&mut self, node: usize) -> [f32; 3] {
+        let c = node / NODES_PER_CELL;
+        [self.x0 + ((c % self.nx) as f32 + 0.5) * self.cell, self.height_of(node), self.z0 + ((c / self.nx) as f32 + 0.5) * self.cell]
     }
 
     /// Can an agent standing at height `from` step to a surface at height `to`?
@@ -440,8 +631,9 @@ impl Grid {
     }
 
     /// The surface of cell `c` that an agent at height `y` can reach, the nearest in height.
-    fn reach(&self, c: usize, y: f32) -> Option<usize> {
-        self.surfaces(c).filter(|&n| self.connects(y, self.height[n])).min_by(|&a, &b| (self.height[a] - y).abs().total_cmp(&(self.height[b] - y).abs()))
+    fn reach(&mut self, c: usize, y: f32) -> Option<usize> {
+        let d = self.data(c);
+        (0..d.heights.len()).filter(|&k| self.connects(y, d.heights[k])).min_by(|&a, &b| (d.heights[a] - y).abs().total_cmp(&(d.heights[b] - y).abs())).map(|k| c * NODES_PER_CELL + k)
     }
 
     fn cell_at(&self, x: f32, z: f32) -> Option<usize> {
@@ -454,7 +646,7 @@ impl Grid {
     }
 
     /// The walkable node nearest to a point (searching up to four cells around it), and whether it is in the point's own cell.
-    fn locate(&self, x: f32, z: f32, y: f32) -> Option<(usize, bool)> {
+    fn locate(&mut self, x: f32, z: f32, y: f32) -> Option<(usize, bool)> {
         let (cx, cz) = (((x - self.x0) / self.cell).floor() as i64, ((z - self.z0) / self.cell).floor() as i64);
         let mut best: Option<(f32, f32, usize, bool)> = None;
         for ring in 0..=4i64 {
@@ -466,15 +658,16 @@ impl Grid {
                     let c = iz as usize * self.nx + ix as usize;
                     let (px, pz) = (self.x0 + (ix as f32 + 0.5) * self.cell - x, self.z0 + (iz as f32 + 0.5) * self.cell - z);
                     let d2 = px * px + pz * pz;
-                    for n in self.surfaces(c) {
-                        let dy = (self.height[n] - y).abs();
+                    let data = self.data(c);
+                    for (k, &height) in data.heights.iter().enumerate() {
+                        let dy = (height - y).abs();
                         if dy > 2.0 + self.p.step_height {
                             continue; // a roof or a ledge far above or below the point is not the ground it means
                         }
                         // closer in the plane first; at the same distance the surface nearest in height
                         let better = best.is_none_or(|(bd, bh, _, _)| d2 < bd - 1.0e-6 || ((d2 - bd).abs() <= 1.0e-6 && dy < bh));
                         if better {
-                            best = Some((d2, dy, n, ring == 0));
+                            best = Some((d2, dy, c * NODES_PER_CELL + k, ring == 0));
                         }
                     }
                 }
@@ -487,11 +680,11 @@ impl Grid {
     }
 
     /// The neighbours of a node: (node, cost), eight directions, never cutting a corner.
-    fn neighbours(&self, node: usize, out: &mut Vec<(usize, u32)>) {
+    fn neighbours(&mut self, node: usize, out: &mut Vec<(usize, u32)>) {
         out.clear();
-        let c = self.node_cell[node] as usize;
+        let c = node / NODES_PER_CELL;
         let (ix, iz) = ((c % self.nx) as i64, (c / self.nx) as i64);
-        let h = self.height[node];
+        let h = self.height_of(node);
         for dz in -1i64..=1 {
             for dx in -1i64..=1 {
                 if dx == 0 && dz == 0 {
@@ -511,10 +704,11 @@ impl Grid {
                     }
                 }
                 let cell = (jz * self.nx as i64 + jx) as usize;
-                for n in self.surfaces(cell) {
-                    if self.connects(h, self.height[n]) {
-                        let rise = ((self.height[n] - h).abs() * 1000.0) as u32;
-                        out.push((n, if diagonal { DIAG } else { ORTHO } + rise));
+                let data = self.data(cell);
+                for (k, &height) in data.heights.iter().enumerate() {
+                    if self.connects(h, height) {
+                        let rise = ((height - h).abs() * 1000.0) as u32;
+                        out.push((cell * NODES_PER_CELL + k, if diagonal { DIAG } else { ORTHO } + rise));
                     }
                 }
             }
@@ -530,20 +724,22 @@ impl Grid {
                 continue;
             }
             let adjacent = (az * self.nx as i64 + ax) as usize;
-            if self.occupied[adjacent] || self.reach(adjacent, h).is_some() {
+            if self.data(adjacent).occupied || self.reach(adjacent, h).is_some() {
                 continue;
             }
-            for n in self.surfaces((fz * self.nx as i64 + fx) as usize) {
-                let drop = h - self.height[n];
+            let far = (fz * self.nx as i64 + fx) as usize;
+            let data = self.data(far);
+            for (k, &height) in data.heights.iter().enumerate() {
+                let drop = h - height;
                 if drop > self.p.step_height + 1.0e-3 && drop <= self.p.max_drop + 1.0e-3 {
-                    out.push((n, 2 * ORTHO + (drop * 1000.0) as u32));
+                    out.push((far * NODES_PER_CELL + k, 2 * ORTHO + (drop * 1000.0) as u32));
                 }
             }
         }
     }
 
     /// Can an agent walk the straight line from `a` to `b`, cell by cell, keeping to ground it can step between?
-    fn line_ok(&self, a: [f32; 3], b: [f32; 3]) -> bool {
+    fn line_ok(&mut self, a: [f32; 3], b: [f32; 3]) -> bool {
         let (dx, dz) = (b[0] - a[0], b[2] - a[2]);
         let len = (dx * dx + dz * dz).sqrt();
         let n = ((len / (self.cell * 0.5)).ceil() as usize).max(1);
@@ -552,7 +748,7 @@ impl Grid {
             let t = i as f32 / n as f32;
             let Some(c) = self.cell_at(a[0] + dx * t, a[2] + dz * t) else { return false };
             match self.reach(c, y) {
-                Some(node) => y = self.height[node],
+                Some(node) => y = self.height_of(node),
                 None => return false,
             }
         }
@@ -583,6 +779,42 @@ pub fn find_path_with(world: &mut World, from: [f32; 3], to: [f32; 3], params: N
 /// [`find_path_with`] for an agent on a collision layer (`who`: its `CollisionLayer`): what it does not collide with does not block it and cannot be stood on.
 /// `None` plans as if every layer counted (what the `path` tool does for two bare points).
 pub fn find_path_as(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavParams, fields: &Terrains, meshes: &MeshStore, who: Option<Filter>) -> Result<PathResult, NavError> {
+    find_path_capped(world, from, to, params, fields, meshes, who, 0)
+}
+
+/// [`find_path_as`] that gives up as "no path" after expanding `cap` cells (0: no limit): what `NavLimits.max_searched` asks of the agents' searches.
+#[allow(clippy::too_many_arguments)]
+pub fn find_path_capped(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavParams, fields: &Terrains, meshes: &MeshStore, who: Option<Filter>, cap: usize) -> Result<PathResult, NavError> {
+    let started = trace_on().then(std::time::Instant::now);
+    let r = find_path_inner(world, from, to, params, fields, meshes, who, cap);
+    if let Some(t0) = started {
+        // (a diagnostic of the cost of a search, `LUNARIS_NAV_TRACE=1`: the time is only printed, it never enters the simulation)
+        let (dx, dz) = (to[0] - from[0], to[2] - from[2]);
+        let (kind, detail) = match &r {
+            Ok(p) => ("ok", format!("cell {:.2} searched {}", p.cell, p.searched)),
+            Err(e) => (e.code(), String::new()),
+        };
+        eprintln!("nav-trace: {:>8} us  {:>6.1} m  {kind} {detail}", t0.elapsed().as_micros(), (dx * dx + dz * dz).sqrt());
+    }
+    r
+}
+
+fn trace_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("LUNARIS_NAV_TRACE").is_some())
+}
+
+/// The widest span, in metres, of a world that is searched again when the first search found no way: the way round may lead outside the box round the two points in a small level (a maze whose only gap is at the other end), but in a streamed world
+/// of hundreds of blocks the same second look is a grid over the whole city for every target that cannot be reached (a closed door, a player in a room), over a second on a server; there the answer is "no path".
+const WIDE_LIMIT: f32 = 300.0;
+
+/// `WIDE_LIMIT`, or what `LUNARIS_NAV_WIDE_LIMIT` says (metres; a huge number gives the old behaviour: a second look over the whole world, for comparing).
+fn wide_limit() -> f32 {
+    static LIMIT: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *LIMIT.get_or_init(|| std::env::var("LUNARIS_NAV_WIDE_LIMIT").ok().and_then(|v| v.parse::<f32>().ok()).filter(|v| v.is_finite() && *v >= 0.0).unwrap_or(WIDE_LIMIT))
+}
+
+fn find_path_inner(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavParams, fields: &Terrains, meshes: &MeshStore, who: Option<Filter>, cap: usize) -> Result<PathResult, NavError> {
     let p = params.sane();
     let all = solids(world, meshes, who);
     let layers = Layers::gather(world);
@@ -598,7 +830,8 @@ pub fn find_path_as(world: &mut World, from: [f32; 3], to: [f32; 3], params: Nav
     let dist = (dx * dx + dz * dz).sqrt();
     let margin = (0.75 * dist).max(8.0 + p.radius);
     let near = [from[0].min(to[0]) - margin, from[2].min(to[2]) - margin, from[0].max(to[0]) + margin, from[2].max(to[2]) + margin];
-    let first = search(&all, &ground, &level, &link_defs, near, from, to, p);
+    let sig = world_signature(&all, &ground, &level);
+    let first = search(&all, &ground, &level, &link_defs, near, from, to, p, cap, sig);
     // the way round may lead far outside the box around the two points (a maze whose only gap is at the other end): when nothing
     // was found there, look again over the whole map (the cells grow coarser if the map is huge)
     if matches!(first, Err(NavError::NoPath(_))) {
@@ -616,8 +849,9 @@ pub fn find_path_as(world: &mut World, from: [f32; 3], to: [f32; 3], params: Nav
         }
         let m = 2.0 + p.radius;
         let wide = [world_box[0] - m, world_box[1] - m, world_box[2] + m, world_box[3] + m];
-        if wide[0] < near[0] || wide[1] < near[1] || wide[2] > near[2] || wide[3] > near[3] {
-            let again = search(&all, &ground, &level, &link_defs, wide, from, to, p);
+        let span = (wide[2] - wide[0]).max(wide[3] - wide[1]);
+        if span <= wide_limit() && (wide[0] < near[0] || wide[1] < near[1] || wide[2] > near[2] || wide[3] > near[3]) {
+            let again = search(&all, &ground, &level, &link_defs, wide, from, to, p, cap, sig);
             if again.is_ok() {
                 return again;
             }
@@ -628,24 +862,25 @@ pub fn find_path_as(world: &mut World, from: [f32; 3], to: [f32; 3], params: Nav
 
 /// One search over the grid cut from `bounds`.
 #[allow(clippy::too_many_arguments)]
-fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[LinkDef], bounds: [f32; 4], from: [f32; 3], to: [f32; 3], p: NavParams) -> Result<PathResult, NavError> {
-    let mut grid = Grid::build(all, ground, level, bounds, p, from)?;
+fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[LinkDef], bounds: [f32; 4], from: [f32; 3], to: [f32; 3], p: NavParams, cap: usize, sig: u64) -> Result<PathResult, NavError> {
+    let mut grid = Grid::build(all, ground, level, bounds, p, from, sig)?;
     grid.add_links(link_defs);
     let (start, _) = grid.locate(from[0], from[2], from[1]).ok_or_else(|| NavError::NoStart(format!("the start ({:.1}, {:.1}, {:.1}) is not on ground an agent of radius {:.2} and height {:.2} can stand on (inside a wall, or off the map)", from[0], from[1], from[2], p.radius, p.height)))?;
     let (goal, exact) = grid.locate(to[0], to[2], to[1]).ok_or_else(|| NavError::NoGoal(format!("the target ({:.1}, {:.1}, {:.1}) is not near any ground an agent can stand on", to[0], to[1], to[2])))?;
-    let goal_cell = grid.node_cell[goal] as usize;
-    let (gx, gz) = ((goal_cell % grid.nx) as i64, (goal_cell / grid.nx) as i64);
+    let goal_cell = Grid::node_cell(goal);
+    let nx = grid.nx;
+    let (gx, gz) = ((goal_cell % nx) as i64, (goal_cell / nx) as i64);
 
-    // A*: the cheapest cost so far per node, ties broken by (f, h, node number)
-    let mut g = vec![u32::MAX; grid.height.len()];
-    let mut came = vec![u32::MAX; grid.height.len()];
+    // A*: the cheapest cost so far per node (only the nodes the search reaches have one), ties broken by (f, h, node number)
+    let mut g: IdMap<u32, u32> = IdMap::default();
+    let mut came: IdMap<u32, u32> = IdMap::default();
     let mut open: BinaryHeap<Reverse<(u32, u32, u32)>> = BinaryHeap::new();
     let mut searched = 0usize;
     let heur = |n: usize| {
-        let c = grid.node_cell[n] as usize;
-        octile((c % grid.nx) as i64, (c / grid.nx) as i64, gx, gz)
+        let c = Grid::node_cell(n);
+        octile((c % nx) as i64, (c / nx) as i64, gx, gz)
     };
-    g[start] = 0;
+    g.insert(start as u32, 0);
     open.push(Reverse((heur(start), heur(start), start as u32)));
     let mut next = Vec::new();
     let mut found = false;
@@ -656,13 +891,16 @@ fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[Lin
             break;
         }
         searched += 1;
-        let gn = g[node];
+        if cap > 0 && searched > cap {
+            return Err(NavError::NoPath(format!("gave up after {cap} cells (the search is limited by `NavLimits.max_searched`)")));
+        }
+        let gn = g[&(node as u32)];
         grid.neighbours(node, &mut next);
         for &(m, cost) in &next {
             let ng = gn.saturating_add(cost);
-            if ng < g[m] {
-                g[m] = ng;
-                came[m] = node as u32;
+            if ng < g.get(&(m as u32)).copied().unwrap_or(u32::MAX) {
+                g.insert(m as u32, ng);
+                came.insert(m as u32, node as u32);
                 open.push(Reverse((ng.saturating_add(heur(m)), heur(m), m as u32)));
             }
         }
@@ -672,7 +910,7 @@ fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[Lin
     }
     let mut nodes = vec![goal];
     while let Some(&last) = nodes.last() {
-        let prev = came[last];
+        let prev = came.get(&(last as u32)).copied().unwrap_or(u32::MAX);
         if prev == u32::MAX {
             break;
         }
@@ -689,17 +927,17 @@ fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[Lin
     // which steps are jumps over a `NavLink`
     let mut jump_at: Vec<Option<[f32; 2]>> = vec![None; pts.len()];
     for k in 1..nodes.len() {
-        if let Some(v) = grid.link_edges.get(&nodes[k - 1]) {
-            if let Some(&(_, _, hs)) = v.iter().find(|e| e.0 == nodes[k]) {
-                // a link is only used when walking from the one node to the next is not possible: the grid's own edges are tried by the search first
-                let walkable = grid.reach(grid.node_cell[nodes[k]] as usize, grid.height[nodes[k - 1]]).is_some() && {
-                    let (a, b) = (grid.node_cell[nodes[k - 1]] as i64, grid.node_cell[nodes[k]] as i64);
-                    let (ax, az, bx, bz) = (a % grid.nx as i64, a / grid.nx as i64, b % grid.nx as i64, b / grid.nx as i64);
-                    (ax - bx).abs() <= 1 && (az - bz).abs() <= 1
-                };
-                if !walkable {
-                    jump_at[k] = Some(hs);
-                }
+        let link = grid.link_edges.get(&nodes[k - 1]).and_then(|v| v.iter().find(|e| e.0 == nodes[k]).map(|&(_, _, hs)| hs));
+        if let Some(hs) = link {
+            // a link is only used when walking from the one node to the next is not possible: the grid's own edges are tried by the search first
+            let from_height = grid.height_of(nodes[k - 1]);
+            let walkable = grid.reach(Grid::node_cell(nodes[k]), from_height).is_some() && {
+                let (a, b) = (Grid::node_cell(nodes[k - 1]) as i64, Grid::node_cell(nodes[k]) as i64);
+                let (ax, az, bx, bz) = (a % nx as i64, a / nx as i64, b % nx as i64, b / nx as i64);
+                (ax - bx).abs() <= 1 && (az - bz).abs() <= 1
+            };
+            if !walkable {
+                jump_at[k] = Some(hs);
             }
         }
     }
@@ -746,12 +984,23 @@ pub struct AgentPath {
     best: f32,
     stalled: u32,
     replans: u32,
+    /// Ticks since the path was found (counted only while `NavLimits` exists).
+    pub(crate) age: u32,
+    /// The path leads to a point on the way to the target, not to the target (the search was limited): at its end the agent asks again.
+    pub(crate) partial: bool,
 }
 
 /// The paths agents are following, by uid. Part of the simulation state.
 #[derive(Clone, Debug, Default)]
 pub struct NavState {
     pub paths: BTreeMap<u64, AgentPath>,
+    /// With `NavLimits`: the agents that asked for a search and are waiting for their turn, by the tick they first asked (first come, first served).
+    pub(crate) waiting: BTreeMap<u64, u64>,
+    /// With `NavLimits.blocked_wait`: the agents whose last search found no way, by the tick until which they do not search again.
+    pub(crate) blocked: BTreeMap<u64, u64>,
+    /// Ticks counted while `NavLimits` exists.
+    pub(crate) tick: u64,
+    pub(crate) limited: bool,
 }
 
 impl NavState {
@@ -775,7 +1024,39 @@ impl NavState {
                 }
             }
         }
+        // (a world without `NavLimits` hashes as it always did)
+        if self.limited {
+            h.u64(self.tick);
+            h.u64(self.waiting.len() as u64);
+            for (uid, since) in &self.waiting {
+                h.u64(*uid);
+                h.u64(*since);
+            }
+            // (a world whose agents have never been blocked hashes as it did)
+            if !self.blocked.is_empty() {
+                h.u64(self.blocked.len() as u64);
+                for (uid, until) in &self.blocked {
+                    h.u64(*uid);
+                    h.u64(*until);
+                }
+            }
+            for p in self.paths.values() {
+                h.u64(p.age as u64 | (p.partial as u64) << 32);
+            }
+        }
     }
+}
+
+/// The goal of a search that may not be longer than `max` metres: the real goal when it is near enough, otherwise the point `max` metres from `from` on the way to it (with
+/// `true`: the path ends short of the target and the agent asks again when it gets there).
+fn limited_goal(from: [f32; 3], to: [f32; 3], max: f32) -> ([f32; 3], bool) {
+    let (dx, dz) = (to[0] - from[0], to[2] - from[2]);
+    let d = (dx * dx + dz * dz).sqrt();
+    if max.is_nan() || max <= 0.0 || d <= max {
+        return (to, false);
+    }
+    let k = max / d;
+    ([from[0] + dx * k, from[1] + (to[1] - from[1]) * k, from[2] + dz * k], true)
 }
 
 const STATUS_WALKING: u32 = 1;
@@ -790,7 +1071,7 @@ fn who_plans(layers: &Layers, uid: u64) -> Option<Filter> {
 }
 
 fn params_of(a: &NavAgent) -> NavParams {
-    NavParams { radius: a.radius, height: a.height, step_height: a.step_height, max_drop: a.max_drop, cell: 0.5 }
+    NavParams { radius: a.radius, height: a.height, step_height: a.step_height, max_drop: a.max_drop, cell: 0.5, keep: false }
 }
 
 /// One tick of every `NavAgent`, in uid order.
@@ -821,19 +1102,78 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
     let alive: BTreeSet<u64> = agents.iter().map(|a| a.0).collect();
     state.paths.retain(|uid, _| alive.contains(uid));
     let layers = Layers::gather(world);
+    // `NavLimits` (one entity, the lowest uid): a budget of searches for the tick, a least time between two searches of an agent and a longest search
+    let limits = {
+        let mut found: Option<(u64, NavLimits)> = None;
+        let _ = world.for_each_uid::<(&NavLimits,), _>(|_, uid, (l,)| {
+            if found.as_ref().is_none_or(|f| uid < f.0) {
+                found = Some((uid, *l));
+            }
+        });
+        found.map(|f| f.1)
+    };
+    state.limited = limits.is_some();
+    // who gets a search this tick: the agents that ask (a request that is on, a stalled path to replan), the one that has waited longest first, up to the budget
+    let mut granted: BTreeSet<u64> = BTreeSet::new();
+    if let Some(lim) = limits {
+        state.tick += 1;
+        let min_ticks = if lim.min_replan > 0.0 && dt > 0.0 { (lim.min_replan / dt).ceil() as u32 } else { 0 };
+        for p in state.paths.values_mut() {
+            p.age = p.age.saturating_add(1);
+        }
+        let mut asking: Vec<(u64, u64)> = Vec::new();
+        for (uid, _, _, a) in &agents {
+            let path = state.paths.get(uid);
+            let wants = (a.active && path.is_none_or(|p| p.age >= min_ticks)) || (a.status == STATUS_WALKING && path.is_some_and(|p| p.stalled >= STALL_TICKS));
+            // (an agent whose last search found no way waits `blocked_wait` before it asks again: its request stays on, and it is not asking)
+            if wants && state.blocked.get(uid).is_none_or(|until| *until <= state.tick) {
+                let since = *state.waiting.entry(*uid).or_insert(state.tick);
+                asking.push((since, *uid));
+            }
+        }
+        // whoever stopped asking (the request was turned off, the agent is gone) is forgotten
+        state.waiting.retain(|uid, _| asking.iter().any(|(_, u)| u == uid));
+        state.blocked.retain(|uid, until| *until > state.tick && alive.contains(uid));
+        asking.sort();
+        let budget = if lim.searches_per_tick == 0 { usize::MAX } else { lim.searches_per_tick as usize };
+        for (_, uid) in asking.into_iter().take(budget) {
+            granted.insert(uid);
+            state.waiting.remove(&uid);
+        }
+    } else {
+        state.waiting.clear();
+        state.blocked.clear();
+        state.tick = 0;
+    }
+    let max_search = limits.map(|l| l.max_distance).unwrap_or(0.0);
+    let cap = limits.map(|l| l.max_searched as usize).unwrap_or(0);
+    let keep = limits.is_some_and(|l| l.keep_cells);
+    let blocked_ticks = match limits {
+        Some(l) if l.blocked_wait > 0.0 && dt > 0.0 => (l.blocked_wait / dt).ceil() as u64,
+        _ => 0,
+    };
     for (uid, entity, t, mut a) in agents {
         let feet = [t.pos[0], t.pos[1] - a.feet, t.pos[2]];
         let was = (a.status, a.active);
-        if a.active {
+        if a.active && (limits.is_none() || granted.contains(&uid)) {
             a.active = false;
-            match find_path_as(world, feet, a.target, params_of(&a), fields, meshes, who_plans(&layers, uid)) {
+            let (goal, partial) = limited_goal(feet, a.target, max_search);
+            match find_path_capped(world, feet, goal, NavParams { keep, ..params_of(&a) }, fields, meshes, who_plans(&layers, uid), cap) {
                 Ok(r) => {
-                    state.paths.insert(uid, AgentPath { points: r.points, jumps: r.jumps, hop_t: 0.0, hop_from: [0.0; 3], next: 1, best: f32::INFINITY, stalled: 0, replans: 0 });
+                    state.paths.insert(uid, AgentPath { points: r.points, jumps: r.jumps, hop_t: 0.0, hop_from: [0.0; 3], next: 1, best: f32::INFINITY, stalled: 0, replans: 0, age: 0, partial });
+                    a.status = STATUS_WALKING;
+                }
+                // a limited search whose point on the way has no ground to stand on: walk straight to it (and ask again from there)
+                Err(_) if partial => {
+                    state.paths.insert(uid, AgentPath { points: vec![feet, goal], jumps: vec![None, None], hop_t: 0.0, hop_from: [0.0; 3], next: 1, best: f32::INFINITY, stalled: 0, replans: 0, age: 0, partial: true });
                     a.status = STATUS_WALKING;
                 }
                 Err(_) => {
                     state.paths.remove(&uid);
                     a.status = STATUS_BLOCKED;
+                    if blocked_ticks > 0 {
+                        state.blocked.insert(uid, state.tick + blocked_ticks);
+                    }
                 }
             }
         }
@@ -885,8 +1225,13 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
                 let (dx, dz) = (w[0] - feet[0], w[2] - feet[2]);
                 let dist = (dx * dx + dz * dz).sqrt();
                 if path.next >= last && dist <= a.arrive.abs().max(0.05) {
-                    a.status = STATUS_ARRIVED;
-                    state.paths.remove(&uid);
+                    if path.partial {
+                        // the end of the part that was searched, not of the way: ask for the rest (the target is still the real one) and wait here meanwhile
+                        a.active = true;
+                    } else {
+                        a.status = STATUS_ARRIVED;
+                        state.paths.remove(&uid);
+                    }
                 } else {
                     // remaining path length, for whoever is watching
                     let mut rem = dist;
@@ -902,12 +1247,13 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
                     } else {
                         path.stalled += 1;
                     }
-                    if path.stalled >= STALL_TICKS {
+                    if path.stalled >= STALL_TICKS && (limits.is_none() || granted.contains(&uid)) {
                         let replans = path.replans + 1;
                         state.paths.remove(&uid);
-                        match (replans <= MAX_REPLANS).then(|| find_path_as(world, feet, a.target, params_of(&a), fields, meshes, who_plans(&layers, uid))) {
+                        let (goal, partial) = limited_goal(feet, a.target, max_search);
+                        match (replans <= MAX_REPLANS).then(|| find_path_capped(world, feet, goal, params_of(&a), fields, meshes, who_plans(&layers, uid), cap)) {
                             Some(Ok(r)) => {
-                                state.paths.insert(uid, AgentPath { points: r.points, jumps: r.jumps, hop_t: 0.0, hop_from: [0.0; 3], next: 1, best: f32::INFINITY, stalled: 0, replans });
+                                state.paths.insert(uid, AgentPath { points: r.points, jumps: r.jumps, hop_t: 0.0, hop_from: [0.0; 3], next: 1, best: f32::INFINITY, stalled: 0, replans, age: 0, partial });
                             }
                             _ => {
                                 a.status = STATUS_BLOCKED;

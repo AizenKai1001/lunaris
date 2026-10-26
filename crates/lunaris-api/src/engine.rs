@@ -17,8 +17,8 @@ pub(crate) const MAX_SPAWN_COUNT: u64 = 1_000_000;
 
 /// Tools that never change the world (they may write a file or draw a picture). Every other tool advances the revision counter.
 const READ_ONLY_TOOLS: &[&str] = &[
-    "describe", "schema", "get", "query", "hash", "revision", "snapshots", "events", "resources", "systems", "get_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project",
-    "save_scene", "export_game", "verify", "files", "saves", "model_info", "prefabs", "path", "acoustics", "compile_script", "get_script", "terrain_height", "terrain_layer", "water_depth", "bake_probe",
+    "describe", "schema", "get", "query", "hash", "revision", "snapshots", "events", "resources", "systems", "get_system", "trace_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project",
+    "save_scene", "export_game", "verify", "files", "saves", "model_info", "prefabs", "path", "acoustics", "ui_audit", "compile_script", "get_script", "terrain_height", "terrain_layer", "water_depth", "bake_probe",
 ];
 
 fn script_diag_json(d: &lunaris_script::Diagnostic) -> Json {
@@ -287,6 +287,23 @@ impl Engine {
                 self.single(Command::SetSystemEnabled { name: a.str("name")?.to_string(), enabled })
             }
             "set_resource" => {
+                // `values`: many resources in one undoable step (a program that feeds a display sends all of them once a second)
+                if let Some(Json::Obj(values)) = a.0.get("values") {
+                    let mut cmds = Vec::with_capacity(values.len());
+                    for (name, v) in values {
+                        let value = match v {
+                            Json::Null => None,
+                            v => Some(resource_number(v, &format!("values.{name}"))?),
+                        };
+                        cmds.push(Command::SetResource { name: name.clone(), value });
+                    }
+                    if cmds.is_empty() {
+                        return Err(EcsError::new("bad_arguments", "`values` is empty"));
+                    }
+                    let (done, inverse) = self.sim.apply_batch(&cmds)?;
+                    let undoable = self.push_history(inverse);
+                    return Ok(Json::obj([("ok", Json::Bool(true)), ("applied", Json::from(done.len())), ("undoable", Json::Bool(undoable))]));
+                }
                 let name = a.str("name")?.to_string();
                 let value = match a.0.get("value") {
                     None | Some(Json::Null) => None,
@@ -313,7 +330,38 @@ impl Engine {
                     EcsError::new("no_such_system", format!("no graph system named `{name}`")).hint(format!("graph systems: {}", if all.is_empty() { "(none)".to_string() } else { all.join(", ") }))
                 })?;
                 let mut o = lunaris_sim::graph::describe(sys);
-                o.set("def", sys.def.clone());
+                o.set("def", (*sys.def).clone());
+                Ok(o)
+            }
+            "timeline_seek" => {
+                let uid = a.u64("uid")?;
+                let time = match a.0.get("time") {
+                    Some(v) => v.as_f64().ok_or_else(|| EcsError::new("type_mismatch", "`time` must be a number of seconds").at("time"))? as f32,
+                    None => return Err(a.missing("time", "number of seconds")),
+                };
+                let e = self.sim.world.require_entity(uid)?;
+                let (written, length) = lunaris_sim::gameplay::seek_timeline(&mut self.sim.world, e, time).map_err(|m| EcsError::new("bad_timeline", m).at("uid").hint("the entity needs a `Timeline` component whose script parses (see docs/GAMEPLAY.md, \"Timelines\")"))?;
+                let now = self.sim.world.get::<lunaris_sim::components::Timeline>(e).map(|t| t.time).unwrap_or(0.0);
+                Ok(Json::obj([("time", Json::Float(now as f64)), ("length", Json::Float(length as f64)), ("written", Json::from(written))]))
+            }
+            "trace_system" => {
+                let uid = a.u64("uid")?;
+                let def = match a.0.get("def") {
+                    Some(d) => d.clone(),
+                    None => {
+                        let name = a.str("name")?;
+                        let sys = self.sim.scripts.get(name).ok_or_else(|| EcsError::new("no_such_system", format!("no graph system named `{name}`")).hint("give `name` (see `systems`) or a whole `def`"))?;
+                        (*sys.def).clone()
+                    }
+                };
+                let t = lunaris_sim::graph::trace(&self.sim.world, &def, uid, self.sim.tick, self.sim.dt, self.sim.seed)?;
+                let mut o = Json::obj([("matched", Json::Bool(t.matched)), ("tick", Json::from(self.sim.tick as i64)), ("values", Json::Obj(t.values.into_iter().collect())), ("ran", Json::arr(t.ran.into_iter().map(Json::str)))]);
+                if let Some(e) = t.error {
+                    o.set("error", Json::str(e));
+                }
+                if let Some(n) = t.note {
+                    o.set("note", Json::str(n));
+                }
                 Ok(o)
             }
             "contacts" => self.contacts_tool(&a),
@@ -322,6 +370,7 @@ impl Engine {
             "record_audio" => self.record_audio_tool(&a),
             "nearby" => self.nearby_tool(&a),
             "render" => self.render_tool(&a),
+            "ui_audit" => self.ui_audit_tool(&a),
             "pick" => self.pick_tool(&a),
             "minimap" => self.minimap_tool(&a),
             "check" => self.check_tool(&a),
@@ -386,7 +435,10 @@ impl Engine {
         let w = &self.sim.world;
         if let Some(name) = a.opt_str("component")? {
             let id = w.require_component(name)?;
-            return Ok(w.info(id).schema_json());
+            // (with the values a new one starts with, so that an editor can show which fields differ and reset them)
+            let mut o = w.info(id).schema_json();
+            o.set("defaults", w.default_json(id));
+            return Ok(o);
         }
         Ok(Json::obj([
             ("components", Json::arr(w.infos().iter().map(|i| i.schema_json()))),
@@ -1115,7 +1167,7 @@ fn resource_number(v: &Json, at: &str) -> Result<f64> {
 fn event_json(e: &lunaris_sim::Event) -> Json {
     let mut o = Json::obj([("tick", Json::from(e.tick as i64)), ("name", Json::str(e.name.clone())), ("uid", Json::from(e.uid as i64))]);
     if let Some(p) = e.pos {
-        o.set("pos", Json::arr(p.iter().map(|x| Json::from(*x as f64))));
+        o.set("pos", Json::arr(p.iter().map(|x| Json::from(*x))));
     }
     o
 }

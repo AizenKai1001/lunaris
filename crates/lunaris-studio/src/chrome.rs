@@ -20,7 +20,7 @@ pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, &str)], active: T
                 ui.painter().rect_filled(rect, CornerRadius::ZERO, theme::PANEL);
                 ui.painter().line_segment([rect.left_top(), rect.left_bottom()], Stroke::new(1.0, theme::LINE));
                 ui.painter().line_segment([rect.right_top(), rect.right_bottom()], Stroke::new(1.0, theme::LINE));
-                ui.painter().line_segment([rect.left_top(), rect.right_top()], Stroke::new(1.5, theme::BLUE));
+                ui.painter().line_segment([rect.left_top(), rect.right_top()], Stroke::new(1.0, Color32::from_rgb(70, 70, 70)));
                 ui.painter().line_segment([rect.left_bottom() + Vec2::new(1.0, 0.0), rect.right_bottom() + Vec2::new(-1.0, 0.0)], Stroke::new(1.0, theme::PANEL));
             } else if resp.hovered() {
                 ui.painter().rect_filled(rect, CornerRadius::ZERO, theme::BUTTON_ACTIVE.gamma_multiply(0.6));
@@ -56,7 +56,7 @@ pub fn foldout(ui: &mut Ui, id: egui::Id, title: &str, icon: crate::icons::Icon,
     let open_id = id.with("open");
     let mut open = ui.data_mut(|d| d.get_persisted::<bool>(open_id)).unwrap_or(default_open);
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 22.0), Sense::click());
-    let fill = if resp.hovered() { Color32::from_rgb(70, 70, 70) } else { theme::HEADER };
+    let fill = if resp.hovered() { Color32::from_rgb(58, 58, 58) } else { theme::HEADER };
     ui.painter().rect_filled(rect, CornerRadius::ZERO, fill);
     ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, theme::LINE));
     // the arrow
@@ -64,7 +64,8 @@ pub fn foldout(ui: &mut Ui, id: egui::Id, title: &str, icon: crate::icons::Icon,
     let pts = if open { vec![c + Vec2::new(-4.0, -2.5), c + Vec2::new(4.0, -2.5), c + Vec2::new(0.0, 3.0)] } else { vec![c + Vec2::new(-2.5, -4.0), c + Vec2::new(-2.5, 4.0), c + Vec2::new(3.0, 0.0)] };
     ui.painter().add(egui::Shape::convex_polygon(pts, theme::TEXT_DIM, Stroke::NONE));
     crate::icons::draw(ui.painter(), Rect::from_center_size(egui::pos2(rect.min.x + 30.0, rect.center().y), Vec2::splat(16.0)), icon, icon.tint());
-    ui.painter().text(egui::pos2(rect.min.x + 46.0, rect.center().y), egui::Align2::LEFT_CENTER, title, FontId::proportional(13.0), theme::TEXT_BRIGHT);
+    // (the name of a category in bold, as Unreal's Details panel has it)
+    ui.painter().text(egui::pos2(rect.min.x + 46.0, rect.center().y), egui::Align2::LEFT_CENTER, title, FontId::new(13.0, egui::FontFamily::Name("segoe-bold".into())), theme::TEXT_BRIGHT);
     if resp.clicked() {
         open = !open;
         ui.data_mut(|d| d.insert_persisted(open_id, open));
@@ -78,11 +79,61 @@ pub fn rule(ui: &mut Ui) {
     ui.painter().line_segment([rect.center_top() + Vec2::new(0.0, 3.0), rect.center_bottom() - Vec2::new(0.0, 3.0)], Stroke::new(1.0, theme::LINE));
 }
 
-/// A drop-down style button that opens a menu (Unity's "Shaded v", "Layers v").
+/// A pill: a dark rounded button with a thin outline, as the buttons of Unreal's viewport toolbar are. `on` draws a toggle that is switched on (lighter, bright text); `chevron` adds the
+/// drop-down arrow after the label.
+pub fn pill(ui: &mut Ui, label: &str, on: bool, chevron: bool) -> egui::Response {
+    let font = FontId::proportional(12.0);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font.clone(), theme::TEXT);
+    let w = galley.size().x + 18.0 + if chevron { 12.0 } else { 0.0 };
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 20.0), Sense::click());
+    let fill = if on { Color32::from_rgb(66, 66, 66) } else if resp.hovered() { Color32::from_rgb(50, 50, 50) } else { Color32::from_rgb(30, 30, 30) };
+    let edge = if on { Color32::from_rgb(100, 100, 100) } else { Color32::from_rgb(58, 58, 58) };
+    ui.painter().rect(rect, CornerRadius::same(10), fill, Stroke::new(1.0, edge), StrokeKind::Inside);
+    let color = if on || resp.hovered() { theme::TEXT_BRIGHT } else { theme::TEXT };
+    ui.painter().text(egui::pos2(rect.min.x + 9.0, rect.center().y), egui::Align2::LEFT_CENTER, label, font, color);
+    if chevron {
+        let c = egui::pos2(rect.max.x - 11.0, rect.center().y + 0.5);
+        ui.painter().add(egui::Shape::convex_polygon(vec![c + Vec2::new(-3.5, -2.0), c + Vec2::new(3.5, -2.0), c + Vec2::new(0.0, 2.5)], color, Stroke::NONE));
+    }
+    resp
+}
+
+/// A drop-down style button that opens a menu (a pill with an arrow: Unreal's "Perspective", "Lit", "Show").
 pub fn drop_down(ui: &mut Ui, label: &str, add_contents: impl FnOnce(&mut Ui)) {
-    let r = ui.add(egui::Button::new(egui::RichText::new(format!("{label}  v")).size(12.0)).min_size(Vec2::new(0.0, 20.0)));
+    let r = pill(ui, label, false, true);
     let id = ui.make_persistent_id(("dropdown", label));
     egui::Popup::menu(&r).id(id).show(add_contents);
+}
+
+/// A search box in the shape Unreal's panels have: a dark pill with a magnifying glass at its left (the type is typed after the glass). Returns the text edit's response.
+pub fn search_box(ui: &mut Ui, text: &mut String, hint: &str, width: f32) -> egui::Response {
+    let resp = ui
+        .scope(|ui| {
+            let round = CornerRadius::same(11);
+            let w = &mut ui.visuals_mut().widgets;
+            w.inactive.corner_radius = round;
+            w.hovered.corner_radius = round;
+            w.active.corner_radius = round;
+            ui.add(egui::TextEdit::singleline(text).hint_text(hint).desired_width(width).margin(Margin { left: 24, right: 8, top: 3, bottom: 3 }))
+        })
+        .inner;
+    // the glass: a ring and a handle
+    let c = egui::pos2(resp.rect.min.x + 13.0, resp.rect.center().y - 1.0);
+    let stroke = Stroke::new(1.4, theme::TEXT_DIM);
+    ui.painter().circle_stroke(c, 4.2, stroke);
+    ui.painter().line_segment([c + Vec2::new(3.0, 3.0), c + Vec2::new(6.5, 6.5)], stroke);
+    resp
+}
+
+/// The label that hangs at the pointer while something is dragged from one panel to another (a file out of the Project panel, a thing out of the Place panel).
+pub fn drag_chip(ctx: &egui::Context, text: &str) {
+    let Some(p) = ctx.pointer_latest_pos() else { return };
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("drag-chip")));
+    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(12.0), theme::TEXT_BRIGHT);
+    let r = Rect::from_min_size(p + Vec2::new(14.0, 10.0), galley.size() + Vec2::new(12.0, 6.0));
+    painter.rect_filled(r, CornerRadius::same(3), Color32::from_rgba_unmultiplied(20, 22, 26, 230));
+    painter.galley(r.min + Vec2::new(6.0, 3.0), galley, theme::TEXT_BRIGHT);
+    ctx.request_repaint();
 }
 
 pub fn dim(text: &str) -> egui::RichText {

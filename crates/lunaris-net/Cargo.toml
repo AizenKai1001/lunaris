@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 lunaris-json = { path = "../lunaris-json" }
+lunaris-ecs = { path = "../lunaris-ecs" }
 lunaris-api = { path = "../lunaris-api" }
 lunaris-sim = { path = "../lunaris-sim" }
 

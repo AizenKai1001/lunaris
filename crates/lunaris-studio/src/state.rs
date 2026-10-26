@@ -54,6 +54,8 @@ pub enum Center {
     Blueprint,
     Script,
     Canvas,
+    Sequencer,
+    Effects,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -88,6 +90,11 @@ pub struct Row {
     /// What it is, for the little icon: the first of Camera, Light, MeshRenderer, Sprite, ...
     pub kind: Kind,
     pub pos: Option<V3>,
+    /// Does the entity itself have a MeshRenderer?
+    pub own_mesh: bool,
+    /// How many MeshRenderers there are in this row and everything attached under it, and how many of those are shown (the Outliner's eye).
+    pub meshes: u32,
+    pub shown: u32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -134,6 +141,8 @@ pub struct FieldDef {
 
 #[derive(Clone, Debug, Default)]
 pub struct CompDef {
+    /// The values a new component of this kind starts with, by field (`schema`'s `defaults`).
+    pub defaults: Option<Json>,
     pub name: String,
     pub doc: String,
     pub fields: Vec<FieldDef>,
@@ -168,11 +177,19 @@ impl Entity {
     }
 }
 
+/// The tabs of the panel on the left of the scene view.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LeftTab {
+    Hierarchy,
+    Place,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BottomTab {
     Project,
     Console,
     Systems,
+    Profiler,
 }
 
 const READ_ONLY: &[&str] = &[
@@ -192,7 +209,10 @@ pub struct Studio {
     pub opts: Options,
     pub scene: Option<String>,
     pub dirty: bool,
+    /// The main selected entity (the Inspector shows it, the handles are on it): the one selected last.
     pub selection: Option<u64>,
+    /// Every selected entity, the main one last (empty when nothing is selected); Ctrl+click adds and removes, Shift+click in the Hierarchy takes a range.
+    pub selected: Vec<u64>,
     pub entity: Option<Entity>,
     pub mode: Mode,
     pub console: Vec<LogLine>,
@@ -209,6 +229,8 @@ pub struct Studio {
     pub tick: u64,
     pub toast: Option<(String, Instant, bool)>,
     pub tab: BottomTab,
+    /// The tab of the left panel that shows while the scene view is in the middle.
+    pub left_tab: LeftTab,
     pub center: Center,
     /// A panel asks the window to open this graph system in the Script tab.
     pub open_script: Option<String>,
@@ -225,6 +247,8 @@ pub struct Studio {
     pub system_text: String,
     pub system_error: Option<String>,
     pub prefabs: Vec<String>,
+    /// The brush of Paint mode while one is armed (the scene view sprinkles copies of it where the button is dragged).
+    pub brush: Option<crate::paint::Brush>,
     pub quit: bool,
     next_refresh: Option<Instant>,
     /// When the scene file had the modification time we know of (what we loaded or saved), and when to look again.
@@ -242,6 +266,7 @@ impl Studio {
             scene: None,
             dirty: false,
             selection: None,
+            selected: Vec::new(),
             entity: None,
             mode: Mode::Edit,
             console: Vec::new(),
@@ -257,6 +282,7 @@ impl Studio {
             tick: 0,
             toast: None,
             tab: BottomTab::Project,
+            left_tab: LeftTab::Hierarchy,
             center: Center::View,
             open_script: None,
             open_blueprint: None,
@@ -271,6 +297,7 @@ impl Studio {
             system_text: String::new(),
             system_error: None,
             prefabs: Vec::new(),
+            brush: None,
             quit: false,
             next_refresh: None,
             scene_stamp: None,
@@ -398,6 +425,7 @@ impl Studio {
         let Ok(q) = q else { return };
         self.total_entities = q.get("total").and_then(|t| t.as_u64()).unwrap_or(0) as usize;
         let mut rows: Vec<Row> = Vec::new();
+        let mut mesh_rows: Vec<(usize, bool)> = Vec::new();
         for e in q.get("entities").and_then(|e| e.as_array()).unwrap_or(&[]) {
             let uid = e.get("uid").and_then(|u| u.as_u64()).unwrap_or(0);
             let comps = e.get("components");
@@ -430,10 +458,37 @@ impl Studio {
                 Kind::Empty
             };
             let pos = comps.and_then(|c| c.get("Transform")).and_then(|t| t.get("pos")).and_then(|p| p.as_array()).filter(|a| a.len() >= 3).map(|a| [a[0].as_f64().unwrap_or(0.0) as f32, a[1].as_f64().unwrap_or(0.0) as f32, a[2].as_f64().unwrap_or(0.0) as f32]);
-            rows.push(Row { uid, name, parent, depth: 0, children: 0, kind, pos });
+            let own_mesh = has("MeshRenderer");
+            let visible = comps.and_then(|c| c.get("MeshRenderer")).and_then(|m| m.get("visible")).and_then(|v| v.as_bool()).unwrap_or(true);
+            if own_mesh {
+                mesh_rows.push((rows.len(), visible));
+            }
+            rows.push(Row { uid, name, parent, depth: 0, children: 0, kind, pos, own_mesh, meshes: 0, shown: 0 });
+        }
+        // each row counts the meshes in it and under it, and how many of them are shown
+        let by_uid: std::collections::HashMap<u64, usize> = rows.iter().enumerate().map(|(i, r)| (r.uid, i)).collect();
+        for (i, visible) in mesh_rows {
+            let (mut at, mut hops) = (Some(i), 0);
+            while let Some(k) = at {
+                rows[k].meshes += 1;
+                rows[k].shown += visible as u32;
+                hops += 1;
+                let up = rows[k].parent.and_then(|p| by_uid.get(&p).copied());
+                at = if hops > 256 { None } else { up.filter(|p| *p != k) };
+            }
         }
         self.all = rows;
         self.rebuild_tree();
+        // a selected entity that is gone leaves the selection (only judged against a list that was just read)
+        let alive: std::collections::HashSet<u64> = self.all.iter().map(|r| r.uid).collect();
+        if self.total_entities <= self.all.len() && self.selected.iter().any(|u| !alive.contains(u)) {
+            self.selected.retain(|u| alive.contains(u));
+            let main = self.selected.last().copied();
+            if self.selection != main {
+                self.selection = main;
+                self.refresh_entity();
+            }
+        }
     }
 
     /// Lay the entities out as a list: parents before their children, children indented, hidden when their parent is collapsed.
@@ -505,12 +560,103 @@ impl Studio {
             }
             Err(_) => {
                 self.selection = None;
+                self.selected.clear();
                 self.entity = None;
             }
         }
     }
 
+    /// Is this entity one of the selected ones?
+    pub fn is_selected(&self, uid: u64) -> bool {
+        self.selected.contains(&uid)
+    }
+
+    /// Ctrl+click: add the entity to the selection (and make it the main one), or take it out if it was in.
+    pub fn toggle_select(&mut self, uid: u64) {
+        if let Some(i) = self.selected.iter().position(|u| *u == uid) {
+            self.selected.remove(i);
+            let main = self.selected.last().copied();
+            if self.selection != main {
+                self.selection = main;
+                self.refresh_entity();
+            }
+        } else {
+            if let Some(main) = self.selection.filter(|m| !self.selected.contains(m)) {
+                self.selected.push(main);
+            }
+            self.selected.push(uid);
+            self.selection = Some(uid);
+            self.refresh_entity();
+        }
+    }
+
+    /// Select several entities at once (a range of the Hierarchy); `main` is the one the Inspector shows.
+    pub fn select_many(&mut self, uids: Vec<u64>, main: Option<u64>) {
+        let mut list: Vec<u64> = Vec::new();
+        for u in uids {
+            if !list.contains(&u) {
+                list.push(u);
+            }
+        }
+        if let Some(m) = main.filter(|m| list.contains(m)) {
+            list.retain(|u| *u != m);
+            list.push(m);
+        }
+        let main = list.last().copied();
+        self.selected = list;
+        if self.selection != main {
+            self.selection = main;
+            self.refresh_entity();
+        }
+    }
+
+    /// The selected entities that are not inside another selected one (acting on a parent acts on what hangs on it).
+    fn selection_roots(&self) -> Vec<u64> {
+        let parent_of = |u: u64| self.all.iter().find(|r| r.uid == u).and_then(|r| r.parent);
+        self.selected
+            .iter()
+            .copied()
+            .filter(|&u| {
+                let (mut cur, mut guard) = (parent_of(u), 0);
+                while let Some(p) = cur {
+                    if self.selected.contains(&p) {
+                        return false;
+                    }
+                    cur = parent_of(p);
+                    guard += 1;
+                    if guard > 64 {
+                        break;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+
+    /// Delete every selected entity (one inside another selected one goes with it).
+    pub fn delete_selected(&mut self) {
+        for u in self.selection_roots() {
+            self.delete(u);
+        }
+    }
+
+    /// Duplicate every selected entity; the copies become the selection.
+    pub fn duplicate_selected(&mut self) {
+        let mut copies: Vec<u64> = Vec::new();
+        for u in self.selection_roots() {
+            self.duplicate(u);
+            if let Some(c) = self.selection {
+                copies.push(c);
+            }
+        }
+        if copies.len() > 1 {
+            self.select_many(copies, None);
+        }
+    }
+
     pub fn select(&mut self, uid: Option<u64>) {
+        // (a single click collapses a selection of several, even onto the entity that was the main one)
+        self.selected = uid.into_iter().collect();
         if self.selection != uid {
             self.selection = uid;
             self.refresh_entity();
@@ -550,6 +696,7 @@ impl Studio {
         let mut def = CompDef { name: name.to_string(), ..Default::default() };
         if let Ok(s) = self.engine.call("schema", &Self::obj(vec![("component", Json::str(name))])) {
             def.doc = s.get("doc").and_then(|d| d.as_str()).unwrap_or("").to_string();
+            def.defaults = s.get("defaults").cloned();
             for f in s.get("fields").and_then(|f| f.as_array()).unwrap_or(&[]) {
                 def.fields.push(FieldDef { name: f.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string(), ty: f.get("type").and_then(|n| n.as_str()).unwrap_or("f32").to_string(), count: f.get("count").and_then(|n| n.as_u64()).unwrap_or(1) as usize });
             }
@@ -588,6 +735,7 @@ impl Studio {
                 self.scene_stamp = self.scene_mtime();
                 self.dirty = false;
                 self.selection = None;
+                self.selected.clear();
                 self.entity = None;
                 self.expanded.clear();
                 self.forget_schema();
@@ -616,6 +764,7 @@ impl Studio {
             self.scene = None;
             self.dirty = false;
             self.selection = None;
+            self.selected.clear();
             self.entity = None;
             self.rows_dirty = true;
             // a new scene starts with a camera and a light, so that there is something to see
@@ -662,6 +811,11 @@ impl Studio {
     pub fn spawn_template(&mut self, t: Template, at: V3) -> Option<u64> {
         let name = self.unique_name(t.label());
         let comps = t.components(&name, at);
+        self.spawn_components(comps)
+    }
+
+    /// Spawn an entity from a `components` object (as the `spawn` tool takes it) and select it.
+    fn spawn_components(&mut self, comps: Json) -> Option<u64> {
         let r = self.try_call("spawn", Self::obj(vec![("components", comps)]))?;
         let uid = r.get("uid").and_then(|u| u.as_u64())?;
         self.rows_dirty = true;
@@ -670,12 +824,35 @@ impl Studio {
         Some(uid)
     }
 
+    /// A new entity that shows the model file at `path`, named after the file and standing with its lowest point on `at`: where a model's own origin lies is up to its author,
+    /// so the bounds of the model (`model_info`) say how far to lift it.
+    pub fn add_model(&mut self, path: &str, at: V3) -> Option<u64> {
+        let file = path.rsplit('/').next().unwrap_or(path);
+        let stem = file.rsplit_once('.').map_or(file, |(s, _)| s);
+        let lowest = self
+            .try_call("model_info", Self::obj(vec![("path", Json::str(path))]))
+            .and_then(|i| i.get("bounds")?.get("min")?.as_array()?.get(1)?.as_f64())
+            .unwrap_or(0.0) as f32;
+        let name = self.unique_name(if stem.is_empty() { "Model" } else { stem });
+        let mut comps = Template::Empty.components(&name, [at[0], at[1] - lowest, at[2]]);
+        comps.set("MeshRenderer", Json::obj([("mesh", Json::str(path))]));
+        self.spawn_components(comps)
+    }
+
+    /// A new Audio Source at `at` that plays the sound file at `path`.
+    pub fn add_sound(&mut self, path: &str, at: V3) -> Option<u64> {
+        let uid = self.spawn_template(Template::AudioSource, at)?;
+        self.set(uid, "AudioSource", Json::obj([("file", Json::str(path)), ("voice", Json::str(""))]), None);
+        Some(uid)
+    }
+
     pub fn spawn_prefab(&mut self, name: &str, at: V3) {
-        let args = Self::obj(vec![("prefab", Json::str(name)), ("at", Json::arr(at.iter().map(|x| Json::from(*x as f64))))]);
+        let args = Self::obj(vec![("prefab", Json::str(name)), ("at", Json::arr(at.iter().map(|x| Json::from(*x))))]);
         if let Some(r) = self.try_call("spawn_prefab", args) {
-            if let Some(uid) = r.get("uid").or_else(|| r.get("root")).and_then(|u| u.as_u64()) {
-                self.rows_dirty = true;
-                self.refresh_rows();
+            self.rows_dirty = true;
+            self.refresh_rows();
+            // (the tool answers with the roots of the copies it made, `uids`)
+            if let Some(uid) = r.get("uids").and_then(|a| a.as_array()).and_then(|a| a.first()).or_else(|| r.get("uid")).and_then(|u| u.as_u64()) {
                 self.select(Some(uid));
             }
         }
@@ -686,6 +863,7 @@ impl Studio {
             if self.selection == Some(uid) {
                 self.select(None);
             }
+            self.selected.retain(|u| *u != uid);
             self.rows_dirty = true;
         }
     }
@@ -735,6 +913,78 @@ impl Studio {
         let _ = self.try_call("set", Self::obj(args));
     }
 
+    /// Like `set`, and when `uid` is the main one of several selected entities the same fields go to every other selected entity that has the component (what is typed in the Inspector goes to
+    /// everything that is selected, as in Unreal's Details panel). The edits share one undo group, so one Undo takes them all back; a name is never copied.
+    pub fn set_selected(&mut self, uid: u64, comp: &str, value: Json, group: Option<&str>) {
+        let mut targets = vec![uid];
+        if comp != "Name" && self.selected.len() > 1 && self.selection == Some(uid) {
+            let others: Vec<u64> = self.selected.iter().copied().filter(|u| *u != uid).collect();
+            for o in others {
+                // (asked of the engine directly: an entity without the component is an answer here, not an error for the Console)
+                let has = self
+                    .engine
+                    .call("get", &Self::obj(vec![("uid", Json::from(o as i64)), ("components", Json::arr([Json::str(comp)]))]))
+                    .ok()
+                    .is_some_and(|g| g.get("components").and_then(|c| c.get(comp)).is_some_and(|v| !v.is_null()));
+                if has {
+                    targets.push(o);
+                }
+            }
+        }
+        if targets.len() == 1 {
+            self.set(uid, comp, value, group);
+            return;
+        }
+        // one `batch` call: one undo step for all of them (a group of single `set` calls would keep only the first one's inverse: consecutive edits of one group are taken to be one drag of one thing)
+        let commands = targets.iter().map(|u| Json::obj([("op", Json::str("set")), ("uid", Json::from(*u as i64)), ("component", Json::str(comp)), ("value", value.clone())]));
+        let mut args = vec![("commands", Json::arr(commands))];
+        if let Some(g) = group {
+            args.push(("undo_group", Json::str(g)));
+        }
+        let _ = self.try_call("batch", Self::obj(args));
+    }
+
+    /// Show or hide an entity and everything attached under it (the Outliner's eye): `MeshRenderer.visible` of every mesh in the subtree, as one `batch` call (one Undo).
+    pub fn set_shown(&mut self, uid: u64, show: bool) {
+        let mut kids: std::collections::HashMap<u64, Vec<u64>> = std::collections::HashMap::new();
+        for r in &self.all {
+            if let Some(p) = r.parent {
+                kids.entry(p).or_default().push(r.uid);
+            }
+        }
+        let own: std::collections::HashSet<u64> = self.all.iter().filter(|r| r.own_mesh).map(|r| r.uid).collect();
+        let (mut stack, mut seen, mut targets) = (vec![uid], std::collections::HashSet::new(), Vec::new());
+        while let Some(u) = stack.pop() {
+            if !seen.insert(u) {
+                continue;
+            }
+            if own.contains(&u) {
+                targets.push(u);
+            }
+            if let Some(k) = kids.get(&u) {
+                stack.extend(k.iter().copied());
+            }
+        }
+        if targets.is_empty() {
+            return;
+        }
+        let commands = targets.iter().map(|u| Json::obj([("op", Json::str("set")), ("uid", Json::from(*u as i64)), ("component", Json::str("MeshRenderer")), ("value", Json::obj([("visible", Json::Bool(show))]))]));
+        if self.try_call("batch", Self::obj(vec![("commands", Json::arr(commands))])).is_some() {
+            self.rows_dirty = true;
+            self.refresh_rows();
+            if self.selection.is_some_and(|s| targets.contains(&s)) {
+                self.refresh_entity();
+            }
+        }
+    }
+
+    /// Read the prefabs of the scene again (they are defined while the editor runs, by a tool call or by loading a scene).
+    pub fn refresh_prefabs(&mut self) {
+        if let Ok(p) = self.engine.call("prefabs", &Self::obj(vec![])) {
+            self.prefabs = p.get("prefabs").and_then(|a| a.as_array()).map(|a| a.iter().filter_map(|x| x.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect()).unwrap_or_default();
+        }
+    }
+
     /// The world transform of a parent: (position, rotation, scale).
     fn parent_tf(&mut self, parent: u64) -> (V3, [f32; 4], V3) {
         let pt = self.engine.call("get", &Self::obj(vec![("uid", Json::from(parent as i64)), ("components", Json::arr([Json::str("Transform")]))])).ok();
@@ -750,7 +1000,7 @@ impl Studio {
 
     /// Move an entity to a world position; an entity attached to a parent moves by changing its `LocalTransform`.
     pub fn move_to(&mut self, uid: u64, world: V3, group: &str) {
-        let jv = |p: V3| Json::arr(p.iter().map(|x| Json::from(*x as f64)));
+        let jv = |p: V3| Json::arr(p.iter().map(|x| Json::from(*x)));
         match self.attached_to(uid) {
             Some(parent) => {
                 let (ppos, prot, pscale) = self.parent_tf(parent);
@@ -764,7 +1014,7 @@ impl Studio {
 
     /// Turn an entity to a world rotation (a quaternion); an attached entity changes its `LocalTransform`.
     pub fn rotate_to(&mut self, uid: u64, world: [f32; 4], group: &str) {
-        let jq = |q: [f32; 4]| Json::arr(q.iter().map(|x| Json::from(*x as f64)));
+        let jq = |q: [f32; 4]| Json::arr(q.iter().map(|x| Json::from(*x)));
         match self.attached_to(uid) {
             Some(parent) => {
                 let (_, prot, _) = self.parent_tf(parent);
@@ -777,7 +1027,7 @@ impl Studio {
 
     /// Give an entity a world scale; an attached entity changes its `LocalTransform`.
     pub fn scale_to(&mut self, uid: u64, world: V3, group: &str) {
-        let jv = |p: V3| Json::arr(p.iter().map(|x| Json::from(*x as f64)));
+        let jv = |p: V3| Json::arr(p.iter().map(|x| Json::from(*x)));
         match self.attached_to(uid) {
             Some(parent) => {
                 let (_, _, ps) = self.parent_tf(parent);
@@ -925,7 +1175,7 @@ impl Template {
     /// The components of a new entity of this kind, as the `spawn` tool takes them.
     pub fn components(self, name: &str, at: V3) -> Json {
         let at = [(at[0] * 100.0).round() / 100.0, (at[1] * 100.0).round() / 100.0, (at[2] * 100.0).round() / 100.0];
-        let pos = Json::arr(at.iter().map(|x| Json::from(*x as f64)));
+        let pos = Json::arr(at.iter().map(|x| Json::from(*x)));
         let tr = |extra: Vec<(&str, Json)>| {
             let mut t = vec![("pos", pos.clone())];
             t.extend(extra);

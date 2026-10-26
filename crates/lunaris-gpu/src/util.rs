@@ -589,3 +589,163 @@ mod tests {
         assert!((top[0] as i32 - 188).abs() <= 2, "{}", top[0]);
     }
 }
+
+/// A hash for small integer keys (addresses, indices): one multiply a word, no randomness, so a look-up costs a few nanoseconds (the default hasher's strength is for keys from outside). Only for look-ups: never iterated where the order matters.
+#[derive(Default, Clone, Copy)]
+pub struct FastHasher(u64);
+
+impl std::hash::Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ *b as u64).wrapping_mul(0x517c_c1b7_2722_0a95);
+        }
+    }
+    fn write_u8(&mut self, i: u8) {
+        self.0 = (self.0.rotate_left(5) ^ i as u64).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+    fn write_u32(&mut self, i: u32) {
+        self.0 = (self.0.rotate_left(5) ^ i as u64).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+    fn write_u64(&mut self, i: u64) {
+        self.0 = (self.0.rotate_left(5) ^ i).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+    fn write_usize(&mut self, i: usize) {
+        self.0 = (self.0.rotate_left(5) ^ i as u64).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+pub type FastMap<K, V> = std::collections::HashMap<K, V, std::hash::BuildHasherDefault<FastHasher>>;
+
+/// Run `f(first_index, chunk)` over pieces of `data` on up to 8 threads, each piece at least `min_chunk` long (a short slice is done right here: starting threads costs more than they save below a few thousand elements). The result must
+/// not depend on how the slice is cut, which it does not when each element is a function of its own index.
+pub fn par_chunks_mut<T: Send>(data: &mut [T], min_chunk: usize, f: impl Fn(usize, &mut [T]) + Sync) {
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8);
+    let n = data.len();
+    if threads <= 1 || n < min_chunk * 2 {
+        f(0, data);
+        return;
+    }
+    let chunk = n.div_ceil(threads).max(min_chunk);
+    std::thread::scope(|s| {
+        for (ci, c) in data.chunks_mut(chunk).enumerate() {
+            let f = &f;
+            s.spawn(move || f(ci * chunk, c));
+        }
+    });
+}
+
+/// The planes of a view volume (a camera's, or one cascade of a shadow map): what is outside any one of them cannot be seen, so it need not be drawn. Made from a view-projection matrix in the GPU's clip space
+/// (x and y in -w..w, z in 0..w; the depth being reversed does not matter), each plane normalised and pointing inwards, so that a point's signed distance from it is its distance in metres.
+#[derive(Clone, Copy, Debug)]
+pub struct Frustum {
+    planes: [[f32; 4]; 6],
+    count: usize,
+}
+
+impl Frustum {
+    /// `sides_only` leaves out the near and far planes: for a shadow map, whose caster may stand between the light and the map's volume (and still throw its shadow into it).
+    pub fn from_view_proj(m: &M4, sides_only: bool) -> Frustum {
+        let row = |r: usize| [m.0[r], m.0[4 + r], m.0[8 + r], m.0[12 + r]];
+        let (r0, r1, r2, r3) = (row(0), row(1), row(2), row(3));
+        let comb = |a: [f32; 4], b: [f32; 4], s: f32| [a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2], a[3] + s * b[3]];
+        let raw = [comb(r3, r0, 1.0), comb(r3, r0, -1.0), comb(r3, r1, 1.0), comb(r3, r1, -1.0), r2, comb(r3, r2, -1.0)];
+        let mut planes = [[0.0, 0.0, 0.0, 1.0]; 6];
+        for (out, p) in planes.iter_mut().zip(raw) {
+            let len = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+            // a degenerate plane (a matrix that is not a view) lets everything through
+            if len > 1.0e-12 && len.is_finite() {
+                *out = [p[0] / len, p[1] / len, p[2] / len, p[3] / len];
+            }
+        }
+        Frustum { planes, count: if sides_only { 4 } else { 6 } }
+    }
+
+    /// Could any part of the box (`min` to `max`, axis-aligned) be inside? (Conservative, like `sphere_visible`.)
+    pub fn aabb_visible(&self, min: V3, max: V3) -> bool {
+        self.planes[..self.count].iter().all(|p| {
+            // the corner of the box that lies farthest along the plane's normal: if even that one is outside, the whole box is
+            let x = if p[0] >= 0.0 { max[0] } else { min[0] };
+            let y = if p[1] >= 0.0 { max[1] } else { min[1] };
+            let z = if p[2] >= 0.0 { max[2] } else { min[2] };
+            !(p[0] * x + p[1] * y + p[2] * z + p[3] < 0.0)
+        })
+    }
+
+    /// Could any part of the sphere be inside? (Conservative: a sphere that only touches counts, and a NaN is "yes".)
+    #[inline]
+    pub fn sphere_visible(&self, c: V3, r: f32) -> bool {
+        self.planes[..self.count].iter().all(|p| !(p[0] * c[0] + p[1] * c[1] + p[2] * c[2] + p[3] < -r))
+    }
+}
+
+#[cfg(test)]
+mod frustum_tests {
+    use super::*;
+
+    fn view(eye: V3, target: V3) -> M4 {
+        // a look-at in the engine's own convention: the camera looks down its own -z
+        let f = normalize(sub(target, eye));
+        let r = normalize(cross(f, [0.0, 1.0, 0.0]));
+        let u = cross(r, f);
+        let mut m = M4::identity();
+        m.0[0] = r[0];
+        m.0[4] = r[1];
+        m.0[8] = r[2];
+        m.0[1] = u[0];
+        m.0[5] = u[1];
+        m.0[9] = u[2];
+        m.0[2] = -f[0];
+        m.0[6] = -f[1];
+        m.0[10] = -f[2];
+        m.0[12] = -dot(r, eye);
+        m.0[13] = -dot(u, eye);
+        m.0[14] = dot(f, eye);
+        m
+    }
+
+    #[test]
+    fn a_sphere_is_seen_when_it_touches_the_view_volume_and_not_otherwise() {
+        // 90 degrees across, square picture, from the origin down -z, 0.5 m to 100 m
+        let vp = to_gpu_clip(&M4::perspective(90.0, 1.0, 0.5, 100.0).mul(&view([0.0, 0.0, 0.0], [0.0, 0.0, -1.0])));
+        let fr = Frustum::from_view_proj(&vp, false);
+        assert!(fr.sphere_visible([0.0, 0.0, -10.0], 0.1), "straight ahead");
+        assert!(fr.sphere_visible([9.0, 0.0, -10.0], 0.1), "inside the 45 degree side plane");
+        assert!(!fr.sphere_visible([12.0, 0.0, -10.0], 0.1), "beside it");
+        assert!(fr.sphere_visible([12.0, 0.0, -10.0], 2.5), "a big sphere that reaches in (the plane is 10 m out at that depth: 1.41 m from the centre)");
+        assert!(!fr.sphere_visible([0.0, 14.0, -10.0], 1.0), "above it");
+        assert!(!fr.sphere_visible([0.0, 0.0, 10.0], 1.0), "behind it");
+        assert!(!fr.sphere_visible([0.0, 0.0, -150.0], 1.0), "beyond the far plane");
+        assert!(fr.sphere_visible([0.0, 0.0, -101.0], 2.0), "reaching over the far plane");
+        assert!(fr.sphere_visible([0.0, 0.0, 0.2], 1.0), "reaching over the near plane");
+        // a shadow cascade is a box (an orthographic volume 20 m high and wide, from 0.5 to 100 m along -z): a caster behind it (towards the light) still throws its shadow in, so only the sides count
+        let vp = to_gpu_clip(&M4::ortho(20.0, 1.0, 0.5, 100.0).mul(&view([0.0, 0.0, 0.0], [0.0, 0.0, -1.0])));
+        let (all, sides) = (Frustum::from_view_proj(&vp, false), Frustum::from_view_proj(&vp, true));
+        assert!(!all.sphere_visible([0.0, 0.0, 10.0], 1.0), "behind the box");
+        assert!(sides.sphere_visible([0.0, 0.0, 10.0], 1.0), "behind the box, but between its sides");
+        assert!(sides.sphere_visible([9.0, 0.0, 10.0], 0.5), "inside the side");
+        assert!(!sides.sphere_visible([12.0, 0.0, 10.0], 1.0), "outside the sides");
+        // nothing to say about a sphere of infinite size, and a NaN is kept
+        assert!(fr.sphere_visible([1.0e6, 0.0, 0.0], f32::INFINITY));
+        assert!(fr.sphere_visible([f32::NAN, 0.0, 0.0], 1.0));
+    }
+
+    #[test]
+    fn a_box_is_seen_when_any_corner_of_it_is_inside_the_volume() {
+        let vp = to_gpu_clip(&M4::perspective(90.0, 1.0, 0.5, 100.0).mul(&view([0.0, 0.0, 0.0], [0.0, 0.0, -1.0])));
+        let fr = Frustum::from_view_proj(&vp, false);
+        assert!(fr.aabb_visible([-1.0, -1.0, -11.0], [1.0, 1.0, -9.0]), "straight ahead");
+        assert!(fr.aabb_visible([8.0, -1.0, -11.0], [20.0, 1.0, -9.0]), "a box that reaches in from the side");
+        assert!(!fr.aabb_visible([12.0, -1.0, -11.0], [20.0, 1.0, -9.0]), "wholly beside it");
+        assert!(!fr.aabb_visible([-5.0, -5.0, 3.0], [5.0, 5.0, 9.0]), "behind it");
+        assert!(!fr.aabb_visible([-1.0, -1.0, -300.0], [1.0, 1.0, -200.0]), "beyond the far plane");
+    }
+
+    #[test]
+    fn a_degenerate_matrix_lets_everything_through() {
+        let fr = Frustum::from_view_proj(&M4([0.0; 16]), false);
+        assert!(fr.sphere_visible([5.0, 5.0, 5.0], 0.0));
+    }
+}

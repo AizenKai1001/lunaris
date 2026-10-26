@@ -33,12 +33,62 @@ pub fn build_mesh(field: &Heightfield, g: &Terrain) -> Mesh {
             idx.extend_from_slice(&[v00, v01, v10, v10, v01, v11]);
         }
     }
-    Mesh { pos, nrm, uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None }
+    if g.skirt.is_finite() && g.skirt > 0.0 {
+        let depth = g.skirt.min(1.0e4);
+        let edges: [(Vec<usize>, [f32; 3]); 4] = [
+            ((0..=nx).collect(), [0.0, 0.0, -1.0]),
+            ((0..=nx).map(|i| nz * stride + i).collect(), [0.0, 0.0, 1.0]),
+            ((0..=nz).map(|j| j * stride).collect(), [-1.0, 0.0, 0.0]),
+            ((0..=nz).map(|j| j * stride + nx).collect(), [1.0, 0.0, 0.0]),
+        ];
+        for (edge, out) in edges {
+            let first = pos.len() as u32;
+            for &v in &edge {
+                let (p, n, t) = (pos[v], nrm[v], uv[v]);
+                pos.push([p[0], p[1] - depth, p[2]]);
+                nrm.push(n);
+                uv.push(t);
+            }
+            for k in 0..edge.len() - 1 {
+                let (a, b, a2, b2) = (edge[k] as u32, edge[k + 1] as u32, first + k as u32, first + k as u32 + 1);
+                // the wall faces away from the ground: swap the winding where it came out the other way
+                let n = cross(sub(pos[b as usize], pos[a as usize]), sub(pos[a2 as usize], pos[a as usize]));
+                if n[0] * out[0] + n[2] * out[2] >= 0.0 {
+                    idx.extend_from_slice(&[a, b, a2, b, b2, a2]);
+                } else {
+                    idx.extend_from_slice(&[a, a2, b, b, a2, b2]);
+                }
+            }
+        }
+    }
+    Mesh { pos, nrm, uv, col: Vec::new(), texw: Vec::new(), idx, tex: None, rig: None, normal_tex: None, arm_tex: None, alpha_cutoff: 0.0, lod: crate::mesh::LodMode::Ground, parts: Vec::new(), occluders: Vec::new(), depth_whole: None, emissive_factor: 0.0 }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_skirt_hangs_a_wall_below_every_edge_that_faces_outward_and_changes_nothing_above() {
+        let mut s = vec![0u16; 25];
+        s[12] = 65535;
+        let f = Heightfield::new(5, 5, s).unwrap();
+        let g = Terrain { size: [40.0, 40.0], height: 20.0, step: 1, ..Terrain::default() };
+        let plain = build_mesh(&f, &g);
+        let skirted = build_mesh(&f, &Terrain { skirt: 3.0, ..g });
+        // four edges of five vertices, four wall quads (two triangles) on each
+        assert_eq!((skirted.pos.len(), skirted.idx.len()), (25 + 4 * 5, plain.idx.len() + 4 * 4 * 6));
+        assert_eq!(&skirted.pos[..25], &plain.pos[..]);
+        assert_eq!(&skirted.idx[..plain.idx.len()], &plain.idx[..]);
+        assert!(skirted.pos[25..].iter().all(|p| p[1] == -3.0), "the walls hang 3 m below the lowest ground (0)");
+        for t in skirted.idx[plain.idx.len()..].chunks(3) {
+            let (a, b, c) = (skirted.pos[t[0] as usize], skirted.pos[t[1] as usize], skirted.pos[t[2] as usize]);
+            let n = cross(sub(b, a), sub(c, a));
+            let mid = [(a[0] + b[0] + c[0]) / 3.0, (a[2] + b[2] + c[2]) / 3.0];
+            // it faces away from the middle of the ground
+            assert!(n[0] * mid[0] + n[2] * mid[1] > 0.0 && n[1].abs() < 1e-3, "{a:?} {b:?} {c:?} {n:?}");
+        }
+    }
 
     #[test]
     fn the_mesh_is_the_ground_physics_stands_on_and_faces_up() {

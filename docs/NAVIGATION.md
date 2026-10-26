@@ -23,7 +23,7 @@ The fields: `target`, `active`, `speed` (4 m/s), `radius` (0.4), `height` (1.8),
 
 ## How it works
 
-1. The ground plane between the two points (plus a margin) is cut into square cells, 0.5 m, coarser when the area is very large.
+1. The ground plane between the two points (plus a margin) is cut into square cells, 0.5 m, coarser when the area is very large (the window starts at the corner of the box between the two points; with `NavLimits.keep_cells` it starts on a lattice instead, see "Keeping the cells" below).
 2. Every **solid, non-moving `Collider`** (not a trigger, not a `CharacterBody` or `NavAgent`, not a dynamic rigid body) adds to each cell it covers: if it is a **box**, its top is a **surface** to stand on; every solid is an **obstacle** for the heights it occupies. Walls are grown sideways by the agent's radius, except where they are lower than a step (so stairs do not push the agent away from them). A surface is walkable when no obstacle intersects the agent's height above it. Several levels in one cell (a bridge over a road) work. The triangles of a `MeshCollider` add surfaces and obstacles too (below).
 3. Cells are connected in eight directions when the height difference is a step the agent climbs or a drop it accepts; diagonals never cut corners; an agent can step off a platform's edge past the cell that is too close to the platform's side.
 4. A\* with the octile distance and integer costs; ties are broken by node number, so the answer depends only on the world. A line-of-sight pass over the grid removes the waypoints that only the cells needed.
@@ -65,12 +65,38 @@ is low): a dynamic one is not part of the map, like any dynamic body, unless it 
 walks up a mesh ramp to a platform by itself, and the tests in `crates/lunaris-sim/src/mesh_physics_tests.rs` plan paths over a mesh floor, round a mesh
 wall, up a gentle ramp and not up a steep one. The `path` tool takes the meshes into account too.
 
+## How fast a search is
+
+A search works out the data of a cell (the heights of the surfaces an agent can stand on) only when it first looks at the cell, from the solids, terrain and triangles over that cell, and keeps it: a search of a hundred nodes looks at a few hundred cells. A 164 m search is 0.15 ms over open ground and 4 ms across 36 shells of 4 000 triangles (it was 6.8 and 41 ms when the grid was cut whole over the box between the two points); the paths are the same bit for bit. `lunaris bench` has both numbers (`nav open`, `nav city`) and `docs/PERFORMANCE.md` has the story.
+
+### Keeping the cells between searches (opt-in)
+
+Most of what is left of a search over a city is working out the data of the cells (asking each mesh's tree for the triangles near the cell and clipping them: about 3 of the 4 ms), and a server asks again and again for the same streets. `NavLimits.keep_cells` (default **off**; or `NavParams.keep` for a call of `find_path_with`) keeps that data between searches: the window of a search then starts on a **lattice of the cell size anchored at the world's origin**, so the cell (i, j) of one search is the cell (i, j) of the next, and the data of a cell is kept, for each size of agent (radius, height, step), while a hash of the world's solids, grounds and mesh levels is the same (a different hash drops the cells; at most 600 000 per size, per thread, four sizes). A door that swings does not change the hash (its solid is a box that ignores turning); a wall built does, and then the cells are made again.
+
+A repeated search over the same streets costs 0.09 ms across the city of the bench instead of 4.2 (`nav city kept`). The price is that **the paths are not the ones of the same world without it**: the cells' centres move to the lattice, so a waypoint can differ by up to half a cell and a tie between two equally near cells can fall the other way. Because nav paths are part of the state hash, snapshots and recordings, turning it on is a decision of the game, and a recording made without it does not replay with it. What is tested (`nav_tests.rs`): kept cells give exactly the paths of cells worked out fresh on the same lattice (150 searches by agents of three sizes, with keeping off, on and on again), a wall built after the cells were kept is walked round, and a search without `keep` leaves no cells behind and gives the paths it always gave (the fingerprint test, `0x14d88eab…`).
+
+## Crowds: `NavLimits`
+
+Every search builds a grid of the ground round its two points, and in a world of many meshes (a streamed city) one search can take tens of milliseconds and a bad one more than a second. A hundred agents that each ask again whenever their target moves a metre can ask dozens of times a second, and without a limit every request is answered in the tick it was made: a server with 150 roaming, shooting bots measured 40 to 60 ms ticks and single ticks of 1.0 to 1.4 s, with navigation as the cause. `NavLimits` (put it on one entity; the lowest uid counts) rations the searches:
+
+| Field | Meaning |
+|---|---|
+| `searches_per_tick` (default 2, 0 = no limit) | At most this many searches in one tick (an agent's request, or the replan of a path that stalled). An agent that asked and did not get one keeps its request on (`active` stays true) and **waits its turn: first come, first served** (the tick it first asked, then uid), so nobody starves and the order does not depend on uids. It keeps following its old path meanwhile. |
+| `min_replan` (default 0.5 s, 0 = none) | The least time between two searches of one agent: an agent that asks every tick gets a new path at most that often. |
+| `max_distance` (default 0 = none) | The longest search in metres. A target farther than that is walked towards in parts: the search is for the point that far along the way (its height interpolated), the agent walks that path and, at its end, asks again for the rest (it never reports *arrived* until it reaches the real target). If that point has no ground to stand on the agent walks straight to it and asks again from there. |
+| `blocked_wait` (default 3 s, 0 = none) | (2026-10-25) The time an agent waits after a search that found **no way** before it may search again; its request stays on meanwhile. A target that cannot be reached (a player in a building, a closed door) keeps a chaser's autopilot asking, a failed search leaves no path to count `min_replan` from, and a failed search has looked at every cell of the box it could get to: on the city server 26 to 42 of them in 110 s cost 200 to 800 ms each. |
+| `max_searched` (default 0 = none) | The most cells one search may expand: a search that has looked at that many gives up as "no path" (`gave up after N cells`). A way that exists is found in a few thousand cells (a 95 m search across the city: 2,700 to 4,800 cells, a long detour 33,000), one that does not exist is looked for in all of them, so this caps the cost of a failure (5 microseconds a cell in a city: 20,000 is 100 ms). |
+
+**The second look.** When the first search (the box round the two points, with a margin of three quarters of their distance) finds no way, the search looks again over the whole world, because in a small level the way round may lead far outside the box. In a world wider than 300 m that second look is skipped (`WIDE_LIMIT`, or `LUNARIS_NAV_WIDE_LIMIT` in metres for comparing): on the city server it was a grid over the whole city for every unreachable target, 2.5 s each. `LUNARIS_NAV_TRACE=1` prints one line a search (microseconds, distance, result, cells) to stderr; `nav_trace_report.py` of the a game game folder summarises it.
+
+Everything is counted in ticks, not in microseconds, so it is deterministic and replays. The waiting list is part of the state (hashed, copied into snapshots) **only while `NavLimits` exists**: a world without it behaves and hashes exactly as before. `crates/lunaris-sim/src/nav_tests.rs` checks the order of service, the least time, the far target arriving in parts and that a copy of the simulation carries the waiting list. Not done (ideas, in the order they would pay): a per-mesh cache of the rasterised cells, so that a search does not rasterise the same shell again; a cell size per agent (a big machine does not need 0.5 m); a corridor instead of a box.
+
 ## Limits
 
 - Boxes and spheres, no rotation (a rotated box, a capsule and a hull count as the axis-aligned box around them, as for characters); a ramp of boxes is stairs, but a ramp of mesh triangles is a slope (above).
 - Dynamic bodies are not part of the map unless they carry a `NavObstacle` (a pushable crate, a sliding door, a parked car: agents then plan round where it is when they plan, and plan again when they get stuck against it); agents avoid each other only with `NavAvoid`, and then only by steering (no planning around crowds). Moving obstacles are noticed only when the agent stalls and replans.
 - Collision layers (`CollisionLayer`, `docs/PHYSICS.md`) apply: an agent plans over, round and through only the colliders (boxes, spheres, hulls, terrain, mesh levels and `NavObstacle`s) that its own layer and mask collide with, so a ghost walks through doors and a guard is not stopped by a wall of another world. The `path` tool does the same for the entity it starts from (`from` as a uid) and counts every layer for a bare point.
-- The grid is built for each planning request from the colliders, which is a few milliseconds for a few hundred colliders; ask for a path when a target changes, not every tick.
+- The grid is built for each planning request from the colliders, which is a few milliseconds for a few hundred colliders; ask for a path when a target changes, not every tick (and, for a crowd, put `NavLimits` in the world: above).
 
 ## With minds
 

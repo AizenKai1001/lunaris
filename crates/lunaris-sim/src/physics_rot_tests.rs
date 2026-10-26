@@ -604,11 +604,18 @@ fn shot(s: &mut Sim, spinning: bool, speed: f32) {
 #[test]
 fn a_fast_spinning_ball_cannot_pass_through_a_thin_wall_and_bounces_off_it_at_its_real_speed() {
     // 150 m/s is 2.5 m per tick: the ball is 20 cm across and the wall 5 cm thick
+    // (a ball without an AngularVelocity is caught as well: the continuous collision of fast bodies, `tunnel_fixes`, puts it back against the wall
+    // it crossed and the contact bounces it with its real speed; it used to fly through)
     let mut plain = Sim::new(1);
     thin_wall(&mut plain);
     shot(&mut plain, false, 150.0);
-    plain.step_n(30);
-    assert!(pos(&plain, 2)[0] > 20.0, "(without an AngularVelocity it flies through, as it always did: {:?})", pos(&plain, 2));
+    let mut plain_bounced = false;
+    for _ in 0..30 {
+        plain.step();
+        assert!(pos(&plain, 2)[0] < 10.0, "a ball without a spin stays on this side of the wall: {:?}", pos(&plain, 2));
+        plain_bounced |= lin(&plain, 2)[0] < -100.0;
+    }
+    assert!(plain_bounced, "and bounces back: {:?}", lin(&plain, 2));
     let mut s = Sim::new(1);
     thin_wall(&mut s);
     shot(&mut s, true, 150.0);
@@ -766,4 +773,273 @@ fn balls_roll_and_boxes_and_capsules_settle_on_a_heightmap() {
     // the capsule lies on its ground: its middle is a radius (0.25) above it, its axis level
     let cp = pos(&s, 4);
     assert!((cp[1] - 5.0 - 0.25).abs() < 0.03 && axes(rot(&s, 4))[1][1].abs() < 0.05, "the capsule lies on the ground: {cp:?} {:?}", rot(&s, 4));
+}
+
+// ------------------------------------------------------------------------------------------------ hinge motors and swing limits
+
+fn add(s: &mut Sim, uid: u64, component: &str, json: &str) {
+    s.apply(&Command::Add { uid, component: component.into(), value: parse(json).unwrap() }).unwrap();
+}
+
+/// A wheel 2 m across on a hinge through its centre about z, so gravity has no torque on it.
+fn wheel(motor: &str) -> Sim {
+    let mut s = Sim::new(1);
+    body(&mut s, 2, 1, [2.0, 2.0, 0.4], [0.0, 5.0, 0.0], [0.0, 0.0, 0.0, 1.0], r#"{"mass":2,"restitution":0}"#, [0.0; 3]);
+    add(&mut s, 2, "Joint", r#"{"kind":4,"anchor":[0,5,0],"axis":[0,0,1]}"#);
+    add(&mut s, 2, "JointMotor", motor);
+    s
+}
+
+#[test]
+fn a_hinge_motor_turns_a_wheel_at_its_speed_and_a_weak_one_only_gets_it_going() {
+    let mut strong = wheel(r#"{"speed":3,"max_torque":50}"#);
+    strong.step_n(120);
+    assert!((spin(&strong, 2)[2] - 3.0).abs() < 0.1, "the wheel turns at the motor's speed: {:?}", spin(&strong, 2));
+    assert!(spin(&strong, 2)[0].abs() < 0.05 && spin(&strong, 2)[1].abs() < 0.05, "and only about the axis: {:?}", spin(&strong, 2));
+    // the other way round
+    let mut back = wheel(r#"{"speed":-2,"max_torque":50}"#);
+    back.step_n(120);
+    assert!((spin(&back, 2)[2] + 2.0).abs() < 0.1, "{:?}", spin(&back, 2));
+    // a motor of half a newton-metre on a wheel whose inertia is 1.33 gives 0.375 radians per second squared: 0.375 after a second
+    let mut weak = wheel(r#"{"speed":3,"max_torque":0.5}"#);
+    weak.step_n(60);
+    let w = spin(&weak, 2)[2];
+    assert!(w > 0.25 && w < 0.5, "a weak motor speeds it up slowly: {w}");
+    // no torque, no motor
+    let mut off = wheel(r#"{"speed":3,"max_torque":0}"#);
+    off.step_n(60);
+    assert!(spin(&off, 2)[2].abs() < 0.01, "{:?}", spin(&off, 2));
+}
+
+/// An arm 2 m long and 5 kg hinged at the origin about z, let go horizontal (gravity pulls on it with 49 newton-metres).
+fn arm(motor: &str) -> Sim {
+    let mut s = Sim::new(1);
+    body(&mut s, 2, 1, [2.0, 0.2, 0.2], [1.0, 5.0, 0.0], [0.0, 0.0, 0.0, 1.0], r#"{"mass":5,"restitution":0}"#, [0.0; 3]);
+    add(&mut s, 2, "Joint", r#"{"kind":4,"anchor":[0,5,0],"axis":[0,0,1]}"#);
+    add(&mut s, 2, "JointMotor", motor);
+    s
+}
+
+fn angle_z(s: &Sim, uid: u64) -> f32 {
+    let q = rot(s, uid);
+    2.0 * q[2].atan2(q[3])
+}
+
+#[test]
+fn a_strong_motor_at_speed_zero_holds_an_arm_and_a_weak_one_cannot() {
+    let mut held = arm(r#"{"speed":0,"max_torque":300}"#);
+    held.step_n(180);
+    assert!(angle_z(&held, 2).abs() < 0.1, "a strong brake holds the arm where it was: {}", angle_z(&held, 2));
+    let mut falls = arm(r#"{"speed":0,"max_torque":10}"#);
+    falls.step_n(180);
+    assert!(angle_z(&falls, 2) < -0.5, "a weak one is overpowered by the load: {}", angle_z(&falls, 2));
+    // a motor that lifts: it turns the arm up against gravity, at its speed while it has the torque
+    let mut lifts = arm(r#"{"speed":1,"max_torque":300}"#);
+    lifts.step_n(60);
+    assert!(angle_z(&lifts, 2) > 0.7 && angle_z(&lifts, 2) < 1.3, "the arm is lifted at about one radian a second: {}", angle_z(&lifts, 2));
+}
+
+/// A rod 2 m long hung by its top end from a ball-and-socket at (0, 10, 0), given a push. The angle between the rod and the vertical.
+fn rod_swing(cone: Option<&str>) -> f32 {
+    let mut s = Sim::new(1);
+    body(&mut s, 2, 1, [0.2, 2.0, 0.2], [0.0, 9.0, 0.0], [0.0, 0.0, 0.0, 1.0], r#"{"mass":2,"restitution":0}"#, [0.0; 3]);
+    add(&mut s, 2, "Joint", r#"{"kind":3,"anchor":[0,10,0],"axis":[0,1,0]}"#);
+    if let Some(c) = cone {
+        add(&mut s, 2, "JointCone", c);
+    }
+    // (the joint binds itself to the two bodies on the first physics tick: push the rod after that, so that the limit is measured from the vertical)
+    s.step_n(2);
+    s.apply(&Command::Set { uid: 2, component: "AngularVelocity".into(), value: parse(r#"{"w":[0,0,15]}"#).unwrap() }).unwrap();
+    let mut widest = 0.0f32;
+    for _ in 0..240 {
+        s.step();
+        let a = axes(rot(&s, 2));
+        widest = widest.max(a[1][1].clamp(-1.0, 1.0).acos());
+    }
+    widest
+}
+
+#[test]
+fn a_ball_and_socket_with_a_cone_limit_swings_no_further_than_its_angle() {
+    let free = rod_swing(None);
+    assert!(free > 1.0, "without a limit the pushed rod swings far: {free}");
+    let limited = rod_swing(Some(r#"{"angle":0.5}"#));
+    assert!(limited < 0.6, "the limit holds: {limited}");
+    assert!(limited > 0.4, "and the rod did swing out to it: {limited}");
+    // an angle of 0 means no limit
+    let none = rod_swing(Some(r#"{"angle":0}"#));
+    assert!((none - free).abs() < 1e-5, "{none} {free}");
+}
+
+// ------------------------------------------------------------------------------------------------ stacks
+
+/// A tower of `n` one-metre boxes (each can turn), started a hair out of line, stepped for ten seconds: how far the top box drifted sideways, how far it
+/// sank, and the top speed at the end.
+fn tower(n: u64, reference: bool) -> (f32, f32, f32) {
+    let mut s = Sim::new(1);
+    s.reference_physics = reference;
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-0.5,0]},"Collider":{"shape":1,"size":[60,1,60]}}"#);
+    for k in 0..n {
+        let off = ((k * 7919) % 13) as f32 * 0.0008 - 0.005;
+        body(&mut s, 10 + k, 1, [1.0, 1.0, 1.0], [off, 0.5 + k as f32, -off * 0.7], [0.0, 0.0, 0.0, 1.0], r#"{"mass":1,"restitution":0,"friction":0.6}"#, [0.0; 3]);
+    }
+    s.step_n(600);
+    let top = pos(&s, 10 + n - 1);
+    let fastest = (0..n).map(|k| len(lin(&s, 10 + k))).fold(0.0f32, f32::max);
+    ((top[0] * top[0] + top[2] * top[2]).sqrt(), (n as f32 - 0.5) - top[1], fastest)
+}
+
+#[test]
+fn towers_of_turning_boxes_stand_ten_boxes_high_and_more() {
+    // (with 20 solver rounds and no memory a tower of ten collapsed: the top box ended 7 m away at 10 m/s. The solver now starts every tick from the impulses it
+    // ended the last one with, and gives few contact points many rounds: towers of 16 stand still to within a few millimetres)
+    for (n, drift, speed) in [(4u64, 0.02f32, 0.01f32), (8, 0.03, 0.02), (10, 0.03, 0.02), (12, 0.03, 0.02), (16, 0.05, 0.03)] {
+        for reference in [false, true] {
+            let (d, sank, v) = tower(n, reference);
+            assert!(d < drift && sank < 0.05 && v < speed, "a tower of {n} boxes (reference {reference}): drifted {d} m, sank {sank} m, top speed {v} (limits {drift} {speed})");
+        }
+    }
+}
+
+#[test]
+fn a_pyramid_of_boxes_stands() {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-0.5,0]},"Collider":{"shape":1,"size":[60,1,60]}}"#);
+    let mut ids = Vec::new();
+    let mut uid = 10u64;
+    for r in 0..7u64 {
+        let count = 7 - r;
+        for c in 0..count {
+            let x = (c as f32 - (count as f32 - 1.0) * 0.5) * 1.002;
+            body(&mut s, uid, 1, [1.0, 1.0, 1.0], [x, 0.5 + r as f32, 0.0], [0.0, 0.0, 0.0, 1.0], r#"{"mass":1,"restitution":0,"friction":0.6}"#, [0.0; 3]);
+            ids.push((uid, x, 0.5 + r as f32));
+            uid += 1;
+        }
+    }
+    s.step_n(600);
+    for (id, x, y) in ids {
+        let p = pos(&s, id);
+        assert!((p[0] - x).abs() < 0.03 && (p[1] - y).abs() < 0.03 && p[2].abs() < 0.03, "box {id} moved from {:?} to {p:?}", [x, y, 0.0]);
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ the memory between ticks
+
+/// `n` one-metre boxes in a tower on a floor, each started a hair out of line (the same world as `tower`, not yet stepped).
+fn tower_sim(n: u64) -> Sim {
+    let mut s = Sim::new(1);
+    spawn(&mut s, 1, r#"{"Transform":{"pos":[0,-0.5,0]},"Collider":{"shape":1,"size":[60,1,60]}}"#);
+    for k in 0..n {
+        let off = ((k * 7919) % 13) as f32 * 0.0008 - 0.005;
+        body(&mut s, 10 + k, 1, [1.0, 1.0, 1.0], [off, 0.5 + k as f32, -off * 0.7], [0.0, 0.0, 0.0, 1.0], r#"{"mass":1,"restitution":0,"friction":0.6}"#, [0.0; 3]);
+    }
+    s
+}
+
+#[test]
+fn the_solver_remembers_what_each_contact_carries_and_it_is_part_of_the_state() {
+    let mut s = tower_sim(6);
+    assert!(s.contact_memory.is_empty());
+    s.step_n(120);
+    // 5 pairs of boxes and one pair of the lowest box with the floor
+    assert_eq!(s.contact_memory.pair_count(), 6);
+    // each pair carries the weight of everything above it for one tick (m g dt, the boxes weigh 1 kg)
+    let dt = 1.0 / 60.0;
+    for (a, b, above) in [(1u64, 10u64, 6.0f32), (10, 11, 5.0), (11, 12, 4.0), (12, 13, 3.0), (13, 14, 2.0), (14, 15, 1.0)] {
+        let pts = s.contact_memory.find(a, b).unwrap_or_else(|| panic!("no memory of the pair {a} {b}"));
+        let carried: f32 = pts.iter().map(|p| p.jn).sum();
+        let weight = above * 9.8 * dt;
+        assert!((carried - weight).abs() < 0.06 * weight, "pair {a} {b} carries {carried}, the weight above is {weight}");
+    }
+    // it is state: a copy without it is not the same state
+    let mut cleared = s.clone();
+    cleared.contact_memory.clear();
+    assert_ne!(cleared.state_hash(), s.state_hash());
+    // and `clear` empties it
+    s.clear();
+    assert!(s.contact_memory.is_empty());
+}
+
+#[test]
+fn rewinding_and_forking_bring_the_contact_memory_back() {
+    let mut s = tower_sim(5);
+    s.step_n(40);
+    let c = s.checkpoint();
+    s.step_n(30);
+    let h = s.state_hash();
+    let mut fork = s.clone();
+    s.rewind_to(&c).unwrap();
+    assert!(!s.contact_memory.is_empty());
+    s.step_n(30);
+    assert_eq!(s.state_hash(), h, "stepping again from a checkpoint gives the same history, contact memory included");
+    s.step_n(40);
+    fork.step_n(40);
+    assert_eq!(s.state_hash(), fork.state_hash(), "a fork stays in lockstep");
+}
+
+#[test]
+fn a_recording_started_in_the_middle_of_a_run_replays_exactly_even_through_json() {
+    let mut s = tower_sim(5);
+    s.step_n(40);
+    s.start_recording().unwrap();
+    s.step_n(30);
+    let rec = s.stop_recording().unwrap();
+    assert!(!rec.start_contacts.is_empty(), "the recording keeps what the solver remembered when it began");
+    assert_eq!(Sim::replay(&s, &rec).unwrap().state_hash(), rec.final_hash);
+    let text = rec.to_json().to_string_compact().unwrap();
+    let back = crate::sim::Recording::from_json(&parse(&text).unwrap()).unwrap();
+    assert_eq!(back.start_contacts, rec.start_contacts);
+    assert_eq!(Sim::replay(&s, &back).unwrap().state_hash(), rec.final_hash);
+}
+
+// ------------------------------------------------------------------------------------------------ hinge springs
+
+/// A bar 2 m long and 5 kg hinged at its end about z, in space (no gravity), with a `JointSpring`.
+fn sprung_arm(spring: &str, w0: f32) -> Sim {
+    let mut s = Sim::new(1);
+    no_gravity(&mut s);
+    body(&mut s, 2, 1, [2.0, 0.2, 0.2], [1.0, 5.0, 0.0], [0.0, 0.0, 0.0, 1.0], r#"{"mass":5,"restitution":0}"#, [0.0, 0.0, w0]);
+    add(&mut s, 2, "Joint", r#"{"kind":4,"anchor":[0,5,0],"axis":[0,0,1]}"#);
+    add(&mut s, 2, "JointSpring", spring);
+    s
+}
+
+#[test]
+fn a_hinge_spring_turns_the_body_to_its_angle_and_settles_there() {
+    // inertia about the end is about 6.7 kg m^2: with a stiffness of 20 the arm swings at 1.7 radians per second, and a damping of 15 settles it in a few seconds
+    let mut s = sprung_arm(r#"{"stiffness":20,"damping":15,"angle":1.0}"#, 0.0);
+    s.step_n(30);
+    let early = angle_z(&s, 2);
+    assert!(early > 0.05 && early < 1.0, "it sets off towards the angle: {early}");
+    s.step_n(450);
+    assert!((angle_z(&s, 2) - 1.0).abs() < 0.03, "and settles on it: {}", angle_z(&s, 2));
+    assert!(spin(&s, 2)[2].abs() < 0.02, "at rest: {:?}", spin(&s, 2));
+    // the other way round
+    let mut back = sprung_arm(r#"{"stiffness":20,"damping":15,"angle":-0.7}"#, 0.0);
+    back.step_n(480);
+    assert!((angle_z(&back, 2) + 0.7).abs() < 0.03, "{}", angle_z(&back, 2));
+}
+
+#[test]
+fn a_spring_without_damping_swings_and_with_damping_only_slows_a_turning_body() {
+    // undamped: it overshoots the angle and swings back past it
+    let mut s = sprung_arm(r#"{"stiffness":20,"damping":0,"angle":0.5}"#, 0.0);
+    let mut most = 0.0f32;
+    for _ in 0..240 {
+        s.step();
+        most = most.max(angle_z(&s, 2));
+    }
+    assert!(most > 0.9, "an undamped spring swings out to twice the angle: {most}");
+    // damping alone (no stiffness): a spinning arm slows down and stops, and the angle it reaches is not pulled anywhere
+    let mut d = sprung_arm(r#"{"stiffness":0,"damping":10}"#, 2.0);
+    d.step_n(60);
+    let w1 = spin(&d, 2)[2];
+    d.step_n(240);
+    let w2 = spin(&d, 2)[2];
+    assert!(w1 > 0.05 && w1 < 1.2, "slowed after one second: {w1}");
+    assert!(w2 >= 0.0 && w2 < 0.05, "stopped after five: {w2}");
+    // nothing set: nothing happens
+    let mut none = sprung_arm(r#"{"stiffness":0,"damping":0,"angle":1.0}"#, 0.0);
+    none.step_n(120);
+    assert!(angle_z(&none, 2).abs() < 1e-4, "{}", angle_z(&none, 2));
 }

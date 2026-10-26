@@ -287,7 +287,10 @@ component! {
     /// WAV file `file` (a path in the project folder; 8/16/24/32 bit PCM or float, mono or stereo, any sample rate) instead of a synthesised
     /// voice. With `spatial` the sound is placed where the emitting entity was: it gets quieter with distance (full loudness inside `near`
     /// metres, nothing beyond `range`), moves between the ears with its direction, is muffled by walls and rings with the room (see
-    /// `AcousticMaterial`). `volume` is 0..8 and `pitch` multiplies the playback speed.
+    /// `AcousticMaterial`). `volume` is 0..8 and `pitch` multiplies the playback speed. `file` may name several files (one on each line, or
+    /// separated by `|`): each time the event comes, one of them is played, never the same twice in a row, so a footstep or a gunshot does
+    /// not repeat itself. `pitch_var` and `volume_var` (0 to 1) make every play a little different: the pitch is multiplied by a random number
+    /// in `1 +- pitch_var` and the volume by one in `1 +- volume_var`. (What is played is output: it is never part of the state.)
     pub struct SoundFile {
         pub name: Sym = Sym(0),
         pub file: Sym = Sym(0),
@@ -296,6 +299,8 @@ component! {
         pub spatial: bool = true,
         pub range: f32 = 40.0,
         pub near: f32 = 2.0,
+        pub pitch_var: f32 = 0.0,
+        pub volume_var: f32 = 0.0,
     }
 }
 
@@ -364,7 +369,8 @@ component! {
     /// is the height of black. The rotation and scale of the entity are not used. Spheres, boxes and characters stand on it and rays hit
     /// it (`solid`), and both renderers draw it (`visible`): `color` and an optional `texture` (repeated `uv_scale` times across the ground)
     /// give it its look. `step` uses every step-th sample of the picture, for a coarser (cheaper) ground; 1 uses them all.
-    /// `friction` and `restitution` are the ground's own contact material.
+    /// `friction` and `restitution` are the ground's own contact material. `skirt` (metres, 0 = none) hangs a wall of that depth below every edge of the drawn mesh, to hide the cracks between neighbouring
+    /// tiles drawn at different `step`s (a streamed world draws its far tiles coarser: `docs/REALWORLD.md`); the physics ground is unchanged.
     pub struct Terrain {
         pub heightmap: Sym = Sym(0),
         pub size: [f32; 2] = [256.0, 256.0],
@@ -377,6 +383,7 @@ component! {
         pub restitution: f32 = 0.1,
         pub solid: bool = true,
         pub visible: bool = true,
+        pub skirt: f32 = 0.0,
     }
 }
 
@@ -446,7 +453,7 @@ component! {
 component! {
     /// Lets graph systems react to events (`emit`, animation events, `dialogue_end`...): `names` lists the events to watch, separated by spaces or commas. Every tick, for each
     /// name, the resource `event.NAME` holds how many times that event was emitted **during the tick before** (0 when it was not), and while it is above 0 the resources
-    /// `event.NAME.x`, `.y`, `.z` and `.uid` hold where and by whom the first one was emitted. So `{"if": {"gt": [{"res": "event.coin"}, 0]}, ...}` (Script: `if $event.coin > 0`) runs once
+    /// `event.NAME.x`, `.y`, `.z` and `.uid` hold where and by whom the first one was emitted, and `event.NAME.0.x` ... `event.NAME.3.uid` the first four one by one (`event.NAME.n`: how many of the four slots are filled). So `{"if": {"gt": [{"res": "event.coin"}, 0]}, ...}` (Script: `if $event.coin > 0`) runs once
     /// for each tick in which a coin was picked up. Names are letters, digits and underscores. Put it on any entity; the watched names of all `EventWatch`es count. A scene
     /// that has none is unchanged. See `docs/GAMEPLAY.md`.
     pub struct EventWatch { pub names: Sym = Sym(0) }
@@ -612,11 +619,14 @@ component! {
 component! {
     /// Inverse kinematics: makes a joint of an animated model reach for, or look at, a point. **This entity's own position** (its `Transform`) is the point, so a hand
     /// that grips a door handle, a foot that rests on the stairs or a head that follows the player is one empty entity that you move (or parent to something).
-    /// `skin` is the entity with the animated model (a `MeshRenderer` of a skinned `.glb` and an `Animator`), `joint` the name of the joint (`model_info` lists them).
+    /// `skin` is the entity with the animated model (a `MeshRenderer` of a skinned `.glb` and an `Animator`; 0: the model this entity is a child of, so that a prefab can carry its goals), `joint` the name of the joint (`model_info` lists them).
     /// `kind` 0 reaches: the two bones above `joint` bend, like an arm or a leg, so that `joint` (the hand, the foot) lands on the point, as far as the bones allow; `pole`
     /// is another entity the elbow or knee bends towards (without one it keeps the bend the animation has). `kind` 1 looks: `joint` (a head, a neck, a turret) turns so that its
     /// own axis `axis` faces the point, at most `max_angle` degrees away from where the animation points it. `weight` (0..1) blends the goal with the animation, `active` false
-    /// switches it off. Several goals on one model are applied in uid order. Only the picture changes (the simulation never sees the bent pose); a game that needs the hand's
+    /// switches it off. `kind` 2 **pins**: like 0 it reaches, but the joint is moved only along `axis` (and `axis2`, if it is not zero) so that it is level with the goal in those directions, and keeps the place the
+    /// animation gives it in all others (a hand put on the line of a ledge with `axis` up and `axis2` out of the wall, a foot onto the plane of a wall with `axis` alone); `one_sided` moves it only when it is on the
+    /// wrong side (behind `axis`, as seen from the goal: a foot or hand that must not sink into the ground). `kind` 3 **turns**: `joint` is turned by `angle` degrees about `axis` (in the model's own space, right-hand rule; the goal's
+    /// position is not used), scaled by `weight`: a spine that leans back as the player looks up, a head that tilts. Several goals on one model are applied in uid order. Only the picture changes (the simulation never sees the bent pose); a game that needs the hand's
     /// real place computes it from its own entities. See `docs/GAMEPLAY.md`.
     pub struct Ik {
         pub skin: Uid = Uid(0),
@@ -627,6 +637,9 @@ component! {
         pub axis: [f32; 3] = [0.0, 0.0, 1.0],
         pub max_angle: f32 = 80.0,
         pub active: bool = true,
+        pub axis2: [f32; 3] = [0.0, 0.0, 0.0],
+        pub one_sided: bool = false,
+        pub angle: f32 = 0.0,
     }
 }
 
@@ -717,6 +730,27 @@ component! {
 }
 
 component! {
+    /// Limits on navigation for a crowd (docs/NAVIGATION.md, "Crowds"): put it on one entity (the lowest uid counts) and the agents' path searches are rationed. Each search
+    /// builds a grid of the ground round its two points, which is expensive in a world of many meshes, and an agent that asks again every time its target moves can ask a dozen
+    /// times a second. `searches_per_tick` is how many searches the engine does in one tick (0: no limit): the agents that asked and did not get one wait their turn, the one
+    /// that asked first goes first, so nobody starves. `min_replan` is the least time in seconds between two searches of one agent (0: none): asking sooner is answered with the
+    /// old path until the time has passed. `max_distance` is the longest search in metres (0: none): a target farther than that is walked towards in parts, each search for the
+    /// point that far along the way, and the agent asks again when it gets there. `blocked_wait` is the time in seconds an agent waits after a search that found no way before it may search again (0: none; a failed
+    /// search leaves no path to count `min_replan` from, and has looked at every cell it could reach). `max_searched` is the most cells one search may expand (0: none): a search that has looked at that many gives up as
+    /// "no path", which caps the cost of a failure. `keep_cells` (default off) keeps the data of the grid's cells between the agents' searches, which makes the second search over the same streets many times cheaper: the
+    /// cells are then on a lattice anchored at the world's origin and not at the corner of each search's box, so the paths are not the ones of the same world without it (a waypoint may differ by up to half a cell), and the
+    /// cells are dropped whenever the world's solids, grounds or mesh levels change (a recorded game that turns it on must be recorded again). Without this component nothing is limited and nothing changes.
+    pub struct NavLimits {
+        pub searches_per_tick: u32 = 2,
+        pub min_replan: f32 = 0.5,
+        pub max_distance: f32 = 0.0,
+        pub blocked_wait: f32 = 3.0,
+        pub max_searched: u32 = 0,
+        pub keep_cells: bool = false,
+    }
+}
+
+component! {
     /// Ties this body to another point by a rope, a rod or a spring (docs/PHYSICS.md): swings, chains, hanging lamps, springy platforms.
     /// The entity with the `Joint` needs a `Collider`, a `RigidBody` and a `Velocity` (it is the body that is pulled); the other end is the
     /// entity `target` (a body, or anything with a `Transform`: a fixed point) or, when `target` is 0, the world point `anchor`.
@@ -750,12 +784,59 @@ component! {
 }
 
 component! {
+    /// A motor for a hinge (`Joint` with `kind` 4; put this on the same entity): it turns the body about the hinge axis at `speed` radians per
+    /// second (positive is counter-clockwise about the axis, seen from the side the axis points to, relative to the joint's target) with a torque of
+    /// at most `max_torque` newton-metres, so a strong motor holds the speed against a load and a weak one is slowed or stalled by it. A `speed` of 0
+    /// with a large `max_torque` is a brake that holds an arm where it is. No `max_torque` (0), no motor. The hinge limits still hold.
+    pub struct JointMotor { pub speed: f32 = 0.0, pub max_torque: f32 = 0.0 }
+}
+
+component! {
+    /// A swing limit for a ball-and-socket (`Joint` with `kind` 3; put this on the same entity): the joint's `axis` (a world direction as the scene
+    /// starts, default up) is a line fixed in the body and a line fixed in the target; the angle between the two lines may not grow past `angle`
+    /// radians (a shoulder or a hip that bends only so far). An `angle` of 0 or of pi and more means no limit.
+    pub struct JointCone { pub angle: f32 = 0.0 }
+}
+
+component! {
+    /// Lets resting rigid bodies fall asleep (put this on one entity, the lowest uid wins; without it nothing sleeps). A group of touching bodies in which
+    /// every body has stayed within `linear * time` metres of one place (an average speed under `linear` metres per second) and has spun slower than
+    /// `angular` radians per second for `time` seconds goes to sleep: the solver skips it and it stays exactly where it is, until something touches it,
+    /// moves it, or changes the colliders around it. A body tied by a `Joint`, a convex hull or a trigger never sleeps. See `docs/PHYSICS.md`.
+    pub struct PhysicsSleep { pub time: f32 = 0.5, pub linear: f32 = 0.02, pub angular: f32 = 0.04 }
+}
+
+component! {
+    /// A spring on a hinge (`Joint` with `kind` 4; put this on the same entity): it turns the body towards `angle` radians (the hinge angle as `limit` has it, of the body
+    /// relative to its target, 0 where the joint started), with a torque of `stiffness` newton-metres per radian of error and `damping` newton-metres per radian per second
+    /// of the spin about the axis. A door that swings shut by itself, a suspension arm, a muscle. A spring is soft: it is solved with the rest of the joint, so a very stiff one
+    /// is held by the joint's limits and motors if they are there.
+    pub struct JointSpring { pub stiffness: f32 = 0.0, pub damping: f32 = 0.0, pub angle: f32 = 0.0 }
+}
+
+component! {
     /// Input actions (put this on one entity, the lowest uid wins): names for what the player can do, so games do not depend on which key does it.
     /// `bindings` is text, one action per line: `jump = space, gamepad.a`, `move_x = d, a:-1, gamepad.lx` (each term is an `input.*`
     /// resource, or `$resource`, times an optional scale after the colon) and `deadzone = 0.15`. Every tick, before the graph systems run, the
     /// engine writes the resources `action.NAME` (-1 to 1: terms added and clamped), `action.NAME.pressed` and `action.NAME.released` (1 on the
     /// one tick when the action went above or below one half). Change `bindings` to rebind. See `docs/GAMEPLAY.md`.
     pub struct InputMap { pub bindings: Sym = Sym(0) }
+}
+
+component! {
+    /// A button that rebinds one key of an action of the `InputMap` (docs/KEYBINDS.md): put it on a `Ui` button. `action` is the action's name and `index` which of its keys (from 0, in the order the `InputMap` text
+    /// has them; pad terms and `$resources` are not counted: `move_y = w, s:-1, gamepad.ly` has the keys `w` and `s`). The engine writes the button's text, the key now (`E`, `SPACE`, `LEFT CLICK`), and while it waits for
+    /// a key `PRESS A KEY`. A click starts the wait, the next key or mouse button pressed becomes the action's key (Esc cancels; a key another button has trades places with this one), the `InputMap` text is rewritten
+    /// and `settings.save` is set, so the native player keeps it (`bind.ACTION.INDEX` in `settings.json`). `listening` is true while the button waits (a game lights it). `default` is the key the scene had (the engine
+    /// fills it in on the first tick when it is empty): the resource `rebind.reset` above 0 puts it back. The resources: `rebind.state` (0 nothing, 1 clicked, 2 waiting for the key, 3 taken, not let go yet: the actions
+    /// all read 0 while it is above 0), `rebind.cancel` (set it when the screen closes), `rebind.count` (how many changes), `rebind.denied`. `{key:ACTION}` in any text is the first key of that action, `{key:ACTION:N}`
+    /// the Nth. Not for a lockstep or rollback game: the bindings are part of the world there.
+    pub struct KeyBind {
+        pub action: Sym = Sym(0),
+        pub index: u32 = 0,
+        pub listening: bool = false,
+        pub default: Sym = Sym(0),
+    }
 }
 
 component! {
@@ -798,7 +879,13 @@ component! {
     /// A camera that works itself: on an entity with a `Transform` (and a `Camera`), it follows `target` (`mode` 0: stays at `offset` from it, eased
     /// at `follow_speed` per second, 0 snaps; `mode` 1 orbits it at `distance` with `yaw` and `pitch` in radians, which a graph system can steer from
     /// the mouse or a stick), and with `look_at` turns to face `target` plus `look_offset`. Set `shake` (0 to 1) when something big happens: the
-    /// camera jitters by `shake_amount` metres times its square and calms down at `shake_decay` per second.
+    /// camera jitters by `shake_amount` metres times its square and calms down at `shake_decay` per second. `roll` leans the picture (radians, positive to the right) about the way it looks.
+    ///
+    /// A follow spring on the point the rig orbits (the pivot), for a camera that trails a fast character without lagging the mouse: with `lag` above 0 the pivot is a critically damped spring on the target (its natural
+    /// frequency in rad/s: 12 settles in about a quarter of a second, `lag_up` the same for the up axis, 0 = `lag`), the camera orbits the pivot with the yaw and pitch it is given (the mouse stays one to one: nothing
+    /// eases the turn), and `follow_speed` is not used. `lead` is the seconds of the target's velocity the pivot aims ahead sideways (`2 / lag` keeps up with a target that goes at a steady speed, more shows what is ahead),
+    /// `lag_max` and `lag_max_up` the farthest the pivot may fall behind or run ahead, in metres (0 = no limit, `lag_max_up` 0 = `lag_max`). A target that moves faster than 90 m/s in a tick (a teleport) takes the pivot with it.
+    /// The last five fields are the spring's state, written by the engine.
     pub struct CameraRig {
         pub target: Uid = Uid(0),
         pub mode: u32 = 0,
@@ -812,6 +899,19 @@ component! {
         pub shake: f32 = 0.0,
         pub shake_decay: f32 = 1.5,
         pub shake_amount: f32 = 0.4,
+        // the picture's roll about the way the camera looks, in radians (positive leans the top of the picture to the right): a game eases it in a wall run, a slide
+        pub roll: f32 = 0.0,
+        // the follow spring of the pivot (see above)
+        pub lag: f32 = 0.0,
+        pub lag_up: f32 = 0.0,
+        pub lead: f32 = 0.0,
+        pub lag_max: f32 = 0.0,
+        pub lag_max_up: f32 = 0.0,
+        pub pivot: [f32; 3] = [0.0, 0.0, 0.0],
+        pub pivot_vel: [f32; 3] = [0.0, 0.0, 0.0],
+        pub pivot_from: [f32; 3] = [0.0, 0.0, 0.0],
+        pub pivot_lead: [f32; 3] = [0.0, 0.0, 0.0],
+        pub pivot_on: bool = false,
     }
 }
 
@@ -948,6 +1048,40 @@ component! {
     }
 }
 
+/// Most samples a `UiPlot` keeps (and so most bars it can have).
+pub const PLOT_MAX: usize = 128;
+
+component! {
+    /// A live graph of a resource, drawn as bars: put it on an entity with a `Ui` (the frame and background; the bars lie inside its rectangle). `source` is the
+    /// name of the resource to plot (`cpu.percent`); every `every` ticks the plot takes its value as a new sample and the graph scrolls to the left, newest on the
+    /// right; `samples` bars (1 to 128) show the last that many. The vertical scale is `min` to `max`, or, when `max` is not above `min`, from zero (the lowest sample
+    /// when `log` is on) to the largest sample shown; `log` plots the base-10 logarithm of the value, for something that grows by factors (a population). `gap` is the
+    /// space between bars as a share of a bar's slot, `bar_color` their colour. The engine makes the bars (`UiPlotBar` entities) the first tick, and keeps `data`, `head`, `count`,
+    /// `timer`, `built`, `scale_lo` and `scale_hi` (the scale now in use: a label can show it). See `docs/UI.md`.
+    pub struct UiPlot {
+        pub source: Sym = Sym(0),
+        pub every: u32 = 6,
+        pub samples: u32 = 60,
+        pub min: f32 = 0.0,
+        pub max: f32 = 0.0,
+        pub log: bool = false,
+        pub gap: f32 = 0.15,
+        pub bar_color: [f32; 4] = [0.3, 0.75, 1.0, 1.0],
+        pub built: bool = false,
+        pub timer: u32 = 0,
+        pub head: u32 = 0,
+        pub count: u32 = 0,
+        pub scale_lo: f32 = 0.0,
+        pub scale_hi: f32 = 1.0,
+        pub data: [f32; 128] = [0.0; 128],
+    }
+}
+
+component! {
+    /// One bar of a `UiPlot` (made by the engine, with a `Ui` that the plot moves and sizes every tick): `plot` is the plot's uid and `index` the bar's place from the left.
+    pub struct UiPlotBar { pub plot: Uid = Uid(0), pub index: u32 = 0 }
+}
+
 component! {
     /// A switch on a `Ui` button: every click flips `on` (`changed` is true for that one tick) and the rectangle takes `on_color` or `off_color`.
     pub struct UiToggle {
@@ -962,13 +1096,18 @@ component! {
     /// A text field on a `Ui` button: a click gives it focus (a click elsewhere takes it away), then typed characters are added to `text` (the host puts the
     /// code point of the key into the resource `input.char` for one tick at a time; `input.backspace`, `input.enter` and `input.escape` are the other keys,
     /// the `type_text` tool does it for agents). `submitted` is true for the tick after Enter. The rectangle shows the text (or `placeholder` while it is
-    /// empty and not focused, and a blinking bar while focused). `max_len` characters at most.
+    /// empty and not focused, and a blinking bar while focused). `max_len` characters at most. In a window (`lunaris play`) the keyboard types into the focused field, Ctrl+V pastes the
+    /// clipboard, holding Backspace repeats and Ctrl+Backspace clears it (docs/UI.md, "Typing"). `show_last` above 0 shows only the last that many characters after `...` (a long text
+    /// such as a connect token does not run out of its box; the whole text is still `text`). `remember` is a name: the native player keeps the field's text in `settings.json` under `text.NAME` when it has been changed and the field has lost the focus, and puts it back before the first tick of the next start (an address, a player's name; never a secret). `number` (the engine's) is the text read as a whole number of up to nine digits (`4711`; `0042` is 42), -1 while the text is empty or is anything else: a graph system cannot read a text, and a code or an amount is read from here.
     pub struct UiInput {
         pub text: Sym = Sym(0),
         pub placeholder: Sym = Sym(0),
         pub focused: bool = false,
         pub max_len: u32 = 32,
         pub submitted: bool = false,
+        pub show_last: u32 = 0,
+        pub remember: Sym = Sym(0),
+        pub number: i32 = -1,
     }
 }
 
@@ -1038,12 +1177,36 @@ component! {
     /// camera) comes within `radius` metres (measured on the ground plane) of this entity, the prefab `prefab` is created at this entity's position and
     /// turning, and when it goes farther than `radius` plus `hysteresis` the whole thing is removed again (the margin keeps it from flickering at the border).
     /// Whatever happened to the loaded entities is forgotten with them: put the things that must remember outside the prefab. `loaded` is the engine's.
+    /// `min_radius` (0 = none) makes the zone a ring: it loads only while the target is at least that far away (and unloads when it comes nearer than `min_radius` minus `hysteresis`),
+    /// so that the same piece of ground can be a coarse prefab in the distance and a detailed one up close (`docs/REALWORLD.md`, "Levels of detail of a streamed world").
+    /// `prefetch` (metres, 0 = none) and `assets` make the load seamless: `assets` is text, one file a line (`texture NAME`, `model NAME`, `heights NAME`, `splat NAME`, names relative to the workspace), the files
+    /// the prefab will need, and while the zone is not loaded and the camera is within `radius + prefetch` of it (and not nearer than `min_radius - prefetch`) the renderer's file cache reads them on other threads,
+    /// so that when the zone loads they are already in memory instead of being read, and the game stopped, in the picture the prefab first appears in.
+    /// `requires` (an entity with a `StreamZone`; 0 = none) makes the zone depend on another: it loads only while that zone is loaded (and unloads when it unloads), besides its own distances. A tree of tiles that is
+    /// refined as the camera comes near (a city's levels of detail) is built so: a tile's coarse prefab is a ring zone, the same place's "refined" zone (a small prefab, nothing to see) has the ring's inner radius, and the
+    /// tiles under it `require` the refined zone, so exactly one level of each branch is there at a time. A required zone that does not exist keeps the zone from loading.
+    /// `vertical` (metres, 0 = ignore height) also bounds the height: the zone loads only while the target is within that many metres of the entity's height (and unloads beyond `vertical` plus `hysteresis`), so the
+    /// floors of a tall building can each be a zone, and only the floors near the player are there (a city whose every building can be walked into: `docs/REALWORLD.md`).
     pub struct StreamZone {
         pub prefab: Sym = Sym(0),
         pub radius: f32 = 100.0,
         pub hysteresis: f32 = 20.0,
         pub target: Uid = Uid(0),
         pub loaded: bool = false,
+        pub min_radius: f32 = 0.0,
+        pub prefetch: f32 = 0.0,
+        pub assets: Sym = Sym(0),
+        pub requires: Uid = Uid(0),
+        pub vertical: f32 = 0.0,
+    }
+}
+
+component! {
+    /// A place that streaming works from, besides the camera (a server has no camera and many players): put it on an entity that has a `Transform` (a player's avatar). The `StreamZone`s that name no target and the cells of a `ProcGrid`
+    /// are loaded while ANY anchor (or the active camera) is within their radius and let go only when ALL of them are beyond radius plus hysteresis, so a server that gives every avatar a `StreamAnchor` has loaded the world round every player and
+    /// nothing else. `on` false leaves the entity out. A client does not need it: its camera is its anchor.
+    pub struct StreamAnchor {
+        pub on: bool = true,
     }
 }
 
@@ -1232,6 +1395,986 @@ component! {
 }
 
 component! {
+    /// Which side an entity is on (docs/COMBAT.md): weapons never hurt an entity of their own team, and the AI toolkit treats other teams as hostile. `id` 0 is no team: it is hurt
+    /// by everybody and hurts everybody (a free-for-all player, a barrel). Players of a free-for-all server all have 0; a squad shares an id; the machines of a game share another.
+    pub struct Team {
+        pub id: u32 = 0,
+    }
+}
+
+component! {
+    /// A gun (docs/COMBAT.md): fires along its entity's local -z from `muzzle` (an offset in the entity's own axes), as an instant ray (`kind` 0, a hitscan: rifles, pistols, SMGs,
+    /// shotguns with `pellets` above 1) or as a travelling round (`kind` 1: a `Bullet` entity that flies at `muzzle_speed` and falls by `gravity`, for snipers and anything where distance
+    /// should take time). A script, the input or an AI holds `fire` true to pull the trigger and sets `reload` for one tick; `auto` false makes it one round for each pull. Hits hurt the
+    /// `HitPoints` of the first thing in the way (cover and walls stop the round) except the `owner` (its holder, never hurt; 0 takes the entity's `Parent`) and anyone of the owner's
+    /// `Team`. Damage is `damage` per pellet, full up to `falloff_start` metres and falling to `falloff_min` times that at `range` (nothing beyond); the head (the top fifth of a
+    /// character) takes `head_mult` times, the legs (the lower 45 percent) `limb_mult`; `pierce` (0 to 1) is the share of worn armor's stopping that a hit ignores (0 none, 1 all: a sniper round goes through a vest), see `armor::absorb_piercing`. The cone of fire is `spread` plus the `bloom` that each shot adds (`bloom_per_shot` up to
+    /// `bloom_max`, `bloom_recover` degrees a second back) and the recoil (`recoil` degrees up and at random sideways per shot) piles up in `kick` (pitch and yaw, degrees; a camera or an
+    /// aim adds it to where it looks, and it settles by `recoil_recover` degrees a second); the shot itself already leans by `kick`. `noise` is how far (metres) a round can be heard by an AI's `Perception` (0 for a silenced gun). Ammo: `mag` of `mag_size`, `reserve` behind it
+    /// (`infinite` never runs out), `reload_time` seconds to reload (an empty magazine starts it by itself when the trigger is held). Everything below `cooldown` is the engine's:
+    /// `fired` is true for the tick a round left, `dry` for a trigger pulled on nothing, `hit` (a uid, 0 for none or a wall), `hit_point`, `hit_normal`, `hit_zone` (0 nothing, 1 body,
+    /// 2 head, 3 legs), `hit_dist` and `hit_damage` (all pellets of the tick) describe what the first pellet of the tick hit, `shots` and `kills` count. Events: `shot` (the weapon,
+    /// at the muzzle), `hit` (the victim, at the point), `impact` (a wall, at the point), `kill` (the victim, at the point), `reload_done`, `dry`.
+    pub struct Weapon {
+        pub active: bool = true,
+        pub fire: bool = false,
+        pub reload: bool = false,
+        pub owner: Uid = Uid(0),
+        pub kind: u32 = 0,
+        pub damage: f32 = 25.0,
+        pub pellets: u32 = 1,
+        pub spread: f32 = 0.4,
+        pub range: f32 = 200.0,
+        pub falloff_start: f32 = 50.0,
+        pub falloff_min: f32 = 0.35,
+        pub head_mult: f32 = 2.0,
+        pub limb_mult: f32 = 0.7,
+        pub pierce: f32 = 0.0,
+        pub rate: f32 = 600.0,
+        pub auto: bool = true,
+        pub mag_size: u32 = 30,
+        pub mag: u32 = 30,
+        pub reserve: u32 = 120,
+        pub infinite: bool = false,
+        pub reload_time: f32 = 2.2,
+        pub bloom: f32 = 0.0,
+        pub bloom_per_shot: f32 = 0.3,
+        pub bloom_max: f32 = 3.0,
+        pub bloom_recover: f32 = 5.0,
+        pub recoil: [f32; 2] = [0.6, 0.25],
+        pub recoil_recover: f32 = 8.0,
+        pub kick: [f32; 2] = [0.0, 0.0],
+        pub muzzle: [f32; 3] = [0.0, 0.0, 0.0],
+        pub noise: f32 = 120.0,
+        pub muzzle_speed: f32 = 400.0,
+        pub gravity: f32 = 9.81,
+        pub bullet_life: f32 = 4.0,
+        pub cooldown: f32 = 0.0,
+        pub reload_left: f32 = 0.0,
+        pub held: bool = false,
+        pub fired: bool = false,
+        pub dry: bool = false,
+        pub shots: u32 = 0,
+        pub kills: u32 = 0,
+        pub hit: Uid = Uid(0),
+        pub hit_point: [f32; 3] = [0.0, 0.0, 0.0],
+        pub hit_normal: [f32; 3] = [0.0, 0.0, 0.0],
+        pub hit_zone: u32 = 0,
+        pub hit_dist: f32 = 0.0,
+        pub hit_damage: f32 = 0.0,
+    }
+}
+
+component! {
+    /// A round in flight, made by a `Weapon` of `kind` 1 (docs/COMBAT.md; a game does not add these by hand, but may read them to draw a tracer: `Transform.pos` is where it is,
+    /// `vel` its velocity). Each tick it moves by `vel`, falls by `gravity`, and the stretch it flew is tested for what it hit (walls, targets with `HitPoints`, never `owner` or its
+    /// team); a hit hurts with the weapon's own numbers (`damage` with the falloff over `travelled` metres) and removes it, as do `range` and `life`. `weapon` is the gun to credit.
+    pub struct Bullet {
+        pub owner: Uid = Uid(0),
+        pub weapon: Uid = Uid(0),
+        pub team: u32 = 0,
+        pub damage: f32 = 25.0,
+        pub range: f32 = 200.0,
+        pub falloff_start: f32 = 50.0,
+        pub falloff_min: f32 = 0.35,
+        pub head_mult: f32 = 2.0,
+        pub limb_mult: f32 = 0.7,
+        pub pierce: f32 = 0.0,
+        pub vel: [f32; 3] = [0.0, 0.0, 0.0],
+        pub gravity: f32 = 9.81,
+        pub life: f32 = 4.0,
+        pub age: f32 = 0.0,
+        pub travelled: f32 = 0.0,
+    }
+}
+
+component! {
+    /// Makes noise for an AI to hear (docs/AI.md): `radius` is how far, in metres, it can be heard from now. A game's script sets it every tick (footsteps by speed: a walk 5 m, a sprint 14 m,
+    /// a crouch 1.5 m; a door slam 20 m); 0 is silent. A `Weapon` that fires is heard to its own `noise` without this. Only a `Perception` of another side hears it.
+    pub struct Noisy {
+        pub radius: f32 = 0.0,
+    }
+}
+
+component! {
+    /// The senses and the awareness of an AI (docs/AI.md), beside a `Transform` (and a `Team`: it perceives entities of other teams, or any when its own team is 0, that have `HitPoints`).
+    /// **Sight**: within `sight_range` metres and `sight_fov` degrees in front (its local -z, from `sight_eye` metres above its `Transform`), with `los` true only if no wall is in the way
+    /// (a thing within 1.5 m is always noticed). **Hearing**: a `Noisy` thing or a `Weapon` that fires is heard when it is nearer than its own `radius` times `hearing` (0 is deaf, 1 normal, 2 sharp).
+    /// **Awareness** (0 to 1) fills while it sees a hostile (in `notice_time` seconds at the edge of its range, three times faster point blank) and drains in `lose_time` seconds when it does not;
+    /// a noise lifts it to 0.55 and remembers the place. `state` is 0 idle, 1 suspicious (it sees something but is not sure), 2 alert (it sees the target and is sure), 3 searching (it knows where
+    /// the target was: `seen_pos`). `target` is who, `visible` whether it sees it this tick, `distance`, `since_seen`, `seen_count` how many hostiles it sees, `heard` and `noise_pos`.
+    /// When it becomes alert, same-team `Perception`s within `shout` metres start searching where the target is. Events: `spotted` (it became alert), `lost` (alert to searching), `forgot` (back to idle), `heard`.
+    /// With `engage` true the toolkit also acts: while alert or searching it walks its `NavAgent` to `seen_pos` (`chase`, stopping at 85 percent of `attack_range` when it sees the target), turns to face
+    /// a target it sees (`turn`), and holds `weapon`'s trigger (its own `Weapon` when `weapon` is 0) while it sees the target within `attack_range`. Without `engage` it only senses: a behaviour tree or a
+    /// state machine reads `Perception.state` and decides.
+    pub struct Perception {
+        pub active: bool = true,
+        pub sight_range: f32 = 40.0,
+        pub sight_fov: f32 = 110.0,
+        pub sight_eye: f32 = 1.6,
+        pub los: bool = true,
+        pub hearing: f32 = 1.0,
+        pub notice_time: f32 = 1.0,
+        pub lose_time: f32 = 6.0,
+        pub shout: f32 = 0.0,
+        pub engage: bool = false,
+        pub chase: bool = true,
+        pub turn: bool = true,
+        pub attack_range: f32 = 25.0,
+        pub weapon: Uid = Uid(0),
+        pub state: u32 = 0,
+        pub awareness: f32 = 0.0,
+        pub target: Uid = Uid(0),
+        pub visible: bool = false,
+        pub seen_count: u32 = 0,
+        pub distance: f32 = 0.0,
+        pub seen_pos: [f32; 3] = [0.0, 0.0, 0.0],
+        pub since_seen: f32 = 0.0,
+        pub heard: bool = false,
+        pub noise_pos: [f32; 3] = [0.0, 0.0, 0.0],
+    }
+}
+
+component! {
+    /// A searching beam (docs/AI.md): a cone from this entity's `Transform` along its local -z, `angle` degrees either side of the axis and `range` metres long; with `sweep` degrees a second the
+    /// engine turns the entity about the vertical axis (a lighthouse; the entity must have no `Parent`, or turn the parent). Hostile entities with `HitPoints` inside the beam (and, with `los`, not behind
+    /// a wall) become exposed: their `Exposure.value` (added by the engine) fills in `hold` seconds and drains by its own `decay` when they are out of the light; at 1 they are detected. `lit` counts those in
+    /// the beam now, `target` and `exposure` say who is the most exposed, `detected` whether any has been caught. Events: `lit` (a target entered the beam), `unlit` (left it), `detected` (an exposure reached 1).
+    /// A game (or the AI director) answers `detected` by sending machines: set their `Perception` or give them a `NavAgent` target.
+    pub struct Searchlight {
+        pub active: bool = true,
+        pub range: f32 = 150.0,
+        pub angle: f32 = 6.0,
+        pub sweep: f32 = 0.0,
+        pub hold: f32 = 1.5,
+        pub los: bool = true,
+        pub lit: u32 = 0,
+        pub target: Uid = Uid(0),
+        pub exposure: f32 = 0.0,
+        pub detected: bool = false,
+    }
+}
+
+component! {
+    /// How exposed something is to the `Searchlight`s of the other side (docs/AI.md): `value` 0 (hidden) to 1 (detected), filled by a beam and drained by `decay` per second out of it; `by` is the last light
+    /// that held it, `lit` whether it is in a beam this tick, `detected` whether `value` is 1. The engine adds it to a target the first time a beam touches it; a game may add it beforehand to change `decay`
+    /// (a player in cover or crouched drains faster).
+    pub struct Exposure {
+        pub value: f32 = 0.0,
+        pub decay: f32 = 0.5,
+        pub by: Uid = Uid(0),
+        pub lit: bool = false,
+        pub detected: bool = false,
+    }
+}
+
+component! {
+    /// The survival needs of a character (docs/SURVIVAL.md), beside its `HitPoints`: `hunger`, `thirst` and `stamina` (0 to 100; 100 is full) and `bleeding` (hit points lost a second until it is stopped).
+    /// Hunger and thirst fall by `hunger_rate` and `thirst_rate` a second (`exertion` times faster while sprinting, half as fast while `resting`); at 0 they hurt (`starve_damage`, `dehydrate_damage`
+    /// hit points a second). Stamina falls by `sprint_cost` a second while `sprint` is true and it can (`can_sprint`), and comes back by `stamina_regen` after `stamina_delay` seconds; at 0 the character
+    /// is `exhausted` and cannot sprint until it is back to 25. A character that is fed and watered (both at least `heal_threshold`) and not bleeding heals `heal_rate` a second. A game's script sets the
+    /// inputs (`sprint`, `resting`) and the one-tick requests when an item is used (`eat` and `drink` add to the meters, `heal` adds hit points at once, `bandage` stops the bleeding); the engine answers in
+    /// `status` (bits: 1 hungry below 25, 2 thirsty below 25, 4 bleeding, 8 exhausted, 16 starving or dehydrated), `can_sprint` and `speed_scale` (multiply the walking speed by it: slower when
+    /// exhausted, starving or bleeding). Events: `hungry`, `thirsty`, `bleeding`, `exhausted`, `starving` when the bit comes on. **Wounds:** a hit of a weapon (after the worn armor) of at least `wound_min` hit points starts a bleed with the chance `wound_chance` (0, the default, never: `survival::wound`, deterministic from a hash of the tick, the victim and the shot), adding `wound_rate` hit points a second to `bleeding` up to `bleed_max`; a bandage stops it.
+    pub struct Vitals {
+        pub active: bool = true,
+        pub sprint: bool = false,
+        pub resting: bool = false,
+        pub hunger: f32 = 100.0,
+        pub thirst: f32 = 100.0,
+        pub stamina: f32 = 100.0,
+        pub bleeding: f32 = 0.0,
+        pub hunger_rate: f32 = 0.05,
+        pub thirst_rate: f32 = 0.08,
+        pub exertion: f32 = 2.0,
+        pub sprint_cost: f32 = 18.0,
+        pub stamina_regen: f32 = 12.0,
+        pub stamina_delay: f32 = 1.0,
+        pub starve_damage: f32 = 0.5,
+        pub dehydrate_damage: f32 = 0.8,
+        pub heal_threshold: f32 = 70.0,
+        pub heal_rate: f32 = 0.3,
+        pub eat: f32 = 0.0,
+        pub drink: f32 = 0.0,
+        pub heal: f32 = 0.0,
+        pub bandage: bool = false,
+        pub wound_chance: f32 = 0.0,
+        pub wound_min: f32 = 6.0,
+        pub wound_rate: f32 = 0.5,
+        pub bleed_max: f32 = 2.0,
+        pub exhausted: bool = false,
+        pub can_sprint: bool = true,
+        pub since_sprint: f32 = 10.0,
+        pub status: u32 = 0,
+        pub speed_scale: f32 = 1.0,
+    }
+}
+
+component! {
+    /// How much trouble a player is in with the machines (docs/AI.md, the director): a meter from 0 up (the engine caps it at 10) that the `Director` raises when the player is caught in a
+    /// `Searchlight` (`Exposure.detected`), fires a `Weapon` that can be heard, or is seen by a machine, and that falls by `decay` a second. At the director's `threshold` hunters are sent. `cooldown`
+    /// (seconds until another wave may be sent for this player) and `waves` (how many were sent) are the engine's. A game may also add to `value` itself (a loud alarm, a kill, a raid).
+    /// With an `Escalation` in the scene (docs/WALKER.md) the director also keeps the player's `alert` (a slow meter that takes a share of all the heat gained and falls only slowly), its `tier` (0 to 7, from the alert), `walker_cd`
+    /// (seconds until another Walker may be sent for this player) and `last` (what `value` was when the director left it: the heat that others added since is what it counts).
+    pub struct Heat {
+        pub value: f32 = 0.0,
+        pub decay: f32 = 0.04,
+        pub cooldown: f32 = 0.0,
+        pub waves: u32 = 0,
+        pub alert: f32 = 0.0,
+        pub tier: u32 = 0,
+        pub walker_cd: f32 = 0.0,
+        pub last: f32 = 0.0,
+    }
+}
+
+component! {
+    /// The AI director (docs/AI.md): it watches every entity with a `Heat` and, when one reaches `threshold`, sends a wave of hunters made from the prefab `prefab` (the game's own: its body, its
+    /// `Team`, a `Perception` with `engage`, a `NavAgent`, a `Weapon`) on a ring `min_dist` to `max_dist` metres round the player, `height` metres above its feet, facing it, already alerted to where it is
+    /// (their `Perception` starts searching at the player's place). A wave is `1 + per_heat` times the heat above the threshold hunters (at most `max_alive` of this director's alive in all, and 16 in a
+    /// wave), costs the player `wave_cost` of heat, and the next one for that player waits `cooldown` seconds. Heat comes from `light_heat` a second while a `Searchlight` has the player detected,
+    /// `shot_heat` for each tick the player fires a `Weapon` that can be heard (the gun's `owner`, or when it has none the entity it is a child of: the gun on an avatar's head is the avatar's), and `seen_heat` a second for each machine (up to 3) that is alert and sees the player (the first active director's numbers
+    /// are used for all). A hunter that has gone back to idle for `cleanup` seconds is removed (0 keeps it). `clear` is how many more places a hunter may be drawn for to find one with a clear line to the player's head (0: the first draw is taken, as before): hunters dropped behind a building in a city never saw the player. Events: `wave` (this director, at the player), `hunter` (the new hunter). `waves`, `sent` and
+    /// `alive` are the engine's.
+    pub struct Director {
+        pub active: bool = true,
+        pub prefab: Sym = Sym(0),
+        pub threshold: f32 = 1.0,
+        pub light_heat: f32 = 0.6,
+        pub shot_heat: f32 = 0.15,
+        pub seen_heat: f32 = 0.1,
+        pub per_heat: f32 = 2.0,
+        pub wave_cost: f32 = 0.6,
+        pub cooldown: f32 = 25.0,
+        pub max_alive: u32 = 6,
+        pub min_dist: f32 = 40.0,
+        pub max_dist: f32 = 70.0,
+        pub height: f32 = 1.0,
+        pub cleanup: f32 = 90.0,
+        pub clear: u32 = 0,
+        pub waves: u32 = 0,
+        pub sent: u32 = 0,
+        pub alive: u32 = 0,
+    }
+}
+
+component! {
+    /// A machine a `Hacker` can take over (docs/AI.md, hacking): within `range` metres of the hacker (and with `los`, in its line of sight) it takes `difficulty` seconds of continuous hacking at
+    /// the hacker's speed 1, and `progress` falls back by half a second's worth a second when nobody hacks it. When it is taken (`hacked`), it joins the hacker's `Team`, its own `Perception` and
+    /// autopilot stop (so its AI no longer shoots at the hacker's side), the hacker's `move_dir` drives it (`speed` metres a second at most, `accel` m/s^2: its `Velocity` if it has one, its `CharacterBody` walk
+    /// if it has one) and the hacker's `fire` holds its `Weapon`'s trigger. Control lasts `duration` seconds (0: until released), or until the hacker lets go, the machine is destroyed or the hacker
+    /// dies; then it goes back to its own team and AI (with `keep` true it stays on the hacker's team and its AI works again, now against the old side). **`mode` 1 turns the machine instead of taking it** (a turret that
+    /// is stationary and has no use for hands, docs/SENTRY.md): at 100 percent it joins the hacker's `Team` for `duration` seconds and its own AI keeps working, now against the old side (it never targets its hacker or the
+    /// hacker's party: `Hackable.controller`), the hacker stays free (no `state` 2, no camera, no driving; the hack key must be let go before the next hack) and nobody drives it; it goes back when the time runs out
+    /// or it is destroyed (the hacker dying or leaving does not end it); events `hacked` (the machine) and `link_lost`. `time_left` is the seconds that remain. The last fields are the engine's.
+    pub struct Hackable {
+        pub active: bool = true,
+        pub difficulty: f32 = 4.0,
+        pub range: f32 = 25.0,
+        pub los: bool = true,
+        pub duration: f32 = 60.0,
+        pub keep: bool = false,
+        pub speed: f32 = 8.0,
+        pub accel: f32 = 20.0,
+        pub progress: f32 = 0.0,
+        pub hacked: bool = false,
+        pub controller: Uid = Uid(0),
+        pub time_left: f32 = 0.0,
+        pub saved_team: u32 = 0,
+        pub saved_engage: bool = false,
+        pub saved_perception: bool = true,
+        pub saved_fly: bool = true,
+        pub mode: u32 = 0,
+    }
+}
+
+component! {
+    /// The goggles (docs/AI.md, hacking), on a player beside its `Transform`: the game sets `target` (the machine the crosshair is on) and holds `hack` true; within `range` metres (and the machine's own
+    /// `range`) and in line of sight the machine's `progress` fills at `speed` (1 is its `difficulty` in seconds) and the hacker's own `Heat` (if it has one) rises by `trace_heat` a second: the machines'
+    /// network notices. At 1 the machine is taken: `state` 2, `controlled` its uid, and the `camera` (an entity with a `CameraRig`) follows it instead. While controlling the game sets `move_dir` (the
+    /// direction in the world, up to length 1) and `fire` and the engine drives the machine; `release` true for a tick gives it back. `state` is 0 idle, 1 hacking, 2 controlling; `progress` is the hack's
+    /// progress; `in_range` whether the target can be hacked now. Events: `hack_start` (the hacker), `hacked` (the machine), `released` (the machine), `link_lost` (the machine: time ran out, it was destroyed, or
+    /// the hacker died). **Aiming**: with `aim` the engine chooses `target` itself while `hack` is held: the `Hackable` machine within `range` whose direction from the goggles (the hacker's place and 1.6 m) is
+    /// nearest to `look` (the way the player looks, a unit vector in the world that the game sets: a game server sets it from the player's yaw and pitch) and within `aim_cone` degrees of it (4); nothing when none is.
+    pub struct Hacker {
+        pub active: bool = true,
+        pub range: f32 = 30.0,
+        pub speed: f32 = 1.0,
+        pub trace_heat: f32 = 0.5,
+        pub camera: Uid = Uid(0),
+        pub target: Uid = Uid(0),
+        pub hack: bool = false,
+        pub release: bool = false,
+        pub move_dir: [f32; 3] = [0.0, 0.0, 0.0],
+        pub fire: bool = false,
+        pub state: u32 = 0,
+        pub progress: f32 = 0.0,
+        pub controlled: Uid = Uid(0),
+        pub in_range: bool = false,
+        pub saved_view: Uid = Uid(0),
+        pub blocked: bool = false,
+        pub aim: bool = false,
+        pub aim_cone: f32 = 4.0,
+        pub look: [f32; 3] = [0.0, 0.0, -1.0],
+    }
+}
+
+component! {
+    /// The loot tables of a game, as text (docs/LOOT.md). One entity of the world has it (the lowest uid wins). A table is a line `table NAME rolls=A-B empty=P` (the number of rolls, and the chance
+    /// P, 0 to 1, that a roll gives nothing) followed by its entries, one a line: `ITEM w=WEIGHT n=A-B` (an item of the `ItemTable` by key, its weight among the entries, how many of it) or `@OTHER w=WEIGHT`
+    /// (roll another table: a rare find inside a common one). `#` starts a comment. Used by `LootContainer`.
+    pub struct LootTable {
+        pub text: Sym = Sym(0),
+    }
+}
+
+component! {
+    /// A chest, a cabinet, a corpse, a crate (docs/LOOT.md), beside an `Inventory`: the first time (or after a refill) it fills the inventory from the loot table named `table`, rolled from `key` (give each
+    /// container its own number, a building's or a room's, so the same container always holds the same things in a world; 0 uses its uid) and how many times it has been filled. With `refill` above 0 the
+    /// container fills again that many seconds after the last fill, once its inventory is empty (looted). `filled` and `fills` are the engine's; set `filled` false to fill it again at once. Event `loot_filled`.
+    pub struct LootContainer {
+        pub table: Sym = Sym(0),
+        pub key: u32 = 0,
+        pub refill: f32 = 0.0,
+        pub filled: bool = false,
+        pub fills: u32 = 0,
+        pub timer: f32 = 0.0,
+    }
+}
+
+component! {
+    /// A thing that drops loot when it is destroyed (docs/LOOT.md, "Drops"), beside `HitPoints` and a `Transform`: the first tick its `HitPoints` are `dead` it makes, for every stack that the table `table` (of the world's
+    /// `LootTable`) rolls, a copy of the prefab `prefab` (a pickup: a prefab of the game with an `Interactable`, like the thing a player's dropped item becomes) with `Interactable.item` set to `KEY N`, in a ring of `spread` metres round
+    /// it and `lift` metres up (from the ground below it when `ground` is on, as it is by default: a drone that dies 7 m up leaves its loot on the floor, found by a ray down to the first thing the rays hit; with `ground` off, from where it was). The roll is the same every time for the same `key` (a number of your own: 0 uses the thing's uid), like a container's. Nothing is made without the table, the item table or the prefab. `done` is the engine's
+    /// (set it false to drop again). Event `loot_dropped`. On a game server the pickups are told to the players like any pickup the prefab makes; a client's own copy of the machine is replaced by the server's, so only the server drops.
+    pub struct LootDrop {
+        pub table: Sym = Sym(0),
+        pub prefab: Sym = Sym(0),
+        pub key: u32 = 0,
+        pub spread: f32 = 0.8,
+        pub lift: f32 = 0.3,
+        pub done: bool = false,
+        pub ground: bool = true,
+    }
+}
+
+component! {
+    /// The local player of an online game (docs/NETWORK_SCALE.md, "In a game"): when the game is played with `lunaris play SCENE --connect HOST:PORT`, the entity with this component (the lowest uid) is the one the
+    /// server hears about: its `Transform` (the feet) and `Velocity` go up thirty times a second with `pitch` (radians, looking up is positive), `flags` (bits the game gives meaning to: crouched, sliding, wall
+    /// running ...), `anim` and `anim_t` (a clip number and its time, if the others should see it) and `extra` (a number: the weapon in the hands); the body's yaw is the rotation's. `puppet` names the prefab
+    /// that is made for every other player (the game's own body, with its `NetPuppet` filled in by the engine; with none, a bare entity with a `Transform` and a `NetPuppet`). The server chooses where a
+    /// player starts: on connecting the entity is put there, and a move the server refuses puts it back (`corrections` counts them). The engine writes `connected`, `id` (the server's number for this player),
+    /// `ping` (round trip, milliseconds) and `players` (how many others it can see). Against a **game server** (`NetHost`, docs/GAME_SERVER.md) the same entity also: shows the things the server replicates
+    /// (`NetEntity`: a wall, a machine, a loot bag) as puppets made from the prefab that the text `kinds` names, one line a thing `CLASS KIND PREFAB` (`KIND` `*` is any: `3 12 wall_model`,
+    /// `4 * machine_model`; things with no line are not shown); and sends a command to the server's game by setting `cmd` (a name: `build:wall` chooses what the build tool builds, `place` builds it, any
+    /// other is for the game's scripts, with `cmd_args` as numbers) for one tick (the engine clears both). A graph system cannot set a name, so a command can also be said by a number: `act` (the engine clears it) names a line of the text `acts`, one a line `NUMBER COMMAND` (`1 build:wall`, `2 place`), and is sent as that command with `cmd_args`. The buttons are `flags` bits (the server maps them to the avatar's weapon with `NetAvatar`). `say_input` is the uid of a `UiInput` whose text is sent to the server as a chat message when the player submits it (Enter), and then emptied (`NetHost.chat`, `NetChat`).
+    /// **Vehicles** (docs/SEATS.md): while the player sits in a seat of the server's (`Seat`) the server tells it so and the engine sets `riding` (the server's number of the vehicle, 0 when not) and `seat` (where the player
+    /// sits, in the vehicle's axes): the player's `Transform` is carried to that place on the vehicle's puppet every tick (the walking is overridden, the camera follows), and the server ignores the place it reports.
+    /// What the hands say goes up in `axes` (four numbers from -1 to 1, a helicopter's roll, collective, pitch and yaw; a graph system sets them from the keys) whenever they change.
+    /// **Goggles** (docs/AI.md, hacking): while the player controls a machine of the server's (`Hacker`) the server says so and the engine sets `viewing` (the server's number of the machine, 0 when not) and moves the entity
+    /// `camera` (the player's camera, a child of the player: its `LocalTransform` position is set so that it is at the machine's puppet, its direction stays the player's) until it is given back to `eye`, its place when
+    /// the player sees for itself. Then `axes` drive the machine: 1 up, 2 forward and 3 right (in the way the player looks), the fire button fires its weapon, the reload button gives it back.
+    /// **Itself** (docs/GAME_SERVER.md, "What a player is told about itself"): the server tells the player what its interface shows of its own character, which only the server knows, and the engine sets `health`,
+    /// `food`, `water` and `stamina` (0 to 1: `Ui.fill` of a bar), `heat` (the director's meter, 0 to 10), `tier` (the Core's alert tier for this player, 0 to 7: docs/WALKER.md), `bleeding`, `exhausted` (cannot sprint), `reloading`, and for the gun in its hand `gun` (the item number, 0
+    /// for none), `mag` (rounds in the magazine) and `reserve` (rounds in the bag for it; 65535 for a gun that never runs out).
+    /// **Parties** (docs/PARTIES.md): `say_party_input` is the uid of a second `UiInput` (the party chat box): what is typed in it goes to the player's party only (see `NetParty`).
+    pub struct NetPlayer {
+        pub puppet: Sym = Sym(0),
+        pub kinds: Sym = Sym(0),
+        pub cmd: Sym = Sym(0),
+        pub cmd_args: [f32; 4] = [0.0, 0.0, 0.0, 0.0],
+        pub acts: Sym = Sym(0),
+        pub act: u32 = 0,
+        pub flags: u32 = 0,
+        pub anim: u32 = 0,
+        pub anim_t: f32 = 0.0,
+        pub pitch: f32 = 0.0,
+        pub extra: u32 = 0,
+        pub id: u32 = 0,
+        pub connected: bool = false,
+        pub ping: f32 = 0.0,
+        pub players: u32 = 0,
+        pub corrections: u32 = 0,
+        pub axes: [f32; 4] = [0.0, 0.0, 0.0, 0.0],
+        pub riding: u32 = 0,
+        pub seat: [f32; 3] = [0.0, 0.0, 0.0],
+        pub viewing: u32 = 0,
+        pub camera: Uid = Uid(0),
+        pub eye: [f32; 3] = [0.0, 1.6, 0.0],
+        pub health: f32 = 1.0,
+        pub food: f32 = 1.0,
+        pub water: f32 = 1.0,
+        pub stamina: f32 = 1.0,
+        pub heat: f32 = 0.0,
+        pub tier: u32 = 0,
+        pub bleeding: bool = false,
+        pub exhausted: bool = false,
+        pub reloading: bool = false,
+        pub gun: u32 = 0,
+        pub mag: u32 = 0,
+        pub reserve: u32 = 0,
+        pub say_input: Uid = Uid(0),
+        pub say_party_input: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// Another player in an online game (docs/NETWORK_SCALE.md, "In a game"), made, moved and removed by the engine from what the server says: its `Transform` is where that player is (shown a tenth of a
+    /// second in the past, between two records, so that it moves smoothly), its `Velocity` (if it has one) the speed, and these fields what the player reports: `id` (the server's number), `flags`, `anim` and
+    /// `anim_t` (the clip and its time), `pitch` (looking up is positive, radians), `health` (0 to 255), `extra`, and `speed` (the ground speed, for a locomotion blend). A game's own systems dress it: they
+    /// pick the clip from `speed` and `flags`, show a name, turn the head by `pitch`. Against a game server the things it replicates (`NetEntity`) are puppets too: `class` and `kind` say what, `extra`
+    /// carries the server's `kind` again for a thing that is not a player.
+    pub struct NetPuppet {
+        pub id: u32 = 0,
+        pub class: u32 = 0,
+        pub kind: u32 = 0,
+        pub flags: u32 = 0,
+        pub anim: u32 = 0,
+        pub anim_t: f32 = 0.0,
+        pub pitch: f32 = 0.0,
+        pub health: f32 = 0.0,
+        pub extra: u32 = 0,
+        pub speed: f32 = 0.0,
+    }
+}
+
+component! {
+    /// A thing the game server tells the players about (docs/GAME_SERVER.md), on the server's entity (a wall, a machine, a helicopter, a loot bag, a corpse): every tick (every `NetHost.static_every` ticks for
+    /// the still `class`es 1 and 3) its `Transform`, its `HitPoints` (as a byte), `flags`, `anim`, `anim_t` and `kind` (the picture of it: the clients pick the prefab by `class` and `kind`) are copied into
+    /// the server's world, and the clients near it are sent them at a rate that falls with distance. `class`: 1 an item on the ground and 3 a thing in the world are still (sent slowly), 2 a thing in flight is
+    /// sent fast, 4 and up are things that move (machines, vehicles: sent like players). `net` is the server's number for it (the engine's). An entity with a `NetEntity` that is in a scene a client loads is
+    /// removed from the client when it connects: the server's copy is the one that counts.
+    pub struct NetEntity {
+        pub class: u32 = 3,
+        pub kind: u32 = 0,
+        pub flags: u32 = 0,
+        pub anim: u32 = 0,
+        pub anim_t: f32 = 0.0,
+        pub net: u32 = 0,
+    }
+}
+
+component! {
+    /// The server's body of a connected player (docs/GAME_SERVER.md), on the entity the server makes for each player from `NetHost.player`. The engine puts the player's reported place and look on it before
+    /// every simulation step (`Transform` the feet and the yaw, the pitch on the `head` child, or on the entity itself if it has none) and turns the reported button `flags` into the actions of the avatar:
+    /// bits of `fire_mask` pull the trigger of its `Weapon`, `reload_mask` reload it, `sprint_mask` set `Vitals.sprint`, `use_mask` press the use button of its `Interactor` (docs/INTERACT.md), `crouch_mask` set `Stealth.crouch` (docs/STEALTH.md), `aim_mask` set `Loadout.aiming` (aim down sights: docs/LOADOUT.md). `head` is the child that carries the `Weapon`, the `BuildTool` and the `Interactor` (an entity of the
+    /// avatar's prefab with a `Parent`, a `LocalTransform` at eye height and one of those): the engine finds it when the avatar is made and turns it by the pitch; without one the tools sit on the avatar itself
+    /// and aim from its feet. `buttons`, `pitch` and `held` (the number the player says it holds) are what the player reported, `cmd` and `args` the last command the player's game sent that is not the
+    /// engine's own (`build:KIND` and `place` are), for one tick, for the game's scripts. `slot` and `id` are the server's numbers for the player.
+    pub struct NetAvatar {
+        pub slot: u32 = 0,
+        pub id: u32 = 0,
+        pub fire_mask: u32 = 1,
+        pub reload_mask: u32 = 2,
+        pub sprint_mask: u32 = 4,
+        pub use_mask: u32 = 8,
+        pub crouch_mask: u32 = 16,
+        pub hack_mask: u32 = 32,
+        pub aim_mask: u32 = 64,
+        pub head: Uid = Uid(0),
+        pub buttons: u32 = 0,
+        pub pitch: f32 = 0.0,
+        pub held: u32 = 0,
+        pub cmd: Sym = Sym(0),
+        pub args: [f32; 4] = [0.0, 0.0, 0.0, 0.0],
+        pub name: Sym = Sym(0),
+    }
+}
+
+component! {
+    /// How a scene is hosted as a game server (docs/GAME_SERVER.md): one entity of the scene has it (the lowest uid wins) and `lunaris server --scene SCENE` reads it. `player` is the prefab made for every player
+    /// that connects (it should have a `NetAvatar`, `HitPoints`, a `Respawn`, a collider and the player's `Weapon` and `BuildTool`; the server adds a `NetAvatar` if it has none). `forward` is the text of the
+    /// events of the simulation that the players are told about, one line a kind, `NAME RADIUS` (`shot 150`: every client within 150 m of where the event happened gets it, as an event of its own simulation, which is
+    /// what the sound and the effects of a game listen to; its `uid` there is the server's number, the one `NetPlayer.id` holds, of the entity it is about: the victim of a `hit` or a `kill`, the shooter of a `shot`, 0 for none). `static_every` is every how many ticks the still things (`NetEntity` class 1 and 3) are looked at for changes. `save` is a file of the workspace the
+    /// world's state is written to every `save_every` seconds and loaded from when the server starts (empty: never saved); the players' avatars are not in it, but what `persist` names (the components of an avatar to
+    /// keep for the player, by name, space separated: `Transform Inventory Vitals HitPoints`) is kept by the player's name and given back to the avatar they get when they connect again. `drop` is the prefab made on the ground when a player drops
+    /// something from their bag (`inv_drop`): a pickup (an `Interactable` of kind 3, a `NetEntity`, whatever it looks like) that the engine gives the item.
+    /// **Using items** (`inv_use`, docs/GAME_SERVER.md): `uses` is the text of what an item of the bag does when the player uses it, one line an item, `use KEY eat=30 drink=0 heal=0 bandage=1 keep=0` (`KEY` is the item's key in the
+    /// `ItemTable`): the numbers are added to the avatar's `Vitals` requests (`eat`, `drink`, `heal` and `bandage`, docs/SURVIVAL.md) and one of the item is used up unless `keep` is 1 (a tool).
+    /// **Lag compensation** (docs/LAG_COMPENSATION.md): a hitscan shot is tested against the characters and the moving `NetEntity`s with `HitPoints` where the shooter saw them on its screen, which is the shooter's half round trip plus
+    /// `interp` (the milliseconds the clients show others behind the present: the client's default is 100) in the past; `lag_comp` is the most milliseconds that is allowed to be (250; 0 switches it off: shots are decided at the present).
+    /// **A picture for each item on the ground**: `item_kinds` is a text with a line `ITEM KIND` for each item key whose pickup should look different from the others (`rifle 34`; `#` starts a comment). A pickup (an `Interactable` of kind 3 with a `NetEntity`)
+    /// that holds such an item is told to the clients with that `kind` instead of its `NetEntity.kind`, whatever made it (a scene's loot, `inv_drop`, a game's script), so a client's `NetPlayer.kinds` can show a pistol on the ground as a pistol (`1 33 PickupPistol`).
+    /// It follows the item: a stack that is partly picked up keeps its picture, and a world saved before the text changed shows the new one.
+    /// **Updating a game with a saved world**: a save holds the world's state (entities, resources); the scene's graph systems and prefabs are CODE and always come from the scene the server is started with, so a new version of the
+    /// game's logic reaches a world that was saved before it. `world_version` says which LAYOUT of the world the scene has (bump it when the scene's entities change: a bench is added, a crate moves): a save of another
+    /// `world_version` is not loaded as a world (it would lack the new things and keep the old ones) and the world starts fresh from the scene, but the players' characters (`persist`) are still given back.
+    /// **Resources every client is told** (docs/GAME_SERVER.md): `sync` lists names of resources of the server's world (`dn.t dn.rate dn.force`, separated by spaces, commas or lines; at most 32; the engine's own `input.`,
+    /// `action.`, `game.`, `scene.` and `time.` names are ignored). The server sends the ones that changed to every client, at most once every `sync_every` seconds (a clock that changes every tick goes once a second), all of them again
+    /// every 5 seconds, and all of them at once to a client that has just joined; a client writes them into its own simulation as resources of the same names. The client's scene needs nothing for it.
+    /// **Leaving out what a server does not need**: `skip` lists component names (`Ui Text`, separated by spaces or commas); when the server starts, every entity of its world that has one of them, and everything attached to it with a `Parent`, is
+    /// removed: a server has no screen, and the interface's entities (a game's HUD, menus and crafting pages are hundreds of `Ui` entities) cost it memory and the time of every system that visits them. The clients' own scene is not touched
+    /// (they run the same scene file and keep their interface). An entity that itself has the `NetHost`, a `NetEntity` or a `SpawnPoint` is not removed because of a listed component (but whatever hangs on an entity that goes, goes with it). Measured on a game scene
+    /// of 1,140 entities of which 1,038 were interface: the server's tick fell from 2.1 to 0.9 ms and its memory from 27.3 to 20.3 MB with no player in.
+    /// **Chat** (docs/GAME_SERVER.md, "Chat"): `chat` is how far, in metres, a player's text message is told (to every player within that distance of the speaker, the speaker included); 0 switches chat off, a very large number is a chat for everybody.
+    /// **Wallhacks** (docs/NETWORK_SCALE.md, "Wallhacks"): the server tells a client where the other players are, so a modified client could show them through walls. `occlusion` is the defence and the switch for it:
+    /// 0 (the default) tells every client about every player within the interest radius, as before; a number above 0 is the SAFE RADIUS in metres: a player nearer than that to another is always told, and a
+    /// player farther away is not told (the client forgets it after two seconds) while the static world (the `Collider`s that do not move, mesh levels, terrain: what `lunaris_sim::sight::Sight` sees) is in the way of every straight line
+    /// from the other's eye to the player's head, chest, feet and shoulders, now and 0.45 s ahead at the speeds they are moving (so that nobody pops into view late round a corner), and for
+    /// 0.6 s after it was last in sight (so that ducking behind a wall for a moment loses nothing). 16 to 25 is a good safe radius; loot and the things of the world are still always told. `occlude_machines` hides
+    /// the things that move on their own and are told like players (`NetEntity.class` 4 and up: drones, vehicles) in the same way; off by default.
+    /// **Parties** (docs/PARTIES.md): `party` is the most members a party has (4 by default; 0 or 1 switches parties off). Players invite each other by name, a party's members never hurt each other
+    /// (weapons treat a party as a `Team` from 100 up), talk to each other by `/p` wherever they are, are told where the others are, share spawn points and land, and are always told about each other past walls.
+    /// **Characters that are not coming back** (docs/SERVER_ROBUSTNESS.md): a stored character (`persist`) is kept for `character_days` days after its player last left (30 by default; 0 keeps it for ever), then it is let go
+    /// at the next save: the world's save, and the memory a save needs, grow with the number of different players otherwise (about 40 to 65 KB for each new name).
+    pub struct NetHost {
+        pub player: Sym = Sym(0),
+        pub forward: Sym = Sym(0),
+        pub static_every: u32 = 15,
+        pub save: Sym = Sym(0),
+        pub save_every: f32 = 60.0,
+        pub persist: Sym = Sym(0),
+        pub drop: Sym = Sym(0),
+        pub lag_comp: f32 = 250.0,
+        pub interp: f32 = 100.0,
+        pub uses: Sym = Sym(0),
+        pub item_kinds: Sym = Sym(0),
+        pub world_version: u32 = 0,
+        pub sync: Sym = Sym(0),
+        pub sync_every: f32 = 1.0,
+        pub skip: Sym = Sym(0),
+        pub occlusion: f32 = 0.0,
+        pub occlude_machines: bool = false,
+        pub chat: f32 = 0.0,
+        pub party: u32 = 4,
+        pub character_days: f32 = 30.0,
+    }
+}
+
+component! {
+    /// Worn gear (docs/EQUIPMENT.md), on a character that has an `Inventory`: `slots` is a text, one worn place of the bag a line, `slot INDEX accepts=CLASS zones=body,head,legs` (the slot takes only items whose `class`
+    /// is CLASS, and what is in it protects those zones: the item's `power` is the percent of a hit it stops, its `dur` how much damage it stops before it is used up). A hit of the weapons system on this character
+    /// is lessened by what it wears where it was hit (the zones are the weapons system's: body, head, legs and arms), the pieces that stopped something are worn by `wear` points of durability for each point stopped,
+    /// and a piece that is used up is broken (the event `item_break`). `cover` (the engine's, kept on a client too) is the share of a hit that is stopped now in each zone (index 1 body, 2 head, 3 legs), `absorbed` all the damage the gear has stopped.
+    pub struct Equipment {
+        pub slots: Sym = Sym(0),
+        pub wear: f32 = 1.0,
+        pub cover: [f32; 4] = [0.0, 0.0, 0.0, 0.0],
+        pub absorbed: f32 = 0.0,
+    }
+}
+
+component! {
+    /// The chat log of an online game (docs/GAME_SERVER.md, "Chat"), on a `Text` (or a `Ui`) entity of the client's scene: the engine writes the last `lines` messages the player has heard, one to a line as `name: text`, into its
+    /// text, and takes a message off the log `life` seconds after it came. `count` is how many messages have come in all (a game that plays a sound for a new line watches it). Messages are said with `NetPlayer.say_input` and
+    /// told by a server whose `NetHost.chat` is above 0. With `bottom` the text is filled out with empty lines above it up to `lines`, so that the newest line always stands at the bottom of a text box that grows downward (a log over a chat box).
+    pub struct NetChat {
+        pub lines: u32 = 6,
+        pub life: f32 = 14.0,
+        pub count: u32 = 0,
+        pub bottom: bool = false,
+    }
+}
+
+component! {
+    /// The party panel of an online game (docs/PARTIES.md), on a `Text` (or a `Ui`) entity of the client's scene: the engine writes what the server says of the player's party into its text, `lines` lines at most:
+    /// a header, then a line a member (a star for the leader, `you`, the health in percent, how far in metres and which way by the compass, or `away` for one that lost its connection and `dead`), or, while an
+    /// invitation waits, who invites the player, the seconds left and `invite_hint` (a text of the game's, such as the keys that accept and decline; empty: `/accept  /decline`). The text is empty when the player is in no party and
+    /// has no invitation. The engine also writes `count` (members, 0 for no party), `party` (the party's number), `leader` (the player leads it), `invited` and `invite_secs` (an invitation waits and for how long), and `heard`
+    /// (how many panels have come in: a game that plays a sound for a change watches it). North is -z, east +x.
+    /// `marker` names a prefab (a `Text` with a `UiAnchor`, `world` the offset above the feet, such as `[0, 2.2, 0]`): the engine makes one for each party mate whose puppet this client shows, pins it to the puppet (`UiAnchor.entity`),
+    /// writes the mate's name into its `Text`, gives it the panel's `Parent` (so that it goes with the HUD) and takes it away when the mate goes, leaves the party or is no longer shown. It is drawn over the world, so it shows through walls.
+    pub struct NetParty {
+        pub lines: u32 = 8,
+        pub invite_hint: Sym = Sym(0),
+        pub count: u32 = 0,
+        pub party: u32 = 0,
+        pub leader: bool = false,
+        pub invited: bool = false,
+        pub invite_secs: f32 = 0.0,
+        pub heard: u32 = 0,
+        pub marker: Sym = Sym(0),
+    }
+}
+
+component! {
+    /// The container that the local player has open on a game server (docs/GAME_SERVER.md): an entity of the client's scene with this and an `Inventory` (the interface's `InvSlot`s are bound to that inventory, as to the
+    /// player's own bag). When the player opens a container the server says what is in it and the engine writes it into this inventory and sets `open`; when it shuts, `open` goes off and the inventory is emptied.
+    /// `source` is the server's number for the container. Things are moved by the commands `inv_move` (`cmd_args` `from`, `to`, `count`, 0: a place is 100 times the bag (0 is the player's own, 1 the open
+    /// container) plus the slot; `count` 0 moves the whole stack), `inv_drop` (`slot`, `count`) and `inv_craft` (the recipe number): the server does them and tells the new contents.
+    pub struct NetContainer {
+        pub open: bool = false,
+        pub source: u32 = 0,
+    }
+}
+
+component! {
+    /// The way into an online game from the game's own menu (docs/UI.md, "Connecting from a menu"): the native player (`lunaris play SCENE`, without `--connect`) watches the entity that has this (the lowest uid wins).
+    /// When `go` is set (a Connect button's graph system sets it) it takes the server's address from the text of the `UiInput` entity `address_input` (or from `address` when there is no such input), the player's name
+    /// from `name_input` (or `name`; "player" when empty), and starts a connection to that server of `docs/GAME_SERVER.md`; `go` goes back to 0. `status` is then 0 nothing going on, 1 connecting, 2 in the game,
+    /// 3 the server said no (full, another version), 4 the connection was lost, 5 there was no answer or the address was bad; `message` says it in words. After 3, 4 and 5 the connection is spent: the
+    /// menu stays and `go` tries again. A server that answers within `timeout` seconds is let in, otherwise status 5 ("No answer from the server"). `leave` (set by a Leave button) tells the server we go, takes
+    /// the other players away and sets `status` 0. While `status` is 2 the player's `NetPlayer.connected` is on too.
+    /// A server run with `--secure KEYFILE` (docs/SECURE.md) lets in only players with a connect token: `token_input` (a `UiInput` where the player pastes it) or `token` (text), the hex text or `@FILE` of `--connect-token`;
+    /// when both are empty the token of `lunaris play --connect-token ...` given at start is used. With a token the player is whoever the token was made for (`name_input` and `name` are ignored); a text that is no token is
+    /// `status` 5 ("that is not a connect token ..."). Without one the connection is a plain one.
+    pub struct NetConnect {
+        pub address_input: u32 = 0,
+        pub name_input: u32 = 0,
+        pub address: Sym = Sym(0),
+        pub name: Sym = Sym(0),
+        pub token_input: u32 = 0,
+        pub token: Sym = Sym(0),
+        pub go: bool = false,
+        pub leave: bool = false,
+        pub status: u32 = 0,
+        pub message: Sym = Sym(0),
+        pub timeout: f32 = 8.0,
+    }
+}
+
+component! {
+    /// The building rules of a game, as text (docs/BUILDING.md). One entity of the world has it (the lowest uid wins). `rules snap=1.2 min=0.1 gap=0.05 slope=0.7 step=15 ground=0.5 audit=1` sets how
+    /// close to a socket the aim must be to snap, the stability under which a piece collapses, how much every piece's box is shrunk when testing for overlap, the steepest ground that can be built on
+    /// (the ground normal's y), the turn step of a free piece in degrees, how far under a piece the ground may be and still hold it up, and every how many seconds the world is looked over for decay and for
+    /// pieces that changed by other means. `piece NAME size=X,Y,Z hp=N free=1 anchor=1 loose=1 decay=D inset=G prefab=P debris=P` starts a kind of piece (a box of that size centred on its entity; free: it can
+    /// stand on open ground; anchor: resting on the ground it holds itself up and holds up what is joined to it; loose: furniture, it needs no support but falls with what it was put on; decay: hit points lost a
+    /// second without upkeep; prefab: what is spawned; debris: what is spawned when it falls) and each `socket NAME at=X,Y,Z yaw=D type=T mates=A,B carry=0.9,T:0.5 turn=180` under it a point where pieces join
+    /// (`mates`: the socket types it plugs into; `carry`: the share of the neighbour's stability it takes, per type or for all). `pieces` and `stamp` are the engine's (what the world looked like at the last audit).
+    pub struct BuildRules {
+        pub text: Sym = Sym(0),
+        pub pieces: u32 = 0,
+        pub stamp: u32 = 0,
+    }
+}
+
+component! {
+    /// The building tool of a player (docs/BUILDING.md): on the entity that looks (a camera, a hammer in the hand), it aims along its local -z from its position, `reach` metres. The game sets `kind` (the piece to
+    /// build, a `piece` of the `BuildRules`; empty switches the tool off), `owner` (a number for the player or the clan: building is refused inside another owner's `BuildUpkeep`), `turn` (extra degrees for a piece
+    /// put on open ground), `flip` (face the other way when it snaps) and, for one tick, `place`. The engine writes where the piece would go (`pos`, `yaw` in degrees, a quarter turn to the left is positive), whether
+    /// it can go there (`valid`; if not `why` says: unknown_piece, no_aim, no_socket, no_ground, blocked, not_yours, unstable), what it would be joined to (`snapped`, 0 for open ground) and how stable it
+    /// would be (`stability`, 0 to 1). If `ghost` names an entity, that entity's `Transform` follows `pos` and `yaw` (the translucent model of the piece). `place` builds the piece when it is valid (event
+    /// `build_placed`, the new piece's uid in `placed`) and is cleared either way (an invalid one gives the event `build_refused`).
+    /// `party` (docs/PARTIES.md; the server's party system writes it, 0 for none) is the party the holder is in: a tool whose owner is in the same party as the owner of a `BuildUpkeep` is not refused (`not_yours`) on that land.
+    pub struct BuildTool {
+        pub kind: Sym = Sym(0),
+        pub owner: u32 = 0,
+        pub reach: f32 = 6.0,
+        pub turn: f32 = 0.0,
+        pub flip: bool = false,
+        pub place: bool = false,
+        pub ghost: Uid = Uid(0),
+        pub valid: bool = false,
+        pub why: Sym = Sym(0),
+        pub pos: [f32; 3] = [0.0, 0.0, 0.0],
+        pub yaw: f32 = 0.0,
+        pub snapped: Uid = Uid(0),
+        pub stability: f32 = 0.0,
+        pub placed: Uid = Uid(0),
+        pub built: u32 = 0,
+        pub party: u32 = 0,
+    }
+}
+
+component! {
+    /// A piece that has been built (docs/BUILDING.md), made by a `BuildTool` or put in a scene by hand (a base that is already there): `kind` is a `piece` of the `BuildRules`, `owner` who built it. The engine keeps
+    /// `stability` (0 to 1: 1 is held by the ground, less the further it hangs from it through the sockets; under the rules' `min` it collapses) and `anchored` (it rests on the ground) up to date. `on` is what a
+    /// `loose` piece stands on: it falls when that is gone. Its hit points are its `HitPoints`; when they are gone it is destroyed (event `build_destroyed`) and what it held up may collapse (`build_collapse`).
+    /// A piece put in a scene by hand has `checked` false: the engine then finds out by itself whether it rests on the ground (the first audit) and sets `anchored` and `checked`; set both to say so yourself.
+    pub struct BuildPiece {
+        pub kind: Sym = Sym(0),
+        pub owner: u32 = 0,
+        pub stability: f32 = 1.0,
+        pub anchored: bool = false,
+        pub checked: bool = false,
+        pub on: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// A place on something that is not a piece, where pieces may be built (docs/BUILDING.md): the entity's `Transform` is the point and the way it faces (a point on the facade or the roof of a generated
+    /// building). `kind` is a socket type, which a piece socket lists in its `mates` to join here. With `anchor` (the default) the thing is solid ground to the structure: a piece joined to it is held up
+    /// through its `carry` as if it stood on the ground; without, it is only a place to snap to.
+    pub struct BuildSocket {
+        pub kind: Sym = Sym(0),
+        pub anchor: bool = true,
+    }
+}
+
+component! {
+    /// A tool cupboard (docs/BUILDING.md): within `radius` metres of its `Transform` the pieces of an owner other than `owner` cannot be built (while `exclusive`), and the pieces decay no more while `protect`
+    /// is above 0 (it runs down by a second each second; the game fills it from what the player puts in, so many seconds of upkeep for so much wood). `covered` is how many pieces it covers (the engine's: a
+    /// game charges by it).
+    pub struct BuildUpkeep {
+        pub owner: u32 = 0,
+        pub radius: f32 = 40.0,
+        pub protect: f32 = 0.0,
+        pub exclusive: bool = true,
+        pub covered: u32 = 0,
+    }
+}
+
+component! {
+    /// A helicopter (docs/HELICOPTER.md), on a rigid body (a `Collider`, a `RigidBody`, a `Velocity` and an `AngularVelocity`): the rotors lift it along its own up axis, tilting it moves it, the pedals turn it, it is
+    /// loud, and it is a crash risk. **Inputs** (a graph system or the game's controls set them): `engine` (rotors on), `collective` -1 to 1 (up is climb; 0 hovers when `lift` is twice gravity, -1 is no lift, 1 is
+    /// full), `pitch` -1 to 1 (1 tips the nose down: forward), `roll` -1 to 1 (1 tips to the right) and `yaw` -1 to 1 (1 turns right); `pilot` is the uid of whoever flies it (their `Heat` is raised while the rotors are
+    /// up). **The machine**: `lift` (m/s^2 at full collective and full rotor speed), `spool_up` and `spool_down` (seconds for the rotors to get to speed and to stop), `max_tilt` (degrees) and `tilt_rate`
+    /// (degrees a second the attitude follows the stick at), `yaw_rate` (degrees a second at full pedal), `assist` 0 to 1 (how much of the lift lost to tilt is given back, so that a tipped helicopter does not
+    /// sink), `drag` and `climb_drag` (1/s, sideways and up and down), `ground_effect` (the extra share of lift near the ground, fading out over `ground_height` metres). **Attention**: `noise` is how far (metres)
+    /// the rotors are heard at full power by an AI's `Perception` (the engine keeps a `Noisy` on the helicopter at that times the rotor speed, between `idle_noise` and 1 by how hard the rotors work) and `heat` is how
+    /// much heat a second the pilot's `Heat` gains at full noise: flying draws the machines. **Crash**: a sudden loss of speed above `crash_speed` (m/s) costs `crash_damage` hit points for every m/s over it, and
+    /// the event `heli_crash` (the hit points reaching 0 stops the engine). **Parts**: `rotor` and `tail_rotor` name entities whose rotation the engine sets (the main one turns about its local y, the tail one about
+    /// its local x, `rotor_rps` turns a second at full rotor speed, the tail 5 times that). **Outputs**: `spool` (0 to 1, rotor speed), `speed` (m/s), `altitude` (metres above what is under it, -1 if nothing within 300 m),
+    /// `tilt` (nose down and right side down, degrees), `heading` (degrees, a quarter turn to the left is positive), `rotor_angle` (radians).
+    pub struct Helicopter {
+        pub engine: bool = true,
+        pub collective: f32 = 0.0,
+        pub pitch: f32 = 0.0,
+        pub roll: f32 = 0.0,
+        pub yaw: f32 = 0.0,
+        pub pilot: Uid = Uid(0),
+        pub lift: f32 = 19.6,
+        pub spool_up: f32 = 6.0,
+        pub spool_down: f32 = 10.0,
+        pub max_tilt: f32 = 30.0,
+        pub tilt_rate: f32 = 70.0,
+        pub yaw_rate: f32 = 80.0,
+        pub assist: f32 = 1.0,
+        pub drag: f32 = 0.15,
+        pub climb_drag: f32 = 0.8,
+        pub ground_effect: f32 = 0.2,
+        pub ground_height: f32 = 6.0,
+        pub noise: f32 = 160.0,
+        pub idle_noise: f32 = 0.35,
+        pub heat: f32 = 0.0,
+        pub crash_speed: f32 = 8.0,
+        pub crash_damage: f32 = 12.0,
+        pub rotor: Uid = Uid(0),
+        pub tail_rotor: Uid = Uid(0),
+        pub rotor_rps: f32 = 6.0,
+        pub spool: f32 = 0.0,
+        pub speed: f32 = 0.0,
+        pub altitude: f32 = 0.0,
+        pub tilt: [f32; 2] = [0.0, 0.0],
+        pub heading: f32 = 0.0,
+        pub rotor_angle: f32 = 0.0,
+        pub last_v: [f32; 3] = [0.0, 0.0, 0.0],
+    }
+}
+
+component! {
+    /// What a character's hands say to the thing it drives (docs/SEATS.md): four `axes`, each -1 to 1 (for a helicopter: 0 roll, right is positive; 1 collective, up is positive; 2 pitch, forward is positive; 3 yaw, right is
+    /// positive) and a set of `buttons` (bits the game defines). A game's graph system writes them from the keys (`{"set": "Controls.axes[1]", "to": ...}`); a game server writes them from what the player's computer says
+    /// (`NetPlayer.axes`). The engine only reads them: a `Seat` with `drive` 1 flies its `Helicopter` from the sitter's.
+    pub struct Controls {
+        pub axes: [f32; 4] = [0.0, 0.0, 0.0, 0.0],
+        pub buttons: u32 = 0,
+    }
+}
+
+component! {
+    /// A place in a vehicle (docs/SEATS.md), on the vehicle (or on a child of it, for a second seat) beside an `Interactable` of kind 0 (`prompt` "Enter"): a character whose `Interactor` uses it sits down while nobody does, and
+    /// is carried with the vehicle at `offset` (in the seat entity's own axes); using again (the use button pressed once more: a press that sat it down does not count) gets it out at `exit` (own axes of the seat entity).
+    /// `drive` 0 is a passenger's seat, 1 the pilot's: the entity's `Helicopter` is flown from the sitter's `Controls` (and its `pilot`, `engine` set; leaving puts the stick back, shuts the engine and clears the pilot), and
+    /// the sitter may only get out of it within `max_exit_altitude` metres of the ground; 2 the driver's: the entity's `Vehicle` is driven from the sitter's `Controls` (`axes[2]` throttle, forward is positive; `axes[3]`
+    /// steer, right is positive; `axes[1]` below 0 the brake, above 0.5 the handbrake) and the sitter may only get out of it below `max_exit_speed` m/s (the handbrake is put on when it does). `occupant` and `held` are the engine's. Events: `seat_enter`, `seat_exit` (on the seat's entity; also when the sitter dies or is gone) and
+    /// `seat_denied` (the helicopter was too high to get out of). The sitter has a `Seated` component for as long as it sits.
+    pub struct Seat {
+        pub offset: [f32; 3] = [0.0, 0.0, 0.0],
+        pub exit: [f32; 3] = [2.0, 0.0, 0.0],
+        pub drive: u32 = 0,
+        pub max_exit_altitude: f32 = 3.0,
+        pub max_exit_speed: f32 = 4.0,
+        pub occupant: Uid = Uid(0),
+        pub held: bool = false,
+    }
+}
+
+component! {
+    /// Guns that are items (docs/LOADOUT.md), on a character or on the entity that carries its `Weapon` (a head): `guns` is a text, one gun a line, `gun ITEM key=value ...` (`ammo` the item of the ammunition, empty: it never
+    /// runs out; `damage`, `rate`, `mag`, `reload`, `spread`, `range`, `auto`, `pellets`, `noise`, `head`, `limb`, `falloff`, `falloff_min`, `kind`, `speed`, `recoil`, `recoil_side`, `bloom`, `aim`, `aim_recoil`); `held` is the slot of the bag in hand (the game
+    /// sets it: the hotbar, or a player's own number). The `Weapon` (`weapon`: its entity, 0 for this one) is the gun that slot holds, or switched off when it holds no gun; the bag is `inventory`'s (0: this entity's, or its parent's).
+    /// The engine's: `holding` (the item), `slot`, `reserve` (the ammunition in the bag as the weapon saw it), `mags` (the magazine each slot's gun had when it was last held; the biggest number: never held), `took` (rounds taken out of the bag). `aiming` is the player's aim button (a game server sets it from the avatar's `NetAvatar.aim_mask`; a game may set it itself): while it is on, the gun's `aim` multiplies its `spread` and `bloom` and `aim_recoil` its kick. `aim_applied` is the engine's.
+    pub struct Loadout {
+        pub guns: Sym = Sym(0),
+        pub weapon: Uid = Uid(0),
+        pub inventory: Uid = Uid(0),
+        pub held: u32 = 0,
+        pub holding: u32 = 0,
+        pub slot: u32 = 0,
+        pub reserve: u32 = 0,
+        pub took: u32 = 0,
+        pub mags: [u32; 48] = [u32::MAX; 48],
+        pub aiming: bool = false,
+        pub aim_applied: bool = false,
+    }
+}
+
+component! {
+    /// The engine's mark on a character that sits in a seat (docs/SEATS.md): `seat` is the uid of the entity with the `Seat`. A game stops the walking of a seated character (a graph system `each: ["Seated"]`, or
+    /// reads the component in its controls); a game server carries the player with the seat and ignores the place its computer reports.
+    pub struct Seated {
+        pub seat: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// A player's life cycle (docs/RESPAWN.md), beside its `HitPoints`: when they reach 0 the player is **dead**: a corpse is made where they fell from the prefab `corpse` (the game's: a body, a bag) holding
+    /// a copy of the player's `Inventory` (and removed after `corpse_time` seconds; 0 keeps it), the player's own inventory is emptied (unless `keep_items`), and after `delay` seconds the player **respawns**
+    /// (if `hold`, only once the game has set `request`: a death screen with a button): back to full `HitPoints` with `protect` seconds of grace, fed to `food` percent, at one of the `SpawnPoint`s: the
+    /// player's own (a `SpawnPoint` of the same non-zero `group`: a sleeping bag) if there is one, else a shared one (group 0) that is at least `avoid` metres from every other living player (or, if none
+    /// is, the one farthest from them). Without any `SpawnPoint` the player gets up where it fell. `state` (0 alive, 1 dead), `timer` (seconds to go), `deaths`, `corpse_uid` and `died_at` are the engine's.
+    /// Events: `corpse` (the corpse, at its place) and `respawned` (the player, at the spawn point).
+    pub struct Respawn {
+        pub delay: f32 = 5.0,
+        pub hold: bool = false,
+        pub request: bool = false,
+        pub corpse: Sym = Sym(0),
+        pub corpse_time: f32 = 300.0,
+        pub keep_items: bool = false,
+        pub group: u32 = 0,
+        pub avoid: f32 = 80.0,
+        pub food: f32 = 80.0,
+        pub protect: f32 = 3.0,
+        pub state: u32 = 0,
+        pub timer: f32 = 0.0,
+        pub deaths: u32 = 0,
+        pub corpse_uid: Uid = Uid(0),
+        pub died_at: [f32; 3] = [0.0, 0.0, 0.0],
+    }
+}
+
+component! {
+    /// A place where a player (with a `Respawn`) can start again (docs/RESPAWN.md): the entity's `Transform` is where the feet go and which way the player faces. `group` 0 is a shared point; a non-zero
+    /// `group` belongs to the players whose `Respawn.group` is the same (a sleeping bag or a bed, which a game puts down and gives the player's number). `radius` scatters the player over a disc round it.
+    /// `once` uses the point up (it goes inactive, a bag is used once). `active` false switches it off. `uses` counts, the engine's.
+    pub struct SpawnPoint {
+        pub group: u32 = 0,
+        pub radius: f32 = 0.0,
+        pub active: bool = true,
+        pub once: bool = false,
+        pub uses: u32 = 0,
+    }
+}
+
+component! {
+    /// A flying machine's mind (docs/DRONES.md), on an entity with a `Transform` and a `Velocity` (it is moved by setting its velocity, like a `Steer`; no physics body needed): it holds `hover` metres above
+    /// whatever is under it, goes where it is told, steers round what is in its way and away from the other `FlyAgent`s, and follows or circles a target. **`mode`**: 0 hold (hover where it is), 1 go to `goal`,
+    /// 2 follow `target` (an entity's uid) and stay `range` metres from it, 3 circle `target` at `range` metres with a speed of `orbit` m/s round it (negative the other way), 4 patrol the points of `patrol`
+    /// (text, one `x y z` a line; only x and z are used, the height is `hover`), waiting `wait` seconds at each. With **`perception`** on, its own `Perception` chooses: alert (`state` 2) it circles the target
+    /// it sees, searching (3) it goes to where it was last seen, otherwise it patrols (or holds without a patrol); the `Perception`'s own autopilot (`engage`) turns it to the target and pulls its `Weapon`'s trigger. **The body**:
+    /// `speed` (m/s), `accel` (m/s^2), `climb` (m/s up or down), `turn_rate` (degrees a second it turns to face the way it goes while it is not engaged; `face` off leaves its rotation alone), `avoid` (the distance
+    /// ahead it looks for obstacles, metres; 0 switches avoidance off), `separation` (the distance it keeps from other agents). **Outputs**: `arrived` (at the goal or the point it was patrolling to), `altitude` (metres
+    /// above what is under it, -1 if nothing within 500 m), `blocked` (something is in its way), `patrol_at` and `wait_left` (the patrol's state), `speed_now` (m/s).
+    pub struct FlyAgent {
+        pub active: bool = true,
+        pub mode: u32 = 0,
+        pub goal: [f32; 3] = [0.0, 0.0, 0.0],
+        pub target: Uid = Uid(0),
+        pub range: f32 = 12.0,
+        pub orbit: f32 = 0.0,
+        pub perception: bool = false,
+        pub patrol: Sym = Sym(0),
+        pub wait: f32 = 1.0,
+        pub speed: f32 = 12.0,
+        pub accel: f32 = 10.0,
+        pub climb: f32 = 6.0,
+        pub turn_rate: f32 = 180.0,
+        pub face: bool = true,
+        pub hover: f32 = 6.0,
+        pub avoid: f32 = 8.0,
+        pub separation: f32 = 5.0,
+        pub arrived: bool = false,
+        pub altitude: f32 = 0.0,
+        pub blocked: bool = false,
+        pub patrol_at: u32 = 0,
+        pub wait_left: f32 = 0.0,
+        pub speed_now: f32 = 0.0,
+    }
+}
+
+component! {
+    /// Something a character can use (docs/INTERACT.md): a door, a chest, an item on the ground, a switch. An `Interactor` that looks at it from within `range` metres (the shape it is aimed at is its `Collider`, or a
+    /// sphere of `radius` metres if it has none) and acts uses it. **`kind`**: 1 a door (the entity also has a `Door`: using it opens or shuts it), 2 a container (an `Inventory` beside it: using it opens it, `user` is
+    /// the character who has it open until they use it again or walk off; the game's screen shows its inventory), 3 an item to pick up (`item` is the text `ITEM N`: it goes into the user's `Inventory` and the thing is
+    /// removed, or stays with what did not fit), 0 anything else (only the event `used`: the game's scripts do the rest). `prompt` is the text for the screen (`Open`, `Search`). `locked` keeps it shut: a character
+    /// with the item `key` in their inventory unlocks it by using it (and the key is used up with `key_consume`), others are told it is locked. `cooldown` seconds between two uses. `enabled` false hides it from
+    /// everybody. `user`, `open` (a container is open), `uses` and `ready` (the tick it can be used again) are the engine's. Events: `interact` (always, on the thing), `door_open`, `door_close`, `container_open`, `container_close`, `picked`, `unlocked`, `locked`, `inventory_full`, `used`.
+    pub struct Interactable {
+        pub kind: u32 = 0,
+        pub prompt: Sym = Sym(0),
+        pub range: f32 = 3.0,
+        pub radius: f32 = 0.6,
+        pub enabled: bool = true,
+        pub locked: bool = false,
+        pub key: Sym = Sym(0),
+        pub key_consume: bool = false,
+        pub item: Sym = Sym(0),
+        pub cooldown: f32 = 0.3,
+        pub ready: u32 = 0,
+        pub user: Uid = Uid(0),
+        pub open: bool = false,
+        pub uses: u32 = 0,
+    }
+}
+
+component! {
+    /// A door that swings (docs/INTERACT.md): its entity (a box with a `Collider`, a model, a leaf) turns about the hinge when `open` is set (by an `Interactable` of kind 1, or by a script) and back when it is cleared.
+    /// `hinge` is the hinge's place in the door's own axes from its origin (a door one metre wide with its origin in the middle has its hinge at `[-0.5, 0, 0]` or `[0.5, 0, 0]`), `axis` the way the hinge runs in the same axes
+    /// (up, `[0, 1, 0]`, by default), `angle_open` how far it swings in degrees (negative the other way) and `speed` how fast, degrees a second. The pose the door has when the scene starts is its shut pose: put it
+    /// shut. With a `Parent` and a `LocalTransform` the swing is done on the local pose. `angle` (the engine's) is where it is now.
+    pub struct Door {
+        pub open: bool = false,
+        pub hinge: [f32; 3] = [0.0, 0.0, 0.0],
+        pub axis: [f32; 3] = [0.0, 1.0, 0.0],
+        pub angle_open: f32 = 100.0,
+        pub speed: f32 = 160.0,
+        pub angle: f32 = 0.0,
+        pub based: bool = false,
+        pub base_pos: [f32; 3] = [0.0, 0.0, 0.0],
+        pub base_rot: [f32; 4] = [0.0, 0.0, 0.0, 1.0],
+    }
+}
+
+component! {
+    /// The use button of a character (docs/INTERACT.md): it looks along its entity's local -z from its place (`eye` is an offset in the entity's own axes; put it on the camera or the avatar's head) `reach` metres,
+    /// and `act` (held down by the game or the player's button: a press counts once) uses what it looks at. `inventory` is whose `Inventory` holds the keys and receives what is picked up (0: this entity's, else its
+    /// parent's). With `look` (on by default) it finds what it is looking at every tick, for the prompt on the screen: `target` (a uid, 0 for nothing), `prompt` (its text), `kind`, `distance`; without it (a server's
+    /// avatar) it looks only when it acts. `used` is the uid of what was used this tick, `denied` the reason one was refused (`locked`, `full`), both for one tick; `open` is the container it has open (a uid) and `held` the button's last state: the engine's.
+    pub struct Interactor {
+        pub reach: f32 = 3.0,
+        pub eye: [f32; 3] = [0.0, 0.0, 0.0],
+        pub act: bool = false,
+        pub inventory: Uid = Uid(0),
+        pub look: bool = true,
+        pub target: Uid = Uid(0),
+        pub prompt: Sym = Sym(0),
+        pub kind: u32 = 0,
+        pub distance: f32 = 0.0,
+        pub used: Uid = Uid(0),
+        pub denied: Sym = Sym(0),
+        pub held: bool = false,
+        pub open: Uid = Uid(0),
+    }
+}
+
+component! {
+    /// How hard a character is to notice (docs/STEALTH.md), beside a `Transform`: the engine measures how fast it moves and keeps a `Noisy` on it (the noise radius an AI hears: still 0, walking `walk_noise` metres, running
+    /// `run_noise`, sprinting `sprint_noise`, between the speeds `walk_speed`, `run_speed` and `sprint_speed` in a straight line; crouched, `crouch_mult` times that) and a `visibility` (0 to 1: how much of its sight range an
+    /// AI's eyes have for it: crouched `vis_crouch`, standing still `still_mult` of that, and less in the dark: `min_light` of it with `light` 0). **Inputs**: `crouch` and `light` (0 dark to 1 bright: a game sets it from
+    /// the time of day or a flashlight). **Outputs**: `speed` (metres a second, smoothed), `noise` (metres), `visibility`.
+    pub struct Stealth {
+        pub crouch: bool = false,
+        pub light: f32 = 1.0,
+        pub walk_noise: f32 = 5.0,
+        pub run_noise: f32 = 14.0,
+        pub sprint_noise: f32 = 22.0,
+        pub crouch_mult: f32 = 0.3,
+        pub walk_speed: f32 = 2.0,
+        pub run_speed: f32 = 5.0,
+        pub sprint_speed: f32 = 8.0,
+        pub vis_crouch: f32 = 0.6,
+        pub still_mult: f32 = 0.7,
+        pub min_light: f32 = 0.4,
+        pub speed: f32 = 0.0,
+        pub noise: f32 = 0.0,
+        pub visibility: f32 = 1.0,
+        pub last: [f32; 3] = [0.0, 0.0, 0.0],
+        pub seen: bool = false,
+    }
+}
+
+component! {
     /// Colour grading and screen fades for the GPU renderer's high qualities (the first `ColorGrade` counts; the reference renderer ignores it): `lift` is added in the
     /// shadows (per colour channel), `gamma` bends the midtones (1 = unchanged, above 1 brightens), `gain` multiplies the highlights, `temperature` warms (up to 1) or cools
     /// (down to -1) the whole picture and `tint_shift` trades green (-1) against magenta (1). `fade` is a colour laid over the whole picture: its alpha says how much (a fade to
@@ -1276,6 +2419,17 @@ component! {
         pub falloff: f32 = 0.15,
         pub height: f32 = 0.0,
         pub color: [f32; 3] = [0.72, 0.82, 0.95],
+    }
+}
+
+component! {
+    /// The weather of the picture, for the GPU renderer (the first `Weather` counts; the reference renderer ignores it, and so do the classic modes). `rain` (0..1) is how hard it rains: up to 36,000 drops, stretched along
+    /// their fall (a little aslant), in a box of 40 x 22 x 40 m round the camera, drawn by the card alone (the vertex shader places each drop from its number and the clock; a `Particles` cloud of 7,000 drops cost
+    /// 6 ms of CPU a picture). Drops keep their place in the world while the camera moves, so they have parallax, and the depth test hides them behind what stands in front. A game puts the rain out indoors by setting it to 0 there. `wet` (0..1) wets the world in the high qualities: flat surfaces darken and turn glossy, in
+    /// patches (puddles), walls a little, so that lamps and sky shine in the street after rain; a game raises it while it rains and lets it fall slowly afterwards. Neither is read by the simulation.
+    pub struct Weather {
+        pub rain: f32 = 0.0,
+        pub wet: f32 = 0.0,
     }
 }
 
@@ -1705,10 +2859,12 @@ component! {
     /// texture repeats across the whole ground (`uv_scale=48`, or `uv_scale=48,32`; the `Terrain`'s own `uv_scale` when left out), the depth in metres of the relief of a built-in material's bumps in the GPU
     /// renderer's high qualities (`bump=0.03`, 0 for flat), and a colour the texture is multiplied by (`tint=1.2,1.2,1.3`, each 0 to 4). `Terrain.color` multiplies the blend as it multiplies a texture
     /// (set it to `[1, 1, 1, 1]` to see the layers as they are); `Terrain.texture` and its alpha are not used while this is here. Both renderers draw the blend; a mistake in the text
-    /// (see `check`) leaves the terrain drawn with its own texture.
+    /// (see `check`) leaves the terrain drawn with its own texture. In the GPU renderer's high qualities a terrain that also has a `Terrain.texture` (a photograph of the ground) takes its colour from the photograph and
+    /// only its detail from the layers: `photo` (0 to 1, default 0.85) is how much of the colour is the photograph's (1: all of it; the layers then only give the detail and the `cliff` layer's sideways rock).
     pub struct TerrainLayers {
         pub splat: Sym = Sym(0),
         pub layers: Sym = Sym(0),
+        pub photo: f32 = 0.85,
     }
 }
 
@@ -1878,10 +3034,20 @@ component! {
     /// Keeps a third-person camera out of the walls (put it beside a `CameraRig`): every tick, after the rig has placed the camera, a line is looked along from the point the camera looks at (the rig's
     /// target plus its `look_offset`) towards the camera; when something solid (a `Collider` that is not a trigger, terrain, the triangles of a `MeshCollider`, a convex hull) is in the way, the camera is
     /// pulled in to `radius` metres in front of it, but never nearer to the target than `min_distance`. Without this a camera orbiting a character goes through trees, ruins and the side of a hill. The rig eases
-    /// the camera out again when the way is free (`CameraRig.follow_speed`), so a camera that is pulled in does not snap back.
+    /// the camera out again when the way is free (`CameraRig.follow_speed`), so a camera that is pulled in does not snap back. With `recover` above 0 the camera is pulled in at once but goes back out at that rate
+    /// (per second, exponentially: 4 takes about three quarters of a second), whatever the rig does: a camera that slides along a wall or passes a pillar does not pop in and out. `held` is the distance the camera is
+    /// held at while it comes back (written by the engine, 0 when it is free). `pull_in` above 0 eases the pull-in as well (per second: 15 covers half of a step in three ticks), but never lets the camera
+    /// come deeper into the `radius` margin than 0.7 of it, so it cannot go through the wall: a small step of the line's end (an edge crossing it) is rounded off, a big one is still taken at once.
+    /// `whisker` above 0 (metres) adds four more lines, to the sides and above and below the camera's place at that distance (A Hat in Time's camera whiskers): an obstacle that is not on the middle line yet but is
+    /// within a whisker of it pulls the camera in a little early (the distance it hits, `radius` less, plus the whisker: one metre of pull for each metre it is from the middle), so a wall that an edge of crosses the line
+    /// is met in two smaller steps instead of one big one.
     pub struct CameraCollide {
         pub radius: f32 = 0.35,
         pub min_distance: f32 = 0.9,
+        pub recover: f32 = 0.0,
+        pub held: f32 = 0.0,
+        pub pull_in: f32 = 0.0,
+        pub whisker: f32 = 0.0,
     }
 }
 
@@ -1975,7 +3141,7 @@ component! {
 
 component! {
     /// Fixes an entity with a `MeshRenderer` to a **joint of an animated model**, so that a sword stays in a hand, a shield on an arm, a torch in a fist and a helmet on a head while the skeleton moves (docs/GAMEPLAY.md, "Bone
-    /// attachments"). `target` is the entity of the skinned model (a `MeshRenderer` of a rigged `.glb` with an `Animator`), `joint` the name of the joint in that model (`model_info` lists them), `pos`, `rot` (a quaternion
+    /// attachments"). `target` is the entity of the skinned model (a `MeshRenderer` of a rigged `.glb` with an `Animator`; 0: the model the entity is a child of, so that a prefab can carry its own attachments, like an `Ik` goal with no `skin`), `joint` the name of the joint in that model (`model_info` lists them), `pos`, `rot` (a quaternion
     /// x y z w) and `scale` place the thing relative to the joint. Both renderers draw it at the joint's place in the pose of the picture, after the model itself: this is **presentation only**, like `Ik` (the entity's own
     /// `Transform` is left alone and stays what the simulation says; a game that needs the hand's place in the simulation uses a `Sensor` or the `Transform` of the character). If the target is not drawn animated (or has no
     /// such joint) the thing is drawn at its own `Transform`, and the picture says why.
@@ -2037,7 +3203,10 @@ component! {
     /// patches and a lean in a common direction, not noise. `height` is the range of the blades' heights in metres, `blade_width` their width at the foot, `bend` how far they lean over (0 stiff, 1 drooping), `base_color` and `tip_color`
     /// their colours at the foot and the tip (linear light; the foot is darker than its colour by the ambient occlusion of a dense field), `density` how many clumps of four blades per square metre near the camera. Normals are bent
     /// across the width so the blades look round, blades seen edge-on are widened a little, the sun shines through them (and is shadowed where something stands in its way) and the far blades are wider, so that a distant
-    /// field is as full as a near one. Give `mesh` a model and the old way is used: that model is the tuft.
+    /// field is as full as a near one. `mask_layer` (0 off; 1 to 4) makes the grass grow only where that layer of the terrain's `TerrainLayers` is painted (its density follows the splat map's weight, and the blades are
+    /// shorter where it is thin), as the shipped games grow each kind of grass on its own kind of ground: none on the rock or the sand. Give `mesh` a model and the old way is used: that model is the tuft.
+    /// `terrain` is the entity with the `Terrain` it grows on; 0 means the `Terrain` on this same entity (what a prefab needs: a streamed cell of the world is a prefab, and the entities of a prefab cannot name each other),
+    /// or, when this entity has none, the first terrain in the scene.
     pub struct GrassField {
         pub terrain: Uid = Uid(0),
         pub mesh: Sym = Sym(0),
@@ -2062,6 +3231,7 @@ component! {
         pub bend: f32 = 0.55,
         pub base_color: [f32; 3] = [0.03, 0.07, 0.012],
         pub tip_color: [f32; 3] = [0.2, 0.32, 0.07],
+        pub mask_layer: u32 = 0,
     }
 }
 
@@ -2107,6 +3277,41 @@ component! {
 }
 
 component! {
+    /// Fill, bounce and lamp falloff (the GPU renderer's high qualities; the first enabled `Lighting` counts; the reference picture and classic mode ignore it; a world without it is lit exactly as before). What the sun,
+    /// the sky and the lamps leave dark gets a little light instead of black, and lamps fall off the way light does: `fill` is the lowest light a surface gets from the sky whatever the hour (a colour, linear, before the
+    /// exposure: a night sky's glow and the glow of a city; a street at midnight is not pitch black), `bounce` is the share of the sun's (or the moon's) light that comes back as ambient light from the ground and the walls
+    /// (it lifts the shadowed side of a wall and the floor of a street that no direct light reaches; 0 off), `lamp_falloff` blends the lamps' old falloff (0: a broad pool that fades smoothly to nothing at its range) into
+    /// inverse-square light (1: a bright core and a long tail, as a real lamp), `lamp_core` is the size of the core as a share of the range (0.12), `shadow_distance` pushes the sun's cascades out to at least that many
+    /// metres (the `Environment`'s own 80 is kept when it is the larger; 0 leaves it), and `softness` is the sun's apparent size for soft shadows when the world has no `Shadows` component of its own (see `Shadows`; 0
+    /// the plain filter), and `point_shadows` is how many point or spot lights cast shadows (0 to 4; the renderer's own is the two that matter most: each costs six faces of a shadow map, 0.3 to 0.7 ms of a GTX 1070 in a street, and 4 MB a face at 1024).
+    /// A new component.
+    pub struct Lighting {
+        pub fill: [f32; 3] = [0.02, 0.025, 0.04],
+        pub bounce: f32 = 0.18,
+        pub lamp_falloff: f32 = 1.0,
+        pub lamp_core: f32 = 0.12,
+        pub shadow_distance: f32 = 200.0,
+        pub softness: f32 = 0.03,
+        pub point_shadows: u32 = 4,
+        pub enabled: bool = true,
+    }
+}
+
+component! {
+    /// Macro variation of a surface (the GPU renderer's high qualities; beside a `MeshRenderer`; the reference picture and classic mode ignore it). A wall, a floor or a road that repeats one small texture shows the repetition
+    /// from afar whatever `PbrMaps.untile` does to the small picture: the same grey over a whole street. The engine multiplies the colour by smooth noise made from the **world position** (so it needs no UV layout, and the next
+    /// piece of the same material carries on the same patches) at three scales: `scale` metres (the biggest patches), a fifth of that and a twenty-fifth. `strength` (0 to 1) is how much the brightness varies (0.25: about a tenth
+    /// either way in most places, a third at the extremes), `tint` (0 to 1) leans the colour warm in some patches and cool in others, `rough` (0 to 1) makes the darker patches rougher and the lighter ones smoother. All three at 0
+    /// draw the surface as it was. The noise is still (it does not move or flicker). It costs a few noise lookups a pixel on a surface that has it and nothing on the others (docs/GPU.md, "No two places alike").
+    pub struct MacroVary {
+        pub strength: f32 = 0.25,
+        pub scale: f32 = 24.0,
+        pub tint: f32 = 0.3,
+        pub rough: f32 = 0.3,
+    }
+}
+
+component! {
     /// A sky made by the physics of the air (the GPU renderer's high qualities; the first enabled `Atmosphere` counts, the reference picture and classic mode keep the `Environment`'s colours): the air is a layer of
     /// molecules that scatters blue light (Rayleigh) and a layer of haze and dust (Mie), and the sun's light is scattered towards the eye along every line of sight (Nishita's single scattering, worked out for every pixel
     /// of the sky). The sky is blue at noon with a pale horizon, the sun reddens and dims as it gets low, the sky glows round it, and after sunset it goes dark: all from the direction of the first directional light, which
@@ -2133,5 +3338,115 @@ component! {
         pub shallow: [f32; 3] = [0.22, 0.62, 0.58],
         pub foam: f32 = 0.7,
         pub foam_width: f32 = 0.7,
+    }
+}
+
+component! {
+    /// A world made on demand (`procgen`, docs/REALWORLD.md): a city whose every street, building and room is generated as the camera comes near, from a seed, so that its size is not a number of entities. The program's provider says which
+    /// `StreamZone`s each cell of a grid has; this entity keeps the zones of the cells near the camera alive. A cell is a square of `cell` metres on the ground (cell (i, j) covers x from i `cell` to (i + 1) `cell`, z the same); the cells whose
+    /// middle is within `radius` metres of the camera have their zones (at most `per_tick` cells a tick, nearest first), and a cell beyond `radius` plus `hysteresis` loses them again, and with them whatever they had loaded. `grid` is the name given
+    /// to the provider; `extent` (0 = none) is the half width of the map in metres: there are no cells beyond it.
+    pub struct ProcGrid {
+        pub grid: Sym = Sym(0),
+        pub cell: f32 = 400.0,
+        pub radius: f32 = 3000.0,
+        pub hysteresis: f32 = 400.0,
+        pub extent: f32 = 0.0,
+        pub per_tick: u32 = 2,
+    }
+}
+
+component! {
+    /// Marks a `StreamZone` that a `ProcGrid` made: the grid's entity, and the cell (i, j) it belongs to. The engine's.
+    pub struct GridZone {
+        pub grid: Uid = Uid(0),
+        pub i: f32 = 0.0,
+        pub j: f32 = 0.0,
+    }
+}
+
+component! {
+    /// An evolved creature (docs/CREATURES.md): a spider whose body and brain were trained together on the GPU and that walks to a target over any ground. `brain` is a file of the workspace (a `champions.json` of the trainer,
+    /// or one genome) and `genome` says which of its programs; `model` is the file of another body (empty: the built-in spider); `body_seed` makes this animal's own body (its strength, weight, grip and stiffness differ
+    /// a little from the next one's). It walks to the entity `target` (the nearest `Terrain` or the flat ground at its own height is the ground), or to the point `goal` (x, y, z) when `target` is 0. It is placed where its
+    /// own `Transform` is, facing the way its x axis points; from then on the `Transform` follows its prosoma. The engine spawns 50 `CreaturePart` entities that draw it (turn `visible` off to draw it yourself, following
+    /// `CreaturePart.index`) and writes, every tick, `distance` (metres to the target), `speed` (metres per second along the ground), `height` (of the prosoma above the ground), `upright` (1 standing, below 0.3 fallen over)
+    /// and `feet` (how many touch the ground), `web` (a silk thread is held: the spider has shot it at a surface and pulls on it) and `tension` (newtons), `eaten` (how many foods it has eaten). `size` is how big it is against the animal it was trained as (1: a spider 1.5 m across; 0.25: a big tarantula, with every length and mass scaled and its clock sped up to match, so that it walks the same way, at half the speed). With `forage` true it chooses its own target, the nearest `Food` (and writes it to `target`). `enabled` false freezes it. A foraging creature that has not got closer to its food for `patience` seconds (20; 0 never) gives up on that food for three times as long and goes for the nearest other one; `stuck` (seconds without progress), `best` (the closest it has been), `given_up` and `give_up_left` are what it remembers for that, written by the engine. Like a real spider it moves in bursts: after it eats it **rests** for about `rest` seconds (0: never), while it walks it stops now and then to **scan** (every `scan_every` seconds on average for about `scan_for` seconds; 0: never), and while `alarm` is above 0 (a game sets it when something startles the creature; it counts down) it **freezes**; during all three it stands with all eight legs down and its brain waits (`pause_left` and `walked` are what the engine remembers for the first two).
+    pub struct Creature {
+        pub brain: Sym = Sym(0),
+        pub model: Sym = Sym(0),
+        pub genome: u32 = 0,
+        pub body_seed: u32 = 1,
+        pub target: Uid = Uid(0),
+        pub goal: [f32; 3] = [0.0, 0.0, 0.0],
+        pub enabled: bool = true,
+        pub visible: bool = true,
+        pub forage: bool = false,
+        pub size: f32 = 1.0,
+        pub distance: f32 = 0.0,
+        pub speed: f32 = 0.0,
+        pub height: f32 = 0.0,
+        pub upright: f32 = 1.0,
+        pub feet: u32 = 8,
+        pub web: bool = false,
+        pub tension: f32 = 0.0,
+        pub eaten: u32 = 0,
+        pub patience: f32 = 20.0,
+        pub rest: f32 = 30.0,
+        pub scan_every: f32 = 12.0,
+        pub scan_for: f32 = 1.5,
+        pub alarm: f32 = 0.0,
+        pub pause_left: f32 = 0.0,
+        pub walked: f32 = 0.0,
+        pub stuck: f32 = 0.0,
+        pub best: f32 = 0.0,
+        pub given_up: Uid = Uid(0),
+        pub give_up_left: f32 = 0.0,
+    }
+}
+
+component! {
+    /// Something a foraging `Creature` (`forage` true) goes to and eats: the creature walks to the nearest `Food`, and when it is there the food appears again at one of the `FoodSpot`s
+    /// (never beside the creature), so that the animal has to travel, climb and web its way around the place it lives in. `eaten` counts how many times it was eaten.
+    pub struct Food {
+        pub value: f32 = 1.0,
+        pub eaten: u32 = 0,
+    }
+}
+
+component! {
+    /// A place where `Food` can appear (the `Transform` is the place; `weight` is not used yet).
+    pub struct FoodSpot {
+        pub weight: f32 = 1.0,
+    }
+}
+
+component! {
+    /// One of the pieces that draw a `Creature` (made and moved by the engine): `owner` is the creature's entity, `index` the body (0 the prosoma, 1 the abdomen, then the six segments of each of the eight legs; 50 and up
+    /// are the drawn-on details, 200 is the silk thread).
+    pub struct CreaturePart {
+        pub owner: Uid = Uid(0),
+        pub index: u32 = 0,
+    }
+}
+
+component! {
+    /// A particle system (docs/FX.md): the engine's answer to Niagara. `effect` is the **description of the effect**, a JSON document of emitters (how particles are born, what they start with, forces, noise and colliders, size, colour and speed over their life, flipbook pictures, ribbons, solids, a light for each, and events that make
+    /// one emitter's particles when another's die or hit something): either the name of a file of the workspace (`fx/campfire.fx.json`) or the JSON itself, when the text starts with `{`. One entity holds every emitter of an effect (a fire is flame, smoke and embers in one place), and
+    /// `ParticleModules`/`Particles` go on working beside it. Unlike a `Particles` cloud the particles of a system **are stepped** (fixed 1/60 s steps from a clock), so they can collide, spawn each other and leave ribbons; the stepping happens in the picture, where the camera is, and only for what is in view (a server never does it, and
+    /// the state hash never sees it). The same history (the effect, the seed and the clocks the pictures saw) gives the same particles on every machine, whatever the number of threads; a system seen for the first time at some clock starts from a steady state. `time` is the clock (it runs by itself while `playing`, `speed` times as fast; set it to 0 to play an effect that has ended again), `seed` 0 takes the entity's number (two campfires are not twins), `scale` scales its
+    /// sizes and distances (the entity's own scale does too), `intensity` the rates of every emitter (0 stops it making more: the particles that live carry on), `tint` multiplies the colours, `quality` (0..1) thins out the rates and the budget for a slow machine, `repeat` (seconds, 0 never) takes the clock back to 0 whenever it gets there: an effect that is a burst (a blast, a shot) plays over and over, and when `repeat` is longer than the effect's longest life the seam is not seen. A new component.
+    pub struct ParticleSystem {
+        pub effect: Sym = Sym(0),
+        pub playing: bool = true,
+        pub time: f32 = 0.0,
+        pub speed: f32 = 1.0,
+        pub seed: u32 = 0,
+        pub visible: bool = true,
+        pub scale: f32 = 1.0,
+        pub intensity: f32 = 1.0,
+        pub tint: [f32; 4] = [1.0, 1.0, 1.0, 1.0],
+        pub quality: f32 = 1.0,
+        pub repeat: f32 = 0.0,
     }
 }

@@ -1,0 +1,4246 @@
+{
+ "lunaris": 1,
+ "components": [
+  {
+   "name": "Hero",
+   "doc": "",
+   "fields": []
+  },
+  {
+   "name": "Prop",
+   "doc": "",
+   "fields": []
+  },
+  {
+   "name": "HudHealth",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  },
+  {
+   "name": "HudFood",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  },
+  {
+   "name": "HudWater",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  },
+  {
+   "name": "HudStamina",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  },
+  {
+   "name": "HudHeat",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  },
+  {
+   "name": "HudAmmo",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  },
+  {
+   "name": "HudBleeding",
+   "doc": "marks a part of the HUD (`net_hud` systems)",
+   "fields": []
+  }
+ ],
+ "next_uid": 400,
+ "entities": [
+  {
+   "uid": 6,
+   "components": {
+    "Name": {
+     "value": "Loot tables"
+    },
+    "LootTable": {
+     "text": "table crate rolls=2-3 empty=0.15\n  bandage w=5 n=1-2\n  can w=4\n  water w=4\n  @rare w=1\n  @guns w=3\n  @ammo w=4\ntable rare rolls=1\n  crowbar w=2\n  medkit w=2\n  flashlight w=2\n  goggles w=1\ntable guns rolls=1\n  pistol w=4\n  smg w=3\n  shotgun w=3\n  rifle w=2\n  sniper w=1\ntable ammo rolls=1\n  ammo9 w=4 n=12-30\n  shells w=3 n=4-10\n  ammo556 w=3 n=15-30\n  ammo762 w=1 n=5-10\n"
+    }
+   }
+  },
+  {
+   "uid": 7,
+   "components": {
+    "Name": {
+     "value": "Items"
+    },
+    "ItemTable": {
+     "text": "item bandage | Bandage | stack=10 weight=0.1\nitem can | Canned food | stack=5 weight=0.4\nitem water | Water bottle | stack=3 weight=0.5\nitem crowbar | Crowbar | stack=1 weight=2\nitem pistol | Pistol | stack=1 weight=1\nitem smg | Submachine gun | stack=1 weight=2.5\nitem shotgun | Shotgun | stack=1 weight=3.5\nitem rifle | Assault rifle | stack=1 weight=3.5\nitem sniper | Sniper rifle | stack=1 weight=5\nitem ammo9 | 9 mm rounds | stack=60 weight=0.02\nitem shells | Shotgun shells | stack=24 weight=0.04\nitem ammo556 | 5.56 rounds | stack=90 weight=0.02\nitem ammo762 | 7.62 rounds | stack=30 weight=0.03\nitem medkit | Medical kit | stack=1 weight=1.2\nitem flashlight | Flashlight | stack=1 weight=0.4\nitem goggles | Hacking goggles | stack=1 weight=0.6\n"
+    }
+   }
+  },
+  {
+   "uid": 8,
+   "components": {
+    "Name": {
+     "value": "Building rules"
+    },
+    "BuildRules": {
+     "text": "rules step=90 snap=1.5\npiece foundation size=4,0.5,4 hp=500 free=1 anchor=1 decay=0.02\n  socket n at=0,0.25,-2 yaw=0   type=edge mates=edge,wall_base carry=0.8,wall_base:0\n  socket s at=0,0.25,2  yaw=180 type=edge mates=edge,wall_base carry=0.8,wall_base:0\n  socket e at=2,0.25,0  yaw=-90 type=edge mates=edge,wall_base carry=0.8,wall_base:0\n  socket w at=-2,0.25,0 yaw=90  type=edge mates=edge,wall_base carry=0.8,wall_base:0\npiece wall size=4,3,0.2 hp=300 inset=0.12 decay=0.02\n  socket base at=0,-1.5,0 yaw=0 type=wall_base mates=edge carry=0.9 turn=0\n"
+    }
+   }
+  },
+  {
+   "uid": 9,
+   "components": {
+    "Name": {
+     "value": "Server"
+    },
+    "NetHost": {
+     "player": "Avatar",
+     "forward": "shot 150\nbuild_placed 120\ncorpse 120\ndoor_open 60\ndoor_close 60\ncontainer_open 40\npicked 40",
+     "static_every": 15,
+     "save": "saves/outpost_world.json",
+     "save_every": 60,
+     "persist": "Transform Inventory Vitals HitPoints",
+     "drop": "Pickup",
+     "uses": "use can eat=35\nuse water drink=40\nuse bandage heal=5 bandage=1\nuse medkit heal=60 bandage=1"
+    }
+   }
+  },
+  {
+   "uid": 5,
+   "components": {
+    "Name": {
+     "value": "Environment"
+    },
+    "Environment": {
+     "sky": true,
+     "sky_top": [
+      0.25,
+      0.4,
+      0.75
+     ],
+     "sky_horizon": [
+      0.75,
+      0.82,
+      0.92
+     ],
+     "ambient": 0.9,
+     "ssao": 1.0,
+     "bloom": 0.2,
+     "fog": 0.003
+    }
+   }
+  },
+  {
+   "uid": 3,
+   "components": {
+    "Name": {
+     "value": "Sun"
+    },
+    "Transform": {
+     "rot": [
+      -0.5,
+      0.35,
+      0.15,
+      0.78
+     ]
+    },
+    "Light": {
+     "kind": 0,
+     "intensity": 2.6
+    }
+   }
+  },
+  {
+   "uid": 10,
+   "components": {
+    "Name": {
+     "value": "Ground"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      -0.5,
+      0
+     ],
+     "scale": [
+      80,
+      1,
+      80
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.45,
+      0.55,
+      0.4,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 11,
+   "components": {
+    "Name": {
+     "value": "Perimeter 1"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      2,
+      -40.25
+     ],
+     "scale": [
+      80,
+      4,
+      0.5
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.6,
+      0.58,
+      0.55,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 12,
+   "components": {
+    "Name": {
+     "value": "Perimeter 2"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      2,
+      40.25
+     ],
+     "scale": [
+      80,
+      4,
+      0.5
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.6,
+      0.58,
+      0.55,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 13,
+   "components": {
+    "Name": {
+     "value": "Perimeter 3"
+    },
+    "Transform": {
+     "pos": [
+      -40.25,
+      2,
+      0
+     ],
+     "scale": [
+      0.5,
+      4,
+      80
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.6,
+      0.58,
+      0.55,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 14,
+   "components": {
+    "Name": {
+     "value": "Perimeter 4"
+    },
+    "Transform": {
+     "pos": [
+      40.25,
+      2,
+      0
+     ],
+     "scale": [
+      0.5,
+      4,
+      80
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.6,
+      0.58,
+      0.55,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 100,
+   "components": {
+    "Name": {
+     "value": "Spawn 1"
+    },
+    "Transform": {
+     "pos": [
+      30.0,
+      0,
+      0.0
+     ],
+     "rot": [
+      0,
+      0.70711,
+      0,
+      0.70711
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 101,
+   "components": {
+    "Name": {
+     "value": "Spawn 2"
+    },
+    "Transform": {
+     "pos": [
+      21.21,
+      0,
+      21.21
+     ],
+     "rot": [
+      0,
+      0.38268,
+      0,
+      0.92388
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 102,
+   "components": {
+    "Name": {
+     "value": "Spawn 3"
+    },
+    "Transform": {
+     "pos": [
+      0.0,
+      0,
+      30.0
+     ],
+     "rot": [
+      0,
+      0.0,
+      0,
+      1.0
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 103,
+   "components": {
+    "Name": {
+     "value": "Spawn 4"
+    },
+    "Transform": {
+     "pos": [
+      -21.21,
+      0,
+      21.21
+     ],
+     "rot": [
+      0,
+      -0.38268,
+      0,
+      0.92388
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 104,
+   "components": {
+    "Name": {
+     "value": "Spawn 5"
+    },
+    "Transform": {
+     "pos": [
+      -30.0,
+      0,
+      0.0
+     ],
+     "rot": [
+      0,
+      -0.70711,
+      0,
+      0.70711
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 105,
+   "components": {
+    "Name": {
+     "value": "Spawn 6"
+    },
+    "Transform": {
+     "pos": [
+      -21.21,
+      0,
+      -21.21
+     ],
+     "rot": [
+      0,
+      -0.92388,
+      0,
+      0.38268
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 106,
+   "components": {
+    "Name": {
+     "value": "Spawn 7"
+    },
+    "Transform": {
+     "pos": [
+      -0.0,
+      0,
+      -30.0
+     ],
+     "rot": [
+      0,
+      -1.0,
+      0,
+      0.0
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 107,
+   "components": {
+    "Name": {
+     "value": "Spawn 8"
+    },
+    "Transform": {
+     "pos": [
+      21.21,
+      0,
+      -21.21
+     ],
+     "rot": [
+      0,
+      0.92388,
+      0,
+      0.38268
+     ]
+    },
+    "SpawnPoint": {
+     "radius": 2
+    }
+   }
+  },
+  {
+   "uid": 20,
+   "components": {
+    "Name": {
+     "value": "Hut back"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.5,
+      -17
+     ],
+     "scale": [
+      6,
+      3,
+      0.3
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.6,
+      0.5,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 21,
+   "components": {
+    "Name": {
+     "value": "Hut left"
+    },
+    "Transform": {
+     "pos": [
+      -3,
+      1.5,
+      -14
+     ],
+     "scale": [
+      0.3,
+      3,
+      6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.6,
+      0.5,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 22,
+   "components": {
+    "Name": {
+     "value": "Hut right"
+    },
+    "Transform": {
+     "pos": [
+      3,
+      1.5,
+      -14
+     ],
+     "scale": [
+      0.3,
+      3,
+      6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.6,
+      0.5,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 23,
+   "components": {
+    "Name": {
+     "value": "Hut front left"
+    },
+    "Transform": {
+     "pos": [
+      -1.9,
+      1.5,
+      -11
+     ],
+     "scale": [
+      2.2,
+      3,
+      0.3
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.6,
+      0.5,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 24,
+   "components": {
+    "Name": {
+     "value": "Hut front right"
+    },
+    "Transform": {
+     "pos": [
+      1.9,
+      1.5,
+      -11
+     ],
+     "scale": [
+      2.2,
+      3,
+      0.3
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.6,
+      0.5,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 25,
+   "components": {
+    "Name": {
+     "value": "Hut over the door"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      2.55,
+      -11
+     ],
+     "scale": [
+      1.6,
+      0.9,
+      0.3
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.6,
+      0.5,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 26,
+   "components": {
+    "Name": {
+     "value": "Hut roof"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      3.15,
+      -14
+     ],
+     "scale": [
+      6.6,
+      0.3,
+      6.6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.45,
+      0.3,
+      0.25,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 27,
+   "components": {
+    "Name": {
+     "value": "Door"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.05,
+      -11
+     ],
+     "scale": [
+      1.1,
+      2.1,
+      0.12
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.4,
+      0.28,
+      0.18,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 1,
+     "prompt": "Open"
+    },
+    "Door": {
+     "hinge": [
+      -0.55,
+      0,
+      0
+     ],
+     "angle_open": -100,
+     "speed": 200
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 30
+    }
+   }
+  },
+  {
+   "uid": 30,
+   "components": {
+    "Name": {
+     "value": "Crate 1"
+    },
+    "Transform": {
+     "pos": [
+      -2.0,
+      0.5,
+      -16.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "Inventory": {
+     "size": 8
+    },
+    "LootContainer": {
+     "table": "crate",
+     "key": 1000,
+     "refill": 900
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 31
+    }
+   }
+  },
+  {
+   "uid": 31,
+   "components": {
+    "Name": {
+     "value": "Crate 2"
+    },
+    "Transform": {
+     "pos": [
+      2.0,
+      0.5,
+      -16.0
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "Inventory": {
+     "size": 8
+    },
+    "LootContainer": {
+     "table": "crate",
+     "key": 1001,
+     "refill": 900
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 31
+    }
+   }
+  },
+  {
+   "uid": 32,
+   "components": {
+    "Name": {
+     "value": "Crate 3"
+    },
+    "Transform": {
+     "pos": [
+      2.2,
+      0.5,
+      -13.5
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "Inventory": {
+     "size": 8
+    },
+    "LootContainer": {
+     "table": "crate",
+     "key": 1002,
+     "refill": 900
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 31
+    }
+   }
+  },
+  {
+   "uid": 33,
+   "components": {
+    "Name": {
+     "value": "Crate 4"
+    },
+    "Transform": {
+     "pos": [
+      -8,
+      0.5,
+      6
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "Inventory": {
+     "size": 8
+    },
+    "LootContainer": {
+     "table": "crate",
+     "key": 1003,
+     "refill": 900
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 31
+    }
+   }
+  },
+  {
+   "uid": 34,
+   "components": {
+    "Name": {
+     "value": "Crate 5"
+    },
+    "Transform": {
+     "pos": [
+      9,
+      0.5,
+      -3
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "Inventory": {
+     "size": 8
+    },
+    "LootContainer": {
+     "table": "crate",
+     "key": 1004,
+     "refill": 900
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 31
+    }
+   }
+  },
+  {
+   "uid": 35,
+   "components": {
+    "Name": {
+     "value": "Crate 6"
+    },
+    "Transform": {
+     "pos": [
+      6,
+      0.5,
+      12
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "Inventory": {
+     "size": 8
+    },
+    "LootContainer": {
+     "table": "crate",
+     "key": 1005,
+     "refill": 900
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 31
+    }
+   }
+  },
+  {
+   "uid": 50,
+   "components": {
+    "Name": {
+     "value": "Pickup 1"
+    },
+    "Transform": {
+     "pos": [
+      -5,
+      0.3,
+      -4
+     ],
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.85,
+      0.2,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 3,
+     "prompt": "Take",
+     "item": "bandage 3",
+     "radius": 0.7
+    },
+    "NetEntity": {
+     "class": 1,
+     "kind": 32
+    }
+   }
+  },
+  {
+   "uid": 51,
+   "components": {
+    "Name": {
+     "value": "Pickup 2"
+    },
+    "Transform": {
+     "pos": [
+      4,
+      0.3,
+      -6
+     ],
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.85,
+      0.2,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 3,
+     "prompt": "Take",
+     "item": "can 2",
+     "radius": 0.7
+    },
+    "NetEntity": {
+     "class": 1,
+     "kind": 32
+    }
+   }
+  },
+  {
+   "uid": 52,
+   "components": {
+    "Name": {
+     "value": "Pickup 3"
+    },
+    "Transform": {
+     "pos": [
+      -10,
+      0.3,
+      10
+     ],
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.85,
+      0.2,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 3,
+     "prompt": "Take",
+     "item": "shells 8",
+     "radius": 0.7
+    },
+    "NetEntity": {
+     "class": 1,
+     "kind": 32
+    }
+   }
+  },
+  {
+   "uid": 53,
+   "components": {
+    "Name": {
+     "value": "Pickup 4"
+    },
+    "Transform": {
+     "pos": [
+      11,
+      0.3,
+      8
+     ],
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.85,
+      0.2,
+      1
+     ]
+    },
+    "Interactable": {
+     "kind": 3,
+     "prompt": "Take",
+     "item": "shotgun 1",
+     "radius": 0.7
+    },
+    "NetEntity": {
+     "class": 1,
+     "kind": 32
+    }
+   }
+  },
+  {
+   "uid": 200,
+   "components": {
+    "Name": {
+     "value": "Drone 1"
+    },
+    "Transform": {
+     "pos": [
+      -12,
+      7,
+      -12
+     ]
+    },
+    "Velocity": {},
+    "Team": {
+     "id": 2
+    },
+    "HitPoints": {
+     "value": 40,
+     "max": 40
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.85,
+      0.15,
+      0.15,
+      1
+     ],
+     "emissive": 0.4
+    },
+    "Perception": {
+     "engage": true,
+     "chase": false,
+     "sight_range": 18,
+     "sight_fov": 360,
+     "attack_range": 18,
+     "hearing": 1.0,
+     "shout": 25,
+     "los": true,
+     "sight_eye": 0.0
+    },
+    "Weapon": {
+     "damage": 5,
+     "rate": 150,
+     "range": 40,
+     "spread": 1.5,
+     "infinite": true,
+     "noise": 60,
+     "recoil": [
+      0,
+      0
+     ],
+     "owner": 200
+    },
+    "FlyAgent": {
+     "perception": true,
+     "patrol": "-12 0 -12\n12 0 -12\n12 0 12\n-12 0 12\n",
+     "speed": 8,
+     "range": 12,
+     "orbit": 4,
+     "hover": 7,
+     "wait": 1.5
+    },
+    "Hackable": {
+     "difficulty": 3,
+     "range": 25,
+     "duration": 40,
+     "speed": 8,
+     "accel": 20
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 40
+    }
+   }
+  },
+  {
+   "uid": 201,
+   "components": {
+    "Name": {
+     "value": "Drone 2"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      7,
+      -12
+     ]
+    },
+    "Velocity": {},
+    "Team": {
+     "id": 2
+    },
+    "HitPoints": {
+     "value": 40,
+     "max": 40
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.85,
+      0.15,
+      0.15,
+      1
+     ],
+     "emissive": 0.4
+    },
+    "Perception": {
+     "engage": true,
+     "chase": false,
+     "sight_range": 18,
+     "sight_fov": 360,
+     "attack_range": 18,
+     "hearing": 1.0,
+     "shout": 25,
+     "los": true,
+     "sight_eye": 0.0
+    },
+    "Weapon": {
+     "damage": 5,
+     "rate": 150,
+     "range": 40,
+     "spread": 1.5,
+     "infinite": true,
+     "noise": 60,
+     "recoil": [
+      0,
+      0
+     ],
+     "owner": 201
+    },
+    "FlyAgent": {
+     "perception": true,
+     "patrol": "0 0 -12\n0 0 12\n",
+     "speed": 8,
+     "range": 12,
+     "orbit": 4,
+     "hover": 7,
+     "wait": 1.5
+    },
+    "Hackable": {
+     "difficulty": 3,
+     "range": 25,
+     "duration": 40,
+     "speed": 8,
+     "accel": 20
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 40
+    }
+   }
+  },
+  {
+   "uid": 240,
+   "components": {
+    "Name": {
+     "value": "Crawler 1"
+    },
+    "Transform": {
+     "pos": [
+      -16,
+      0,
+      4
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.5,
+     "height": 0.9
+    },
+    "Team": {
+     "id": 2
+    },
+    "HitPoints": {
+     "value": 60,
+     "max": 60
+    },
+    "NavAgent": {
+     "speed": 5,
+     "radius": 0.5,
+     "height": 0.9,
+     "arrive": 1.0
+    },
+    "Perception": {
+     "engage": true,
+     "sight_range": 25,
+     "sight_fov": 360,
+     "attack_range": 2.2,
+     "hearing": 1.0,
+     "shout": 20,
+     "notice_time": 0.6,
+     "lose_time": 6,
+     "sight_eye": 0.6,
+     "weapon": 250
+    },
+    "Hackable": {
+     "difficulty": 3,
+     "range": 25,
+     "duration": 40,
+     "speed": 5,
+     "accel": 30
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 42
+    }
+   }
+  },
+  {
+   "uid": 250,
+   "components": {
+    "Name": {
+     "value": "Crawler 1 mouth"
+    },
+    "Parent": {
+     "target": 240
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.5,
+      0
+     ]
+    },
+    "Transform": {
+     "pos": [
+      -16,
+      0.5,
+      4
+     ]
+    },
+    "Weapon": {
+     "damage": 12,
+     "rate": 120,
+     "range": 2.4,
+     "spread": 0,
+     "infinite": true,
+     "noise": 0,
+     "recoil": [
+      0,
+      0
+     ],
+     "owner": 240
+    }
+   }
+  },
+  {
+   "uid": 241,
+   "components": {
+    "Name": {
+     "value": "Crawler 2"
+    },
+    "Transform": {
+     "pos": [
+      16,
+      0,
+      6
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.5,
+     "height": 0.9
+    },
+    "Team": {
+     "id": 2
+    },
+    "HitPoints": {
+     "value": 60,
+     "max": 60
+    },
+    "NavAgent": {
+     "speed": 5,
+     "radius": 0.5,
+     "height": 0.9,
+     "arrive": 1.0
+    },
+    "Perception": {
+     "engage": true,
+     "sight_range": 25,
+     "sight_fov": 360,
+     "attack_range": 2.2,
+     "hearing": 1.0,
+     "shout": 20,
+     "notice_time": 0.6,
+     "lose_time": 6,
+     "sight_eye": 0.6,
+     "weapon": 251
+    },
+    "Hackable": {
+     "difficulty": 3,
+     "range": 25,
+     "duration": 40,
+     "speed": 5,
+     "accel": 30
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 42
+    }
+   }
+  },
+  {
+   "uid": 251,
+   "components": {
+    "Name": {
+     "value": "Crawler 2 mouth"
+    },
+    "Parent": {
+     "target": 241
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      0.5,
+      0
+     ]
+    },
+    "Transform": {
+     "pos": [
+      16,
+      0.5,
+      6
+     ]
+    },
+    "Weapon": {
+     "damage": 12,
+     "rate": 120,
+     "range": 2.4,
+     "spread": 0,
+     "infinite": true,
+     "noise": 0,
+     "recoil": [
+      0,
+      0
+     ],
+     "owner": 241
+    }
+   }
+  },
+  {
+   "uid": 220,
+   "components": {
+    "Name": {
+     "value": "Helicopter"
+    },
+    "Transform": {
+     "pos": [
+      22,
+      1.0,
+      14
+     ],
+     "scale": [
+      2.4,
+      2.0,
+      4.5
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.3,
+      0.35,
+      0.4,
+      1
+     ],
+     "roughness": 0.6
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "RigidBody": {
+     "mass": 2000
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0
+    },
+    "HitPoints": {
+     "value": 1500,
+     "max": 1500,
+     "last": 1500
+    },
+    "Helicopter": {
+     "engine": false,
+     "spool": 0,
+     "spool_up": 4,
+     "noise": 160,
+     "heat": 0.5
+    },
+    "Interactable": {
+     "kind": 0,
+     "prompt": "Fly"
+    },
+    "Seat": {
+     "offset": [
+      0,
+      0.6,
+      0.4
+     ],
+     "exit": [
+      3,
+      -0.7,
+      0
+     ],
+     "drive": 1,
+     "max_exit_altitude": 3
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 60
+    }
+   }
+  },
+  {
+   "uid": 221,
+   "components": {
+    "Name": {
+     "value": "Car"
+    },
+    "Transform": {
+     "pos": [
+      -33,
+      0.74,
+      28
+     ]
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1.8,
+      0.7,
+      4.2
+     ]
+    },
+    "RigidBody": {
+     "mass": 1200,
+     "friction": 0.3
+    },
+    "Velocity": {},
+    "AngularVelocity": {
+     "damping": 0.05
+    },
+    "HitPoints": {
+     "value": 800,
+     "max": 800,
+     "last": 800
+    },
+    "Vehicle": {
+     "wheels": "defaults: radius=0.35 rest=0.3 travel=0.2 spring=35000 damper=3200 grip=1.2\nfl: -0.8 -0.15 -1.3 steer=1 brake=1\nfr: 0.8 -0.15 -1.3 steer=1 brake=1\nrl: -0.8 -0.15 1.3 drive=1 brake=0.7 handbrake=1\nrr: 0.8 -0.15 1.3 drive=1 brake=0.7 handbrake=1",
+     "handbrake": 1
+    },
+    "Interactable": {
+     "kind": 0,
+     "prompt": "Drive"
+    },
+    "Seat": {
+     "offset": [
+      -0.4,
+      0.45,
+      0.2
+     ],
+     "exit": [
+      -2.2,
+      -0.3,
+      0
+     ],
+     "drive": 2,
+     "max_exit_speed": 4
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 61
+    }
+   }
+  },
+  {
+   "uid": 230,
+   "components": {
+    "Name": {
+     "value": "Tower"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      15,
+      0
+     ],
+     "scale": [
+      2,
+      30,
+      2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.5,
+      0.5,
+      0.55,
+      1
+     ],
+     "roughness": 0.8
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 229,
+   "components": {
+    "Name": {
+     "value": "Mast"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      32.5,
+      0
+     ],
+     "scale": [
+      0.4,
+      5,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.4,
+      0.4,
+      0.45,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "uid": 231,
+   "components": {
+    "Name": {
+     "value": "Lighthouse"
+    },
+    "Transform": {
+     "pos": [
+      0,
+      35,
+      0
+     ],
+     "rot": [
+      -0.54464,
+      0,
+      0,
+      0.83867
+     ]
+    },
+    "Team": {
+     "id": 2
+    },
+    "Searchlight": {
+     "range": 44,
+     "angle": 9,
+     "sweep": 18,
+     "hold": 0.8
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 70
+    }
+   }
+  },
+  {
+   "uid": 232,
+   "components": {
+    "Name": {
+     "value": "Director"
+    },
+    "Director": {
+     "prefab": "Hunter",
+     "threshold": 1.0,
+     "light_heat": 1.2,
+     "max_alive": 4,
+     "min_dist": 22,
+     "max_dist": 32,
+     "height": 7,
+     "cooldown": 20,
+     "cleanup": 60
+    }
+   }
+  },
+  {
+   "uid": 40,
+   "components": {
+    "Name": {
+     "value": "Player"
+    },
+    "Hero": {},
+    "Transform": {
+     "pos": [
+      0,
+      0,
+      20
+     ]
+    },
+    "CharacterBody": {
+     "radius": 0.35,
+     "height": 1.8
+    },
+    "Inventory": {
+     "size": 12
+    },
+    "Heat": {},
+    "NetPlayer": {
+     "puppet": "Mate",
+     "kinds": "3 30 DoorLeaf\n3 31 CrateModel\n3 9 CorpseModel\n3 1 FoundationModel\n3 2 WallModel\n1 32 PickupModel\n4 40 DroneModel\n4 60 HeliModel\n4 61 CarModel\n4 42 CrawlerModel\n4 70 BeamModel",
+     "acts": "1 build:foundation\n2 build:wall\n3 place\n4 inv_drop\n5 inv_move\n6 inv_use",
+     "camera": 41,
+     "eye": [
+      0,
+      1.62,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "uid": 41,
+   "components": {
+    "Name": {
+     "value": "Eyes"
+    },
+    "Parent": {
+     "target": 40
+    },
+    "LocalTransform": {
+     "pos": [
+      0,
+      1.62,
+      0
+     ]
+    },
+    "Transform": {
+     "pos": [
+      0,
+      1.62,
+      20
+     ]
+    },
+    "Camera": {
+     "fov_y": 72
+    },
+    "MouseLook": {
+     "sensitivity": 0.0022
+    }
+   }
+  },
+  {
+   "uid": 42,
+   "components": {
+    "Name": {
+     "value": "Input"
+    },
+    "InputMap": {
+     "bindings": "move_x = d, a:-1, gamepad.lx\nmove_y = w, s:-1, gamepad.ly\njump = space, gamepad.a\nfire = mouse_left, gamepad.rt\nuse = e, gamepad.x\ncrouch = control\nsprint = shift\nbuild1 = 1\nbuild2 = 2\nplace = f\ndrop = g\nhack = h\nreload = r\nuse_item = u\nnext_gun = q\nroll_l = z\nroll_r = c\ndeadzone = 0.15"
+    }
+   }
+  },
+  {
+   "uid": 43,
+   "components": {
+    "Name": {
+     "value": "Open container"
+    },
+    "NetContainer": {},
+    "Inventory": {
+     "size": 8
+    }
+   }
+  },
+  {
+   "uid": 44,
+   "components": {
+    "Name": {
+     "value": "Crosshair"
+    },
+    "Text": {
+     "value": "+",
+     "pos": [
+      0.5,
+      0.47
+     ],
+     "size": 0.05,
+     "align": 1,
+     "color": [
+      1,
+      1,
+      1,
+      0.85
+     ],
+     "shadow": true
+    }
+   }
+  },
+  {
+   "uid": 45,
+   "components": {
+    "Name": {
+     "value": "Hint"
+    },
+    "Text": {
+     "value": "WASD walk  mouse look  click shoot  R reload  Q next gun in the bag  E use (doors, crates, the helicopter, the car)  Ctrl crouch  1 2 choose foundation or wall, F build  G drop what is in the hand  helicopter: W S pitch, A D turn, Space Ctrl up down, Z C roll  car: W S A D, Ctrl brake, Space handbrake  H hold on a drone: hack it, then WASD Space Ctrl fly it, click fires, R lets go  Esc quit",
+     "pos": [
+      0.5,
+      0.95
+     ],
+     "size": 0.026,
+     "align": 1,
+     "color": [
+      1,
+      1,
+      1,
+      0.8
+     ],
+     "shadow": true
+    }
+   }
+  },
+  {
+   "uid": 300,
+   "components": {
+    "Name": {
+     "value": "HUD health"
+    },
+    "HudHealth": {},
+    "Ui": {
+     "pos": [
+      0.02,
+      0.835
+     ],
+     "color": [
+      0.85,
+      0.25,
+      0.22,
+      0.95
+     ],
+     "fill": 1.0,
+     "size": [
+      0.18,
+      0.016
+     ],
+     "back_color": [
+      0.03,
+      0.04,
+      0.05,
+      0.7
+     ],
+     "border": 0.002,
+     "border_color": [
+      0.5,
+      0.9,
+      1.0,
+      0.55
+     ],
+     "layer": 5
+    }
+   }
+  },
+  {
+   "uid": 301,
+   "components": {
+    "Name": {
+     "value": "HUD food"
+    },
+    "HudFood": {},
+    "Ui": {
+     "pos": [
+      0.02,
+      0.862
+     ],
+     "color": [
+      0.95,
+      0.6,
+      0.2,
+      0.95
+     ],
+     "fill": 1.0,
+     "size": [
+      0.18,
+      0.016
+     ],
+     "back_color": [
+      0.03,
+      0.04,
+      0.05,
+      0.7
+     ],
+     "border": 0.002,
+     "border_color": [
+      0.5,
+      0.9,
+      1.0,
+      0.55
+     ],
+     "layer": 5
+    }
+   }
+  },
+  {
+   "uid": 302,
+   "components": {
+    "Name": {
+     "value": "HUD water"
+    },
+    "HudWater": {},
+    "Ui": {
+     "pos": [
+      0.02,
+      0.889
+     ],
+     "color": [
+      0.3,
+      0.6,
+      0.95,
+      0.95
+     ],
+     "fill": 1.0,
+     "size": [
+      0.18,
+      0.016
+     ],
+     "back_color": [
+      0.03,
+      0.04,
+      0.05,
+      0.7
+     ],
+     "border": 0.002,
+     "border_color": [
+      0.5,
+      0.9,
+      1.0,
+      0.55
+     ],
+     "layer": 5
+    }
+   }
+  },
+  {
+   "uid": 303,
+   "components": {
+    "Name": {
+     "value": "HUD stamina"
+    },
+    "HudStamina": {},
+    "Ui": {
+     "pos": [
+      0.02,
+      0.916
+     ],
+     "color": [
+      0.9,
+      0.85,
+      0.35,
+      0.95
+     ],
+     "fill": 1.0,
+     "size": [
+      0.18,
+      0.016
+     ],
+     "back_color": [
+      0.03,
+      0.04,
+      0.05,
+      0.7
+     ],
+     "border": 0.002,
+     "border_color": [
+      0.5,
+      0.9,
+      1.0,
+      0.55
+     ],
+     "layer": 5
+    }
+   }
+  },
+  {
+   "uid": 304,
+   "components": {
+    "Name": {
+     "value": "HUD AI attention"
+    },
+    "HudHeat": {},
+    "Ui": {
+     "pos": [
+      0.8,
+      0.04
+     ],
+     "size": [
+      0.18,
+      0.016
+     ],
+     "color": [
+      1.0,
+      0.7,
+      0.15,
+      0.95
+     ],
+     "back_color": [
+      0.03,
+      0.04,
+      0.05,
+      0.7
+     ],
+     "fill": 0.0,
+     "border": 0.002,
+     "border_color": [
+      0.5,
+      0.9,
+      1.0,
+      0.55
+     ],
+     "layer": 5
+    }
+   }
+  },
+  {
+   "uid": 305,
+   "components": {
+    "Name": {
+     "value": "HUD ammunition"
+    },
+    "HudAmmo": {},
+    "Ui": {
+     "pos": [
+      0.84,
+      0.9
+     ],
+     "size": [
+      0.14,
+      0.06
+     ],
+     "color": [
+      0.03,
+      0.04,
+      0.05,
+      0.6
+     ],
+     "border": 0.002,
+     "border_color": [
+      0.5,
+      0.9,
+      1.0,
+      0.55
+     ],
+     "text": "{hud.mag} / {hud.reserve}",
+     "text_size": 0.04,
+     "text_color": [
+      0.9,
+      0.97,
+      1.0,
+      1
+     ],
+     "layer": 5,
+     "visible": false
+    }
+   }
+  },
+  {
+   "uid": 306,
+   "components": {
+    "Name": {
+     "value": "HUD bleeding"
+    },
+    "HudBleeding": {},
+    "Ui": {
+     "pos": [
+      0.205,
+      0.835
+     ],
+     "size": [
+      0.06,
+      0.03
+     ],
+     "color": [
+      0.8,
+      0.1,
+      0.1,
+      0.9
+     ],
+     "text": "BLEEDING",
+     "text_size": 0.014,
+     "text_color": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "layer": 5,
+     "visible": false
+    }
+   }
+  },
+  {
+   "uid": 307,
+   "components": {
+    "Name": {
+     "value": "HUD label"
+    },
+    "Text": {
+     "value": "AI ATTENTION",
+     "pos": [
+      0.89,
+      0.025
+     ],
+     "size": 0.014,
+     "align": 1,
+     "color": [
+      0.6,
+      0.9,
+      1.0,
+      0.8
+     ]
+    }
+   }
+  }
+ ],
+ "resources": {
+  "cursor.lock": 1,
+  "look.fz": -1,
+  "look.rx": 1,
+  "look.pitch": 0
+ },
+ "systems": [
+  {
+   "name": "look_axes",
+   "doc": "Which way is ahead and to the right on the ground, from the look.",
+   "each": [
+    "MouseLook"
+   ],
+   "order": 9,
+   "do": [
+    {
+     "res_set": "look.fx",
+     "to": {
+      "get": "MouseLook.forward[0]"
+     }
+    },
+    {
+     "res_set": "look.fz",
+     "to": {
+      "get": "MouseLook.forward[2]"
+     }
+    },
+    {
+     "res_set": "look.rx",
+     "to": {
+      "get": "MouseLook.right[0]"
+     }
+    },
+    {
+     "res_set": "look.rz",
+     "to": {
+      "get": "MouseLook.right[2]"
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "walk",
+   "doc": "The keys (or the pad) walk the body along them; Space jumps.",
+   "each": [
+    "Hero",
+    "CharacterBody"
+   ],
+   "order": 10,
+   "do": [
+    {
+     "set": "CharacterBody.walk[0]",
+     "to": {
+      "mul": [
+       {
+        "add": [
+         {
+          "mul": [
+           {
+            "res": "look.rx"
+           },
+           {
+            "res": "action.move_x"
+           }
+          ]
+         },
+         {
+          "mul": [
+           {
+            "res": "look.fx"
+           },
+           {
+            "res": "action.move_y"
+           }
+          ]
+         }
+        ]
+       },
+       5
+      ]
+     }
+    },
+    {
+     "set": "CharacterBody.walk[1]",
+     "to": {
+      "mul": [
+       {
+        "add": [
+         {
+          "mul": [
+           {
+            "res": "look.rz"
+           },
+           {
+            "res": "action.move_x"
+           }
+          ]
+         },
+         {
+          "mul": [
+           {
+            "res": "look.fz"
+           },
+           {
+            "res": "action.move_y"
+           }
+          ]
+         }
+        ]
+       },
+       5
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "action.jump.pressed"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "CharacterBody.jump",
+       "to": 5.5
+      }
+     ]
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "net_look",
+   "doc": "What the server needs of the look: the pitch.",
+   "each": [
+    "MouseLook"
+   ],
+   "order": 11,
+   "do": [
+    {
+     "res_set": "look.pitch",
+     "to": {
+      "get": "MouseLook.pitch"
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "net_buttons",
+   "doc": "The buttons and the build keys, as the network says them.",
+   "each": [
+    "NetPlayer"
+   ],
+   "order": 12,
+   "do": [
+    {
+     "set": "NetPlayer.pitch",
+     "to": {
+      "res": "look.pitch"
+     }
+    },
+    {
+     "set": "NetPlayer.flags",
+     "to": {
+      "add": [
+       {
+        "add": [
+         {
+          "res": "action.fire"
+         },
+         {
+          "mul": [
+           {
+            "res": "action.sprint"
+           },
+           4
+          ]
+         }
+        ]
+       },
+       {
+        "add": [
+         {
+          "add": [
+           {
+            "mul": [
+             {
+              "res": "action.use"
+             },
+             8
+            ]
+           },
+           {
+            "mul": [
+             {
+              "res": "action.crouch"
+             },
+             16
+            ]
+           }
+          ]
+         },
+         {
+          "add": [
+           {
+            "mul": [
+             {
+              "res": "action.hack"
+             },
+             32
+            ]
+           },
+           {
+            "mul": [
+             {
+              "res": "action.reload"
+             },
+             2
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "action.build1.pressed"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "NetPlayer.act",
+       "to": 1
+      }
+     ]
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "action.build2.pressed"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "NetPlayer.act",
+       "to": 2
+      }
+     ]
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "action.place.pressed"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "NetPlayer.act",
+       "to": 3
+      }
+     ]
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "action.use_item.pressed"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "NetPlayer.cmd_args[0]",
+       "to": {
+        "get": "NetPlayer.extra"
+       }
+      },
+      {
+       "set": "NetPlayer.act",
+       "to": 6
+      }
+     ]
+    },
+    {
+     "if": {
+      "gt": [
+       {
+        "res": "action.drop.pressed"
+       },
+       0.5
+      ]
+     },
+     "then": [
+      {
+       "set": "NetPlayer.cmd_args[0]",
+       "to": {
+        "get": "NetPlayer.extra"
+       }
+      },
+      {
+       "set": "NetPlayer.cmd_args[1]",
+       "to": 1
+      },
+      {
+       "set": "NetPlayer.act",
+       "to": 4
+      }
+     ]
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "net_hand",
+   "doc": "Q: the hand takes the next gun of the bag.",
+   "each": [
+    "NetPlayer",
+    "Inventory"
+   ],
+   "order": 14,
+   "do": [
+    {
+     "let": "held",
+     "be": {
+      "clamp": [
+       {
+        "get": "NetPlayer.extra"
+       },
+       0,
+       11
+      ]
+     }
+    },
+    {
+     "let": "steps",
+     "be": {
+      "min": [
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[0]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[0]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             23,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[1]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[1]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             24,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[2]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[2]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             25,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[3]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[3]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             26,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[4]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[4]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             27,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[5]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[5]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             28,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[6]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[6]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             29,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[7]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[7]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             30,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[8]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[8]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             31,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[9]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[9]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             32,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[10]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[10]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             33,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       },
+       {
+        "select": [
+         {
+          "and": [
+           {
+            "ge": [
+             {
+              "get": "Inventory.id[11]"
+             },
+             5
+            ]
+           },
+           {
+            "le": [
+             {
+              "get": "Inventory.id[11]"
+             },
+             9
+            ]
+           }
+          ]
+         },
+         {
+          "mod": [
+           {
+            "sub": [
+             34,
+             {
+              "var": "held"
+             }
+            ]
+           },
+           12
+          ]
+         },
+         99
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "if": {
+      "and": [
+       {
+        "gt": [
+         {
+          "res": "action.next_gun.pressed"
+         },
+         0.5
+        ]
+       },
+       {
+        "lt": [
+         {
+          "var": "steps"
+         },
+         99
+        ]
+       }
+      ]
+     },
+     "then": [
+      {
+       "set": "NetPlayer.extra",
+       "to": {
+        "mod": [
+         {
+          "add": [
+           {
+            "var": "held"
+           },
+           {
+            "var": "steps"
+           },
+           1
+          ]
+         },
+         12
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "net_axes",
+   "doc": "The keys as the helicopter's stick while the player rides (the engine says so in NetPlayer.riding).",
+   "each": [
+    "NetPlayer"
+   ],
+   "order": 13,
+   "do": [
+    {
+     "set": "NetPlayer.axes[0]",
+     "to": {
+      "mul": [
+       {
+        "add": [
+         {
+          "res": "action.roll_r"
+         },
+         {
+          "mul": [
+           {
+            "res": "action.roll_l"
+           },
+           -1
+          ]
+         }
+        ]
+       },
+       {
+        "min": [
+         {
+          "add": [
+           {
+            "get": "NetPlayer.riding"
+           },
+           {
+            "get": "NetPlayer.viewing"
+           }
+          ]
+         },
+         1
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "set": "NetPlayer.axes[1]",
+     "to": {
+      "mul": [
+       {
+        "add": [
+         {
+          "res": "action.jump"
+         },
+         {
+          "mul": [
+           {
+            "res": "action.crouch"
+           },
+           -1
+          ]
+         }
+        ]
+       },
+       {
+        "min": [
+         {
+          "add": [
+           {
+            "get": "NetPlayer.riding"
+           },
+           {
+            "get": "NetPlayer.viewing"
+           }
+          ]
+         },
+         1
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "set": "NetPlayer.axes[2]",
+     "to": {
+      "mul": [
+       {
+        "res": "action.move_y"
+       },
+       {
+        "min": [
+         {
+          "add": [
+           {
+            "get": "NetPlayer.riding"
+           },
+           {
+            "get": "NetPlayer.viewing"
+           }
+          ]
+         },
+         1
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "set": "NetPlayer.axes[3]",
+     "to": {
+      "mul": [
+       {
+        "res": "action.move_x"
+       },
+       {
+        "min": [
+         {
+          "add": [
+           {
+            "get": "NetPlayer.riding"
+           },
+           {
+            "get": "NetPlayer.viewing"
+           }
+          ]
+         },
+         1
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "net_hud_feed",
+   "doc": "What the server told the player about itself, as resources for the HUD.",
+   "each": [
+    "NetPlayer"
+   ],
+   "order": 15,
+   "do": [
+    {
+     "res_set": "hud.health",
+     "to": {
+      "get": "NetPlayer.health"
+     }
+    },
+    {
+     "res_set": "hud.food",
+     "to": {
+      "get": "NetPlayer.food"
+     }
+    },
+    {
+     "res_set": "hud.water",
+     "to": {
+      "get": "NetPlayer.water"
+     }
+    },
+    {
+     "res_set": "hud.stamina",
+     "to": {
+      "get": "NetPlayer.stamina"
+     }
+    },
+    {
+     "res_set": "hud.heat",
+     "to": {
+      "get": "NetPlayer.heat"
+     }
+    },
+    {
+     "res_set": "hud.mag",
+     "to": {
+      "get": "NetPlayer.mag"
+     }
+    },
+    {
+     "res_set": "hud.gun",
+     "to": {
+      "get": "NetPlayer.gun"
+     }
+    },
+    {
+     "res_set": "hud.reserve",
+     "to": {
+      "select": [
+       {
+        "ge": [
+         {
+          "get": "NetPlayer.reserve"
+         },
+         65535
+        ]
+       },
+       999,
+       {
+        "get": "NetPlayer.reserve"
+       }
+      ]
+     }
+    },
+    {
+     "res_set": "hud.bleeding",
+     "to": {
+      "select": [
+       {
+        "get": "NetPlayer.bleeding"
+       },
+       1,
+       0
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_health",
+   "each": [
+    "HudHealth",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.fill",
+     "to": {
+      "mul": [
+       {
+        "res": "hud.health"
+       },
+       1
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_food",
+   "each": [
+    "HudFood",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.fill",
+     "to": {
+      "mul": [
+       {
+        "res": "hud.food"
+       },
+       1
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_water",
+   "each": [
+    "HudWater",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.fill",
+     "to": {
+      "mul": [
+       {
+        "res": "hud.water"
+       },
+       1
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_stamina",
+   "each": [
+    "HudStamina",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.fill",
+     "to": {
+      "mul": [
+       {
+        "res": "hud.stamina"
+       },
+       1
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_heat",
+   "each": [
+    "HudHeat",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.fill",
+     "to": {
+      "mul": [
+       {
+        "res": "hud.heat"
+       },
+       0.1
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_ammo",
+   "each": [
+    "HudAmmo",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.visible",
+     "to": {
+      "gt": [
+       {
+        "res": "hud.gun"
+       },
+       0.5
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  },
+  {
+   "name": "hud_bleeding",
+   "each": [
+    "HudBleeding",
+    "Ui"
+   ],
+   "order": 16,
+   "do": [
+    {
+     "set": "Ui.visible",
+     "to": {
+      "gt": [
+       {
+        "res": "hud.bleeding"
+       },
+       0.5
+      ]
+     }
+    }
+   ],
+   "enabled": true
+  }
+ ],
+ "prefabs": {
+  "Avatar": {
+   "components": {
+    "Name": {
+     "value": "Avatar"
+    },
+    "Transform": {},
+    "CharacterBody": {
+     "radius": 0.35,
+     "height": 1.8,
+     "gravity_scale": 0
+    },
+    "HitPoints": {
+     "value": 100,
+     "max": 100,
+     "last": 100
+    },
+    "Vitals": {},
+    "Heat": {},
+    "Hacker": {
+     "range": 30,
+     "speed": 2,
+     "trace_heat": 0.4,
+     "aim": true
+    },
+    "Stealth": {},
+    "Respawn": {
+     "delay": 5,
+     "avoid": 20,
+     "protect": 8,
+     "corpse": "Corpse",
+     "corpse_time": 300
+    },
+    "Inventory": {
+     "size": 12,
+     "id": [
+      5,
+      10,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "count": [
+      1,
+      24,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    "NetAvatar": {}
+   },
+   "children": [
+    {
+     "components": {
+      "Name": {
+       "value": "Head"
+      },
+      "LocalTransform": {
+       "pos": [
+        0,
+        1.6,
+        0
+       ]
+      },
+      "Weapon": {
+       "active": false,
+       "spread": 0,
+       "noise": 0
+      },
+      "Loadout": {
+       "guns": "gun pistol  ammo=ammo9   damage=25 rate=300 mag=12 reload=1.4 auto=0 spread=0.3 range=120 noise=100 recoil=0.5\ngun smg     ammo=ammo9   damage=14 rate=800 mag=30 reload=2.0 auto=1 spread=1.2 bloom=0.35 range=90 noise=130 falloff=25 recoil=0.4\ngun shotgun ammo=shells  damage=9  pellets=8 rate=70 mag=6 reload=3.0 auto=0 spread=3.5 range=50 noise=170 falloff=10 falloff_min=0.2 recoil=1.4\ngun rifle   ammo=ammo556 damage=32 rate=640 mag=30 reload=2.4 auto=1 spread=0.5 bloom=0.25 range=220 noise=150 recoil=0.6\ngun sniper  ammo=ammo762 damage=90 rate=45 mag=5 reload=3.2 auto=0 spread=0.05 range=400 noise=190 head=2.5 falloff=200 falloff_min=0.8 recoil=2.0\n"
+      },
+      "BuildTool": {
+       "reach": 8
+      },
+      "Interactor": {
+       "reach": 3,
+       "look": false
+      }
+     }
+    }
+   ]
+  },
+  "Corpse": {
+   "components": {
+    "Name": {
+     "value": "Corpse"
+    },
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1.8,
+      0.4,
+      0.7
+     ]
+    },
+    "Inventory": {
+     "size": 12
+    },
+    "Interactable": {
+     "kind": 2,
+     "prompt": "Search"
+    },
+    "NetEntity": {
+     "class": 3,
+     "kind": 9
+    }
+   }
+  },
+  "Hunter": {
+   "components": {
+    "Name": {
+     "value": "Hunter"
+    },
+    "Transform": {},
+    "Velocity": {},
+    "Team": {
+     "id": 2
+    },
+    "HitPoints": {
+     "value": 40,
+     "max": 40
+    },
+    "Collider": {
+     "shape": 0,
+     "size": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    "Perception": {
+     "engage": true,
+     "chase": false,
+     "sight_range": 30,
+     "sight_fov": 360,
+     "attack_range": 22,
+     "hearing": 1.0,
+     "shout": 25,
+     "los": true,
+     "sight_eye": 0.0
+    },
+    "Weapon": {
+     "damage": 5,
+     "rate": 150,
+     "range": 40,
+     "spread": 1.5,
+     "infinite": true,
+     "noise": 60,
+     "recoil": [
+      0,
+      0
+     ]
+    },
+    "FlyAgent": {
+     "perception": true,
+     "speed": 9,
+     "range": 14,
+     "orbit": 4,
+     "hover": 7,
+     "wait": 1.5
+    },
+    "Hackable": {
+     "difficulty": 3,
+     "range": 25,
+     "duration": 40,
+     "speed": 9,
+     "accel": 20
+    },
+    "NetEntity": {
+     "class": 4,
+     "kind": 40
+    }
+   }
+  },
+  "Pickup": {
+   "components": {
+    "Name": {
+     "value": "Pickup"
+    },
+    "Transform": {
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "Interactable": {
+     "kind": 3,
+     "prompt": "Take",
+     "radius": 0.7
+    },
+    "NetEntity": {
+     "class": 1,
+     "kind": 32
+    }
+   }
+  },
+  "Mate": {
+   "components": {
+    "Name": {
+     "value": "Mate"
+    },
+    "Transform": {
+     "scale": [
+      0.7,
+      1.8,
+      0.7
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.2,
+      0.5,
+      0.95,
+      1
+     ]
+    },
+    "NetPuppet": {}
+   }
+  },
+  "CorpseModel": {
+   "components": {
+    "Name": {
+     "value": "CorpseModel"
+    },
+    "Transform": {
+     "scale": [
+      1.8,
+      0.4,
+      0.7
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.4,
+      0.1,
+      0.1,
+      1
+     ]
+    },
+    "NetPuppet": {}
+   }
+  },
+  "DoorLeaf": {
+   "components": {
+    "Name": {
+     "value": "DoorLeaf"
+    },
+    "Transform": {
+     "scale": [
+      1.1,
+      2.1,
+      0.12
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.4,
+      0.28,
+      0.18,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    },
+    "Door": {
+     "hinge": [
+      -0.55,
+      0,
+      0
+     ],
+     "angle_open": -100,
+     "speed": 200
+    }
+   }
+  },
+  "CrateModel": {
+   "components": {
+    "Name": {
+     "value": "CrateModel"
+    },
+    "Transform": {
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.55,
+      0.4,
+      0.2,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  "PickupModel": {
+   "components": {
+    "Name": {
+     "value": "PickupModel"
+    },
+    "Transform": {
+     "scale": [
+      0.4,
+      0.4,
+      0.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.95,
+      0.85,
+      0.2,
+      1
+     ]
+    },
+    "NetPuppet": {}
+   }
+  },
+  "DroneModel": {
+   "components": {
+    "Name": {
+     "value": "DroneModel"
+    },
+    "Transform": {
+     "scale": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "sphere",
+     "color": [
+      0.85,
+      0.15,
+      0.15,
+      1
+     ],
+     "emissive": 0.4
+    },
+    "NetPuppet": {}
+   }
+  },
+  "FoundationModel": {
+   "components": {
+    "Name": {
+     "value": "FoundationModel"
+    },
+    "Transform": {
+     "scale": [
+      4,
+      0.5,
+      4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.6,
+      0.6,
+      0.62,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  "WallModel": {
+   "components": {
+    "Name": {
+     "value": "WallModel"
+    },
+    "Transform": {
+     "scale": [
+      4,
+      3,
+      0.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.62,
+      0.5,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  "HeliModel": {
+   "components": {
+    "Name": {
+     "value": "HeliModel"
+    },
+    "Transform": {
+     "scale": [
+      2.4,
+      2.0,
+      4.5
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.3,
+      0.35,
+      0.4,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  "CarModel": {
+   "components": {
+    "Name": {
+     "value": "CarModel"
+    },
+    "Transform": {
+     "scale": [
+      1.8,
+      0.7,
+      4.2
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.7,
+      0.15,
+      0.12,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  "CrawlerModel": {
+   "components": {
+    "Name": {
+     "value": "CrawlerModel"
+    },
+    "Transform": {
+     "scale": [
+      1.1,
+      0.5,
+      1.4
+     ]
+    },
+    "MeshRenderer": {
+     "mesh": "cube",
+     "color": [
+      0.12,
+      0.12,
+      0.14,
+      1
+     ]
+    },
+    "NetPuppet": {},
+    "Collider": {
+     "shape": 1,
+     "size": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  "BeamModel": {
+   "components": {
+    "Name": {
+     "value": "BeamModel"
+    },
+    "Transform": {},
+    "NetPuppet": {}
+   },
+   "children": [
+    {
+     "components": {
+      "Name": {
+       "value": "Beam"
+      },
+      "LocalTransform": {
+       "pos": [
+        0,
+        -17.357,
+        -7.728
+       ],
+       "rot": [
+        -0.54464,
+        0,
+        0,
+        0.83867
+       ],
+       "scale": [
+        0.6,
+        0.6,
+        38
+       ]
+      },
+      "MeshRenderer": {
+       "mesh": "cube",
+       "color": [
+        1.0,
+        0.95,
+        0.6,
+        1
+       ],
+       "emissive": 1.0,
+       "cast_shadow": false
+      }
+     }
+    }
+   ]
+  }
+ }
+}

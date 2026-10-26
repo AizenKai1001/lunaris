@@ -58,8 +58,15 @@ What it does:
 * **Fast balls do not tunnel.** A sphere with an `AngularVelocity` that would move farther than its own radius in the next step is tried against
   every solid static body on the way (walls, floors, ramps, terrain), however thin: if it would hit one, its `Velocity.lin` is cut to the share of the
   step that ends exactly at the surface and its real velocity is kept in `AngularVelocity.stash` for that one tick, so the bounce is the bounce of
-  the real speed at the real place. Only spinning spheres get this, and only against static things; without an `AngularVelocity` a ball is the old kind
-  of ball (it can still fly through a wall thinner than its step).
+  the real speed at the real place. That forward-looking test is for spinning spheres; every other dynamic body has the one below.
+* **Fast bodies do not tunnel through scenery.** A dynamic ball, box or capsule that moved farther than its own size (a radius, or the smallest half
+  extent of a box) in the last tick has its path (from where it was a tick ago to where it is) tried, with its real shape, against the solid colliders
+  that never move and that lie near the path: walls and floors of any thinness, turned boxes, balls, capsules, terrain. If it touched one, the first
+  moment it did is found (tests a body size apart, then halving) and the body is put there, touching, with its velocity left alone, so the contacts
+  stop it or bounce it with its real speed against the side it came from. A body that already touched the thing a tick ago is left to the contacts;
+  triggers and things on a layer the body passes through are not solid to it; a mesh level has its own path test (`catch_up`). Each body is looked at
+  on its own and only its own position changes, so the answer does not depend on the order of the bodies or the colliders (`tunnel_fixes` in
+  `physics_rot.rs`, tested in `physics_ccd_tests.rs` and against the reference step in `physics_fast_tests.rs`).
 * **No rolling resistance.** A ball on a floor rolls on until something stops it; `AngularVelocity.damping` is the knob (a ball that should come to
   rest after a while wants 0.3 or more).
 * **Limits.** The spin is at most 60 radians per second. A body whose `Transform.rot` is zero or not a number counts as unturned.
@@ -100,6 +107,22 @@ position and orientation then say where the hinge is). The two bodies do not col
 * A hinge has an `axis` (world direction at the start, default up (0, 1, 0)) the two bodies turn about, and `limit` [low, high]: the angle of the body
   relative to its target, in radians, 0 as the scene starts, positive the right-handed way about `axis`. It may not leave that range (when `limit[0]` is
   below `limit[1]`; the default [0, 0] means no limit). The limit closes in on its end and stops there, with no bounce.
+* **`JointMotor` (a hinge's motor)**: put `{"speed": 3, "max_torque": 50}` on the same entity as the hinge. The body is turned about the axis at `speed` radians
+  per second (positive: counter-clockwise about the axis, relative to the target) with a torque of at most `max_torque` newton-metres, so a strong motor
+  holds its speed against a load, a weak one is slowed or stalled by it (a motor of 0.5 N m on a wheel whose inertia is 1.33 kg m^2 reaches 0.375 rad/s after
+  a second), and a `speed` of 0 with a large torque is a brake that holds an arm where gravity would drop it. A `max_torque` of 0 is no motor. The limits still hold.
+* **`JointSpring` (a hinge's spring)**: put `{"stiffness": 20, "damping": 15, "angle": 1.0}` on the same entity as the hinge. The body is pulled towards `angle` radians (the
+  same angle as `limit`: of the body relative to its target, 0 where the joint started) with `stiffness` newton-metres per radian of error, and the spin about the axis is
+  resisted with `damping` newton-metres per radian per second: a door that swings shut by itself, a suspension arm, a muscle. It is a soft constraint (Box2D's
+  formulation, so a very stiff spring does not blow up) solved with the rest of the joint; an arm of 5 kg and 2 m with a stiffness of 20 and a damping of 15 settles on its angle
+  within 1/30 of a radian in a few seconds, with no damping it swings out to twice the angle, and damping alone only slows a turning body. A stiffness and a damping of 0 are no spring.
+* **`check` names the mistakes** with these extras and with sleeping: a `JointMotor` or `JointSpring` on an entity whose `Joint` is not a hinge (kind 4) or that has no `Joint`, a
+  `JointCone` without a ball-and-socket (kind 3), a motor with a `max_torque` of 0, a spring with neither stiffness nor damping, a cone angle that means no limit, more than one
+  `PhysicsSleep` (the lowest uid is used) and one whose `time` switches sleeping off.
+* **`JointCone` (a ball-and-socket's swing limit)**: put `{"angle": 0.5}` on the same entity as the ball-and-socket. The joint's `axis` is a line fixed in the body
+  and a line fixed in the target (both start along the world direction given, as the engine first sees the joint); the angle between the two lines may not
+  grow past `angle` radians, so a shoulder, a hip or a neck bends only so far (the limit closes in on its end and stops there, with no bounce). An `angle` of 0,
+  or of pi or more, is no limit. There is no twist limit about the axis.
 * A hinged door: a thin tall box that is a body, `{"kind": 4, "target": <the post>, "anchor": <a point on the edge>, "axis": [0, 1, 0], "limit": [0, 1.5]}`.
   Joints in a chain of capsules: one ball-and-socket per link, each `target`ing the one before it, `anchor` the point where the two meet.
 * `examples/dominoes.lunaris.json` (`tools/build_dominoes.py` writes it, `examples/tests/dominoes.test.json` plays it) has a ball that rolls down a ramp
@@ -111,6 +134,40 @@ position and orientation then say where the hinge is). The two bodies do not col
 `check` warns about a joint whose owner is not a dynamic body or whose target does not exist.
 
 A long chain of heavy things on six solver rounds stretches a little (the solver pulls the ends back every tick); lighten the end, or add links.
+
+## Sleeping: `PhysicsSleep`
+
+Put `{"time": 0.5, "linear": 0.02, "angular": 0.04}` on one entity (the lowest uid wins; all three fields have these defaults, and without the component nothing sleeps)
+and groups of rigid bodies that have lain still stop costing physics. Nothing changes for a world without the component (no hash moves).
+
+* **Falling asleep.** Every awake dynamic body that is not moving fast keeps a timer and an anchor (where it was when the timer started). The timer runs while the body
+  stays within `linear * time` metres of its anchor (so its average speed is under `linear`; a stack of plain boxes that buzzes at a few centimetres a second without going
+  anywhere counts as still) and spins slower than `angular`; it starts again from the body's place when the body strays. An **island** is a group of awake dynamic bodies
+  that touch each other this tick (scenery and sleepers never join one); when every body of an island has run its timer to `time`, the island goes to sleep together.
+  A joint (`Joint` on the body or targeting it), a convex hull and a trigger never sleep, and keep the island they touch awake.
+* **What a sleeper is.** Its velocity is zeroed and it stays exactly where it is: no gravity, no contact rows, no pair tests between sleepers. To the others it is a
+  collider that never moves, until it wakes.
+* **Waking.** A sleeper wakes, with its whole island, when
+  - an awake dynamic body's box overlaps it (the step is then made again from the start with the island awake, so a hit is resolved against bodies that can move),
+  - its `Transform` or `Collider`, or its `Velocity` or `AngularVelocity`, is not what it was when it lay down (a script moved it or pushed it; buoyancy or a wind that writes a velocity every tick
+    keeps a body awake),
+  - the colliders around it changed: when the signature of all the scenery differs from last tick's, each sleeper compares the scenery whose boxes touch its own with
+    what it was when it lay down. A floor taken away, a wall that appears or moves next to it wakes it and nothing else (a scenery that moves every tick far away costs
+    one signature per sleeper per tick but wakes no one),
+  - its entity is gone, or has lost its `RigidBody`.
+* **The contact impulses are kept.** The impulses the island's contacts had when it lay down (see "What the solver remembers between ticks") are held and given back when it
+  wakes, so a tower that is woken does not wobble.
+* **It is state**, like the contact memory: cloned with a `Sim`, kept by `checkpoint` and `rewind_to`, written to a recording (`start_sleep`, only when there is any), mixed into the
+  state hash when there is any and emptied by `Sim::clear`. A scene file does not hold it: a game loaded from a file lies down again after `time` seconds.
+* **Both physics paths agree**: the random worlds of the fast-versus-reference test run with sleeping in half of them (9,800 bodies put to sleep and 6,700 woken in the test),
+  and the state hash is the same on every tick.
+* **Costs and limits.** On the fast path a sleeper is not a body of the step at all: its row is skipped after one lookup and a comparison of its `Transform`, `Collider` and
+  speed with what it lay down with (about 45 ns a sleeper a tick), and it lives in a grid of its own, kept while the list of sleepers stays the same, that the awake bodies
+  look in (an awake body whose box overlaps a sleeper wakes it; a trigger only sees it, so trigger events go on). 3,000 boxes resting in stacks of three cost 0.85 ms a tick
+  awake and 0.14 ms asleep (`cargo run --release -p lunaris-sim --example physics_bench -- rest`; the reference step, which every world with a spinning body takes, gathers its
+  sleepers as bodies that never move and saves only the solver: 1.9 and 1.2 ms). A world with scenery that changes every tick (a city that streams its buildings) compares
+  each sleeper's surroundings every tick. Continuous collision covers only colliders that never move, and a sleeper that a fast body wakes is one that can move: a body that
+  crosses more than its own size in a tick can pass through the box it wakes, as through any dynamic box.
 
 ## Mesh colliders: a level made of triangles
 
@@ -233,7 +290,7 @@ A rock, a crate, a wedge, a gem, a barrel: a shape that is not a ball, box or ca
   hull or a thin wall of boxes can still pass through, as any body can (see Limits): keep thin things slower or thicker, or shorten the step.
 * **A face that is nearly parallel to another and a little bent** can give a contact patch that is a bit small (the body is held on fewer than four
   points for a moment).
-* **Nothing is remembered between ticks**, as for every body here: a tall pile of hulls creeps like the piles of boxes do (see Limits).
+* **A hull remembers its contact impulses from tick to tick** like the other rich bodies (see Limits): a pile of hulls settles instead of creeping.
 * **Hull against hull is the costly one** (table below).
 
 ### What it costs
@@ -373,6 +430,45 @@ Numbers from the tests (`cargo test -p lunaris-sim --lib vehicle -- --nocapture`
 * The forces are applied right after the rigid bodies of the tick, so a control set by a graph system takes effect one tick later (the usual one-tick latency of everything a graph system writes). A vehicle's `Transform.scale` is not used for the wheel positions.
 * The friction solver is order dependent when the wheels fight (the two front wheels at different angles): the answer is deterministic and the same on every machine, but a wheel earlier in the table gets its way a little more.
 
+## Speed: the fast path
+
+`physics::step` has two implementations that give the same bits. `step_reference` is the simple one: every tick it gathers every collider, sorts them all by uid, sorts them all again along the sweep axis and sweeps them all, scenery included, so a world of three thousand boxes that never move cost about 0.7 ms a tick even with nothing moving. The fast path (`crates/lunaris-sim/src/physics/fast.rs`) keeps the colliders that never move (a `Transform` and a `Collider`, no `RigidBody`) in a grid between ticks, so a tick costs what the moving bodies cost:
+
+* The grid of an archetype of scenery is made again only when that archetype's entities, transforms or colliders differ from the copy it was made from (a memory compare, a few nanoseconds per collider), so a collider that is added, removed, moved, resized or turned into a trigger is noticed the same tick. Scenery that is moved every tick by writing its `Transform` (with no `Velocity`) makes its archetype's grid be made again every tick: that is still faster than the reference, but giving moving things a `Velocity` keeps them out of the grid of the ones that stand still.
+* The bodies that can move (dynamic bodies, triggers, scenery with a material) are put in a grid made every tick, and look for neighbours in it and in the grids of the scenery. A pair is accepted by the very test the sweep of the reference uses, so the narrow phase, the solver and the write-back see the same pairs and run the same code: the contacts, the velocities, the positions and the state hash are bit for bit the reference's.
+* The reference sweeps along the axis where the bodies are most spread out; that axis decides only a pair whose boxes touch to within rounding. The fast path works it out (the same sums in the same order) only on a tick where such a pair turns up.
+* A world with terrain, a mesh collider, a convex hull, a body that turns (`AngularVelocity`), a `Joint`, or a number that is not finite is stepped by the reference.
+* The cache lives in `Sim::physics`; a clone of a `Sim` starts with an empty one, and nothing in it is part of the state. `Sim::reference_physics = true` runs the reference (for tests and benchmarks).
+
+Measured on a Linux test machine (an i7-9700K at about 8 busy cores out of 8, so the numbers are pessimistic), best of three, `cargo run --release -p lunaris-sim --example physics_bench`:
+
+| scene | reference | fast path |
+|---|---|---|
+| 3,072 boxes that never move | 0.69 ms a tick | 0.023 ms |
+| 256 rooms of 12 boxes with a rolling ball in each (3,328 colliders) | 0.8 to 0.9 ms | 0.09 to 0.1 ms (about 350 ns a ball) |
+| 1,024 such rooms (13,312 colliders) | 4.8 to 5.5 ms | 0.5 to 0.9 ms |
+| 5,000 spheres dropped on a floor | 3.2 to 4 ms | 1.9 to 2.6 ms |
+| 600 mixed bodies, walls, turned boxes and triggers | 0.27 ms | 0.27 ms |
+
+The tests (`cargo test --release -p lunaris-sim physics_fast`) run the same random worlds with both steps and compare the state hash and the contacts of every tick: 240 worlds of 90 ticks and six of 400, mixing spheres, boxes, capsules, turned boxes, triggers, collision layers, scenery that moves, scenery with a material, large floors, huge coordinates, spinning bodies and joints, while teleporting, spawning, despawning and changing colliders and layers as they run; pairs that touch to within the last bit of their numbers; a fork of a world; and different thread counts.
+
+A bigger sweep is kept out of the normal run (`cargo test --release -p lunaris-sim many_more_worlds -- --ignored`, about 90 seconds on a Linux test machine): 2,160 more worlds of 150 ticks, half of them with a `PhysicsSleep`. It found two things on the day sleeping was written: a very fast body that the reference stopped against a sleeper (which woke it) but that the fast path did not stop, because its query for colliders that never move did not look in the grid of the sleepers; and that worlds that go to NaN have contacts that `==` calls different in both paths, so the comparison is by bits. `debug_seed` (`SEED=n cargo test -p lunaris-sim debug_seed -- --ignored --nocapture`) names the first body or contact that differs in a world where the paths part.
+
+* **The solver stops when it has settled, and a contact row is cheap to visit.** The rounds of the contact solver (20 to 160, see "What the solver remembers between ticks") stop as
+  soon as a whole round changes the speeds by less than a tenth of a millimetre per second (`rot::SETTLED`) or by less than a thousandth of what the first round changed them by
+  (`SETTLED_REL`: a falling chain needs no more than that, a stack at rest, whose first round changes next to nothing, goes on to the first limit). Joints report their changes too (the
+  speed between the pivots, the spin across the axis, what a motor, a spring, a limit or a swing limit added); only a rope (`Joint` kinds 0 to 2) makes a world go on to the end. A contact
+  row also keeps, from the start of the tick, the arm of each body crossed with each of its three directions and the inverse inertia applied to them (`Row::ca`, `cb`, `wa`, `wb`), so
+  a visit is dot products and a few additions. The 30 dominoes of the example with their hinge: 1.2 ms a tick before, 0.43 now; ragdolls 0.59 to 0.32; a mixed world of 600 bodies
+  0.56 to 0.26 ms.
+* **Threads.** The neighbour search and the write-back of the fast step run on the pool when a world has 1,024 bodies or more. A pile of 5,000 balls on the quiet Linux test machine (8 cores):
+  1.59 ms a tick with 1 thread, 1.33 with 2, 1.15 with 4, 1.07 with 8 (the rest of a step, the grid of the bodies and the solver, runs on one thread), and the state hash is the
+  same at every count. `THREADS=n` sets it in `physics_bench`.
+* **Where a step goes.** `PhysicsCache::set_profile(true)` times the parts of the fast step and `stage_ns()` reads them (`STAGES`; the benchmark prints them with `STAGES=1`). `reference_profile(true)` and `reference_stage_ns()` do the same for the reference step (`REF_STAGES`; `cargo run --release -p lunaris-sim --example ref_profile -- examples/dominoes.lunaris.json`).
+  Awake bodies on a Linux test machine: a pile of 5,000 balls (1.5 ms a tick) spends 31% making the grid of the bodies, 39% looking for neighbours, 9% gathering, 9% writing back,
+  5% in the narrow phase and 3% solving; 3,000 boxes at rest in stacks of three (0.8 ms): 23% the grid, 14% the neighbours, 31% solving, 12% narrow phase. The grid of the bodies
+  and the neighbour search are what a step of awake bodies costs, and what a sleeper saves.
+
 ## Limits (what a full engine would add)
 
 * Balls, boxes, capsules, convex hulls and triangle meshes (a `MeshCollider` is static; there is no compound shape). Rays hit oriented boxes and capsules as
@@ -380,9 +476,19 @@ Numbers from the tests (`cargo test -p lunaris-sim --lib vehicle -- --nocapture`
   it; they see the triangles of a mesh as they are. The sound tracer sees boxes and spheres only. A long wall turned by an angle that is not a multiple of 90 degrees
   is therefore much bigger to a character than to a rock thrown at it (a ruin of turned walls was sealed in the game Caldera, `docs/DOGFOOD_3D.md`): `check` warns about
   such boxes in a world that has a `CharacterBody` or a `NavAgent`; keep the walls square to the axes or build a turned wall from several small boxes.
-* **Nothing is remembered from tick to tick**, so that a snapshot or a replay from the middle of a run gives exactly the same future. A stack of
-  turning boxes therefore does not settle as firmly as in an engine that remembers its contact forces: a tower of six boxes creeps sideways by a
-  few centimetres in ten seconds. Four boxes or fewer stay put; give tall piles a bit more friction.
-* No sleeping (resting bodies are still solved every tick), no joint motors or springs on the hinge, no cone limit on a ball-and-socket.
-* Continuous collision only for spinning spheres against static things (above) and the path test of fast bodies against mesh levels (their centre's
-  path only). Anything else that moves faster than its size in a tick can pass through a thin wall: make the wall thicker or the step smaller.
+* **What the solver remembers between ticks** (`contact_memory.rs`): for every pair of bodies that touched through the rich contact solver (turning boxes,
+  capsules, hulls, mesh levels), the normal and friction impulse of each contact point at the end of the tick. The next tick starts from them (applied once
+  before the rounds, a point being the same point when it is within 2 cm in the frame of the first body and its normal is within 25 degrees), so a stack is
+  not worked out again from nothing. **This is state**, not a cache: it is cloned with a `Sim`, kept by `checkpoint` and `rewind_to`, written to a recording
+  (`start_contacts`, only when there is any) so that a replay from the middle of a run gives exactly the same future, mixed into the state hash when there
+  is any (a world without such contacts has the hash it always had) and emptied by `Sim::clear`. It is not in a saved scene, so a game loaded from a file
+  starts its contacts cold, like the first tick of any scene. (The grid of the scenery that the fast path keeps is another matter: it is derived data,
+  checked against the world every tick, see "Speed".)
+  With it a tower of one-metre boxes that can turn stands still: 16 boxes high the top box moves 2 mm in ten seconds (18 cm without the memory) and
+  ends at rest, a pyramid of seven rows stands, 24 boxes sink 7 cm and settle, 32 creep and 48 fall. The rounds still matter: the contact points and
+  joints share a budget of 20,000 row visits a tick, which is between 20 and 160 rounds (`rot::rounds_for`: few points, many rounds; thousands of points,
+  20). With the memory but only 20 rounds a tower of ten drifts 21 cm and one of twelve 94 cm (`cargo run --release -p lunaris-sim --example stack_bench`).
+* Sleeping is opt-in (`PhysicsSleep`, above); no twist limit on a ball-and-socket, no motors on a ball-and-socket, no spring on a ball-and-socket.
+* Continuous collision: every dynamic ball, box and capsule against the colliders that never move (above), spinning spheres also ahead of their step, and
+  fast bodies against mesh levels (their centre's path only). **Two moving bodies are not tested against each other**: two shots can pass through each
+  other, and a fast body can pass through a thin plate that is itself dynamic. Convex hulls are not covered. Make thin dynamic things thicker or the step smaller.
