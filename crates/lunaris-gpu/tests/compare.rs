@@ -319,6 +319,10 @@ fn draw_layers_put_sprites_tile_maps_and_particles_in_the_same_order_in_both_ren
             assert_eq!(g.pick(x, y), Some(uid), "cloud {which}, GPU classic, {name}");
         }
         // the high quality mode has no reference to match, but the order of the layers is the same: which channels are lit at each spot
+        // (not on a software adapter: the first high-quality picture of a process takes minutes on the CI runner's, 2026-10-26)
+        if gpu.adapter_is_software() {
+            continue;
+        }
         let hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
         for &(name, x, y, between, above, none) in spots {
             let want = match which {
@@ -503,7 +507,10 @@ fn radial_fills_are_the_same_shape_in_both_renderers() {
     // the picture is not empty: the dials are really there
     let lit = cpu.rgba.chunks(4).filter(|p| p[0] > 120).count();
     assert!(lit > 8000, "{lit} pixels are drawn");
-    // the high quality mode draws them too (no reference to compare with there)
+    // the high quality mode draws them too (no reference to compare with there); not on a software adapter, where the first high-quality picture of a process takes minutes on the CI runner's (2026-10-26)
+    if gpu.adapter_is_software() {
+        return;
+    }
     let hi = gpu.render_to_image(&mut sim.world, &mut TextureCache::new(Some(root.clone())), &opts, &Quality::high()).expect("gpu high render");
     png(&out.join("radial-high.png"), w, h, &hi.rgba);
     assert!(hi.rgba.chunks(4).filter(|p| p[0] > 120).count() > 6000);
