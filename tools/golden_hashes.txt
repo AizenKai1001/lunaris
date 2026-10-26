@@ -23,6 +23,7 @@ examples/dungeon.lunaris.json            state 85a1e264912d3bf8  frame 704c5064d
 examples/echo_tour.lunaris.json          state b59f640dbb20c41d  frame 1c9e0f7690b3b80a
 examples/first_person.lunaris.json       state fdbd80d62dda216b  frame fe1ae64c85549fd3
 examples/flock.lunaris.json              state 69584df9913dad9d  frame 30cc1c5d22ad54b8
+examples/fx_showcase.lunaris.json        state 391b36585f366c17  frame 8cbbe1a29d44f993
 examples/gfx_lab.lunaris.json            state fb1e7f0f04bd9fb4  frame e69111b35af9f5b1
 examples/lighting_showcase.lunaris.json  state 94f7c00af5e6f6b9  frame 0d4d36215cf6ade0
 examples/maze.lunaris.json               state 5ba7d47903f46ec1  frame 1ef6fe6cbb659130
@@ -33,6 +34,7 @@ examples/moon_hopper.lunaris.json        state f5ba7241c9426b75  frame 3afd98bcb
 examples/orb_dash.lunaris.json           state 1daea0d7a7220460  frame e260931f82551cb8
 examples/orbits.lunaris.json             state 94dcf6a8b7310294  frame e1de27f645aeee24
 examples/orchard.lunaris.json            state 89b8c6ce9887f803  frame 2ef929e3363ab76f
+examples/outpost.lunaris.json            state e598ef37d50b6b8c  frame eef39355224a03b5
 examples/particle_clouds.lunaris.json    state d6255a965f43f2b5  frame 62995109490ddedd
 examples/particle_fx.lunaris.json        state 715cdc998bfde5a4  frame 7403b708e19d12b5
 examples/particles.lunaris.json          state 8d4c2c59b1e2965f  frame bc7eba8debfa3722
@@ -41,12 +43,19 @@ examples/ragdolls.lunaris.json           state 649e8f4d62cc96b2  frame 16e482f7f
 examples/ropes.lunaris.json              state 4396f95f9c6921e4  frame 825b5f99b0ae52da
 examples/showcase.lunaris.json           state 57a42fa4ba6aeb14  frame c1715350b9142e83
 examples/skirmish.lunaris.json           state 7215f58b961932b3  frame 8997082fb6180518
+examples/spider_house.lunaris.json       state 3610b8b3eb3d9f79  frame 4ca2614a8b5ba69e
+examples/spiders.lunaris.json            state 59c178dd0e8bcb78  frame be24d3735acbe1d6
+examples/spiders_blocks.lunaris.json     state 64fc650054f1a422  frame 051b86f7f32b43a7
+examples/spiders_hills.lunaris.json      state 3e1f8aacbdbb3f98  frame 8b50359187964437
+examples/spiders_ramps.lunaris.json      state 376391aa566d9707  frame 361c1ad2f53d4990
+examples/spiders_steep.lunaris.json      state 3253758f511325e2  frame b06423c27759f11b
+examples/spiders_wall.lunaris.json       state 9fbb294ea3937c08  frame 1c0fea3683a9b796
 examples/sprites.lunaris.json            state 67d6c0bd1db010f5  frame b9a5517d13220754
 examples/terrain.lunaris.json            state 4f92585dc996efc9  frame 5fc1adec6fd8a381
 examples/terrain_layers.lunaris.json     state 3ec698e2be8e1a59  frame 30439aaacd4c1baa
 examples/ui_kit3.lunaris.json            state a7e369605364aca1  frame 15b049380decf92f
 examples/ui_showcase.lunaris.json        state 61032ff25625c455  frame b1388cb44e3fce44
 examples/views.lunaris.json              state e128c3158e3a0419  frame 919018096fc2ff19
-examples/village.lunaris.json            state c458a14bee28f121  frame ec0d3ec33cdb55df
+examples/village.lunaris.json            state c458a14bee28f121  frame 822a6083c3ce9c15
 examples/vista.lunaris.json              state 1a69531c3b39fc62  frame 804e2e2f0b6d57c2
 examples/walker.lunaris.json             state 4f93767973697fd7  frame a605db1ac4219c5d

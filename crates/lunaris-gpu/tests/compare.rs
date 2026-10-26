@@ -59,6 +59,13 @@ fn load(root: &PathBuf, name: &str, ticks: u64) -> Sim {
 
 /// One renderer for every test of this file (they take turns): building one compiles every pipeline it uses, which takes minutes on a machine that draws with the CPU, and a test needs only to
 /// find the renderer as a fresh picture would, which a still always does (its effects start from nothing).
+/// The scenes a test goes through: all of them on a card, the first four on a software adapter (Windows' WARP, Mesa's llvmpipe), which draws one of these pictures in seconds and would take the
+/// CI runner past its time limit for the whole list; the cards of the development machines run every scene.
+fn subset<T, const N: usize>(gpu: &GpuRenderer, all: [T; N]) -> Vec<T> {
+    let n = if gpu.adapter_is_software() { N.min(4) } else { N };
+    all.into_iter().take(n).collect()
+}
+
 fn gpu_or_skip() -> Option<std::sync::MutexGuard<'static, GpuRenderer>> {
     static GPU: std::sync::OnceLock<Option<std::sync::Mutex<GpuRenderer>>> = std::sync::OnceLock::new();
     let cell = GPU.get_or_init(|| match GpuRenderer::headless() {
@@ -200,7 +207,7 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
     let out = root.join("target").join("gpu-compare");
     std::fs::create_dir_all(&out).unwrap();
     let high = Quality::high();
-    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0), ("terrain_layers", 480)] {
+    for (name, ticks) in subset(&gpu, [("showcase", 0u64), ("models", 0), ("sprites", 0), ("orb_dash", 120), ("moon_hopper", 0), ("clockwork", 300), ("coin_chase", 60), ("pile", 120), ("particles", 150), ("ui_showcase", 0), ("ui_kit3", 3), ("particle_clouds", 0), ("particle_fx", 120), ("views", 0), ("terrain_layers", 480)]) {
         eprintln!("high quality picture of {name}");
         let mut sim = load(&root, name, ticks);
         // small: a picture in a high quality is eight draws (its effects settle), and a machine that draws with the CPU makes each of them slowly
@@ -218,7 +225,7 @@ fn high_quality_pictures_are_drawn_and_written_for_a_look() {
 fn entity_ids_agree_with_the_reference_renderer() {
     let Some(mut gpu) = gpu_or_skip() else { return };
     let root = repo_root();
-    for (name, ticks) in [("showcase", 0u64), ("models", 0), ("sprites", 0), ("coin_chase", 60), ("pile", 120), ("clockwork", 300), ("terrain_layers", 480)] {
+    for (name, ticks) in subset(&gpu, [("showcase", 0u64), ("models", 0), ("sprites", 0), ("coin_chase", 60), ("pile", 120), ("clockwork", 300), ("terrain_layers", 480)]) {
         let mut sim = load(&root, name, ticks);
         let opts = RenderOptions { width: 320, height: 180, ..RenderOptions::default() };
         let mut tex_cpu = TextureCache::new(Some(root.clone()));

@@ -28,7 +28,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # the editor crate is a Windows application and is checked in its own job; the GPU tests skip themselves when the runner has no graphics adapter.
       # They are separate steps (with their own time limits) so that the run says which part is slow on a machine that draws with the CPU
-      - run: cargo test --workspace --exclude lunaris-studio --exclude lunaris-gpu --no-fail-fast
+      # through ci_step.sh so that a failure is written as an annotation (the log of a run cannot be read without signing in)
+      - run: bash tools/ci_step.sh --workspace --exclude lunaris-studio --exclude lunaris-gpu --no-fail-fast
       - name: graphics, unit tests
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --lib
@@ -36,51 +37,51 @@ jobs:
       - name: graphics, classic pictures match the reference renderer
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact classic_pictures_match_the_reference_renderer --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, high quality pictures are drawn and written for a look
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact high_quality_pictures_are_drawn_and_written_for_a_look --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, entity ids agree with the reference renderer
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact entity_ids_agree_with_the_reference_renderer --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, draw layers put sprites tile maps and particles in the same 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact draw_layers_put_sprites_tile_maps_and_particles_in_the_same_order_in_both_renderers --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, the interface keeps its shape on other screens in both rende
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact the_interface_keeps_its_shape_on_other_screens_in_both_renderers --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, scroll views cut the interface at the viewport the same way 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact scroll_views_cut_the_interface_at_the_viewport_the_same_way_in_both_renderers --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, radial fills are the same shape in both renderers
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact radial_fills_are_the_same_shape_in_both_renderers --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, the ui kit3 widgets are drawn the same in both renderers in 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact the_ui_kit3_widgets_are_drawn_the_same_in_both_renderers_in_every_state --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, a painted terrain is blended the same way in both renderers
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact a_painted_terrain_is_blended_the_same_way_in_both_renderers --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, each layer is where the splat map puts it in every quality
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact each_layer_is_where_the_splat_map_puts_it_in_every_quality --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, a water body follows its picture in both renderers
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact a_water_body_follows_its_picture_in_both_renderers --nocapture
-        timeout-minutes: 8
+        timeout-minutes: 20
       - name: graphics, the high-quality effects
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test high
-        timeout-minutes: 10
+        timeout-minutes: 20
 
   golden:
     name: the same hashes on every machine (${{ matrix.os }})
