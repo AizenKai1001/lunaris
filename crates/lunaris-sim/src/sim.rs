@@ -124,7 +124,12 @@ pub struct StepProfile {
     pub step_stages: Vec<(String, f64)>,
     /// The slowest steps that took longer than `LUNARIS_SLOW_STEP_MS` (default 30): the step's milliseconds and its biggest stages, the slowest first, at most 12 kept.
     pub slow: Vec<(f64, Vec<(String, f64)>)>,
+    /// How many steps took longer than each of `STEP_LIMITS_MS`: the shape of the tail, which an average and a maximum hide.
+    pub over: [u64; 6],
 }
+
+/// The step times (milliseconds) `StepProfile::over` counts the steps above.
+pub const STEP_LIMITS_MS: [f64; 6] = [10.0, 15.0, 20.0, 30.0, 50.0, 100.0];
 
 impl StepProfile {
     pub(crate) fn add(&mut self, name: &str, ms: f64) {
@@ -137,6 +142,11 @@ impl StepProfile {
 
     /// The step is over: it took `ms`; when that is slow, keep what its biggest stages were.
     pub(crate) fn end_step(&mut self, ms: f64) {
+        for (k, l) in STEP_LIMITS_MS.iter().enumerate() {
+            if ms > *l {
+                self.over[k] += 1;
+            }
+        }
         static SLOW: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
         let limit = *SLOW.get_or_init(|| std::env::var("LUNARIS_SLOW_STEP_MS").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| v.is_finite() && *v > 0.0).unwrap_or(30.0));
         if ms > limit {
@@ -541,6 +551,13 @@ impl Sim {
         // navigation agents choose their walk (after the graph systems, which may give them targets), then characters walk with this
         // tick's input, then attached entities follow their parents after everything else has moved them
         stage!("navigation", crate::nav::step(&mut self.world, &mut self.nav, dt, &self.heightfields, &self.meshes));
+        if let Some(p) = prof.as_mut() {
+            for (k, ms) in crate::nav::take_nav_ms().iter().enumerate() {
+                if *ms > 0.0 {
+                    p.add(&format!("navigation: {}", crate::nav::NAV_PARTS[k]), *ms);
+                }
+            }
+        }
         // (the controller times its three parts too while profiling: "characters: obstacles", "characters: grid", "characters: walking")
         match prof.as_mut() {
             Some(p) => {

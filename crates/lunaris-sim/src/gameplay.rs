@@ -1624,12 +1624,68 @@ fn spawn_transients(world: &mut World, scripts: &mut ScriptSet, list: Vec<lunari
     uids.into_iter().map(|u| u.and_then(|b| world.entity(b).map(|_| b))).collect()
 }
 
+thread_local! {
+    /// The milliseconds `procgrid` spent in each of its parts in its last call (`PROCGRID_PARTS`), which `update` hands to the profile.
+    static PROCGRID_MS: std::cell::RefCell<[f64; 5]> = const { std::cell::RefCell::new([0.0; 5]) };
+}
+/// The most cells (in the box round all the anchors) `cells_near_anchors` keeps in a flat array; a spread of anchors wider than that is done with a hash map.
+const DENSE_CELLS: usize = 1 << 22;
+
+/// The cells that some anchor is within `r` of, each with the distance of the nearest anchor (`from(i, j, anchor)` is a cell's distance from an anchor), in no particular order: found by walking the cells round each anchor, not by
+/// measuring every cell against every anchor. The nearest distance of a cell is kept in a flat array over the box round all the anchors' windows, which is what a city server with two hundred players at three grids spent ten milliseconds
+/// of a call on in a hash map (190,000 updates); the answer is the same set of cells and distances either way (`dense_limit` 0 forces the map, for the test).
+pub(crate) fn cells_near_anchors(anchors: &[V3], r: f32, cell: f32, dense_limit: usize, from: impl Fn(i32, i32, &V3) -> f32) -> Vec<((i32, i32), f32)> {
+    let windows: Vec<[i32; 4]> = anchors.iter().map(|c| [((c[0] - r) / cell).floor() as i32, ((c[0] + r) / cell).floor() as i32, ((c[2] - r) / cell).floor() as i32, ((c[2] + r) / cell).floor() as i32]).collect();
+    let (i_lo, i_hi, j_lo, j_hi) = windows.iter().fold((i32::MAX, i32::MIN, i32::MAX, i32::MIN), |a, w| (a.0.min(w[0]), a.1.max(w[1]), a.2.min(w[2]), a.3.max(w[3])));
+    let (bw, bh) = ((i_hi as i64 - i_lo as i64 + 1).max(0), (j_hi as i64 - j_lo as i64 + 1).max(0));
+    if bw as i128 * bh as i128 <= dense_limit as i128 {
+        let mut best = vec![f32::INFINITY; (bw * bh) as usize];
+        for (c, w) in anchors.iter().zip(&windows) {
+            for j in w[2]..=w[3] {
+                for i in w[0]..=w[1] {
+                    let d = from(i, j, c);
+                    if d <= r {
+                        let e = &mut best[((j as i64 - j_lo as i64) * bw + (i as i64 - i_lo as i64)) as usize];
+                        *e = e.min(d);
+                    }
+                }
+            }
+        }
+        return best.iter().enumerate().filter(|(_, d)| d.is_finite()).map(|(k, d)| (((k as i64 % bw) as i32 + i_lo, (k as i64 / bw) as i32 + j_lo), *d)).collect();
+    }
+    let mut nearest: std::collections::HashMap<(i32, i32), f32> = std::collections::HashMap::new();
+    for (c, w) in anchors.iter().zip(&windows) {
+        for j in w[2]..=w[3] {
+            for i in w[0]..=w[1] {
+                let d = from(i, j, c);
+                if d <= r {
+                    let e = nearest.entry((i, j)).or_insert(f32::INFINITY);
+                    *e = e.min(d);
+                }
+            }
+        }
+    }
+    nearest.into_iter().collect()
+}
+
+const PROCGRID_PARTS: [&str; 5] = ["present", "drop", "want", "zones", "spawn"];
+
+thread_local! {
+    /// How many anchors and how many cells wanted the last call of `procgrid` had (a count, not milliseconds): what its cost depends on.
+    static PROCGRID_COUNTS: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+fn procgrid_time(part: usize, since: std::time::Instant) {
+    PROCGRID_MS.with(|m| m.borrow_mut()[part] += since.elapsed().as_secs_f64() * 1e3);
+}
+
 /// Keep the `StreamZone`s of the cells near the camera that a procedural provider makes for each `ProcGrid` (`procgen`): the cells within `radius` get their zones, a few a tick and the nearest first, the ones beyond `radius + hysteresis` lose them.
 /// The resource `procgrid.every` (a whole number, 1 or missing: every step) says that the cells are looked at only every that many steps: a server with two hundred players and a city of three grids spends a millisecond a step
 /// on it, and a player does not cross a cell (a hundred metres) in a few steps.
 fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
     use crate::components::{GridZone, ProcGrid};
     use lunaris_json::Json;
+    PROCGRID_MS.with(|m| *m.borrow_mut() = [0.0; PROCGRID_PARTS.len()]);
     let every = world.resource("procgrid.every").filter(|v| v.is_finite() && *v >= 1.0).map_or(1, |v| v as u64);
     if every > 1 && tick % every != 0 {
         return;
@@ -1645,9 +1701,12 @@ fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
     if anchors.is_empty() {
         return;
     }
+    PROCGRID_COUNTS.with(|c| c.set((anchors.len(), c.get().1)));
     // the zones that exist, by grid and cell
+    let t_present = std::time::Instant::now();
     let mut present: BTreeMap<(u64, i32, i32), Vec<(u64, Entity)>> = BTreeMap::new();
     let _ = world.for_each_uid::<(&GridZone,), _>(|e, uid, (z,)| present.entry((z.grid.0, z.i as i32, z.j as i32)).or_default().push((uid, e)));
+    procgrid_time(0, t_present);
     for (guid, g) in grids {
         let name = world.strings().get(g.grid.0).to_string();
         let (cell, r, hy) = (g.cell.max(10.0), g.radius.max(1.0), g.hysteresis.max(0.0));
@@ -1662,6 +1721,7 @@ fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
             g.extent <= 0.0 || (x.abs() <= g.extent && z.abs() <= g.extent)
         };
         // the cells to drop: beyond the radius and its margin of every anchor (the first anchor that is near enough keeps a cell: with hundreds of players most cells are kept by one of the first few)
+        let t_drop = std::time::Instant::now();
         let mut gone: Vec<(i32, i32)> = present.keys().filter(|k| k.0 == guid && !anchors.iter().any(|c| from(k.1, k.2, c) <= r + hy)).map(|k| (k.1, k.2)).collect();
         gone.sort_unstable();
         if !gone.is_empty() {
@@ -1684,31 +1744,24 @@ fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
                 world.despawn(e);
             }
         }
+        procgrid_time(1, t_drop);
         // the cells to make: within the radius, none yet, nearest first, a few a tick
+        let t_want = std::time::Instant::now();
         // (the nearest anchor of each cell that some anchor is within `radius` of: found by walking the cells round each anchor, not by measuring every cell against every anchor)
-        let mut nearest: std::collections::HashMap<(i32, i32), f32> = std::collections::HashMap::new();
-        for c in &anchors {
-            let (i0, i1) = (((c[0] - r) / cell).floor() as i32, ((c[0] + r) / cell).floor() as i32);
-            let (j0, j1) = (((c[2] - r) / cell).floor() as i32, ((c[2] + r) / cell).floor() as i32);
-            for j in j0..=j1 {
-                for i in i0..=i1 {
-                    let d = from(i, j, c);
-                    if d <= r {
-                        let e = nearest.entry((i, j)).or_insert(f32::INFINITY);
-                        *e = e.min(d);
-                    }
-                }
-            }
-        }
+        let nearest = cells_near_anchors(&anchors, r, cell, DENSE_CELLS, &from);
         let mut want: Vec<(f32, i32, i32)> = nearest.into_iter().filter(|&((i, j), _)| in_map(i, j) && !present.contains_key(&(guid, i, j))).map(|((i, j), d)| (d, i, j)).collect();
         want.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+        procgrid_time(2, t_want);
+        PROCGRID_COUNTS.with(|c| c.set((c.get().0, c.get().1 + want.len())));
         let n = |v: f32| Json::Float(v as f64);
         // the zones of the cells to make, spawned in one batch (see `spawn_transients`): per cell its place, how many entities it has and whether the one entity is its marker
         let mut cells: Vec<(i32, i32, usize, bool)> = Vec::new();
         let mut all: Vec<Json> = Vec::new();
         let marker = |i: i32, j: i32| Json::obj([("grid", Json::from(guid as i64)), ("i", Json::Float(i as f64)), ("j", Json::Float(j as f64))]);
         for (_, i, j) in want.into_iter().take(g.per_tick.max(1) as usize) {
+            let t_zones = std::time::Instant::now();
             let zones = provider.zones(&name, i, j);
+            procgrid_time(3, t_zones);
             // a cell with no zones at all is remembered too, by a marker entity, so that it is not asked for again every tick
             if zones.is_empty() {
                 all.push(Json::obj([("GridZone", marker(i, j))]));
@@ -1739,6 +1792,7 @@ fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
         if cells.is_empty() {
             continue;
         }
+        let t_spawn = std::time::Instant::now();
         let mut uids = spawn_transients(world, scripts, all).into_iter();
         for (i, j, count, is_marker) in cells {
             let mut made: Vec<(u64, Entity)> = Vec::new();
@@ -1759,6 +1813,7 @@ fn procgrid(world: &mut World, scripts: &mut ScriptSet, tick: u64) {
             }
             present.insert((guid, i, j), made);
         }
+        procgrid_time(4, t_spawn);
     }
 }
 
@@ -2413,6 +2468,22 @@ pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fi
     part!("sways", sways(world, dt));
     part!("grass_fields", grass_fields(world, dt));
     part!("procgrid", procgrid(world, scripts, tick));
+    // (where the time of the call went, for a profile: finding the cells, dropping them, asking the provider, spawning)
+    if let Some(p) = prof.as_deref_mut() {
+        PROCGRID_MS.with(|m| {
+            for (k, ms) in m.borrow().iter().enumerate() {
+                if *ms > 0.0 {
+                    p.add(&format!("gameplay procgrid: {}", PROCGRID_PARTS[k]), *ms);
+                }
+            }
+        });
+        // (counts, not milliseconds: the anchors and the cells that were wanted and not there)
+        let (anchors, wanted) = PROCGRID_COUNTS.with(|c| c.replace((0, 0)));
+        if anchors > 0 {
+            p.add("gameplay procgrid: anchors (a count)", anchors as f64);
+            p.add("gameplay procgrid: cells wanted (a count)", wanted as f64);
+        }
+    }
     part!("streaming", streaming(world, scripts));
     part!("anim_layers", anim_layers(world, dt));
     part!("spawners", spawners(world, scripts, dt));

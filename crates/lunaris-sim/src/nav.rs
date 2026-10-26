@@ -403,7 +403,40 @@ struct Grid<'a> {
     p: NavParams,
 }
 
+/// What a grid works out lazily: the buckets of solids, the triangles of mesh blocks and the cells' data. A search done a few cells at a time (`NavJob`) keeps them from one step to the next, so that a step does not
+/// work out again the cells the last one looked at. They are derived data and not part of the simulation's state (they hold `Rc`s, which the state may not: a copy of it goes to another thread to be saved): they are kept
+/// on the thread in `JOB_CACHES`, by the serial number of the job, and a copy of a job gets a number of its own and so starts without them.
+#[derive(Default)]
+struct GridCaches {
+    buckets: std::cell::OnceCell<Vec<Vec<u32>>>,
+    tri_blocks: IdMap<usize, Rc<Vec<TriRec>>>,
+    cells: IdMap<usize, Rc<CellData>>,
+}
+
+thread_local! {
+    static JOB_CACHES: std::cell::RefCell<BTreeMap<u64, GridCaches>> = const { std::cell::RefCell::new(BTreeMap::new()) };
+}
+
+/// The most jobs whose caches are kept on a thread (more means a few simulations share it, which is not worth keeping them for).
+const MAX_JOB_CACHES: usize = 8;
+
+fn next_job_serial() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 impl<'a> Grid<'a> {
+    /// Take the lazily worked out data out of the grid (`restore` puts it into a grid made from the same world and window).
+    fn save(&mut self) -> GridCaches {
+        GridCaches { buckets: std::mem::take(&mut self.buckets), tri_blocks: std::mem::take(self.tri_blocks.get_mut()), cells: std::mem::take(&mut self.cells) }
+    }
+
+    fn restore(&mut self, c: GridCaches) {
+        self.buckets = c.buckets;
+        *self.tri_blocks.get_mut() = c.tri_blocks;
+        self.cells = c.cells;
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn build(solids: &'a [Solid], ground: &'a [Ground], meshes: &'a [Instance], bounds: [f32; 4], p: NavParams, start_at: [f32; 3], sig: u64) -> Result<Grid<'a>, NavError> {
         let [bx0, bz0, bx1, bz1] = bounds;
@@ -1103,8 +1136,8 @@ impl SearchRun {
 // ------------------------------------------------------------------------------------------------------------- searches done a few cells a step
 
 /// A search of an agent that is done a few cells a step (`NavLimits` with the resource `nav.cells_per_step`): the points it goes between, the box of the grid it is over and where it has got to.
-/// The grid is made again from the world at every step, so the search sees the world as it is then; the nodes it has looked at keep the costs they were found with.
-#[derive(Clone)]
+/// The world it searches is the world of the step it first ran in (`scene`, gathered once: gathering it again every step cost about as much as the cells), and the grid is made again from it at every step; the nodes it has
+/// looked at keep the costs they were found with. The agent walks in a world that has moved on, as it does when a search is answered late.
 pub(crate) struct NavJob {
     from: [f32; 3],
     goal: [f32; 3],
@@ -1118,6 +1151,9 @@ pub(crate) struct NavJob {
     wide: bool,
     first: Option<NavError>,
     run: Option<SearchRun>,
+    scene: Option<std::sync::Arc<NavScene>>,
+    /// Which entry of `JOB_CACHES` is this job's; a copy of the job has another.
+    serial: u64,
     /// The tick the search was started (the oldest goes first).
     pub(crate) started: u64,
     /// The nodes expanded for it so far, in both looks.
@@ -1126,8 +1162,30 @@ pub(crate) struct NavJob {
 
 impl NavJob {
     /// The nodes the search has expanded so far, in both looks.
+    #[cfg(test)]
     pub(crate) fn expanded(&self) -> usize {
         self.expanded
+    }
+}
+
+impl Clone for NavJob {
+    fn clone(&self) -> NavJob {
+        NavJob {
+            from: self.from,
+            goal: self.goal,
+            partial: self.partial,
+            params: self.params,
+            who: self.who,
+            cap: self.cap,
+            bounds: self.bounds,
+            wide: self.wide,
+            first: self.first.clone(),
+            run: self.run.clone(),
+            scene: self.scene.clone(),
+            serial: next_job_serial(),
+            started: self.started,
+            expanded: self.expanded,
+        }
     }
 }
 
@@ -1162,6 +1220,9 @@ fn advance_job(job: &mut NavJob, scene: &NavScene, budget: usize) -> (JobStep, u
             Err(e) => return (JobStep::Done(Err(fail(job, e))), spent),
         };
         grid.add_links(&scene.link_defs);
+        if let Some(c) = JOB_CACHES.with(|m| m.borrow_mut().remove(&job.serial)) {
+            grid.restore(c);
+        }
         if job.run.is_none() {
             match SearchRun::begin(&mut grid, job.from, job.goal, &p) {
                 Ok(r) => job.run = Some(r),
@@ -1177,7 +1238,17 @@ fn advance_job(job: &mut NavJob, scene: &NavScene, budget: usize) -> (JobStep, u
                 let out = run.finish(&mut grid, job.from, job.goal);
                 return (JobStep::Done(out.map_err(|e| fail(job, e))), spent);
             }
-            Ok(false) => return (JobStep::Paused, spent),
+            Ok(false) => {
+                let kept = grid.save();
+                JOB_CACHES.with(|m| {
+                    let mut m = m.borrow_mut();
+                    if m.len() >= MAX_JOB_CACHES {
+                        m.clear();
+                    }
+                    m.insert(job.serial, kept);
+                });
+                return (JobStep::Paused, spent);
+            }
             Err(e) => {
                 if !job.wide && matches!(e, NavError::NoPath(_)) {
                     if let Some(wide) = wide_box(scene, job.from, job.goal, &p, job.bounds) {
@@ -1315,6 +1386,23 @@ fn params_of(a: &NavAgent) -> NavParams {
     NavParams { radius: a.radius, height: a.height, step_height: a.step_height, max_drop: a.max_drop, cell: 0.5, keep: false }
 }
 
+thread_local! {
+    /// The milliseconds `step` spent in the parts of `NAV_PARTS` since a profile last took them (`take_nav_ms`).
+    static NAV_MS: std::cell::RefCell<[f64; 3]> = const { std::cell::RefCell::new([0.0; 3]) };
+}
+
+/// What `NAV_MS` counts: gathering the world for a search done a few cells at a time, working on those searches, and the searches that are done whole.
+pub(crate) const NAV_PARTS: [&str; 3] = ["scene", "jobs", "searches"];
+
+fn nav_time(part: usize, since: std::time::Instant) {
+    NAV_MS.with(|m| m.borrow_mut()[part] += since.elapsed().as_secs_f64() * 1e3);
+}
+
+/// The milliseconds spent in the parts of `NAV_PARTS` since the last call.
+pub(crate) fn take_nav_ms() -> [f64; 3] {
+    NAV_MS.with(|m| std::mem::take(&mut *m.borrow_mut()))
+}
+
 /// One tick of every `NavAgent`, in uid order.
 pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains, meshes: &MeshStore) {
     let mut agents: Vec<(u64, lunaris_ecs::Entity, Transform, NavAgent)> = Vec::new();
@@ -1415,27 +1503,39 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
                 let (goal, partial) = limited_goal(feet, a.target, max_search);
                 let params = NavParams { keep, ..params_of(a) }.sane();
                 let bounds = near_box(feet, goal, &params);
-                state.jobs.insert(*uid, NavJob { from: feet, goal, partial, params, who: who_plans(&layers, *uid), cap, bounds, wide: false, first: None, run: None, started: state.tick, expanded: 0 });
+                state.jobs.insert(*uid, NavJob { from: feet, goal, partial, params, who: who_plans(&layers, *uid), cap, bounds, wide: false, first: None, run: None, scene: None, serial: next_job_serial(), started: state.tick, expanded: 0 });
             }
         }
         let mut order: Vec<(u64, u64)> = state.jobs.iter().map(|(uid, j)| (j.started, *uid)).collect();
         order.sort_unstable();
         let mut left = slice;
-        let mut scenes: Vec<(Option<Filter>, NavScene)> = Vec::new();
+        let mut scenes: Vec<(Option<Filter>, std::sync::Arc<NavScene>)> = Vec::new();
         for (_, uid) in order {
             if left == 0 {
                 break;
             }
             let Some(job) = state.jobs.get_mut(&uid) else { continue };
-            // (the agents of one layer see the same world: it is gathered once for them)
-            let at = match scenes.iter().position(|(w, _)| *w == job.who) {
-                Some(i) => i,
+            // (the agents of one layer that start in one step see the same world: it is gathered once for them)
+            let scene = match &job.scene {
+                Some(s) => s.clone(),
                 None => {
-                    scenes.push((job.who, gather_scene(world, fields, meshes, job.who)));
-                    scenes.len() - 1
+                    let s = match scenes.iter().find(|(w, _)| *w == job.who) {
+                        Some((_, s)) => s.clone(),
+                        None => {
+                            let t_scene = std::time::Instant::now();
+                            let s = std::sync::Arc::new(gather_scene(world, fields, meshes, job.who));
+                            nav_time(0, t_scene);
+                            scenes.push((job.who, s.clone()));
+                            s
+                        }
+                    };
+                    job.scene = Some(s.clone());
+                    s
                 }
             };
-            let (what, spent) = advance_job(job, &scenes[at].1, left);
+            let t_job = std::time::Instant::now();
+            let (what, spent) = advance_job(job, &scene, left);
+            nav_time(1, t_job);
             job.expanded += spent;
             left -= spent.min(left);
             if let JobStep::Done(result) = what {
@@ -1444,6 +1544,13 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
             }
         }
     }
+    // (the caches of searches that were dropped or finished are not kept)
+    JOB_CACHES.with(|m| {
+        let mut m = m.borrow_mut();
+        if !m.is_empty() {
+            m.retain(|serial, _| state.jobs.values().any(|j| j.serial == *serial));
+        }
+    });
     for (uid, entity, t, mut a) in agents {
         let feet = [t.pos[0], t.pos[1] - a.feet, t.pos[2]];
         let was = (a.status, a.active);
@@ -1451,7 +1558,10 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
             finished.remove(&uid).map(|f| (f.result, f.partial, f.goal, f.from))
         } else if a.active && (limits.is_none() || granted.contains(&uid)) {
             let (goal, partial) = limited_goal(feet, a.target, max_search);
-            Some((find_path_capped(world, feet, goal, NavParams { keep, ..params_of(&a) }, fields, meshes, who_plans(&layers, uid), cap), partial, goal, feet))
+            let t_search = std::time::Instant::now();
+            let found = find_path_capped(world, feet, goal, NavParams { keep, ..params_of(&a) }, fields, meshes, who_plans(&layers, uid), cap);
+            nav_time(2, t_search);
+            Some((found, partial, goal, feet))
         } else {
             None
         };

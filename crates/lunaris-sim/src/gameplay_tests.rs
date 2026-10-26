@@ -1442,3 +1442,59 @@ fn the_tree_found_for_a_despawn_is_the_one_a_map_of_all_children_finds_and_costs
     crate::gameplay::despawn_trees(&mut s.world, roots);
     assert_eq!(s.world.len(), before - a.iter().filter(|u| **u < next).count());
 }
+
+#[test]
+fn the_cells_near_the_anchors_are_the_same_in_a_flat_array_and_in_a_map() {
+    use crate::gameplay::cells_near_anchors;
+    let cell = 100.0f32;
+    let from = |i: i32, j: i32, c: &[f32; 3]| {
+        let (x, z) = ((i as f32 + 0.5) * cell, (j as f32 + 0.5) * cell);
+        ((x - c[0]).powi(2) + (z - c[2]).powi(2)).sqrt()
+    };
+    let mut state = 12345u64;
+    let mut next = move || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (state >> 33) as f32 / (1u64 << 31) as f32
+    };
+    let anchors: Vec<[f32; 3]> = (0..60).map(|_| [next() * 4000.0 - 2000.0, 0.0, next() * 4000.0 - 2000.0]).collect();
+    for r in [150.0f32, 400.0, 900.0] {
+        let mut dense = cells_near_anchors(&anchors, r, cell, usize::MAX, from);
+        let mut map = cells_near_anchors(&anchors, r, cell, 0, from);
+        dense.sort_by_key(|a| a.0);
+        map.sort_by_key(|a| a.0);
+        assert!(!dense.is_empty());
+        assert_eq!(dense, map, "radius {r}: the same cells with the same distances");
+    }
+    // anchors a thousand kilometres apart: the box round them is far too big for an array, and a map does it; an anchor that is not a number has no cells
+    let far = [[0.0f32, 0.0, 0.0], [1.0e9, 0.0, 1.0e9], [f32::NAN, 0.0, 0.0]];
+    assert!(!cells_near_anchors(&far, 150.0, cell, 1 << 22, from).is_empty());
+    assert!(cells_near_anchors(&[[f32::NAN, 0.0, 0.0]], 150.0, cell, 1 << 22, from).is_empty());
+    assert!(cells_near_anchors(&[], 150.0, cell, 1 << 22, from).is_empty());
+}
+
+/// `cargo test --release -p lunaris-sim cells_near_anchors_cost -- --ignored --nocapture`: what a call costs for the grids of a city server with two hundred players.
+#[test]
+#[ignore]
+fn cells_near_anchors_cost() {
+    use crate::gameplay::cells_near_anchors;
+    let mut state = 99u64;
+    let mut next = move || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (state >> 33) as f32 / (1u64 << 31) as f32
+    };
+    let anchors: Vec<[f32; 3]> = (0..210).map(|_| [next() * 1660.0 - 830.0, 0.0, next() * 1660.0 - 830.0]).collect();
+    for (name, cell, r) in [("s", 102.2f32, 362.2f32), ("r", 102.2, 183.4), ("b0", 102.2, 317.2), ("b1", 102.2, 562.2), ("c2", 408.8, 4506.6), ("in", 102.2, 197.4), ("t", 102.2, 247.2)] {
+        let from = |i: i32, j: i32, c: &[f32; 3]| {
+            let (x, z) = ((i as f32 + 0.5) * cell, (j as f32 + 0.5) * cell);
+            ((x - c[0]).powi(2) + (z - c[2]).powi(2)).sqrt()
+        };
+        for (what, limit) in [("flat", usize::MAX), ("map", 0usize)] {
+            let t = std::time::Instant::now();
+            let mut n = 0;
+            for _ in 0..20 {
+                n = cells_near_anchors(&anchors, r, cell, limit, from).len();
+            }
+            println!("{name:>3} {what}: {:8.3} ms a call, {n} cells", t.elapsed().as_secs_f64() * 1e3 / 20.0);
+        }
+    }
+}

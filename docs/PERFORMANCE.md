@@ -196,6 +196,8 @@ Benchmarks on a built scene tell what a stage costs there; they do not tell what
 
 **The probe no longer gathers the world in a step where nothing casts (2026-10-25, from a game's measurement).** With a `Probe` on each of 150 avatars the physics stage went from 1.19 to 2.55 ms a step whatever the probes asked for, because `probe::step` gathered the whole static world (and the layers) as soon as one probe existed. Now the gather happens when the first probe of the step has something to cast (`up` + `depth` above 0 for the ground, `ray_max` above 0 with a finite direction for the ray) and not otherwise; an uncasting probe reports the same as a cast that found nothing (`over_ground` false, `ground` its own y), its water reading is unchanged. New rows in `lunaris bench` (150 probes in the gather row's city): `probe idle` 0.005 ms and `probe cast` 0.41 ms (one gather and 300 casts); a game's city's whole-world gather costs more than the bench city's (1.3 ms against 0.1), so a game that casts on 2 steps of 16 pays about an eighth of what it paid. Test: `a_step_in_which_no_probe_casts_does_not_gather_the_world_and_one_that_does_gathers_it_once`. Still to do if it matters: keep the `RayWorld` itself between steps when the hash of the static colliders has not changed.
 
+**The tail of the step times in a crowd, and a profiler for it (2026-10-26).** Where the 10 to 100 ms steps of the city server come from, the 210, 300 and 400 bot numbers and the tools that found them (the slowest steps listed with what each was made of in `--profile-sim`, and the sampling profiler `LUNARIS_SAMPLE=file` with `tools/sample_report.py`, which says which function, not only which stage) are in [NETWORK_SCALE](NETWORK_SCALE.md), section "The tail of the step times in a crowd".
+
 ## Particle systems: what stepping and drawing cost (2026-10-26)
 
 `ParticleSystem` (docs/FX.md) steps its particles in the picture, in fixed 1/60 s steps, only for the systems that are in view; a server never does it. Measured with `cargo test --release -p lunaris-render how_fast_are_particle_systems -- --ignored --nocapture` on a Linux test machine (one thread for the stepping; the drawing on one and on four; a shared machine, so the second decimal is noise):
@@ -264,7 +266,8 @@ What changed (the pictures are bit-identical: the hash `872dca645d6eccb2` of the
 | render 960x540, one thread | 44.1 ms | 40.0 ms |
 | render, 4 threads (the default) | 26.9 ms (1.6x) | 15.3 ms (2.6x) |
 | render, 8 threads | 17.7 ms (2.5x) | 11.5 to 14.2 ms (3.1 to 3.9x) |
-| render, pinned to 2 cores and 4 GB (`taskset -c 2,3`, `ulimit -v`), one thread | 47.3 ms (2026-10-25 run) | 40.2 ms |
+| render, pinned to 2 cores and 4 GB (`taskset -c 2,3`, `ulimit -v`), one thread | 47.3 ms (2026-10-25 run) | 40.0 to 41.0 ms |
+| the same, two threads | (not measured) | 24.2 to 25.9 ms (1.6 to 1.7x) |
 
 Not done: the pixel stage (edge functions in f64 for every pixel of a triangle's box, 8.5 ms) and shading (8.7 ms) are as they were; making them faster without changing a bit of the picture needs an incremental or tiled rasteriser with exact arithmetic, which is its own piece of work. The scaling on more threads stops at about 3x because the bands are unequal (the sphere grid fills the middle rows) and the setup is not parallel.
 

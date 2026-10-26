@@ -437,6 +437,7 @@ fn game_server(kv: &HashMap<String, String>, seed: u64, root: PathBuf, scene: &s
         for (n, t) in rows.iter().take(25) {
             println!("    {:7.4} {:7.3}  {}", t.total_ms / p.ticks.max(1) as f64, t.max_ms, n);
         }
+        println!("steps over {} ms: {} of {}", lunaris_sim::sim::STEP_LIMITS_MS.iter().map(|l| format!("{l}")).collect::<Vec<_>>().join(" / "), p.over.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(" / "), p.ticks);
         if !p.slow.is_empty() {
             println!("the slowest simulation steps over the limit (`LUNARIS_SLOW_STEP_MS`, 30 ms) and what each was made of (ms):");
             for (ms, stages) in &p.slow {
