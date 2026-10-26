@@ -400,7 +400,28 @@ pub fn wander(world: &mut World, ctx: &mut SimCtx) {
 }
 
 /// Rigid-body physics (see `physics`). Gravity comes from the world's `PhysicsSettings` entity with the lowest uid.
+thread_local! {
+    /// While a profile runs: the milliseconds the parts of `physics` took since the profile took them (`PHYSICS_PARTS`).
+    static PHYSICS_MS: std::cell::RefCell<[f64; 4]> = const { std::cell::RefCell::new([0.0; 4]) };
+}
+
+/// What `PHYSICS_MS` counts: the bodies' step, the raycast vehicles, the probes, and the settings and the rest.
+pub(crate) const PHYSICS_PARTS: [&str; 4] = ["bodies", "vehicles", "probes", "settings"];
+
+pub(crate) fn take_physics_ms() -> [f64; 4] {
+    PHYSICS_MS.with(|m| std::mem::take(&mut *m.borrow_mut()))
+}
+
 pub fn physics(world: &mut World, ctx: &mut SimCtx) {
+    let timed = crate::vehicle_ray::timing_on();
+    let mut clock = timed.then(std::time::Instant::now);
+    let mut lap = |part: usize| {
+        if let Some(t) = clock.as_mut() {
+            let now = std::time::Instant::now();
+            PHYSICS_MS.with(|m| m.borrow_mut()[part] += now.duration_since(*t).as_secs_f64() * 1e3);
+            *t = now;
+        }
+    };
     let mut gravity = [0.0f32, -9.8, 0.0];
     let mut lowest = u64::MAX;
     world
@@ -412,13 +433,17 @@ pub fn physics(world: &mut World, ctx: &mut SimCtx) {
         })
         .expect("physics settings query is valid");
     ctx.gravity = gravity;
+    lap(3);
     ctx.contacts = if ctx.reference_physics {
         crate::physics::step_reference(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes, &mut ctx.contact_memory, &mut ctx.sleep)
     } else {
         crate::physics::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes, &ctx.physics, ctx.threads, &mut ctx.contact_memory, &mut ctx.sleep)
     };
+    lap(0);
     // raycast vehicles push their chassis with what the wheels meet (a world without a `Vehicle` finds none and goes on)
     crate::vehicle::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes);
+    lap(1);
     // what the entities with a `Probe` can see of the ground, the water and one ray, for the graph systems that run next
     crate::probe::step(world, &ctx.terrains, &ctx.meshes);
+    lap(2);
 }

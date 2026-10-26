@@ -230,6 +230,11 @@ pub(crate) fn cast_part_is_count(k: usize) -> bool {
     k == 6 || k == 9 || k == 16
 }
 
+/// Is a profile running (the casts and the stages that time their parts read the clock only then)?
+pub(crate) fn timing_on() -> bool {
+    CAST_TIMING.with(|t| t.get())
+}
+
 pub(crate) fn set_cast_timing(on: bool) {
     CAST_TIMING.with(|t| t.set(on));
     CAST_MS.with(|m| *m.borrow_mut() = [0.0; 17]);

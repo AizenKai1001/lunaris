@@ -537,6 +537,13 @@ impl Sim {
                 None => (s.run)(&mut self.world, &mut ctx),
             }
         }
+        if let Some(p) = prof.as_mut() {
+            for (k, ms) in systems::take_physics_ms().iter().enumerate() {
+                if *ms > 0.0 {
+                    p.add(&format!("physics: {}", systems::PHYSICS_PARTS[k]), *ms);
+                }
+            }
+        }
         self.contact_memory = std::mem::take(&mut ctx.contact_memory);
         self.sleep = std::mem::take(&mut ctx.sleep);
         self.rng = ctx.rng;

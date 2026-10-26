@@ -12,7 +12,7 @@ python -I tools/check_all.py                  # everything: build, tests, MCP an
 python -I tools/check_all.py --quick          # without the editor script and the long soak
 ```
 
-Node 22+ is needed for the MCP and JavaScript client tests only. Without a GPU the GPU tests skip themselves.
+Node 22+ is needed for the MCP and JavaScript client tests only. Without a GPU the GPU tests skip themselves. On a machine with a card, run the whole graphics suite before you change the GPU renderer: `cargo test -p lunaris-gpu --test compare --test high` (`LUNARIS_GPU=name` picks the card on a machine with two). The public CI runs only the classic-quality comparisons on a software adapter, where a single high-quality picture takes minutes (`docs/PERFORMANCE.md`, "The card"); `lunaris bench --gpu` and `cargo run --release -p lunaris-gpu --example upload_cost` measure a card.
 
 ## The rules that keep it deterministic
 
