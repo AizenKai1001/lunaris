@@ -258,8 +258,12 @@ fn gpu_rows() -> lunaris_ecs::Result<Vec<Row>> {
     let adapter = renderer.adapter_name();
     let opts = lunaris_render::RenderOptions { width: 960, height: 540, threads: lunaris_sim::default_threads(), ..Default::default() };
     let mut rows = Vec::new();
-    let cases: [(&'static str, &str, usize, fn() -> lunaris_ecs::Result<Sim>); 3] = [("gpu spheres medium", "medium", 21, sphere_grid), ("gpu spheres high", "high", 9, sphere_grid), ("gpu campfires high", "high", 9, campfire_sim)];
-    for (name, quality, runs, make) in cases {
+    let cases: [(&'static str, &'static str, &str, usize, fn() -> lunaris_ecs::Result<Sim>); 3] = [
+        ("gpu spheres medium", "gpu frame spheres medium", "medium", 21, sphere_grid),
+        ("gpu spheres high", "gpu frame spheres high", "high", 9, sphere_grid),
+        ("gpu campfires high", "gpu frame campfires high", "high", 9, campfire_sim),
+    ];
+    for (name, frame_name, quality, runs, make) in cases {
         let mut sim = make()?;
         let q = lunaris_gpu::Quality::from_name(quality).ok_or_else(|| lunaris_ecs::EcsError::new("bad_quality", quality.to_string()))?;
         let mut textures = lunaris_render::TextureCache::new(None);
@@ -303,6 +307,25 @@ fn gpu_rows() -> lunaris_ecs::Result<Vec<Row>> {
             .collect();
         let split = if split.is_empty() { String::new() } else { format!("; the processor (ms): {}", split.join(", ")) };
         rows.push(Row { name, ms: wall[wall.len() / 2], detail: format!("{adapter}, 960x540 {quality}: one picture drawn and read back, median of {runs}{on_card}{split}{tris}") });
+        // the same scene as a running game draws it: one picture a frame, the anti-aliasing carried over from the frame before, nothing read back, the card waited for
+        let (mut total, mut cpu, mut wait) = (Vec::new(), Vec::new(), Vec::new());
+        for i in 0..30 {
+            if name.contains("campfires") {
+                sim.step();
+            }
+            let (g, d, w) = renderer.time_frame(&mut sim.world, &mut textures, &opts, &q).map_err(|e| lunaris_ecs::EcsError::new("gpu_failed", e))?;
+            // the first frames pay for the pipelines and the meshes (and the anti-aliasing is still settling)
+            if i >= 8 {
+                total.push(g + d + w);
+                cpu.push(g + d);
+                wait.push(w);
+            }
+        }
+        for v in [&mut total, &mut cpu, &mut wait] {
+            v.sort_by(|a, b| a.total_cmp(b));
+        }
+        let mid = |v: &Vec<f64>| v[v.len() / 2];
+        rows.push(Row { name: frame_name, ms: mid(&total), detail: format!("{adapter}, 960x540 {quality}: one frame as a game draws it (no read-back, one picture), median of {}: the processor (gather, uploads, encoding) {:.2} ms, then the wait for the card {:.2} ms; a game overlaps the two, so a frame costs between {:.2} and {:.2} ms", total.len(), mid(&cpu), mid(&wait), mid(&cpu).max(mid(&wait)), mid(&total)) });
     }
     Ok(rows)
 }

@@ -228,6 +228,16 @@ On the Linux test machine, RTX 4060 (Vulkan, driver 595), three runs, no memory 
 | `gpu spheres high` | the same at `high` (a still: eight pictures, seven that settle the anti-aliasing and the bounced light, one kept) | 12.3 to 13.0 ms | about 0.8 ms (the kept one) |
 | `gpu campfires high` | the 30 campfires of the `fx campfires` row, a `ParticleSystem` each, one tick between pictures | 8.76 to 8.79 ms | 0.07 ms |
 
+**A frame as a game draws it** (`gpu frame ...` rows, `GpuRenderer::time_frame`): the same three scenes drawn one picture a frame, the anti-aliasing carried over from the frame before, nothing read back to the processor and no entity ids, the call waiting for the card; the median of 22 frames after 8 that settle (two runs, 4060, with another job using the machine's cores):
+
+| Row | Frame, the two added (gather + encoding, wait for the card) | The processor | The card |
+|---|---|---|---|
+| `gpu frame spheres medium` | 1.87 to 1.91 ms | 0.82 to 0.86 ms | 1.02 to 1.09 ms |
+| `gpu frame spheres high` | 2.07 to 2.08 ms | 0.82 to 0.85 ms | 1.23 ms |
+| `gpu frame campfires high` | 1.85 to 1.87 ms | 1.28 ms (the particles' gather is 0.44 of it) | 0.56 to 0.58 ms |
+
+A game overlaps the card's work with the next frame's processor work, so a frame costs between the larger of the two and their sum: 1.1 to 2.1 ms for 359,040 triangles at 960 x 540 on this card, which is hundreds of frames a second; a still (rows above) costs two to six times that because it reads the picture back and draws a `high` picture eight times. The window's own cost (presenting, waiting for the screen) is not in these rows: `lunaris play --perf` prints it.
+
 How to read them, honestly:
 
 * **The card is not what these pictures wait for.** 0.6 ms of the 4.1 ms of the medium picture is on the card. The processor's laps (the bench prints them): gathering the scene 0.15 ms, encoding the picture 0.70 ms, waiting for the card and reading the picture, the ids and the depth back 1.95 ms; the other 1.4 ms or so is not under a lap (building the `Frame`'s arrays is the likely part). In the `high` still the seven settling pictures cost the processor 4.9 ms to encode and the wait is 5.8 ms (eight pictures' worth of card work). The campfires' processor part is the particles' 0.44 ms gather. A picture of a game is not read back and the processor's part overlaps the card's, so these rows say what a *still image* costs (what the `render` tool and the tests pay), not what a frame costs in the window; for the window see the real-city numbers above.

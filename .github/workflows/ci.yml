@@ -26,10 +26,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # the editor crate is a Windows application and is checked in its own job; the GPU tests skip themselves when the runner has no graphics adapter.
-      # They are separate steps (with their own time limits) so that the run says which part is slow on a machine that draws with the CPU
+      # the editor crate is a Windows application and is checked in its own job, the graphics tests have theirs
       # through ci_step.sh so that a failure is written as an annotation (the log of a run cannot be read without signing in)
       - run: bash tools/ci_step.sh --workspace --exclude lunaris-studio --exclude lunaris-gpu --no-fail-fast
+
+  graphics:
+    name: graphics (windows, software adapter)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The runner has no graphics card: wgpu draws with Windows' software adapter (WARP), slowly, so these tests are separate steps with their own time limits (the run says which part is
+      # slow) and a job of their own (the other tests do not wait for them). A step writes what failed as an annotation (ci_step.sh). On Linux the runner has no adapter at all and the tests skip themselves.
       - name: graphics, unit tests
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --lib

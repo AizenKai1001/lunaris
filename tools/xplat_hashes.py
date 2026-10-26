@@ -73,11 +73,25 @@ elif MODE == "write":
 else:
     with open(GOLDEN, encoding="utf-8") as f:
         want = f.read().replace("\r\n", "\n").splitlines()
-    bad = [(w, g) for w, g in zip(want, lines) if w != g]
-    if bad or len(want) != len(lines):
+    # by scene name, so that a scene that was added or removed does not shift every line after it
+    def by_scene(rows):
+        return {r.split()[0]: r for r in rows if r.strip()}
+    w_by, g_by = by_scene(want), by_scene(lines)
+    bad = [(w_by[k], g_by[k]) for k in w_by if k in g_by and w_by[k] != g_by[k]]
+    missing = sorted(set(w_by) - set(g_by))
+    extra = sorted(set(g_by) - set(w_by))
+    if bad or missing or extra:
         for w, g in bad:
             print("expected:", w)
             print("     got:", g)
-        print(f"{len(bad)} scene(s) differ ({len(want)} expected, {len(lines)} produced): fix the change, or if behaviour was meant to change run with --write")
+        for k in missing:
+            print("in the golden file but not produced here:", k)
+        for k in extra:
+            print("produced here but not in the golden file:", k)
+        print(f"{len(bad)} scene(s) differ, {len(missing)} missing, {len(extra)} new ({len(want)} expected, {len(lines)} produced): fix the change, or if behaviour was meant to change run with --write")
+        if os.environ.get("GITHUB_ACTIONS"):
+            # a workflow annotation: the log of a run cannot be read without signing in, an annotation can
+            what = "; ".join([g.split()[0] + " got " + " ".join(g.split()[1:]) + " want " + " ".join(w.split()[1:]) for w, g in bad][:12] + ["missing " + k for k in missing][:6] + ["new " + k for k in extra][:6])
+            print("::error title=golden hashes differ::" + what)
         sys.exit(1)
     print(f"all {len(lines)} scenes reproduce their recorded state and picture hashes")

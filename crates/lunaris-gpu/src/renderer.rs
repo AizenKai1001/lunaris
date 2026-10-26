@@ -4496,6 +4496,31 @@ impl GpuRenderer {
         }
     }
 
+    /// One picture the way a game's window draws it, minus the window: the scene is gathered, the picture is drawn ONCE (no settling pictures, so the anti-aliasing and the bounced light carry over
+    /// from the frame before, as in a running game), nothing is read back to the processor and no entity ids are made, and the call waits for the card. Returns the milliseconds of the gather, of
+    /// the processor's work on the picture (uploads, uniforms, encoding) and of the wait for the card, in that order. A game overlaps the card's work with the next frame's processor work, so
+    /// a frame's cost is between the larger of the last two and their sum.
+    pub fn time_frame(&mut self, world: &mut World, textures: &mut TextureCache, opts: &RenderOptions, quality: &Quality) -> Result<(f64, f64, f64), String> {
+        self.sync_texture_cache(textures);
+        if opts.width == 0 || opts.height == 0 || opts.width > 8192 || opts.height > 8192 {
+            return Err("image size must be between 1x1 and 8192x8192".into());
+        }
+        let t_gather = std::time::Instant::now();
+        textures.fx_on_card = true;
+        let scene = gather_scene_with(world, textures, opts, self.gpu_skin).map_err(|e| e.message)?;
+        let gather_ms = t_gather.elapsed().as_secs_f64() * 1000.0;
+        if quality.mode == Mode::High {
+            self.sync_probes(world, textures, &scene.probes, scene.cam.clear, quality, None)?;
+        }
+        let t_draw = std::time::Instant::now();
+        self.draw(&scene, opts.width, opts.height, Out::Image, quality, false, self.adapt_dt)?;
+        self.settle_fx(textures);
+        let draw_ms = t_draw.elapsed().as_secs_f64() * 1000.0;
+        let t_wait = std::time::Instant::now();
+        self.gpu.device.poll(wgpu::PollType::wait_indefinitely()).map_err(|e| format!("the GPU did not finish: {e}"))?;
+        Ok((gather_ms, draw_ms, t_wait.elapsed().as_secs_f64() * 1000.0))
+    }
+
     pub fn render_frame(&mut self, world: &mut World, textures: &mut TextureCache, opts: &RenderOptions, quality: &Quality, want_ids: bool) -> Result<Frame, String> {
         self.sync_texture_cache(textures);
         if opts.width == 0 || opts.height == 0 || opts.width > 8192 || opts.height > 8192 {
