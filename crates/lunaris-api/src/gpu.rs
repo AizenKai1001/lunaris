@@ -8,6 +8,10 @@ use lunaris_render::{Frame, RenderOptions, TextureCache};
 pub trait GpuBackend: Send {
     /// What it draws on, for messages ("NVIDIA GeForce RTX 4060 (Vulkan, DiscreteGpu)").
     fn name(&self) -> String;
+    /// Whether it is a software adapter (the processor under a graphics API), which draws a picture several times slower than the CPU reference renderer does: a call that names no quality then uses the reference renderer.
+    fn is_software(&self) -> bool {
+        false
+    }
     /// Draw `world` with a quality named `classic`, `low`, `medium`, `high` or `ultra`. The frame has the picture and the entity at
     /// each pixel (`ids`); it may leave `depth` at infinity.
     fn render(&mut self, world: &mut World, textures: &mut TextureCache, opts: &RenderOptions, quality: &str) -> Result<Frame, String>;

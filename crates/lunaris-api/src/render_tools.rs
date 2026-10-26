@@ -146,7 +146,12 @@ impl Engine {
         let mut note = String::new();
         if asked != "reference" {
             if self.gpu_ready() {
-                if let crate::gpu::GpuState::Ready(b) = &mut self.gpu {
+                // a call that names no quality does not go to a software adapter (Mesa's llvmpipe, Windows' WARP): the reference renderer is several times faster there (docs/PERFORMANCE.md); naming a quality, or LUNARIS_GPU, still does
+                let unasked_software = matches!(a.opt_str("quality")?, None | Some("auto")) && std::env::var_os("LUNARIS_GPU").is_none() && matches!(&self.gpu, crate::gpu::GpuState::Ready(b) if b.is_software());
+                if unasked_software {
+                    let name = if let crate::gpu::GpuState::Ready(b) = &self.gpu { b.name() } else { String::new() };
+                    note = format!("the only graphics adapter is a software one ({name}), which is slower than the CPU reference renderer: drew with the reference renderer (name a quality to use the adapter)");
+                } else if let crate::gpu::GpuState::Ready(b) = &mut self.gpu {
                     match b.render(&mut self.sim.world, &mut self.textures, &opts, &asked) {
                         Ok(mut frame) => {
                             let name = format!("gpu: {} ({asked})", b.name());

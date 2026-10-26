@@ -9,6 +9,16 @@ fn round(x: f64, places: i32) -> f64 {
     (x * k).round() / k
 }
 
+/// What to try when a stage has a spike far above its average: the fix the engine has for the stages that are known to make one.
+fn spike_advice(stage: &str) -> Option<&'static str> {
+    match stage {
+        "navigation" => Some("a path search spikes (a target that cannot be reached is looked for everywhere up to the limit): put a `NavLimits` entity in the world with `max_searched` and `max_distance`, and set the resource `nav.cells_per_step` so that a search goes on over several steps (docs/NAVIGATION.md)"),
+        "gameplay procgrid" => Some("a procedural grid makes many cells in one step: lower `ProcGrid.per_tick`, or set the resource `procgrid.every` so that it looks at the cells every few steps (docs/GAMEPLAY.md)"),
+        "gameplay streaming" => Some("streaming loads many zones in one step: set the resource `stream.loads_per_tick` (docs/GAMEPLAY.md)"),
+        _ => None,
+    }
+}
+
 impl Engine {
     pub(crate) fn profile_tool(&mut self, a: &Args) -> Result<Json> {
         let ticks = a.opt_u64("ticks")?.unwrap_or(120);
@@ -58,6 +68,15 @@ impl Engine {
         if prof.max_ms > avg * 4.0 && prof.max_ms > 5.0 {
             advice.push(format!("the slowest tick took {:.1} ms against {avg:.2} ms on average: something spikes (a spawn burst, a path search, a save)", prof.max_ms));
         }
+        // a stage whose slowest step is far above its average and is a stage with a known remedy
+        for (name, s) in &stages {
+            let per_step = s.total_ms / n;
+            if s.max_ms > 8.0 && s.max_ms > 6.0 * per_step.max(0.05) {
+                if let Some(text) = spike_advice(name) {
+                    advice.push(format!("`{name}` took {:.1} ms in its slowest step against {per_step:.2} ms on average: {text}", s.max_ms));
+                }
+            }
+        }
         let mut out = Json::obj([
             ("ticks", Json::from(prof.ticks as i64)),
             ("entities", Json::from(self.sim.world.len())),
@@ -66,6 +85,18 @@ impl Engine {
             ("ticks_per_second_possible", Json::from(round(1000.0 / avg.max(1e-6), 0))),
             ("stages", Json::Arr(rows)),
         ]);
+        // how many steps took longer than 10, 15, 20, 30, 50 and 100 ms: the shape of the tail, which the average and the slowest hide
+        out.set("steps_over_ms", Json::obj(lunaris_sim::sim::STEP_LIMITS_MS.iter().zip(prof.over.iter()).map(|(l, n)| (format!("{l}"), Json::from(*n as i64)))));
+        // the slowest steps that took longer than 30 ms (`LUNARIS_SLOW_STEP_MS`), with their biggest stages
+        if !prof.slow.is_empty() {
+            let rows: Vec<Json> = prof
+                .slow
+                .iter()
+                .take(5)
+                .map(|(ms, st)| Json::obj([("ms", Json::from(round(*ms, 2))), ("stages", Json::arr(st.iter().map(|(n, t)| Json::obj([("stage", Json::str(n.clone())), ("ms", Json::from(round(*t, 3)))]))))]))
+                .collect();
+            out.set("slowest_steps", Json::Arr(rows));
+        }
         if want_render {
             // the pictures of a game are the size of its window: `width` and `height` (default 640 x 360); the first picture builds the meshes and textures, so with `pictures` above 1 the
             // first is reported on its own and `render_ms` is the median of the rest
@@ -98,5 +129,18 @@ impl Engine {
             out.set("advice", Json::arr(advice.into_iter().map(Json::str)));
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::spike_advice;
+
+    #[test]
+    fn stages_with_a_known_remedy_get_advice_and_the_others_none() {
+        for stage in ["navigation", "gameplay procgrid", "gameplay streaming"] {
+            assert!(spike_advice(stage).is_some_and(|t| t.contains("docs/")), "{stage}");
+        }
+        assert!(spike_advice("system physics").is_none() && spike_advice("characters").is_none());
     }
 }

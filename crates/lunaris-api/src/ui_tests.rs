@@ -57,6 +57,9 @@ fn profile_runs_the_ticks_and_says_where_the_time_goes() {
     let times: Vec<f64> = p.get("stages").unwrap().as_array().unwrap().iter().map(|s| s.get("avg_ms").unwrap().as_f64().unwrap()).collect();
     assert!(times.windows(2).all(|w| w[0] >= w[1]), "{times:?}");
     assert!(e.sim.profile.is_none());
+    // the shape of the tail: how many steps took longer than each limit, never more for a higher one
+    let over: Vec<u64> = ["10", "15", "20", "30", "50", "100"].iter().map(|k| p.get("steps_over_ms").and_then(|o| o.get(k)).and_then(|v| v.as_u64()).unwrap_or(u64::MAX)).collect();
+    assert!(over.windows(2).all(|w| w[0] >= w[1]) && over[0] <= 30, "{over:?}");
     let mut plain = engine();
     for i in 0..300 {
         plain.call("spawn", &j(&format!(r#"{{"components":{{"Transform":{{"pos":[{i},5,0]}},"Velocity":{{}},"Collider":{{"shape":0}},"RigidBody":{{"mass":1}}}}}}"#))).unwrap();

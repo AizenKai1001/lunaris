@@ -7,11 +7,17 @@ use lunaris_render::{Frame, RenderOptions, TextureCache};
 
 struct Backend {
     renderer: GpuRenderer,
+    /// The program was started with `--quality NAME`: a software adapter is then wanted as it is.
+    explicit_quality: bool,
 }
 
 impl GpuBackend for Backend {
     fn name(&self) -> String {
         self.renderer.adapter_name()
+    }
+
+    fn is_software(&self) -> bool {
+        self.renderer.adapter_is_software() && !self.explicit_quality
     }
 
     fn render(&mut self, world: &mut World, textures: &mut TextureCache, opts: &RenderOptions, quality: &str) -> Result<Frame, String> {
@@ -30,5 +36,6 @@ pub fn attach(engine: &mut Engine, disabled: bool, quality: Option<&str>) {
     if disabled || std::env::var_os("LUNARIS_NO_GPU").is_some_and(|v| v == "1") {
         return;
     }
-    engine.enable_gpu(Box::new(|| GpuRenderer::headless().map(|renderer| Box::new(Backend { renderer }) as Box<dyn GpuBackend>)), quality.unwrap_or("high"));
+    let explicit_quality = quality.is_some();
+    engine.enable_gpu(Box::new(move || GpuRenderer::headless().map(|renderer| Box::new(Backend { renderer, explicit_quality }) as Box<dyn GpuBackend>)), quality.unwrap_or("high"));
 }
