@@ -29,6 +29,7 @@ target/release/lunaris tools                       # the tool list an AI sees
 target/release/lunaris call describe               # one tool, printed as JSON
 target/release/lunaris run examples/orbits.lunaris.json --steps 600 --twice   # load, simulate, prove determinism
 target/release/lunaris bench --entities 1000000    # measure this machine
+target/release/lunaris bench --gpu                    # measure the graphics card: a picture, and a frame as a game draws it (docs/PERFORMANCE.md)
 target/release/lunaris mind examples/arena.lunaris.json --body 1 --goal "reach the Goal" --scripted examples/mind_walk.scripted.json --think-ticks 30   # a model plays a body (offline stand-in)
 node tools/mcp_smoke.mjs                           # end-to-end check over MCP
 python -I tools/check_all.py                       # every check in one go (build, tests, smokes, playtests, bots, tutorial, soak)
