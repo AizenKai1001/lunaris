@@ -271,6 +271,21 @@ What changed (the pictures are bit-identical: the hash `872dca645d6eccb2` of the
 
 Not done: the pixel stage (edge functions in f64 for every pixel of a triangle's box, 8.5 ms) and shading (8.7 ms) are as they were; making them faster without changing a bit of the picture needs an incremental or tiled rasteriser with exact arithmetic, which is its own piece of work. The scaling on more threads stops at about 3x because the bands are unequal (the sphere grid fills the middle rows) and the setup is not parallel.
 
+## Putting bytes on the card: a card that copies slowly (2026-10-26)
+
+While looking for what a city that streams in spends on the card, the timing guards (`LUNARIS_TIMING=1 LUNARIS_TIMING_MIN=0`) showed 2,690 mesh uploads costing 19 seconds on the RTX 4060 of the Linux test machine, 3 microseconds a vertex, while preparing the same meshes (vertex data, clusters, levels of detail) took a tenth of a millisecond each. `cargo run --release -p lunaris-gpu --example upload_cost` (`LUNARIS_GPU=name` picks the card) isolates it: a buffer is made and `queue.write_buffer` fills it, 300 times, no flush in between, the milliseconds a buffer:
+
+| Buffer size | RTX 2060 SUPER | RTX 4060 |
+|---|---:|---:|
+| 4 KB | 0.004 ms | 0.012 ms |
+| 16 KB | 0.007 ms | 0.87 ms |
+| 64 KB | 0.017 ms | 3.5 ms |
+| 330 KB (a building's part) | 0.065 ms | 17.8 ms |
+| 1 MB | 0.30 ms | 24 ms |
+| 6 MB | 2.8 ms | 3.5 ms |
+
+The 2060 SUPER copies at 5 GB/s; the 4060 takes 18 ms for 330 KB (18 MB/s), and the same through a buffer mapped at creation (36 ms), and the same again when the writes go into slices of one big buffer (17.9 ms a slice, which rules out the number of buffers and an arena as the fix), so it is how this card's driver (595, Linux) or its slot (the card runs at PCIe 1.0 x8 when idle) takes copies of that size, not something the engine does. The engine's mesh uploads are as cheap as the card lets them be. What follows for measuring: **take streaming and upload numbers on the 2060 SUPER** (`LUNARIS_GPU=2060`), where the first picture at a new place of the city costs 0.9 to 2.6 s of which uploads are 2.7 s over the 18 pictures of the probe, and where the time is spent instead in reading the model files (2.5 s for 288), working out the levels of detail of each new mesh (1.8 s for 2,729) and the gather of names and models (3.0 s, which holds the reading): all processor work that the player does on other threads (`async_prep`). Whether the PC's RTX 3080 shows the slow-copy window is not measured (`upload_cost` is a few seconds on any card and prints the table by itself).
+
 ## Start-up, memory and binary size (2026-10-25, Linux test machine, Linux x86-64)
 
 | | |

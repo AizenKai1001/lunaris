@@ -45,7 +45,8 @@ impl HistoryUi {
             }
         }
         ui.horizontal(|ui| {
-            ui.label(RichText::new(format!("{} edits, {} undone", self.now, self.rows.len().saturating_sub(self.now + 1))).small().color(theme::TEXT_DIM));
+            let done = self.now;
+            ui.label(RichText::new(format!("{done} {}, {} undone", if done == 1 { "edit" } else { "edits" }, self.rows.len().saturating_sub(self.now + 1))).small().color(theme::TEXT_DIM));
         });
         let mut jump: Option<i64> = None;
         egui::ScrollArea::vertical().id_salt("history-scroll").auto_shrink([false, false]).stick_to_bottom(false).show(ui, |ui| {

@@ -2480,8 +2480,8 @@ pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fi
         // (counts, not milliseconds: the anchors and the cells that were wanted and not there)
         let (anchors, wanted) = PROCGRID_COUNTS.with(|c| c.replace((0, 0)));
         if anchors > 0 {
-            p.add("gameplay procgrid: anchors (a count)", anchors as f64);
-            p.add("gameplay procgrid: cells wanted (a count)", wanted as f64);
+            p.add_count("gameplay procgrid: anchors (a count)", anchors as f64);
+            p.add_count("gameplay procgrid: cells wanted (a count)", wanted as f64);
         }
     }
     part!("streaming", streaming(world, scripts));

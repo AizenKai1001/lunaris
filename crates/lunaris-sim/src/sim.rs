@@ -140,6 +140,14 @@ impl StepProfile {
         self.step_stages.push((name.to_string(), ms));
     }
 
+    /// A number that is not a time (a count of what a stage worked with): kept like a stage, so that it is listed with its average and its largest, but not among the stages of the step that explain a slow one.
+    pub(crate) fn add_count(&mut self, name: &str, n: f64) {
+        let s = self.stages.entry(name.to_string()).or_default();
+        s.total_ms += n;
+        s.max_ms = s.max_ms.max(n);
+        s.calls += 1;
+    }
+
     /// The step is over: it took `ms`; when that is slow, keep what its biggest stages were.
     pub(crate) fn end_step(&mut self, ms: f64) {
         for (k, l) in STEP_LIMITS_MS.iter().enumerate() {

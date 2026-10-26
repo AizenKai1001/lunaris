@@ -1486,8 +1486,15 @@ fn screenshots_of_the_editor_for_looking_at() {
     h.app.settings_open = false;
     // 8c: the bottom panel's other tabs
     h.app.studio.tab = BottomTab::Console;
+    h.app.studio.log(crate::state::LogKind::Warn, "[warning] the Light has no Transform".to_string(), String::new(), 0.0);
+    h.app.studio.log(crate::state::LogKind::Error, "set: no such entity 99".to_string(), String::new(), 0.0);
     h.frames(4);
     h.shoot("14_console");
+    // (the History tab: the edits so far, newest at the bottom, two undone below the line)
+    h.app.studio.tab = BottomTab::History;
+    h.app.studio.undo_by(2);
+    h.frames(4);
+    h.shoot("16_history");
     h.app.studio.tab = BottomTab::Systems;
     h.frames(4);
     h.shoot("15_systems");
