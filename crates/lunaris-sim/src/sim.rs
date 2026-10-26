@@ -120,6 +120,10 @@ pub struct StepProfile {
     pub total_ms: f64,
     pub max_ms: f64,
     pub stages: std::collections::BTreeMap<String, StageTime>,
+    /// The stages of the step that is running, in the order they ran: what makes a slow step explain itself.
+    pub step_stages: Vec<(String, f64)>,
+    /// The slowest steps that took longer than `LUNARIS_SLOW_STEP_MS` (default 30): the step's milliseconds and its biggest stages, the slowest first, at most 12 kept.
+    pub slow: Vec<(f64, Vec<(String, f64)>)>,
 }
 
 impl StepProfile {
@@ -128,6 +132,23 @@ impl StepProfile {
         s.total_ms += ms;
         s.max_ms = s.max_ms.max(ms);
         s.calls += 1;
+        self.step_stages.push((name.to_string(), ms));
+    }
+
+    /// The step is over: it took `ms`; when that is slow, keep what its biggest stages were.
+    pub(crate) fn end_step(&mut self, ms: f64) {
+        static SLOW: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+        let limit = *SLOW.get_or_init(|| std::env::var("LUNARIS_SLOW_STEP_MS").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| v.is_finite() && *v > 0.0).unwrap_or(30.0));
+        if ms > limit {
+            let mut st = std::mem::take(&mut self.step_stages);
+            st.retain(|(n, _)| !n.contains("(all)"));
+            st.sort_by(|a, b| b.1.total_cmp(&a.1));
+            st.truncate(8);
+            self.slow.push((ms, st));
+            self.slow.sort_by(|a, b| b.0.total_cmp(&a.0));
+            self.slow.truncate(12);
+        }
+        self.step_stages.clear();
     }
 }
 
@@ -459,6 +480,9 @@ impl Sim {
             rec.steps += 1;
         }
         let mut prof = self.profile.take();
+        if let Some(p) = prof.as_mut() {
+            p.step_stages.clear();
+        }
         let tick_started = prof.is_some().then(std::time::Instant::now);
         // `stage!("name", work)` runs the work and, while profiling, adds its time under that name
         macro_rules! stage {
@@ -565,6 +589,7 @@ impl Sim {
             p.ticks += 1;
             p.total_ms += ms;
             p.max_ms = p.max_ms.max(ms);
+            p.end_step(ms);
             self.profile = Some(p);
         }
     }

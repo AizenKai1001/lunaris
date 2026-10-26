@@ -881,8 +881,16 @@ fn wide_limit() -> f32 {
     *LIMIT.get_or_init(|| std::env::var("LUNARIS_NAV_WIDE_LIMIT").ok().and_then(|v| v.parse::<f32>().ok()).filter(|v| v.is_finite() && *v >= 0.0).unwrap_or(WIDE_LIMIT))
 }
 
-fn find_path_inner(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavParams, fields: &Terrains, meshes: &MeshStore, who: Option<Filter>, cap: usize) -> Result<PathResult, NavError> {
-    let p = params.sane();
+/// What the cells of a search are worked out from: the solids, grounds, mesh levels and links of the world as the agent that plans sees them.
+struct NavScene {
+    all: Vec<Solid>,
+    ground: Vec<Ground>,
+    level: Vec<Instance>,
+    link_defs: Vec<LinkDef>,
+    sig: u64,
+}
+
+fn gather_scene(world: &mut World, fields: &Terrains, meshes: &MeshStore, who: Option<Filter>) -> NavScene {
     let all = solids(world, meshes, who);
     let layers = Layers::gather(world);
     let who = who.filter(|_| !layers.is_empty());
@@ -893,32 +901,48 @@ fn find_path_inner(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavP
         level.retain(|m| w.collides(layers.of(m.uid)));
     }
     let link_defs = links(world);
+    let sig = world_signature(&all, &ground, &level);
+    NavScene { all, ground, level, link_defs, sig }
+}
+
+/// The box a search between two points is made in: the two points and a margin round them.
+fn near_box(from: [f32; 3], to: [f32; 3], p: &NavParams) -> [f32; 4] {
     let (dx, dz) = (to[0] - from[0], to[2] - from[2]);
     let dist = (dx * dx + dz * dz).sqrt();
     let margin = (0.75 * dist).max(8.0 + p.radius);
-    let near = [from[0].min(to[0]) - margin, from[2].min(to[2]) - margin, from[0].max(to[0]) + margin, from[2].max(to[2]) + margin];
-    let sig = world_signature(&all, &ground, &level);
-    let first = search(&all, &ground, &level, &link_defs, near, from, to, p, cap, sig);
+    [from[0].min(to[0]) - margin, from[2].min(to[2]) - margin, from[0].max(to[0]) + margin, from[2].max(to[2]) + margin]
+}
+
+/// The box over the whole map that is searched again when the search in `near` found no way (see `find_path_inner`), or `None` when that is not worth it: the map is wider than `wide_limit` or the box is no bigger than `near`.
+fn wide_box(scene: &NavScene, from: [f32; 3], to: [f32; 3], p: &NavParams, near: [f32; 4]) -> Option<[f32; 4]> {
+    let mut world_box = [from[0].min(to[0]), from[2].min(to[2]), from[0].max(to[0]), from[2].max(to[2])];
+    for s in &scene.all {
+        world_box = [world_box[0].min(s.lo[0]), world_box[1].min(s.lo[2]), world_box[2].max(s.hi[0]), world_box[3].max(s.hi[2])];
+    }
+    for g in &scene.ground {
+        let placed = g.placed();
+        world_box = [world_box[0].min(placed.centre[0] - placed.size[0] * 0.5), world_box[1].min(placed.centre[1] - placed.size[1] * 0.5), world_box[2].max(placed.centre[0] + placed.size[0] * 0.5), world_box[3].max(placed.centre[1] + placed.size[1] * 0.5)];
+    }
+    for m in &scene.level {
+        let b = &m.placed.bounds;
+        world_box = [world_box[0].min(b.lo[0]), world_box[1].min(b.lo[2]), world_box[2].max(b.hi[0]), world_box[3].max(b.hi[2])];
+    }
+    let m = 2.0 + p.radius;
+    let wide = [world_box[0] - m, world_box[1] - m, world_box[2] + m, world_box[3] + m];
+    let span = (wide[2] - wide[0]).max(wide[3] - wide[1]);
+    (span <= wide_limit() && (wide[0] < near[0] || wide[1] < near[1] || wide[2] > near[2] || wide[3] > near[3])).then_some(wide)
+}
+
+fn find_path_inner(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavParams, fields: &Terrains, meshes: &MeshStore, who: Option<Filter>, cap: usize) -> Result<PathResult, NavError> {
+    let p = params.sane();
+    let scene = gather_scene(world, fields, meshes, who);
+    let near = near_box(from, to, &p);
+    let first = search(&scene, near, from, to, p, cap);
     // the way round may lead far outside the box around the two points (a maze whose only gap is at the other end): when nothing
     // was found there, look again over the whole map (the cells grow coarser if the map is huge)
     if matches!(first, Err(NavError::NoPath(_))) {
-        let mut world_box = [from[0].min(to[0]), from[2].min(to[2]), from[0].max(to[0]), from[2].max(to[2])];
-        for s in &all {
-            world_box = [world_box[0].min(s.lo[0]), world_box[1].min(s.lo[2]), world_box[2].max(s.hi[0]), world_box[3].max(s.hi[2])];
-        }
-        for g in &ground {
-            let placed = g.placed();
-            world_box = [world_box[0].min(placed.centre[0] - placed.size[0] * 0.5), world_box[1].min(placed.centre[1] - placed.size[1] * 0.5), world_box[2].max(placed.centre[0] + placed.size[0] * 0.5), world_box[3].max(placed.centre[1] + placed.size[1] * 0.5)];
-        }
-        for m in &level {
-            let b = &m.placed.bounds;
-            world_box = [world_box[0].min(b.lo[0]), world_box[1].min(b.lo[2]), world_box[2].max(b.hi[0]), world_box[3].max(b.hi[2])];
-        }
-        let m = 2.0 + p.radius;
-        let wide = [world_box[0] - m, world_box[1] - m, world_box[2] + m, world_box[3] + m];
-        let span = (wide[2] - wide[0]).max(wide[3] - wide[1]);
-        if span <= wide_limit() && (wide[0] < near[0] || wide[1] < near[1] || wide[2] > near[2] || wide[3] > near[3]) {
-            let again = search(&all, &ground, &level, &link_defs, wide, from, to, p, cap, sig);
+        if let Some(wide) = wide_box(&scene, from, to, &p, near) {
+            let again = search(&scene, wide, from, to, p, cap);
             if again.is_ok() {
                 return again;
             }
@@ -928,53 +952,92 @@ fn find_path_inner(world: &mut World, from: [f32; 3], to: [f32; 3], params: NavP
 }
 
 /// One search over the grid cut from `bounds`.
-#[allow(clippy::too_many_arguments)]
-fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[LinkDef], bounds: [f32; 4], from: [f32; 3], to: [f32; 3], p: NavParams, cap: usize, sig: u64) -> Result<PathResult, NavError> {
-    let mut grid = Grid::build(all, ground, level, bounds, p, from, sig)?;
-    grid.add_links(link_defs);
-    let (start, _) = grid.locate(from[0], from[2], from[1]).ok_or_else(|| NavError::NoStart(format!("the start ({:.1}, {:.1}, {:.1}) is not on ground an agent of radius {:.2} and height {:.2} can stand on (inside a wall, or off the map)", from[0], from[1], from[2], p.radius, p.height)))?;
-    let (goal, exact) = grid.locate(to[0], to[2], to[1]).ok_or_else(|| NavError::NoGoal(format!("the target ({:.1}, {:.1}, {:.1}) is not near any ground an agent can stand on", to[0], to[1], to[2])))?;
-    let goal_cell = Grid::node_cell(goal);
-    let nx = grid.nx;
-    let (gx, gz) = ((goal_cell % nx) as i64, (goal_cell / nx) as i64);
+fn search(scene: &NavScene, bounds: [f32; 4], from: [f32; 3], to: [f32; 3], p: NavParams, cap: usize) -> Result<PathResult, NavError> {
+    let mut grid = Grid::build(&scene.all, &scene.ground, &scene.level, bounds, p, from, scene.sig)?;
+    grid.add_links(&scene.link_defs);
+    let mut run = SearchRun::begin(&mut grid, from, to, &p)?;
+    match run.advance(&mut grid, from, to, &p, usize::MAX, cap)? {
+        true => run.finish(&mut grid, from, to),
+        // (a search with no limit on the cells it expands goes on until it is over)
+        false => unreachable!("a search with no limit on the cells it expands is paused"),
+    }
+}
 
-    // A*: the cheapest cost so far per node (only the nodes the search reaches have one), ties broken by (f, h, node number)
-    let mut g: IdMap<u32, u32> = IdMap::default();
-    let mut came: IdMap<u32, u32> = IdMap::default();
-    let mut open: BinaryHeap<Reverse<(u32, u32, u32)>> = BinaryHeap::new();
-    let mut searched = 0usize;
-    let heur = |n: usize| {
+/// A search that can be stopped and taken up again: A* over the nodes of a grid, whose state (the cheapest cost found to each node, where it came from, the nodes still to look at) does not borrow the grid, so that the grid can
+/// be made again from the world and the search go on from where it was (`NavLimits`, the resource `nav.cells_per_step`).
+#[derive(Clone)]
+struct SearchRun {
+    g: IdMap<u32, u32>,
+    came: IdMap<u32, u32>,
+    open: BinaryHeap<Reverse<(u32, u32, u32)>>,
+    searched: usize,
+    goal: usize,
+    exact: bool,
+    gx: i64,
+    gz: i64,
+}
+
+impl SearchRun {
+    /// The start and the goal found on the grid, and the first node to look at.
+    fn begin(grid: &mut Grid, from: [f32; 3], to: [f32; 3], p: &NavParams) -> Result<SearchRun, NavError> {
+        let (start, _) = grid.locate(from[0], from[2], from[1]).ok_or_else(|| NavError::NoStart(format!("the start ({:.1}, {:.1}, {:.1}) is not on ground an agent of radius {:.2} and height {:.2} can stand on (inside a wall, or off the map)", from[0], from[1], from[2], p.radius, p.height)))?;
+        let (goal, exact) = grid.locate(to[0], to[2], to[1]).ok_or_else(|| NavError::NoGoal(format!("the target ({:.1}, {:.1}, {:.1}) is not near any ground an agent can stand on", to[0], to[1], to[2])))?;
+        let goal_cell = Grid::node_cell(goal);
+        let nx = grid.nx;
+        let (gx, gz) = ((goal_cell % nx) as i64, (goal_cell / nx) as i64);
+        // A*: the cheapest cost so far per node (only the nodes the search reaches have one), ties broken by (f, h, node number)
+        let mut run = SearchRun { g: IdMap::default(), came: IdMap::default(), open: BinaryHeap::new(), searched: 0, goal, exact, gx, gz };
+        let h = run.heur(nx, start);
+        run.g.insert(start as u32, 0);
+        run.open.push(Reverse((h, h, start as u32)));
+        Ok(run)
+    }
+
+    fn heur(&self, nx: usize, n: usize) -> u32 {
         let c = Grid::node_cell(n);
-        octile((c % nx) as i64, (c / nx) as i64, gx, gz)
-    };
-    g.insert(start as u32, 0);
-    open.push(Reverse((heur(start), heur(start), start as u32)));
-    let mut next = Vec::new();
-    let mut found = false;
-    while let Some(Reverse((_, _, node))) = open.pop() {
-        let node = node as usize;
-        if node == goal {
-            found = true;
-            break;
-        }
-        searched += 1;
-        if cap > 0 && searched > cap {
-            return Err(NavError::NoPath(format!("gave up after {cap} cells (the search is limited by `NavLimits.max_searched`)")));
-        }
-        let gn = g[&(node as u32)];
-        grid.neighbours(node, &mut next);
-        for &(m, cost) in &next {
-            let ng = gn.saturating_add(cost);
-            if ng < g.get(&(m as u32)).copied().unwrap_or(u32::MAX) {
-                g.insert(m as u32, ng);
-                came.insert(m as u32, node as u32);
-                open.push(Reverse((ng.saturating_add(heur(m)), heur(m), m as u32)));
+        octile((c % nx) as i64, (c / nx) as i64, self.gx, self.gz)
+    }
+
+    /// Expand up to `budget` more nodes. `Ok(true)`: the goal is reached (`finish` makes the path); `Ok(false)`: the budget is spent and the search is not over; `Err`: it gave up after `cap` nodes (0: no limit) or has none left to look at.
+    fn advance(&mut self, grid: &mut Grid, from: [f32; 3], to: [f32; 3], p: &NavParams, budget: usize, cap: usize) -> Result<bool, NavError> {
+        let nx = grid.nx;
+        let mut next = Vec::new();
+        let mut spent = 0usize;
+        loop {
+            if spent >= budget {
+                return Ok(false);
+            }
+            let Some(Reverse((_, _, node))) = self.open.pop() else { break };
+            let node = node as usize;
+            if node == self.goal {
+                return Ok(true);
+            }
+            self.searched += 1;
+            spent += 1;
+            if cap > 0 && self.searched > cap {
+                return Err(NavError::NoPath(format!("gave up after {cap} cells (the search is limited by `NavLimits.max_searched`)")));
+            }
+            let gn = self.g[&(node as u32)];
+            grid.neighbours(node, &mut next);
+            for &(m, cost) in &next {
+                let ng = gn.saturating_add(cost);
+                if ng < self.g.get(&(m as u32)).copied().unwrap_or(u32::MAX) {
+                    self.g.insert(m as u32, ng);
+                    self.came.insert(m as u32, node as u32);
+                    let h = self.heur(nx, m);
+                    self.open.push(Reverse((ng.saturating_add(h), h, m as u32)));
+                }
             }
         }
+        let searched = self.searched;
+        Err(NavError::NoPath(format!("no walkable route from ({:.1}, {:.1}, {:.1}) to ({:.1}, {:.1}, {:.1}) (searched {searched} cells): walls, drops of more than {:.1} m or steps higher than {:.2} m are in the way", from[0], from[1], from[2], to[0], to[1], to[2], p.max_drop, p.step_height)))
     }
-    if !found {
-        return Err(NavError::NoPath(format!("no walkable route from ({:.1}, {:.1}, {:.1}) to ({:.1}, {:.1}, {:.1}) (searched {searched} cells): walls, drops of more than {:.1} m or steps higher than {:.2} m are in the way", from[0], from[1], from[2], to[0], to[1], to[2], p.max_drop, p.step_height)));
-    }
+
+    /// The path of a search whose goal has been reached.
+    fn finish(&mut self, grid: &mut Grid, from: [f32; 3], to: [f32; 3]) -> Result<PathResult, NavError> {
+        let (goal, exact, searched) = (self.goal, self.exact, self.searched);
+        let came = &self.came;
+        let nx = grid.nx;
     let mut nodes = vec![goal];
     while let Some(&last) = nodes.last() {
         let prev = came.get(&(last as u32)).copied().unwrap_or(u32::MAX);
@@ -1035,6 +1098,104 @@ fn search(all: &[Solid], ground: &[Ground], level: &[Instance], link_defs: &[Lin
     let length = out.windows(2).map(|w| ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2) + (w[1][2] - w[0][2]).powi(2)).sqrt()).sum();
     Ok(PathResult { points: out, jumps, length, exact, searched, cell: grid.cell })
 }
+}
+
+// ------------------------------------------------------------------------------------------------------------- searches done a few cells a step
+
+/// A search of an agent that is done a few cells a step (`NavLimits` with the resource `nav.cells_per_step`): the points it goes between, the box of the grid it is over and where it has got to.
+/// The grid is made again from the world at every step, so the search sees the world as it is then; the nodes it has looked at keep the costs they were found with.
+#[derive(Clone)]
+pub(crate) struct NavJob {
+    from: [f32; 3],
+    goal: [f32; 3],
+    /// The goal is a point on the way to the target, not the target (`NavLimits.max_distance`).
+    partial: bool,
+    params: NavParams,
+    who: Option<Filter>,
+    cap: usize,
+    bounds: [f32; 4],
+    /// The second look over the whole map is the one that is running, and the error of the first look.
+    wide: bool,
+    first: Option<NavError>,
+    run: Option<SearchRun>,
+    /// The tick the search was started (the oldest goes first).
+    pub(crate) started: u64,
+    /// The nodes expanded for it so far, in both looks.
+    pub(crate) expanded: usize,
+}
+
+impl NavJob {
+    /// The nodes the search has expanded so far, in both looks.
+    pub(crate) fn expanded(&self) -> usize {
+        self.expanded
+    }
+}
+
+impl std::fmt::Debug for NavJob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NavJob {{ started: {}, expanded: {}, wide: {} }}", self.started, self.expanded, self.wide)
+    }
+}
+
+enum JobStep {
+    Done(Result<PathResult, NavError>),
+    Paused,
+}
+
+/// What a finished search gives back to its agent.
+struct JobDone {
+    result: Result<PathResult, NavError>,
+    partial: bool,
+    from: [f32; 3],
+    goal: [f32; 3],
+}
+
+/// Work on a search for at most `budget` more nodes: what became of it, and how many nodes were expanded.
+fn advance_job(job: &mut NavJob, scene: &NavScene, budget: usize) -> (JobStep, usize) {
+    let p = job.params;
+    let mut spent = 0usize;
+    // (a failure of the second look over the whole map is the failure of the first)
+    let fail = |job: &mut NavJob, e: NavError| if job.wide { job.first.take().unwrap_or(e) } else { e };
+    loop {
+        let mut grid = match Grid::build(&scene.all, &scene.ground, &scene.level, job.bounds, p, job.from, scene.sig) {
+            Ok(g) => g,
+            Err(e) => return (JobStep::Done(Err(fail(job, e))), spent),
+        };
+        grid.add_links(&scene.link_defs);
+        if job.run.is_none() {
+            match SearchRun::begin(&mut grid, job.from, job.goal, &p) {
+                Ok(r) => job.run = Some(r),
+                Err(e) => return (JobStep::Done(Err(fail(job, e))), spent),
+            }
+        }
+        let Some(run) = job.run.as_mut() else { unreachable!("the run was made above") };
+        let before = run.searched;
+        let r = run.advance(&mut grid, job.from, job.goal, &p, budget - spent, job.cap);
+        spent += run.searched - before;
+        match r {
+            Ok(true) => {
+                let out = run.finish(&mut grid, job.from, job.goal);
+                return (JobStep::Done(out.map_err(|e| fail(job, e))), spent);
+            }
+            Ok(false) => return (JobStep::Paused, spent),
+            Err(e) => {
+                if !job.wide && matches!(e, NavError::NoPath(_)) {
+                    if let Some(wide) = wide_box(scene, job.from, job.goal, &p, job.bounds) {
+                        job.first = Some(e);
+                        job.bounds = wide;
+                        job.wide = true;
+                        job.run = None;
+                        if spent >= budget {
+                            return (JobStep::Paused, spent);
+                        }
+                        continue;
+                    }
+                }
+                return (JobStep::Done(Err(fail(job, e))), spent);
+            }
+        }
+    }
+}
 
 // ------------------------------------------------------------------------------------------------------------- agents
 
@@ -1068,6 +1229,8 @@ pub struct NavState {
     /// Ticks counted while `NavLimits` exists.
     pub(crate) tick: u64,
     pub(crate) limited: bool,
+    /// With the resource `nav.cells_per_step`: the searches that are on, by agent.
+    pub(crate) jobs: BTreeMap<u64, NavJob>,
 }
 
 impl NavState {
@@ -1110,6 +1273,17 @@ impl NavState {
             for p in self.paths.values() {
                 h.u64(p.age as u64 | (p.partial as u64) << 32);
             }
+            // (a world that does not slice its searches hashes as it did)
+            if !self.jobs.is_empty() {
+                h.u64(self.jobs.len() as u64);
+                for (uid, j) in &self.jobs {
+                    h.u64(*uid);
+                    h.u64(j.started);
+                    h.u64(j.wide as u64);
+                    h.u64(j.expanded as u64);
+                    h.u64(j.run.as_ref().map_or(0, |r| r.open.len() as u64));
+                }
+            }
         }
     }
 }
@@ -1149,6 +1323,7 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
     }
     if agents.is_empty() {
         state.paths.clear();
+        state.jobs.clear();
         return;
     }
     agents.sort_by_key(|a| a.0);
@@ -1180,6 +1355,9 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
         found.map(|f| f.1)
     };
     state.limited = limits.is_some();
+    // the resource `nav.cells_per_step` (a whole number, 0 or missing: none): the most nodes all the searches of one step expand together; a search that is not over then goes on in the next step (oldest first), so that a hard search
+    // (a target that cannot be reached, which is looked for in every direction up to `max_searched`) costs a few steps a little each and not one step a great deal
+    let slice = if limits.is_some() { world.resource("nav.cells_per_step").filter(|v| v.is_finite() && *v >= 1.0).map_or(0, |v| v.min(1.0e9) as usize) } else { 0 };
     // who gets a search this tick: the agents that ask (a request that is on, a stalled path to replan), the one that has waited longest first, up to the budget
     let mut granted: BTreeSet<u64> = BTreeSet::new();
     if let Some(lim) = limits {
@@ -1188,12 +1366,19 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
         for p in state.paths.values_mut() {
             p.age = p.age.saturating_add(1);
         }
+        // (a search that is on is served by the budget of its step; its agent asks for nothing more, and when the agent's request is turned off the search is dropped)
+        if slice > 0 {
+            let wanting: BTreeSet<u64> = agents.iter().filter(|a| a.3.active).map(|a| a.0).collect();
+            state.jobs.retain(|uid, _| wanting.contains(uid));
+        } else {
+            state.jobs.clear();
+        }
         let mut asking: Vec<(u64, u64)> = Vec::new();
         for (uid, _, _, a) in &agents {
             let path = state.paths.get(uid);
             let wants = (a.active && path.is_none_or(|p| p.age >= min_ticks)) || (a.status == STATUS_WALKING && path.is_some_and(|p| p.stalled >= STALL_TICKS));
             // (an agent whose last search found no way waits `blocked_wait` before it asks again: its request stays on, and it is not asking)
-            if wants && state.blocked.get(uid).is_none_or(|until| *until <= state.tick) {
+            if wants && state.blocked.get(uid).is_none_or(|until| *until <= state.tick) && !state.jobs.contains_key(uid) {
                 let since = *state.waiting.entry(*uid).or_insert(state.tick);
                 asking.push((since, *uid));
             }
@@ -1203,6 +1388,7 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
         state.blocked.retain(|uid, until| *until > state.tick && alive.contains(uid));
         asking.sort();
         let budget = if lim.searches_per_tick == 0 { usize::MAX } else { lim.searches_per_tick as usize };
+        let budget = if slice > 0 { budget.saturating_sub(state.jobs.len()) } else { budget };
         for (_, uid) in asking.into_iter().take(budget) {
             granted.insert(uid);
             state.waiting.remove(&uid);
@@ -1210,6 +1396,7 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
     } else {
         state.waiting.clear();
         state.blocked.clear();
+        state.jobs.clear();
         state.tick = 0;
     }
     let max_search = limits.map(|l| l.max_distance).unwrap_or(0.0);
@@ -1219,13 +1406,58 @@ pub fn step(world: &mut World, state: &mut NavState, dt: f32, fields: &Terrains,
         Some(l) if l.blocked_wait > 0.0 && dt > 0.0 => (l.blocked_wait / dt).ceil() as u64,
         _ => 0,
     };
+    // the searches that are done a few nodes at a time: the ones that are on go on, the oldest first, and the agents that were granted a search start theirs, until the nodes of the step are spent
+    let mut finished: BTreeMap<u64, JobDone> = BTreeMap::new();
+    if slice > 0 {
+        for (uid, _, t, a) in &agents {
+            if a.active && granted.contains(uid) && !state.jobs.contains_key(uid) {
+                let feet = [t.pos[0], t.pos[1] - a.feet, t.pos[2]];
+                let (goal, partial) = limited_goal(feet, a.target, max_search);
+                let params = NavParams { keep, ..params_of(a) }.sane();
+                let bounds = near_box(feet, goal, &params);
+                state.jobs.insert(*uid, NavJob { from: feet, goal, partial, params, who: who_plans(&layers, *uid), cap, bounds, wide: false, first: None, run: None, started: state.tick, expanded: 0 });
+            }
+        }
+        let mut order: Vec<(u64, u64)> = state.jobs.iter().map(|(uid, j)| (j.started, *uid)).collect();
+        order.sort_unstable();
+        let mut left = slice;
+        let mut scenes: Vec<(Option<Filter>, NavScene)> = Vec::new();
+        for (_, uid) in order {
+            if left == 0 {
+                break;
+            }
+            let Some(job) = state.jobs.get_mut(&uid) else { continue };
+            // (the agents of one layer see the same world: it is gathered once for them)
+            let at = match scenes.iter().position(|(w, _)| *w == job.who) {
+                Some(i) => i,
+                None => {
+                    scenes.push((job.who, gather_scene(world, fields, meshes, job.who)));
+                    scenes.len() - 1
+                }
+            };
+            let (what, spent) = advance_job(job, &scenes[at].1, left);
+            job.expanded += spent;
+            left -= spent.min(left);
+            if let JobStep::Done(result) = what {
+                finished.insert(uid, JobDone { result, partial: job.partial, from: job.from, goal: job.goal });
+                state.jobs.remove(&uid);
+            }
+        }
+    }
     for (uid, entity, t, mut a) in agents {
         let feet = [t.pos[0], t.pos[1] - a.feet, t.pos[2]];
         let was = (a.status, a.active);
-        if a.active && (limits.is_none() || granted.contains(&uid)) {
-            a.active = false;
+        let outcome = if slice > 0 {
+            finished.remove(&uid).map(|f| (f.result, f.partial, f.goal, f.from))
+        } else if a.active && (limits.is_none() || granted.contains(&uid)) {
             let (goal, partial) = limited_goal(feet, a.target, max_search);
-            match find_path_capped(world, feet, goal, NavParams { keep, ..params_of(&a) }, fields, meshes, who_plans(&layers, uid), cap) {
+            Some((find_path_capped(world, feet, goal, NavParams { keep, ..params_of(&a) }, fields, meshes, who_plans(&layers, uid), cap), partial, goal, feet))
+        } else {
+            None
+        };
+        if let Some((result, partial, goal, feet)) = outcome {
+            a.active = false;
+            match result {
                 Ok(r) => {
                     state.paths.insert(uid, AgentPath { points: r.points, jumps: r.jumps, hop_t: 0.0, hop_from: [0.0; 3], next: 1, best: f32::INFINITY, stalled: 0, replans: 0, age: 0, partial });
                     a.status = STATUS_WALKING;

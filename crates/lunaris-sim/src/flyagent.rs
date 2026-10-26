@@ -57,6 +57,28 @@ fn points_of(text: &str) -> Vec<V3> {
     out
 }
 
+thread_local! {
+    /// The points of the patrol texts met so far, by text: an agent reads its patrol every step and the text does not change between steps, but reading the numbers out of it (a float parse a line) was
+    /// the largest cost of two hundred patrolling machines in a city server (6% of a tick, profiled with `LUNARIS_SAMPLE`).
+    static PATROLS: std::cell::RefCell<HashMap<String, std::rc::Rc<Vec<V3>>>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// `points_of` of a text, remembered (a few hundred different texts at most: the table is emptied when it gets larger, which costs a parse a text again, not a different answer).
+fn patrol_points(text: &str) -> std::rc::Rc<Vec<V3>> {
+    PATROLS.with(|c| {
+        let mut c = c.borrow_mut();
+        if let Some(p) = c.get(text) {
+            return p.clone();
+        }
+        if c.len() >= 512 {
+            c.clear();
+        }
+        let p = std::rc::Rc::new(points_of(text));
+        c.insert(text.to_string(), p.clone());
+        p
+    })
+}
+
 /// `v` turned about the vertical axis by `deg` degrees (left is positive, as everywhere).
 fn turn(v: V3, deg: f32) -> V3 {
     let a = deg as f64 * (std::f64::consts::PI / 180.0);
@@ -339,8 +361,7 @@ fn decide(world: &mut World, a: &mut FlyAgent, r: &Rig, dt: f32) -> Plan {
             }
         }
         4 => {
-            let text = world.strings().get(a.patrol.0).to_string();
-            let pts = points_of(&text);
+            let pts = patrol_points(world.strings().get(a.patrol.0));
             if pts.is_empty() {
                 return Plan { goal: None, orbit: None, engaged, waiting: false };
             }

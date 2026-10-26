@@ -739,7 +739,8 @@ component! {
     /// search leaves no path to count `min_replan` from, and has looked at every cell it could reach). `max_searched` is the most cells one search may expand (0: none): a search that has looked at that many gives up as
     /// "no path", which caps the cost of a failure. `keep_cells` (default off) keeps the data of the grid's cells between the agents' searches, which makes the second search over the same streets many times cheaper: the
     /// cells are then on a lattice anchored at the world's origin and not at the corner of each search's box, so the paths are not the ones of the same world without it (a waypoint may differ by up to half a cell), and the
-    /// cells are dropped whenever the world's solids, grounds or mesh levels change (a recorded game that turns it on must be recorded again). Without this component nothing is limited and nothing changes.
+    /// cells are dropped whenever the world's solids, grounds or mesh levels change (a recorded game that turns it on must be recorded again). The resource `nav.cells_per_step` (a whole number, off by default) spreads the searches over steps: all the
+    /// searches of one step expand that many cells together and one that is not over goes on in the next step, so a hard search is not one long step (docs/NAVIGATION.md). Without this component nothing is limited and nothing changes.
     pub struct NavLimits {
         pub searches_per_tick: u32 = 2,
         pub min_replan: f32 = 0.5,

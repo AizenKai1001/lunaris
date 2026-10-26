@@ -23,6 +23,7 @@ mod net_scale_cmd;
 #[cfg(any(windows, target_os = "linux"))]
 mod play;
 mod posetrace;
+mod sampler;
 
 use lunaris_api::{serve, tool_defs, Engine};
 use lunaris_json::{parse, Json};
@@ -97,6 +98,14 @@ fn load_into(engine: &mut Engine, scene: &str) -> Result<(), String> {
 }
 
 fn main() -> ExitCode {
+    // (`LUNARIS_SAMPLE=file`: a sampling profiler for the whole command, see sampler.rs; nothing happens without it)
+    sampler::begin();
+    let code = real_main();
+    sampler::end();
+    code
+}
+
+fn real_main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some(cmd) = args.first().cloned() else {
         eprint!("{}", usage());

@@ -423,6 +423,96 @@ fn limited_navigation_is_deterministic_and_comes_back_from_a_copy() {
     assert_eq!(b.state_hash(), c.state_hash(), "a copy of the simulation carries the waiting list");
 }
 
+// ------------------------------------------------------------------------------------------------------------- searches done a few cells a step
+
+/// A walker that has to go round a wall to a target 20 m away, with `NavLimits` (`limits`) and, when `slice` is above 0, `nav.cells_per_step`.
+fn sliced_world(slice: f64, limits: &str) -> Sim {
+    let mut s = floor();
+    spawn(&mut s, 50, limits);
+    wall(&mut s, 60, 5.0, -8.0, 8.0);
+    if slice > 0.0 {
+        let _ = s.world.set_resource("nav.cells_per_step", Some(slice));
+    }
+    spawn(&mut s, 100, r#"{"Transform":{"pos":[0,0,0]},"CharacterBody":{},"NavAgent":{"target":[20,0,0],"active":true,"speed":4}}"#);
+    s
+}
+
+#[test]
+fn a_search_done_a_few_cells_a_step_finds_the_path_of_the_whole_search() {
+    let limits = r#"{"NavLimits":{"searches_per_tick":2,"min_replan":0}}"#;
+    let mut whole = sliced_world(0.0, limits);
+    whole.step();
+    let want = whole.nav.paths.get(&100).expect("the whole search finds a path in a step").points.clone();
+    let budget = 40usize;
+    let mut sliced = sliced_world(budget as f64, limits);
+    let (mut steps, mut last) = (0, 0);
+    while !sliced.nav.paths.contains_key(&100) && steps < 400 {
+        sliced.step();
+        steps += 1;
+        if let Some(j) = sliced.nav.jobs.get(&100) {
+            assert!(j.expanded() - last <= budget, "a step expanded {} cells with a budget of {budget}", j.expanded() - last);
+            last = j.expanded();
+        }
+    }
+    assert!(steps > 3, "a search of some hundreds of cells does not end in {steps} steps of {budget}");
+    assert!(sliced.nav.jobs.is_empty(), "the finished search is forgotten");
+    assert!(!agent(&sliced, 100).active, "the request is answered when the search is over");
+    // (the world did not change meanwhile, so the search that stopped and went on is the search that did not stop)
+    assert_eq!(sliced.nav.paths[&100].points, want);
+}
+
+#[test]
+fn a_search_that_cannot_succeed_ends_as_blocked_in_the_end_and_costs_a_few_cells_a_step() {
+    // the target in a closed box
+    let limits = r#"{"NavLimits":{"searches_per_tick":2,"min_replan":0,"blocked_wait":2,"max_searched":900}}"#;
+    let mut s = sliced_world(60.0, limits);
+    wall(&mut s, 61, 17.0, -3.0, 3.0);
+    wall(&mut s, 62, 23.0, -3.0, 3.0);
+    spawn(&mut s, 63, r#"{"Transform":{"pos":[20,1.5,-3],"scale":[7,3,1]},"Collider":{"shape":1}}"#);
+    spawn(&mut s, 64, r#"{"Transform":{"pos":[20,1.5,3],"scale":[7,3,1]},"Collider":{"shape":1}}"#);
+    let (mut steps, mut last, mut longest) = (0, 0, 0);
+    while agent(&s, 100).status != 3 && steps < 400 {
+        s.step();
+        steps += 1;
+        if let Some(j) = s.nav.jobs.get(&100) {
+            longest = longest.max(j.expanded() - last);
+            last = j.expanded();
+        } else {
+            last = 0;
+        }
+    }
+    assert_eq!(agent(&s, 100).status, 3, "no way in after {steps} steps");
+    assert!(steps >= 10, "900 cells at 60 a step are not over in {steps} steps");
+    assert!(longest <= 60, "a step expanded {longest} cells with a budget of 60");
+    assert!(s.nav.jobs.is_empty());
+    // the same without slicing is one step
+    let mut whole = sliced_world(0.0, limits);
+    wall(&mut whole, 61, 17.0, -3.0, 3.0);
+    wall(&mut whole, 62, 23.0, -3.0, 3.0);
+    spawn(&mut whole, 63, r#"{"Transform":{"pos":[20,1.5,-3],"scale":[7,3,1]},"Collider":{"shape":1}}"#);
+    spawn(&mut whole, 64, r#"{"Transform":{"pos":[20,1.5,3],"scale":[7,3,1]},"Collider":{"shape":1}}"#);
+    whole.step();
+    assert_eq!(agent(&whole, 100).status, 3);
+}
+
+#[test]
+fn searches_done_a_few_cells_a_step_are_deterministic_and_come_back_from_a_copy() {
+    let build = || {
+        let mut s = sliced_world(25.0, r#"{"NavLimits":{"searches_per_tick":2,"min_replan":0.2,"max_distance":30}}"#);
+        crowd(&mut s, 101, 5);
+        s
+    };
+    let (mut a, mut b) = (build(), build());
+    a.step_n(200);
+    b.step_n(6);
+    assert!(!b.nav.jobs.is_empty(), "a search is on when the copy is made");
+    let mut c = b.clone();
+    b.step_n(194);
+    c.step_n(194);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert_eq!(b.state_hash(), c.state_hash(), "a copy of the simulation carries the searches that are on");
+}
+
 // ------------------------------------------------------------------------------------------------------------- the grid is worked out lazily: the same paths as a grid cut whole
 
 /// A building of triangles: four walls and a roof, every face cut into `n` by `n` squares.
