@@ -5,6 +5,7 @@ tolerance, or when the memory an entity costs grew. A speed claim of the engine 
     python3 tools/perf_gate.py --update               measure and write the baseline for this machine (do this when a change is meant to move the numbers, and say so in the commit)
     python3 tools/perf_gate.py --bin target/release/lunaris --runs 5 --entities 200000
     python3 tools/perf_gate.py --selftest             check the gate's own comparison logic (no benchmark is run)
+    python3 tools/perf_gate.py --gpu [--update]       the same for the graphics card (`lunaris bench --gpu`), with a baseline per machine and adapter (LUNARIS_GPU=name picks the card)
 
 The baseline holds one entry per machine, named by its processor and core count (timings are only comparable on the same machine, the clock and the memory of another one would make
 every number a false alarm); on a machine with no entry only the memory an entity costs is checked (it does not depend on the machine) and the script says how to add one.
@@ -51,9 +52,18 @@ def machine_name():
     return f"{cpu} x{os.cpu_count()}"
 
 
-def run_bench(binary, entities, ticks):
-    out = subprocess.run([binary, "bench", "--entities", str(entities), "--ticks", str(ticks), "--json"], check=True, capture_output=True, text=True).stdout
-    return json.loads(out)
+def run_bench(binary, entities, ticks, gpu=False):
+    cmd = [binary, "bench", "--entities", str(entities), "--ticks", str(ticks), "--json"] + (["--gpu"] if gpu else [])
+    out = subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
+    # `bench --gpu` prints nothing at all on a machine without a graphics adapter
+    return json.loads(out) if out.strip() else {"results": []}
+
+
+def adapter_of(run):
+    """The graphics adapter a `bench --gpu` run measured, from the detail of its first row ('NVIDIA GeForce RTX 2060 SUPER (Vulkan, DiscreteGpu), 960x540 ...')."""
+    for row in run.get("results", []):
+        return row.get("detail", "").split(", 960x540")[0]
+    return None
 
 
 def best_of(runs):
@@ -99,6 +109,52 @@ def selftest():
     print("perf_gate selftest: ok")
 
 
+def gpu_main(a):
+    """The graphics rows (`lunaris bench --gpu`): the best of a few runs of each, against the baseline of this machine with this adapter. Timings of a card are noisier than the core's (the processor feeds it), so a row may be 50% slower before it fails."""
+    runs = [run_bench(a.bin, a.entities, a.ticks, gpu=True) for _ in range(max(1, a.runs))]
+    adapter = adapter_of(runs[0])
+    if adapter is None:
+        print("perf gate (graphics): no graphics adapter on this machine, nothing to check")
+        return 0
+    rows, _ = best_of(runs)
+    key = f"{machine_name()} / {adapter}"
+    try:
+        with open(BASELINE, encoding="utf-8") as f:
+            store = json.load(f)
+    except (OSError, ValueError):
+        store = {"entities": a.entities, "machines": {}}
+    if a.update:
+        store.setdefault("gpu_machines", {})[key] = {"rows": {k: round(v, 3) for k, v in rows.items()}}
+        with open(BASELINE, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(store, f, indent=2, sort_keys=True)
+            f.write("\n")
+        print(f"graphics baseline for {key} written to {BASELINE} ({len(rows)} rows, best of {len(runs)} runs)")
+        return 0
+    entry = store.get("gpu_machines", {}).get(key)
+    if entry is None:
+        print(f"no graphics baseline for {key}: run with --gpu --update to add one")
+        return 0
+    tolerance = {name: 0.5 for name in entry["rows"]}
+    bad = []
+    for again in range(3):
+        bad = []
+        for name, was in entry["rows"].items():
+            now = rows.get(name)
+            if now is None:
+                bad.append(f"{name}: row missing from the benchmark")
+            elif now > was * (1.0 + tolerance[name]):
+                bad.append(f"{name}: {now:.3f} ms against {was:.3f} ms ({(now / was - 1) * 100:+.0f}%, at most +{tolerance[name] * 100:.0f}% allowed)")
+        if not bad or again == 2:
+            break
+        print(f"slower than the baseline ({len(bad)} row(s)): measuring again ({again + 1} of 2) before calling it a regression")
+        runs += [run_bench(a.bin, a.entities, a.ticks, gpu=True) for _ in range(max(1, a.runs))]
+        rows, _ = best_of(runs)
+    for line in bad:
+        print("SLOWER  " + line)
+    print(f"perf gate (graphics): {'FAILED' if bad else 'ok'} on {key} (best of {len(runs)} runs)")
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bin", default=os.path.join("target", "release", "lunaris.exe" if os.name == "nt" else "lunaris"))
@@ -107,10 +163,13 @@ def main():
     ap.add_argument("--ticks", type=int, default=20)
     ap.add_argument("--update", action="store_true", help="write the baseline for this machine")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--gpu", action="store_true", help="gate the graphics card instead (`bench --gpu`; the baseline is kept per machine AND adapter, pick the card with LUNARIS_GPU=name)")
     a = ap.parse_args()
     if a.selftest:
         selftest()
         return 0
+    if a.gpu:
+        return gpu_main(a)
     runs = [run_bench(a.bin, a.entities, a.ticks) for _ in range(max(1, a.runs))]
     rows, mem = best_of(runs)
     machine = machine_name()

@@ -314,7 +314,11 @@ The potato budget (resident memory of a small scene, start-up to first frame, sc
 python3 tools/perf_gate.py                 # compare with tools/perf_baseline.json
 python3 tools/perf_gate.py --update        # measure and store the baseline for this machine (when a change is meant to move the numbers: say so in the commit)
 python3 tools/perf_gate.py --selftest      # the gate's own comparison logic, no benchmark
+LUNARIS_GPU=2060 python3 tools/perf_gate.py --gpu            # the graphics card: the rows of `lunaris bench --gpu` (a picture and a frame as a game draws it)
+LUNARIS_GPU=2060 python3 tools/perf_gate.py --gpu --update   # store the baseline of this machine with this adapter
 ```
+
+The graphics gate keeps its baselines (`gpu_machines`) per machine **and adapter** (the key is `i7-9700K ... x8 / NVIDIA GeForce RTX 2060 SUPER (Vulkan, DiscreteGpu)`), compares the best of three runs of each of the six `gpu` rows, allows 50% (the processor feeds the card, so the rows are noisier than the core's), measures again up to twice before it calls a slowdown a regression, and says so and passes on a machine with no adapter or no baseline. The test machine has entries for both of its cards (2026-10-26).
 
 The baseline (`tools/perf_baseline.json`) has one entry per machine, named by its processor and core count, because a time is only comparable on the machine it was taken on; a machine with no entry gets only the memory check (bytes an entity costs, which does not depend on the machine) and a line saying how to add an entry. Timings are noisy, so a failure is measured again (up to twice, judging on the best of everything) before it counts, and the tolerances are loose on purpose: 30% for the one-thread rows, 60% for the rows that use every core, 100% for rows that are mostly allocation or JSON text or are a fraction of a millisecond. That catches an accidental 2x, not a 5% drift; a 5% change is for the history table above, measured by hand. The current baseline is a Linux test machine's i7-9700K (200 000 entities, best of 5 runs, taken on 2026-10-25 while other jobs ran on the machine, so it is slightly pessimistic). It does not run in CI yet: shared runners have no stable clock, so the gate runs where the machine is known (a Linux test machine, with `python3 tools/perf_gate.py` after a release build).
 

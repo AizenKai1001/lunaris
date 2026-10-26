@@ -1,5 +1,27 @@
 {
   "entities": 200000,
+  "gpu_machines": {
+    "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz x8 / NVIDIA GeForce RTX 2060 SUPER (Vulkan, DiscreteGpu)": {
+      "rows": {
+        "gpu campfires high": 19.994,
+        "gpu frame campfires high": 2.879,
+        "gpu frame spheres high": 6.016,
+        "gpu frame spheres medium": 5.75,
+        "gpu spheres high": 38.812,
+        "gpu spheres medium": 8.133
+      }
+    },
+    "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz x8 / NVIDIA GeForce RTX 4060 (Vulkan, DiscreteGpu)": {
+      "rows": {
+        "gpu campfires high": 14.598,
+        "gpu frame campfires high": 2.605,
+        "gpu frame spheres high": 5.582,
+        "gpu frame spheres medium": 3.165,
+        "gpu spheres high": 31.435,
+        "gpu spheres medium": 7.718
+      }
+    }
+  },
   "machines": {
     "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz x8": {
       "bytes_per_entity": 102.7,
