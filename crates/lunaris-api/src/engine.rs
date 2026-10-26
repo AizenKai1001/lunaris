@@ -17,7 +17,7 @@ pub(crate) const MAX_SPAWN_COUNT: u64 = 1_000_000;
 
 /// Tools that never change the world (they may write a file or draw a picture). Every other tool advances the revision counter.
 const READ_ONLY_TOOLS: &[&str] = &[
-    "describe", "schema", "get", "query", "hash", "revision", "snapshots", "events", "resources", "systems", "get_system", "trace_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project",
+    "describe", "schema", "get", "query", "hash", "revision", "history", "snapshots", "events", "resources", "systems", "get_system", "trace_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project",
     "save_scene", "export_game", "verify", "files", "saves", "model_info", "prefabs", "path", "acoustics", "ui_audit", "compile_script", "get_script", "terrain_height", "terrain_layer", "water_depth", "bake_probe",
 ];
 
@@ -230,6 +230,7 @@ impl Engine {
                 let name = a.str("name")?;
                 self.snapshots.remove(name).map(|_| Json::obj([("deleted", Json::str(name))])).ok_or_else(|| self.no_snapshot(name))
             }
+            "history" => Ok(self.history_tool()),
             "undo" => self.undo_redo(true),
             "redo" => self.undo_redo(false),
             "record_start" => {
@@ -736,6 +737,11 @@ impl Engine {
             ("undoable", Json::Bool(undoable)),
             ("uids", Json::arr(done.iter().filter_map(|d| d.uid).map(uid_json))),
         ]))
+    }
+
+    /// What `undo` and `redo` hold: the groups of commands, the oldest first.
+    pub(crate) fn undo_redo_stacks(&self) -> (&[Vec<Command>], &[Vec<Command>]) {
+        (&self.undo, &self.redo)
     }
 
     fn undo_redo(&mut self, undo: bool) -> Result<Json> {

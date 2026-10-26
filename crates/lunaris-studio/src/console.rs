@@ -10,6 +10,7 @@ use lunaris_json::{parse, Json};
 pub struct ConsoleUi {
     show_calls: bool,
     show_info: bool,
+    show_warnings: bool,
     show_errors: bool,
     search: String,
     selected: Option<usize>,
@@ -17,18 +18,39 @@ pub struct ConsoleUi {
 
 impl Default for ConsoleUi {
     fn default() -> ConsoleUi {
-        ConsoleUi { show_calls: true, show_info: true, show_errors: true, search: String::new(), selected: None }
+        ConsoleUi { show_calls: true, show_info: true, show_warnings: true, show_errors: true, search: String::new(), selected: None }
+    }
+}
+
+/// The log level a problem that `check` found has: its severity.
+pub(crate) fn kind_of_severity(severity: &str) -> LogKind {
+    match severity {
+        "error" => LogKind::Error,
+        "warning" => LogKind::Warn,
+        _ => LogKind::Info,
     }
 }
 
 impl ConsoleUi {
+    /// Does the console show a line of this kind with the filters it has now? (A tool call is a message too: it goes when messages do.)
+    fn shows(&self, kind: LogKind) -> bool {
+        match kind {
+            LogKind::Call => self.show_calls && self.show_info,
+            LogKind::Info => self.show_info,
+            LogKind::Warn => self.show_warnings,
+            LogKind::Error => self.show_errors,
+        }
+    }
+
     pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio) {
-        let (infos, errors) = (studio.console.iter().filter(|l| l.kind != LogKind::Error).count(), studio.console.iter().filter(|l| l.kind == LogKind::Error).count());
+        let count = |studio: &Studio, f: fn(LogKind) -> bool| studio.console.iter().filter(|l| f(l.kind)).count();
+        let (infos, warnings, errors) = (count(studio, |k| matches!(k, LogKind::Info | LogKind::Call)), count(studio, |k| k == LogKind::Warn), count(studio, |k| k == LogKind::Error));
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
             chrome::drop_down(ui, "Filters", |ui| {
                 ui.checkbox(&mut self.show_calls, "Tool calls").on_hover_text("Every tool call the editor made (the same calls an AI agent makes)");
                 ui.checkbox(&mut self.show_info, "Messages");
+                ui.checkbox(&mut self.show_warnings, "Warnings");
                 ui.checkbox(&mut self.show_errors, "Errors");
             });
             chrome::search_box(ui, &mut self.search, "Search Log", 220.0);
@@ -42,12 +64,12 @@ impl ConsoleUi {
                     let n = studio.problems.len();
                     studio.log(LogKind::Info, if n == 0 { "check: no problems".to_string() } else { format!("check: {n} problem(s)") }, String::new(), 0.0);
                     for (sev, msg) in studio.problems.clone() {
-                        studio.log(if sev == "error" { LogKind::Error } else { LogKind::Info }, format!("[{sev}] {msg}"), String::new(), 0.0);
+                        studio.log(kind_of_severity(&sev), format!("[{sev}] {msg}"), String::new(), 0.0);
                     }
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                for (icon, count, flag) in [(Icon::Error, errors, &mut self.show_errors), (Icon::Info, infos, &mut self.show_info)] {
+                for (icon, count, flag) in [(Icon::Error, errors, &mut self.show_errors), (Icon::Warn, warnings, &mut self.show_warnings), (Icon::Info, infos, &mut self.show_info)] {
                     let (r, resp) = ui.allocate_exact_size(Vec2::new(46.0, 20.0), Sense::click());
                     if *flag {
                         ui.painter().rect_filled(r, CornerRadius::same(2), theme::BUTTON_ACTIVE);
@@ -70,11 +92,7 @@ impl ConsoleUi {
             .console
             .iter()
             .enumerate()
-            .filter(|(_, l)| match l.kind {
-                LogKind::Call => self.show_calls && self.show_info,
-                LogKind::Info => self.show_info,
-                LogKind::Error => self.show_errors,
-            })
+            .filter(|(_, l)| self.shows(l.kind))
             .filter(|(_, l)| search.is_empty() || l.text.to_lowercase().contains(&search))
             .map(|(i, _)| i)
             .collect();
@@ -95,6 +113,7 @@ impl ConsoleUi {
                 // one line, as the Output Log has it: `LogTool: spawn {...}` then the answer and the time, dimmed
                 let (category, color) = match l.kind {
                     LogKind::Error => ("LogError", theme::ERR),
+                    LogKind::Warn => ("LogWarning", theme::WARN),
                     LogKind::Call => ("LogTool", theme::TEXT),
                     LogKind::Info => ("LogEditor", theme::TEXT),
                 };
@@ -145,5 +164,34 @@ impl ConsoleUi {
                 r.request_focus();
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_problem_of_check_is_logged_at_the_level_of_its_severity() {
+        assert_eq!(kind_of_severity("error"), LogKind::Error);
+        assert_eq!(kind_of_severity("warning"), LogKind::Warn);
+        assert_eq!(kind_of_severity("info"), LogKind::Info);
+        assert_eq!(kind_of_severity(""), LogKind::Info);
+    }
+
+    #[test]
+    fn each_level_has_its_own_filter() {
+        let mut c = ConsoleUi::default();
+        assert!([LogKind::Call, LogKind::Info, LogKind::Warn, LogKind::Error].iter().all(|k| c.shows(*k)));
+        c.show_warnings = false;
+        assert!(!c.shows(LogKind::Warn) && c.shows(LogKind::Error) && c.shows(LogKind::Info) && c.shows(LogKind::Call));
+        c.show_warnings = true;
+        c.show_info = false;
+        assert!(!c.shows(LogKind::Info) && !c.shows(LogKind::Call) && c.shows(LogKind::Warn));
+        c.show_info = true;
+        c.show_calls = false;
+        assert!(!c.shows(LogKind::Call) && c.shows(LogKind::Info));
+        c.show_errors = false;
+        assert!(!c.shows(LogKind::Error) && c.shows(LogKind::Warn));
     }
 }

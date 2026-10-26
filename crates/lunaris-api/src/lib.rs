@@ -12,6 +12,7 @@ mod buses;
 mod check;
 mod engine;
 mod gpu;
+mod history;
 mod render_tools;
 mod ui_audit_tool;
 mod saves;
@@ -60,6 +61,10 @@ mod raiding_check_tests;
 mod gameserver_check_tests;
 #[cfg(test)]
 mod flyagent_check_tests;
+#[cfg(test)]
+mod nav_check_tests;
+#[cfg(test)]
+mod history_tests;
 #[cfg(test)]
 mod interact_check_tests;
 #[cfg(test)]

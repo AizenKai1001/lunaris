@@ -93,6 +93,9 @@ fn file_exists(root: &Path, rel: &str) -> bool {
     lunaris_json::safe_relative(rel).is_ok_and(|norm| root.join(norm).is_file())
 }
 
+/// How many `NavAgent`s make a crowd that the checks on navigation limits are about.
+const CROWD_AGENTS: usize = 20;
+
 impl Engine {
     pub(crate) fn check_tool(&mut self, _a: &Args) -> Result<Json> {
         let mut problems = Problems(Vec::new());
@@ -1575,6 +1578,20 @@ impl Engine {
                 let name = w.strings().get(sym).to_string();
                 if !self.sim.scripts.prefabs.contains_key(&name) {
                     problems.add("warning", Some(uid), format!("StreamZone.prefab `{name}` is not a defined prefab, so nothing is ever loaded"), "define it with define_prefab (see `prefabs`)");
+                }
+            }
+            // ---- crowds of path finders: what a server with many of them has to ration (docs/NAVIGATION.md, "Crowds")
+            let mut agents = 0usize;
+            w.for_each_uid::<(&lunaris_sim::components::NavAgent,), _>(|_, _, _| agents += 1)?;
+            let mut limits: Vec<(u64, lunaris_sim::components::NavLimits)> = Vec::new();
+            w.for_each_uid::<(&lunaris_sim::components::NavLimits,), _>(|_, uid, (l,)| limits.push((uid, *l)))?;
+            limits.sort_by_key(|l| l.0);
+            if agents >= CROWD_AGENTS && limits.is_empty() {
+                problems.add("warning", None, format!("{agents} NavAgents and no NavLimits: every request is searched in the tick it is made, and a target that cannot be reached is looked for in every direction, which can take a tick of tens of milliseconds"), "put one entity with NavLimits in the world (searches_per_tick, max_distance, max_searched: docs/NAVIGATION.md, \"Crowds\")");
+            }
+            if let Some((uid, l)) = limits.first() {
+                if agents >= CROWD_AGENTS && l.max_searched == 0 {
+                    problems.add("warning", Some(*uid), format!("NavLimits.max_searched is 0 with {agents} NavAgents: a search for a target that cannot be reached looks at every cell it can get to"), "set max_searched (a way that exists is found in a few thousand cells; 20000 caps a failure at about 50 ms in a city), and the resource nav.cells_per_step to spread what is left over several steps");
                 }
             }
             let mut splines: Vec<(u64, u32)> = Vec::new();

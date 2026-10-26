@@ -7,6 +7,7 @@ use crate::hierarchy::{create_menu, HierarchyUi};
 use crate::input;
 use crate::inspector::InspectorUi;
 use crate::console::ConsoleUi;
+use crate::history_ui::HistoryUi;
 use crate::panels::SystemsUi;
 use crate::profiler::ProfilerUi;
 use crate::sequencer::SequencerUi;
@@ -56,6 +57,7 @@ pub struct App {
     pub(crate) inspector: InspectorUi,
     pub(crate) project: ProjectUi,
     pub(crate) console: ConsoleUi,
+    pub(crate) history: HistoryUi,
     pub(crate) systems: SystemsUi,
     pub(crate) profiler: ProfilerUi,
     pub(crate) sequencer: SequencerUi,
@@ -112,6 +114,7 @@ impl App {
             Some("console") => studio.tab = BottomTab::Console,
             Some("systems") => studio.tab = BottomTab::Systems,
             Some("profiler") => studio.tab = BottomTab::Profiler,
+            Some("history") => studio.tab = BottomTab::History,
             Some("script") => studio.center = Center::Script,
             Some("blueprint") => studio.center = Center::Blueprint,
             Some("ui") => studio.center = Center::Ui,
@@ -145,6 +148,7 @@ impl App {
             inspector: InspectorUi::default(),
             project: ProjectUi::default(),
             console: ConsoleUi::default(),
+            history: HistoryUi::default(),
             systems: SystemsUi::default(),
             profiler: ProfilerUi::default(),
             sequencer: SequencerUi::default(),
@@ -892,7 +896,7 @@ impl App {
         Panel::bottom("status").exact_size(22.0).resizable(false).frame(bar(theme::TOOLBAR, 22.0)).show(ui, |ui| self.status_bar(ui));
         if self.show_bottom {
             Panel::bottom("bottom").default_size(240.0).size_range(if self.studio.tab == BottomTab::Systems { 340.0..=900.0 } else { 90.0..=600.0 }).resizable(true).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
-                let tabs = [(BottomTab::Project, "Project"), (BottomTab::Console, "Console"), (BottomTab::Systems, "Systems"), (BottomTab::Profiler, "Profiler")];
+                let tabs = [(BottomTab::Project, "Project"), (BottomTab::Console, "Console"), (BottomTab::Systems, "Systems"), (BottomTab::Profiler, "Profiler"), (BottomTab::History, "History")];
                 let errors = self.studio.console.iter().rev().take(40).filter(|l| l.kind == crate::state::LogKind::Error).count();
                 let tab = chrome::tab_strip(ui, &tabs, self.studio.tab, |ui| {
                     if errors > 0 {
@@ -907,6 +911,7 @@ impl App {
                     BottomTab::Console => self.console.show(ui, &mut self.studio),
                     BottomTab::Systems => self.systems.show(ui, &mut self.studio),
                     BottomTab::Profiler => self.profiler.show(ui, &mut self.studio),
+                    BottomTab::History => self.history.show(ui, &mut self.studio),
                 });
             });
         }

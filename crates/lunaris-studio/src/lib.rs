@@ -16,6 +16,7 @@ mod effects;
 mod gizmo;
 mod graph;
 mod hierarchy;
+mod history_ui;
 mod icons;
 mod input;
 mod inspector;

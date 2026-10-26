@@ -306,7 +306,7 @@ fn a_new_scene_has_a_camera_and_a_light_and_saving_then_opening_gives_the_same_w
 fn the_whole_window_draws_in_every_mode_without_trouble() {
     let mut h = Harness::new();
     h.app.studio.select(Some(h.uid("Sun")));
-    for tab in [crate::state::BottomTab::Project, crate::state::BottomTab::Console, crate::state::BottomTab::Systems, crate::state::BottomTab::Profiler] {
+    for tab in [crate::state::BottomTab::Project, crate::state::BottomTab::Console, crate::state::BottomTab::Systems, crate::state::BottomTab::Profiler, crate::state::BottomTab::History] {
         h.app.studio.tab = tab;
         h.frames(3);
     }
@@ -1498,4 +1498,32 @@ fn screenshots_of_the_editor_for_looking_at() {
         h.frames(1);
     }
     h.shoot("13_profiler_while_playing");
+}
+
+#[test]
+fn the_history_tab_lists_the_edits_and_a_jump_takes_the_scene_to_the_state_after_one() {
+    let mut h = Harness::new();
+    let box_uid = h.uid("Box");
+    for x in [1.0, 2.0, 3.0] {
+        h.app.studio.call("set", j(&format!(r#"{{"uid":{box_uid},"component":"Transform","value":{{"pos":[{x},1,0]}}}}"#))).unwrap();
+    }
+    h.app.studio.tab = crate::state::BottomTab::History;
+    h.frames(4);
+    let hist = h.app.studio.engine.call("history", &Json::Null).unwrap();
+    let (rows, now) = crate::history_ui::rows_of(&hist);
+    assert!(rows.len() >= 4 && now == rows.len() - 1, "{} rows, now {now}", rows.len());
+    // back to the state after the first of the three moves: two undos
+    assert_eq!(rows[now - 2].label, format!("Edit Transform of {box_uid}"));
+    h.app.studio.undo_by(rows[now - 2].steps);
+    assert_eq!(h.pos_of("Box"), [1.0, 1.0, 0.0]);
+    // and forward to the last
+    let hist = h.app.studio.engine.call("history", &Json::Null).unwrap();
+    let (rows, now) = crate::history_ui::rows_of(&hist);
+    assert_eq!(rows.len() - 1 - now, 2, "two edits are undone");
+    h.app.studio.undo_by(rows[rows.len() - 1].steps);
+    assert_eq!(h.pos_of("Box"), [3.0, 1.0, 0.0]);
+    // more steps than there are: it stops where it can
+    h.app.studio.undo_by(1000);
+    h.frames(2);
+    assert_eq!(h.app.studio.engine.call("history", &Json::Null).unwrap().get("undo_depth").and_then(|v| v.as_u64()), Some(0));
 }

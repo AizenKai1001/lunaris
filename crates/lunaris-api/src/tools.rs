@@ -110,6 +110,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         tool("restore", "Replace the simulation with a snapshot (clears undo history).", vec![("name", s("Snapshot name."))], &["name"]),
         tool("snapshots", "List saved snapshots.", vec![], &[]),
         tool("delete_snapshot", "Delete a snapshot.", vec![("name", s("Snapshot name."))], &["name"]),
+        tool("history", "What `undo` and `redo` would do: every edit on the two stacks, newest first (the first of `undo` is what `undo` does next), with a label such as `Edit Transform of 5` or `Create entity 7`, how many commands it holds, and the two depths. An editor shows it as a list to jump back through (call `undo` that many times); an agent reads what it has changed. Changes nothing.", vec![], &[]),
         tool("undo", "Undo the last edit (spawn, despawn, set, add_component, remove_component, batch).", vec![], &[]),
         tool("redo", "Redo the last undone edit.", vec![], &[]),
         tool("record_start", "Start recording every command with the tick it ran at, from the current state.", vec![], &[]),

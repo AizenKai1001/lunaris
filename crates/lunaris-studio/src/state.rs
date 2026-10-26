@@ -69,6 +69,7 @@ pub enum Mode {
 pub enum LogKind {
     Call,
     Error,
+    Warn,
     Info,
 }
 
@@ -190,10 +191,11 @@ pub enum BottomTab {
     Console,
     Systems,
     Profiler,
+    History,
 }
 
 const READ_ONLY: &[&str] = &[
-    "describe", "schema", "get", "query", "hash", "revision", "snapshots", "events", "resources", "systems", "get_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project", "files", "model_info",
+    "describe", "schema", "get", "query", "hash", "revision", "history", "snapshots", "events", "resources", "systems", "get_system", "contacts", "raycast", "nearby", "render", "pick", "minimap", "check", "guide", "project", "files", "model_info",
     "prefabs", "path", "acoustics", "compile_script", "get_script", "terrain_height", "terrain_layer", "water_depth", "saves", "bake_probe",
 ];
 
@@ -1045,6 +1047,17 @@ impl Studio {
 
     pub fn redo(&mut self) {
         let _ = self.try_call("redo", Json::Null);
+        self.rows_dirty = true;
+    }
+
+    /// Take the scene back (`steps` above 0) or forward (below 0) that many edits, as that many calls of `undo` or `redo`; it stops at the first one that fails (there is nothing more to undo or redo).
+    pub fn undo_by(&mut self, steps: i64) {
+        for _ in 0..steps.unsigned_abs() {
+            let tool = if steps > 0 { "undo" } else { "redo" };
+            if self.try_call(tool, Json::Null).is_none() {
+                break;
+            }
+        }
         self.rows_dirty = true;
     }
 
