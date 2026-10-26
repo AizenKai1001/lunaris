@@ -45,30 +45,44 @@ jobs:
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --lib
         timeout-minutes: 15
+        env:
+          STEP_TIMEOUT: 600
       - name: graphics, classic pictures match the reference renderer
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact classic_pictures_match_the_reference_renderer --nocapture
         timeout-minutes: 20
+        env:
+          STEP_TIMEOUT: 300
       - name: graphics, draw layers put sprites tile maps and particles in the same 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact draw_layers_put_sprites_tile_maps_and_particles_in_the_same_order_in_both_renderers --nocapture
         timeout-minutes: 20
+        env:
+          STEP_TIMEOUT: 300
       - name: graphics, the interface keeps its shape on other screens in both rende
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact the_interface_keeps_its_shape_on_other_screens_in_both_renderers --nocapture
         timeout-minutes: 20
+        env:
+          STEP_TIMEOUT: 300
       - name: graphics, scroll views cut the interface at the viewport the same way 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact scroll_views_cut_the_interface_at_the_viewport_the_same_way_in_both_renderers --nocapture
         timeout-minutes: 20
+        env:
+          STEP_TIMEOUT: 300
       - name: graphics, radial fills are the same shape in both renderers
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact radial_fills_are_the_same_shape_in_both_renderers --nocapture
         timeout-minutes: 20
+        env:
+          STEP_TIMEOUT: 300
       - name: graphics, the ui kit3 widgets are drawn the same in both renderers in 
         if: always()
         run: bash tools/ci_step.sh -p lunaris-gpu --test compare -- --exact the_ui_kit3_widgets_are_drawn_the_same_in_both_renderers_in_every_state --nocapture
         timeout-minutes: 20
+        env:
+          STEP_TIMEOUT: 300
 
   golden:
     name: the same hashes on every machine (${{ matrix.os }})

@@ -243,6 +243,20 @@ fn clip_height(t: &[V3; 3], cx: f32, cz: f32, r: f32) -> Option<(f32, f32)> {
 /// are the ones a grid numbered 0, 1, 2 ... in that order would give.
 const NODES_PER_CELL: usize = 32;
 
+/// The side, in cells, of a block of the coarse index of a grid's solids (see `Grid::buckets`).
+const BUCKET: usize = 8;
+
+/// A triangle of a mesh collider as a cell wants it: the corners, the cells its box (grown by the agent's radius) reaches in the window, whether it can be walked on, and the denominator of the weights of a point over it seen from above.
+struct TriRec {
+    tri: [V3; 3],
+    ixa: usize,
+    ixb: usize,
+    iza: usize,
+    izb: usize,
+    walkable: bool,
+    den: f32,
+}
+
 /// What one cell holds: the heights of the surfaces an agent can stand on, the lowest first, and whether something solid stands in it.
 struct CellData {
     heights: Vec<f32>,
@@ -365,6 +379,12 @@ struct Grid<'a> {
     nz: usize,
     /// The solids that reach the window, each with the inclusive range of cells it reaches: (solid, ixa, ixb, iza, izb).
     solids: Vec<(&'a Solid, usize, usize, usize, usize)>,
+    /// A coarse index of `solids` for the cells that are worked out (built on the first one): the indices of the solids that reach each block of `BUCKET` x `BUCKET` cells, in the order of `solids`, so that
+    /// a cell looks at the few solids over its block instead of every solid of the window (a city window has hundreds, and looking at them all was most of the microseconds a cell cost).
+    buckets: std::cell::OnceCell<Vec<Vec<u32>>>,
+    /// The mesh triangles that reach each block of `BUCKET` x `BUCKET` cells, worked out the first time a cell of the block is (the tree of every mesh is asked once for the block, not once for each of its 64 cells, and the corner
+    /// arithmetic of a triangle is done once): 26 meshes were asked, and 60 triangles tested, for every cell of a city window.
+    tri_blocks: std::cell::RefCell<IdMap<usize, Rc<Vec<TriRec>>>>,
     /// The same for terrains.
     ground: Vec<(Placed<'a>, usize, usize, usize, usize)>,
     meshes: &'a [Instance],
@@ -423,7 +443,7 @@ impl<'a> Grid<'a> {
             let (iza, izb) = cell_range(placed.centre[1] - half[1], placed.centre[1] + half[1], z0, cell, nz);
             grounds.push((placed, ixa, ixb, iza, izb));
         }
-        let mut grid = Grid { cell, x0, z0, nx, nz, solids: reaching, ground: grounds, meshes, bounds, flat: None, cells: IdMap::default(), ix0, iz0, sig, kept: false, link_edges: BTreeMap::new(), p };
+        let mut grid = Grid { cell, x0, z0, nx, nz, solids: reaching, buckets: std::cell::OnceCell::new(), tri_blocks: std::cell::RefCell::new(IdMap::default()), ground: grounds, meshes, bounds, flat: None, cells: IdMap::default(), ix0, iz0, sig, kept: false, link_edges: BTreeMap::new(), p };
         // a start that is not standing on anything (a top-down game where the floor is only a picture) means one flat, open floor at the
         // start's height: obstacles still block it
         let standing = ((start_at[0] - x0) / cell >= 0.0 && (start_at[2] - z0) / cell >= 0.0)
@@ -462,11 +482,24 @@ impl<'a> Grid<'a> {
     /// whose growth by the agent's radius reaches it (`margin`: only one that rises higher than a step keeps an agent out).
     fn raw_cell(&self, c: usize) -> (Vec<f32>, Vec<(f32, f32)>, Vec<(f32, f32)>) {
         let p = self.p;
-        let [bx0, bz0, bx1, bz1] = self.bounds;
         let (ix, iz) = (c % self.nx, c / self.nx);
         let (cx, cz) = (self.x0 + (ix as f32 + 0.5) * self.cell, self.z0 + (iz as f32 + 0.5) * self.cell);
         let (mut tops, mut exact, mut margin) = (Vec::new(), Vec::new(), Vec::new());
-        for &(s, ixa, ixb, iza, izb) in &self.solids {
+        let bnx = self.nx.div_ceil(BUCKET);
+        let buckets = self.buckets.get_or_init(|| {
+            let bnz = self.nz.div_ceil(BUCKET);
+            let mut b: Vec<Vec<u32>> = vec![Vec::new(); bnx * bnz];
+            for (k, &(_, ixa, ixb, iza, izb)) in self.solids.iter().enumerate() {
+                for bz in iza / BUCKET..=izb / BUCKET {
+                    for bx in ixa / BUCKET..=ixb / BUCKET {
+                        b[bz * bnx + bx].push(k as u32);
+                    }
+                }
+            }
+            b
+        });
+        for &k in &buckets[(iz / BUCKET) * bnx + ix / BUCKET] {
+            let (s, ixa, ixb, iza, izb) = self.solids[k as usize];
             if ix < ixa || ix > ixb || iz < iza || iz > izb {
                 continue;
             }
@@ -491,33 +524,16 @@ impl<'a> Grid<'a> {
             }
         }
         // the triangles of mesh colliders: walkable ones give surfaces, all of them give obstacles (see the module comment). A triangle belongs to this cell when the cell is in the
-        // range its box, grown by the radius, reaches; the tree is asked for the triangles near the cell (a little more than needed), and that exact test decides
-        let slack = 0.5 * self.cell;
-        let reach = 0.5 * self.cell + p.radius + slack;
-        let region = Aabb { lo: [cx - reach, f32::NEG_INFINITY, cz - reach], hi: [cx + reach, f32::INFINITY, cz + reach] };
-        for m in self.meshes {
-            let pm = &m.placed;
-            if pm.bounds.hi[0] + p.radius < bx0 || pm.bounds.lo[0] - p.radius > bx1 || pm.bounds.hi[2] + p.radius < bz0 || pm.bounds.lo[2] - p.radius > bz1 {
-                continue;
-            }
-            for ti in pm.triangles_near(&region) {
-                let tri = pm.tri(ti);
-                let [a, b, c3] = tri;
-                let (tx0, tx1) = (a[0].min(b[0]).min(c3[0]), a[0].max(b[0]).max(c3[0]));
-                let (tz0, tz1) = (a[2].min(b[2]).min(c3[2]), a[2].max(b[2]).max(c3[2]));
-                if tx1 + p.radius < bx0 || tx0 - p.radius > bx1 || tz1 + p.radius < bz0 || tz0 - p.radius > bz1 {
+        // range its box, grown by the radius, reaches; the triangles of the cell's block (the tree is asked for the block, a little more than needed) are tested one by one, and that exact test decides
+        if !self.meshes.is_empty() {
+            let tris = self.mesh_block((iz / BUCKET) * bnx + ix / BUCKET, ix / BUCKET, iz / BUCKET);
+            for t in tris.iter() {
+                if ix < t.ixa || ix > t.ixb || iz < t.iza || iz > t.izb {
                     continue;
                 }
-                let (ixa, ixb) = cell_range(tx0 - p.radius, tx1 + p.radius, self.x0, self.cell, self.nx);
-                let (iza, izb) = cell_range(tz0 - p.radius, tz1 + p.radius, self.z0, self.cell, self.nz);
-                if ix < ixa || ix > ixb || iz < iza || iz > izb {
-                    continue;
-                }
-                let n = tri_cross(a, b, c3);
-                let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-                let walkable = len > 0.0 && n[1] / len >= TERRAIN_MIN_UP;
+                let [a, b, c3] = t.tri;
                 // weights of a point over the triangle seen from above: positive inside; a triangle seen edge-on has no inside
-                let den = (b[2] - c3[2]) * (a[0] - c3[0]) + (c3[0] - b[0]) * (a[2] - c3[2]);
+                let den = t.den;
                 if den != 0.0 {
                     let wa = ((b[2] - c3[2]) * (cx - c3[0]) + (c3[0] - b[0]) * (cz - c3[2])) / den;
                     let wb = ((c3[2] - a[2]) * (cx - c3[0]) + (a[0] - c3[0]) * (cz - c3[2])) / den;
@@ -525,21 +541,72 @@ impl<'a> Grid<'a> {
                     if wa >= 0.0 && wb >= 0.0 && wc >= 0.0 {
                         let y = wa * a[1] + wb * b[1] + wc * c3[1];
                         exact.push((y, y));
-                        if walkable {
+                        if t.walkable {
                             tops.push(y);
                         }
                         continue;
                     }
                 }
                 // (a floor that can be walked on is not an obstacle beside the cells it covers, like the ground of a terrain)
-                if !walkable {
-                    if let Some((y0, y1)) = clip_height(&tri, cx, cz, p.radius) {
+                if !t.walkable {
+                    if let Some((y0, y1)) = clip_height(&t.tri, cx, cz, p.radius) {
                         margin.push((y0, y1));
                     }
                 }
             }
         }
         (tops, exact, margin)
+    }
+
+    /// The mesh triangles that can matter to a cell of block (`bx`, `bz`), in the order the cells used to find them (the meshes in order, each one's triangles ascending), kept for the block.
+    /// A triangle is in the list when a leaf box of its mesh's tree touches the block's region (every cell's own region lies inside it) and the cells its box reaches overlap the block: the cell's test on the range then
+    /// decides exactly as before, because a triangle whose box reaches a cell has a leaf box that touches that cell's region.
+    fn mesh_block(&self, key: usize, bx: usize, bz: usize) -> Rc<Vec<TriRec>> {
+        if let Some(v) = self.tri_blocks.borrow().get(&key) {
+            return v.clone();
+        }
+        let p = self.p;
+        let [wx0, wz0, wx1, wz1] = self.bounds;
+        let (ca, cb) = (bx * BUCKET, ((bx + 1) * BUCKET).min(self.nx) - 1);
+        let (da, db) = (bz * BUCKET, ((bz + 1) * BUCKET).min(self.nz) - 1);
+        let slack = 0.5 * self.cell;
+        let reach = 0.5 * self.cell + p.radius + slack;
+        let region = Aabb {
+            lo: [self.x0 + (ca as f32 + 0.5) * self.cell - reach, f32::NEG_INFINITY, self.z0 + (da as f32 + 0.5) * self.cell - reach],
+            hi: [self.x0 + (cb as f32 + 0.5) * self.cell + reach, f32::INFINITY, self.z0 + (db as f32 + 0.5) * self.cell + reach],
+        };
+        let mut out = Vec::new();
+        for m in self.meshes {
+            let pm = &m.placed;
+            if pm.bounds.hi[0] + p.radius < wx0 || pm.bounds.lo[0] - p.radius > wx1 || pm.bounds.hi[2] + p.radius < wz0 || pm.bounds.lo[2] - p.radius > wz1 {
+                continue;
+            }
+            if pm.bounds.hi[0] < region.lo[0] || pm.bounds.lo[0] > region.hi[0] || pm.bounds.hi[2] < region.lo[2] || pm.bounds.lo[2] > region.hi[2] {
+                continue;
+            }
+            for ti in pm.triangles_near(&region) {
+                let tri = pm.tri(ti);
+                let [a, b, c3] = tri;
+                let (tx0, tx1) = (a[0].min(b[0]).min(c3[0]), a[0].max(b[0]).max(c3[0]));
+                let (tz0, tz1) = (a[2].min(b[2]).min(c3[2]), a[2].max(b[2]).max(c3[2]));
+                if tx1 + p.radius < wx0 || tx0 - p.radius > wx1 || tz1 + p.radius < wz0 || tz0 - p.radius > wz1 {
+                    continue;
+                }
+                let (ixa, ixb) = cell_range(tx0 - p.radius, tx1 + p.radius, self.x0, self.cell, self.nx);
+                let (iza, izb) = cell_range(tz0 - p.radius, tz1 + p.radius, self.z0, self.cell, self.nz);
+                if ixb < ca || ixa > cb || izb < da || iza > db {
+                    continue;
+                }
+                let n = tri_cross(a, b, c3);
+                let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+                let walkable = len > 0.0 && n[1] / len >= TERRAIN_MIN_UP;
+                let den = (b[2] - c3[2]) * (a[0] - c3[0]) + (c3[0] - b[0]) * (a[2] - c3[2]);
+                out.push(TriRec { tri, ixa, ixb, iza, izb, walkable, den });
+            }
+        }
+        let v = Rc::new(out);
+        self.tri_blocks.borrow_mut().insert(key, v.clone());
+        v
     }
 
     /// The surfaces of cell `c` (worked out on the first look, then kept).
