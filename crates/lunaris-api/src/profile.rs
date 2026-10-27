@@ -19,6 +19,18 @@ fn spike_advice(stage: &str) -> Option<&'static str> {
     }
 }
 
+/// What to try when a stage is a steady cost (not a spike): the resource that sets how often the toolkit updates, and what to say. Said only while that resource is not set.
+fn cost_advice(stage: &str) -> Option<(&'static str, &'static str)> {
+    match stage {
+        "gameplay perception::update" => Some(("gameplay.every.perception", "the AI looks at the world every step: set the resource `gameplay.every.perception` to 2 so that it looks every second step with the time of both (docs/AI.md)")),
+        "gameplay flyagent::update" => Some(("gameplay.every.flyagent", "the flying machines decide every step: set the resource `gameplay.every.flyagent` to 2 so that they decide every second step with the time of both (docs/AI.md)")),
+        _ => None,
+    }
+}
+
+/// A stage that costs at least this many milliseconds a step on average gets the advice of `cost_advice`.
+const COST_ADVICE_MS: f64 = 0.4;
+
 impl Engine {
     pub(crate) fn profile_tool(&mut self, a: &Args) -> Result<Json> {
         let ticks = a.opt_u64("ticks")?.unwrap_or(120);
@@ -74,6 +86,17 @@ impl Engine {
             if s.max_ms > 8.0 && s.max_ms > 6.0 * per_step.max(0.05) {
                 if let Some(text) = spike_advice(name) {
                     advice.push(format!("`{name}` took {:.1} ms in its slowest step against {per_step:.2} ms on average: {text}", s.max_ms));
+                }
+            }
+        }
+        // a stage that is a steady cost and has a knob for how often it runs
+        for (name, s) in &stages {
+            let per_step = s.total_ms / n;
+            if per_step >= COST_ADVICE_MS {
+                if let Some((resource, text)) = cost_advice(name) {
+                    if self.sim.world.resource(resource).is_none() {
+                        advice.push(format!("`{name}` costs {per_step:.2} ms a step: {text}"));
+                    }
                 }
             }
         }
@@ -134,7 +157,7 @@ impl Engine {
 
 #[cfg(test)]
 mod tests {
-    use super::spike_advice;
+    use super::{cost_advice, spike_advice};
 
     #[test]
     fn stages_with_a_known_remedy_get_advice_and_the_others_none() {
@@ -142,5 +165,15 @@ mod tests {
             assert!(spike_advice(stage).is_some_and(|t| t.contains("docs/")), "{stage}");
         }
         assert!(spike_advice("system physics").is_none() && spike_advice("characters").is_none());
+    }
+
+    #[test]
+    fn the_ai_toolkits_name_the_resource_that_sets_how_often_they_run_and_other_stages_have_none() {
+        for (stage, resource) in [("gameplay perception::update", "gameplay.every.perception"), ("gameplay flyagent::update", "gameplay.every.flyagent")] {
+            let (r, text) = cost_advice(stage).unwrap();
+            assert_eq!(r, resource);
+            assert!(text.contains(resource) && text.contains("docs/AI.md"), "{text}");
+        }
+        assert!(cost_advice("gameplay procgrid").is_none() && cost_advice("system physics").is_none());
     }
 }

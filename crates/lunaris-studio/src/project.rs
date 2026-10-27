@@ -53,6 +53,44 @@ fn icon_of(kind: &str) -> Icon {
     }
 }
 
+/// The components and fields that name a file of the workspace: what "Select what uses this" looks in.
+const FILE_FIELDS: [(&str, &str); 14] = [
+    ("MeshRenderer", "mesh"),
+    ("MeshRenderer", "texture"),
+    ("MeshCollider", "mesh"),
+    ("Sprite", "texture"),
+    ("Terrain", "heightmap"),
+    ("Terrain", "texture"),
+    ("Tilemap", "texture"),
+    ("Emitter", "texture"),
+    ("Emitter", "mesh"),
+    ("Decal", "texture"),
+    ("UiStyle", "image"),
+    ("AudioSource", "file"),
+    ("TextFont", "file"),
+    ("ParticleSystem", "effect"),
+];
+
+/// The entities of the scene that name the file `path` in one of the fields of `FILE_FIELDS`, by uid (nothing else is read: a query for each field, and the files' own names, as the scene wrote them).
+pub fn users_of(studio: &mut Studio, path: &str) -> Vec<u64> {
+    let mut found: Vec<u64> = Vec::new();
+    for (component, field) in FILE_FIELDS {
+        let clause = Json::obj([("component", Json::str(component)), ("field", Json::str(field)), ("value", Json::str(path))]);
+        let q = Json::obj([("where", Json::arr([clause])), ("select", Json::arr([])), ("limit", Json::from(2000))]);
+        if let Ok(a) = studio.engine.call("query", &q) {
+            for e in a.get("entities").and_then(|e| e.as_array()).unwrap_or(&[]) {
+                if let Some(uid) = e.get("uid").and_then(|u| u.as_u64()) {
+                    if !found.contains(&uid) {
+                        found.push(uid);
+                    }
+                }
+            }
+        }
+    }
+    found.sort_unstable();
+    found
+}
+
 /// The colour of a source control badge: orange for a change, green for a new file in git, blue-grey for a file git does not know, red for a conflict.
 fn badge_color(s: crate::vcs::Status) -> Color32 {
     match s {
@@ -250,6 +288,7 @@ impl ProjectUi {
                 let searching = !filter.is_empty() || !self.kind_filter.is_empty();
                 let mut open: Option<String> = None;
                 let mut go: Option<String> = None;
+                let mut find_users: Option<String> = None;
                 let mut count = 0usize;
                 egui::ScrollArea::vertical().id_salt("project-files").auto_shrink([false, false]).show(ui, |ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
@@ -346,6 +385,10 @@ impl ProjectUi {
                                 }
                             }
                             resp.context_menu(|ui| {
+                                if kind != "folder" && kind != "scene" && ui.button("Select what uses this").on_hover_text("Select the entities of the scene that name this file").clicked() {
+                                    find_users = Some(path.clone());
+                                    ui.close();
+                                }
                                 if kind == "scene" && ui.button("Open scene").clicked() {
                                     open = Some(path.clone());
                                     ui.close();
@@ -381,6 +424,17 @@ impl ProjectUi {
                 ui.painter().text(ui.max_rect().left_bottom() + Vec2::new(8.0, -4.0), Align2::LEFT_BOTTOM, foot, FontId::proportional(11.5), theme::TEXT_DIM);
                 if let Some(p) = go {
                     self.folder = p;
+                }
+                if let Some(p) = find_users {
+                    let uids = users_of(studio, &p);
+                    let name = p.rsplit('/').next().unwrap_or(&p).to_string();
+                    if uids.is_empty() {
+                        studio.toast(format!("Nothing in the scene uses {name}"), false);
+                    } else {
+                        studio.toast(format!("{} {} {name}", uids.len(), if uids.len() == 1 { "entity uses" } else { "entities use" }), false);
+                        let main = uids.first().copied();
+                        studio.select_many(uids, main);
+                    }
                 }
                 if let Some(p) = open {
                     self.open_scene = Some(p);

@@ -206,6 +206,25 @@ fn every_panel_in_a_small_window_for_looking_at() {
 }
 
 #[test]
+fn select_what_uses_this_finds_the_entities_that_name_a_file_in_any_of_the_fields_that_do() {
+    let mut h = Harness::new();
+    let spawn = |h: &mut Harness, comps: &str| h.app.studio.call("spawn", j(&format!(r#"{{"components":{comps}}}"#))).unwrap();
+    spawn(&mut h, r#"{"Name":{"value":"A"},"Transform":{},"MeshRenderer":{"mesh":"cube","texture":"textures/wall.png"}}"#);
+    spawn(&mut h, r#"{"Name":{"value":"B"},"Transform":{},"Sprite":{"texture":"textures/wall.png"}}"#);
+    spawn(&mut h, r#"{"Name":{"value":"C"},"Transform":{},"MeshRenderer":{"mesh":"models/rock.glb","texture":"textures/other.png"}}"#);
+    h.frames(2);
+    let (a, b, c) = (h.uid("A"), h.uid("B"), h.uid("C"));
+    assert_eq!(crate::project::users_of(&mut h.app.studio, "textures/wall.png"), [a.min(b), a.max(b)], "a mesh and a sprite name the same picture");
+    assert_eq!(crate::project::users_of(&mut h.app.studio, "models/rock.glb"), [c]);
+    assert!(crate::project::users_of(&mut h.app.studio, "textures/nothing.png").is_empty());
+    // what the menu does with the answer
+    let uids = crate::project::users_of(&mut h.app.studio, "textures/wall.png");
+    let main = uids.first().copied();
+    h.app.studio.select_many(uids, main);
+    assert_eq!(h.app.studio.selected.len(), 2);
+}
+
+#[test]
 fn the_hierarchy_type_filter_lists_one_kind_alone_or_with_a_search_and_frames_still_draw() {
     use crate::state::Kind;
     let mut h = Harness::new();

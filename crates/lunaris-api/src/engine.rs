@@ -212,7 +212,15 @@ impl Engine {
             "spawn" => self.spawn(&a),
             "despawn" => self.single(Command::Despawn { uid: a.u64("uid")? }),
             "get" => self.get(&a),
-            "set" => self.single(Command::Set { uid: a.u64("uid")?, component: a.str("component")?.to_string(), value: a.value("value")?.clone() }),
+            "set" => {
+                let (uid, component) = (a.u64("uid")?, a.str("component")?.to_string());
+                let mut out = self.single(Command::Set { uid, component: component.clone(), value: a.value("value")?.clone() })?;
+                // the mistake an agent makes most: the Transform of an attached entity is worked out from its LocalTransform every tick, so a value written to it does not stay
+                if component == "Transform" && self.attached_to(uid).is_some() {
+                    out.set("note", Json::str("this entity is attached (it has a Parent): its Transform is worked out from its LocalTransform every tick, so this change will not stay; set LocalTransform (relative to the parent) instead"));
+                }
+                Ok(out)
+            }
             "add_component" => {
                 let value = a.0.get("value").cloned().unwrap_or(Json::Obj(Vec::new()));
                 self.single(Command::Add { uid: a.u64("uid")?, component: a.str("component")?.to_string(), value })
@@ -678,6 +686,13 @@ impl Engine {
         })?;
         let source = lunaris_script::decompile(&sys.def).map_err(|e| EcsError::new("no_script_form", e))?;
         Ok(Json::obj([("name", Json::str(name)), ("source", Json::str(source))]))
+    }
+
+    /// The uid of the entity `uid` is attached to (its `Parent.target`), if it is.
+    fn attached_to(&self, uid: u64) -> Option<u64> {
+        let w = &self.sim.world;
+        let e = w.entity(uid)?;
+        w.get::<lunaris_sim::components::Parent>(e).map(|p| p.target.0).filter(|t| *t != 0)
     }
 
     pub(crate) fn single(&mut self, cmd: Command) -> Result<Json> {
