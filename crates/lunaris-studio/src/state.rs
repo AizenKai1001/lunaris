@@ -193,6 +193,7 @@ pub enum BottomTab {
     Profiler,
     History,
     Streaming,
+    Problems,
 }
 
 const READ_ONLY: &[&str] = &[

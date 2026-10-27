@@ -347,6 +347,36 @@ fn duplicate_and_delete_take_what_is_attached_under_an_entity_with_it_and_each_i
 }
 
 #[test]
+fn the_problems_tab_lists_what_check_finds_and_a_click_selects_the_entity() {
+    let mut h = Harness::new();
+    let floor = h.uid("Floor");
+    // an entity attached to one that is not there, and one attached with no LocalTransform: mistakes `check` names
+    h.app.studio.call("spawn", j(r#"{"uid":100,"components":{"Name":{"value":"Lost"},"Transform":{},"Parent":{"target":99999},"LocalTransform":{}}}"#)).unwrap();
+    h.app.studio.call("spawn", j(&format!(r#"{{"uid":101,"components":{{"Name":{{"value":"Bare"}},"Transform":{{}},"Parent":{{"target":{floor}}}}}}}"#))).unwrap();
+    h.app.studio.tab = crate::state::BottomTab::Problems;
+    h.frames(2);
+    assert!(!h.app.problems.checked, "nothing is checked until asked");
+    h.app.problems.run(&mut h.app.studio);
+    let (errors, _) = h.app.problems.counts();
+    assert!(errors >= 2, "{:?}", h.app.problems.list);
+    assert!(h.app.problems.list.iter().any(|p| p.entity == Some(100)) && h.app.problems.list.iter().any(|p| p.entity == Some(101)));
+    assert!(h.app.problems.list.windows(2).all(|w| w[0].severity != "warning" || w[1].severity != "error"), "errors come before warnings");
+    h.frames(3);
+    h.shoot("problems_tab");
+    // a problem about an entity is a row that selects it
+    h.app.studio.select(None);
+    h.app.studio.select(Some(100));
+    assert_eq!(h.app.studio.selection, Some(100));
+    // with Auto on, a change of the scene is checked again by itself
+    h.app.problems.auto = true;
+    h.app.studio.call("despawn", j(r#"{"uid":100}"#)).unwrap();
+    h.app.studio.call("despawn", j(r#"{"uid":101}"#)).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(1600));
+    h.frames(3);
+    assert!(h.app.problems.list.iter().all(|p| p.entity != Some(100) && p.entity != Some(101)), "{:?}", h.app.problems.list);
+}
+
+#[test]
 fn ctrl_g_puts_the_selection_under_a_new_group_that_moves_them_all_and_one_undo_takes_it_back() {
     let mut h = Harness::new();
     let (b, ball) = (h.uid("Box"), h.uid("Ball"));
@@ -546,6 +576,26 @@ fn the_rows_read_from_the_world_are_the_rows_the_query_tool_gave() {
     let (t, few) = crate::rows_world::read(&h.app.studio.engine.sim.world, 5);
     assert_eq!((t, few.len()), (total, 5));
     assert_eq!(few.iter().map(|r| r.uid).collect::<Vec<_>>(), now.iter().take(5).map(|r| r.uid).collect::<Vec<_>>());
+}
+
+/// How long the editor takes to start and draw its first frames: `... startup_cost -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn startup_cost() {
+    let dir = std::env::temp_dir().join(format!("lunaris-startup-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let t = std::time::Instant::now();
+    let ctx = egui::Context::default();
+    let opts = Options { root: dir, quality: "reference".to_string(), mute: true, ..Options::default() };
+    let app = App::new(&ctx, opts);
+    println!("App::new: {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+    let mut h = Harness { ctx, app, time: 0.0, screen: Default::default(), size: Vec2::new(1600.0, 900.0) };
+    let t = std::time::Instant::now();
+    h.frames(1);
+    println!("the first frame: {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+    let t = std::time::Instant::now();
+    h.frames(10);
+    println!("the next ten frames: {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
 }
 
 /// What a big scene costs the editor: `cargo test --release -p lunaris-studio --features eframe/x11 big_scene -- --ignored --nocapture`.

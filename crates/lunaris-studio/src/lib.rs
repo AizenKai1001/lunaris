@@ -26,6 +26,7 @@ mod panels;
 mod paint;
 mod place;
 mod profiler;
+mod problems_ui;
 mod project;
 mod project_settings;
 mod rows_world;
