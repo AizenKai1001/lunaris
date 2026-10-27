@@ -223,6 +223,8 @@ pub struct Studio {
     pub all: Vec<Row>,
     pub expanded: HashSet<u64>,
     pub filter: String,
+    /// Show only the entities of this kind (the Hierarchy's type filter), as a flat list like a search; None: all.
+    pub kind_filter: Option<Kind>,
     pub comp_names: Vec<String>,
     comps: BTreeMap<String, CompDef>,
     pub revision: u64,
@@ -279,6 +281,7 @@ impl Studio {
             all: Vec::new(),
             expanded: HashSet::new(),
             filter: String::new(),
+            kind_filter: None,
             comp_names: Vec::new(),
             comps: BTreeMap::new(),
             revision: u64::MAX,
@@ -512,7 +515,7 @@ impl Studio {
         }
         let filter = self.filter.to_lowercase();
         let mut out: Vec<Row> = Vec::new();
-        if filter.is_empty() {
+        if filter.is_empty() && self.kind_filter.is_none() {
             let mut stack: Vec<(usize, usize)> = roots.iter().rev().map(|i| (*i, 0)).collect();
             let mut seen = 0usize;
             while let Some((i, depth)) = stack.pop() {
@@ -535,7 +538,10 @@ impl Studio {
             }
         } else {
             for r in &self.all {
-                if r.name.to_lowercase().contains(&filter) || r.uid.to_string() == filter {
+                if self.kind_filter.is_some_and(|k| r.kind != k) {
+                    continue;
+                }
+                if filter.is_empty() || r.name.to_lowercase().contains(&filter) || r.uid.to_string() == filter {
                     let mut r = r.clone();
                     r.depth = 0;
                     out.push(r);

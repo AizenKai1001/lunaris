@@ -416,6 +416,7 @@ impl Viewport {
         }
         // the scene toolbar
         let bar = Rect::from_min_size(ui.cursor().min, Vec2::new(ui.available_width(), 24.0));
+        let narrow = bar.width() < NARROW_TOOLBAR;
         ui.painter().rect_filled(bar, CornerRadius::ZERO, theme::PANEL);
         ui.painter().line_segment([bar.left_bottom(), bar.right_bottom()], Stroke::new(1.0, theme::LINE));
         ui.scope_builder(egui::UiBuilder::new().max_rect(bar.shrink2(Vec2::new(4.0, 1.0))).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
@@ -455,27 +456,50 @@ impl Viewport {
                 self.kind = if two_d { ViewKind::Scene } else { ViewKind::Scene2D };
                 self.forced = true;
             }
-            if chrome::pill(ui, "Grid", self.grid, false).clicked() {
-                self.grid = !self.grid;
-            }
-            if chrome::pill(ui, "Streaming", self.streaming, false).on_hover_text("A ring on the ground for every StreamZone: green while it is loaded, grey while it is not").clicked() {
-                self.streaming = !self.streaming;
-                self.zones.invalidate();
-            }
-            if chrome::pill(ui, "Stats", self.stats, false).on_hover_text("Frame time, picture time, entities and tick; with the right button held the wheel sets the fly speed").clicked() {
-                self.stats = !self.stats;
+            const STATS_TIP: &str = "Frame time, picture time, entities and tick; with the right button held the wheel sets the fly speed";
+            const STREAMING_TIP: &str = "A ring on the ground for every StreamZone: green while it is loaded, grey while it is not";
+            if narrow {
+                // a narrow view (a small window, a wide Inspector): the switches go under one menu and the three snap steps under another, so that nothing is drawn over anything
+                chrome::drop_down(ui, "Show", |ui| {
+                    ui.checkbox(&mut self.grid, "Grid");
+                    if ui.checkbox(&mut self.streaming, "Streaming").on_hover_text(STREAMING_TIP).changed() {
+                        self.zones.invalidate();
+                    }
+                    ui.checkbox(&mut self.stats, "Stats").on_hover_text(STATS_TIP);
+                    ui.checkbox(&mut self.gizmos, "Gizmos");
+                });
+            } else {
+                if chrome::pill(ui, "Grid", self.grid, false).clicked() {
+                    self.grid = !self.grid;
+                }
+                if chrome::pill(ui, "Streaming", self.streaming, false).on_hover_text(STREAMING_TIP).clicked() {
+                    self.streaming = !self.streaming;
+                    self.zones.invalidate();
+                }
+                if chrome::pill(ui, "Stats", self.stats, false).on_hover_text(STATS_TIP).clicked() {
+                    self.stats = !self.stats;
+                }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if chrome::pill(ui, "Gizmos", self.gizmos, false).clicked() {
+                if !narrow && chrome::pill(ui, "Gizmos", self.gizmos, false).clicked() {
                     self.gizmos = !self.gizmos;
                 }
                 if chrome::pill(ui, if self.local_space { "Local" } else { "World" }, self.local_space, false).on_hover_text("The Move and Rotate handles along the object's own axes (Local) or the world's (World); Scale always follows the object").clicked() {
                     self.local_space = !self.local_space;
                 }
                 // (Unreal's snap settings: a step for each of the three handles, or off)
-                snap_menu(ui, "Scale", "", &mut self.snap_scale, &[0.05, 0.1, 0.25, 0.5, 1.0]);
-                snap_menu(ui, "Rotate", "\u{b0}", &mut self.snap_rot, &[5.0, 10.0, 15.0, 30.0, 45.0, 90.0]);
-                snap_menu(ui, "Move", " m", &mut self.snap_move, &[0.1, 0.25, 0.5, 1.0, 5.0, 10.0]);
+                let (scale_steps, rot_steps, move_steps): (&[f32], &[f32], &[f32]) = (&[0.05, 0.1, 0.25, 0.5, 1.0], &[5.0, 10.0, 15.0, 30.0, 45.0, 90.0], &[0.1, 0.25, 0.5, 1.0, 5.0, 10.0]);
+                if narrow {
+                    chrome::drop_down(ui, "Snap", |ui| {
+                        for (title, unit, value, steps) in [("Move", " m", &mut self.snap_move, move_steps), ("Rotate", "\u{b0}", &mut self.snap_rot, rot_steps), ("Scale", "", &mut self.snap_scale, scale_steps)] {
+                            ui.menu_button(snap_label(title, unit, *value), |ui| snap_items(ui, unit, value, steps));
+                        }
+                    });
+                } else {
+                    snap_menu(ui, "Scale", "", &mut self.snap_scale, scale_steps);
+                    snap_menu(ui, "Rotate", "\u{b0}", &mut self.snap_rot, rot_steps);
+                    snap_menu(ui, "Move", " m", &mut self.snap_move, move_steps);
+                }
                 if let Some(e) = &self.error {
                     ui.label(egui::RichText::new(e).small().color(theme::ERR));
                 }
@@ -1153,18 +1177,28 @@ pub fn fly_speed_after_scroll(speed: f32, scroll: f32) -> f32 {
     (speed * (1.0 + scroll * 0.003).clamp(0.5, 2.0)).clamp(0.1, 10.0)
 }
 
+/// The scene toolbar is drawn in its short form (the switches under "Show", the snap steps under "Snap") when the view is narrower than this many points: the long form needs about 800.
+const NARROW_TOOLBAR: f32 = 880.0;
+
+fn snap_label(title: &str, unit: &str, value: f32) -> String {
+    if value > 0.0 { format!("{title} {value}{unit}") } else { format!("{title} off") }
+}
+
+/// The rows of a snap menu: "Off" and the usual steps.
+fn snap_items(ui: &mut egui::Ui, unit: &str, value: &mut f32, steps: &[f32]) {
+    for s in std::iter::once(0.0).chain(steps.iter().copied()) {
+        let text = if s == 0.0 { "Off".to_string() } else { format!("{s}{unit}") };
+        if ui.selectable_label(*value == s, text).clicked() {
+            *value = s;
+            ui.close();
+        }
+    }
+}
+
 /// A drop-down pill for a snap step: "Off" and the usual steps.
 fn snap_menu(ui: &mut egui::Ui, title: &str, unit: &str, value: &mut f32, steps: &[f32]) {
-    let label = if *value > 0.0 { format!("{title} {}{unit}", *value) } else { format!("{title} off") };
-    chrome::drop_down(ui, &label, |ui| {
-        for s in std::iter::once(0.0).chain(steps.iter().copied()) {
-            let text = if s == 0.0 { "Off".to_string() } else { format!("{s}{unit}") };
-            if ui.selectable_label(*value == s, text).clicked() {
-                *value = s;
-                ui.close();
-            }
-        }
-    });
+    let label = snap_label(title, unit, *value);
+    chrome::drop_down(ui, &label, |ui| snap_items(ui, unit, value, steps));
 }
 
 #[cfg(test)]

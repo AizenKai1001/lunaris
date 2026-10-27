@@ -12,6 +12,8 @@ struct Harness {
     time: f64,
     /// What egui drew, kept for `shoot`.
     screen: crate::shot::Screen,
+    /// The size of the window.
+    size: Vec2,
 }
 
 fn j(s: &str) -> Json {
@@ -26,7 +28,7 @@ impl Harness {
         let ctx = egui::Context::default();
         let opts = Options { root: dir, quality: "reference".to_string(), mute: true, ..Options::default() };
         let app = App::new(&ctx, opts);
-        let mut h = Harness { ctx, app, time: 0.0, screen: Default::default() };
+        let mut h = Harness { ctx, app, time: 0.0, screen: Default::default(), size: Vec2::new(1600.0, 900.0) };
         for c in [
             r#"{"components":{"Name":{"value":"Floor"},"Transform":{"pos":[0,-0.5,0],"scale":[20,1,20]},"MeshRenderer":{"mesh":"cube","color":[0.3,0.6,0.3,1]}}}"#,
             r#"{"components":{"Name":{"value":"Box"},"Transform":{"pos":[0,1,0]},"MeshRenderer":{"mesh":"cube","color":[0.9,0.2,0.2,1]}}}"#,
@@ -43,7 +45,7 @@ impl Harness {
 
     fn frame(&mut self, events: Vec<Event>) {
         self.time += 1.0 / 60.0;
-        let raw = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1600.0, 900.0))), time: Some(self.time), events, focused: true, ..RawInput::default() };
+        let raw = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), time: Some(self.time), events, focused: true, ..RawInput::default() };
         let app = &mut self.app;
         let mut out = self.ctx.run_ui(raw, |ui| app.draw(ui));
         // (the textures egui hands over are kept, so that `shoot` can draw the window in software)
@@ -63,19 +65,20 @@ impl Harness {
         let ctx = egui::Context::default();
         let opts = Options { root: dir, quality: "reference".to_string(), mute: true, ..Options::default() };
         let app = App::new(&ctx, opts);
-        let mut h = Harness { ctx, app, time: 0.0, screen: Default::default() };
+        let mut h = Harness { ctx, app, time: 0.0, screen: Default::default(), size: Vec2::new(1600.0, 900.0) };
         h.frames(3);
         h
     }
 
-    /// A picture of the window as it is now (1600 x 900), written to `LUNARIS_SHOTS`/`name`.png.
+    /// A picture of the window as it is now (1600 x 900 unless `size` was changed), written to `LUNARIS_SHOTS`/`name`.png.
     fn shoot(&mut self, name: &str) {
         let Ok(dir) = std::env::var("LUNARIS_SHOTS") else { return };
         self.screen.keep_shapes = true;
         self.frames(2);
         self.screen.keep_shapes = false;
-        let rgba = self.screen.picture(&self.ctx, 1600, 900);
-        crate::shot::save_png(&std::path::Path::new(&dir).join(format!("{name}.png")), 1600, 900, &rgba);
+        let (w, h) = (self.size.x as usize, self.size.y as usize);
+        let rgba = self.screen.picture(&self.ctx, w, h);
+        crate::shot::save_png(&std::path::Path::new(&dir).join(format!("{name}.png")), w, h, &rgba);
     }
 
     fn uid(&self, name: &str) -> u64 {
@@ -167,6 +170,61 @@ fn dragging_a_gizmo_handle_moves_the_selection_along_that_axis_only_and_is_one_u
     h.key(Key::Z, Modifiers::COMMAND);
     let undone = h.pos_of("Box");
     assert!((undone[0] - before[0]).abs() < 1e-4, "one undo puts it back: {undone:?}");
+}
+
+#[test]
+fn the_scene_toolbar_fits_a_small_window_for_looking_at() {
+    let mut h = Harness::new();
+    for (w, hh) in [(1280.0, 720.0), (1500.0, 800.0)] {
+        h.size = Vec2::new(w, hh);
+        h.frames(4);
+        h.shoot(&format!("toolbar_{w}"));
+    }
+}
+
+/// Pictures of every panel at 1280 x 720 (a small window), for looking at: nothing is checked, and without `LUNARIS_SHOTS` the test does nothing.
+#[test]
+fn every_panel_in_a_small_window_for_looking_at() {
+    use crate::state::{BottomTab, Center};
+    if std::env::var("LUNARIS_SHOTS").is_err() {
+        return;
+    }
+    let mut h = Harness::new();
+    h.size = Vec2::new(1280.0, 720.0);
+    h.click(h.screen_of("Box", [0.0, 1.0, 0.0]));
+    for (name, tab) in [("project", BottomTab::Project), ("console", BottomTab::Console), ("systems", BottomTab::Systems), ("profiler", BottomTab::Profiler), ("history", BottomTab::History)] {
+        h.app.studio.tab = tab;
+        h.frames(4);
+        h.shoot(&format!("small_bottom_{name}"));
+    }
+    h.app.studio.tab = BottomTab::Project;
+    for (name, center) in [("ui", Center::Ui), ("blueprint", Center::Blueprint), ("script", Center::Script), ("canvas", Center::Canvas), ("sequencer", Center::Sequencer), ("effects", Center::Effects)] {
+        h.app.studio.center = center;
+        h.frames(4);
+        h.shoot(&format!("small_center_{name}"));
+    }
+}
+
+#[test]
+fn the_hierarchy_type_filter_lists_one_kind_alone_or_with_a_search_and_frames_still_draw() {
+    use crate::state::Kind;
+    let mut h = Harness::new();
+    let names = |h: &Harness| h.app.studio.rows.iter().map(|r| r.name.clone()).collect::<Vec<_>>();
+    assert_eq!(names(&h).len(), 4);
+    h.app.studio.kind_filter = Some(Kind::Mesh);
+    h.app.studio.rebuild_tree();
+    assert_eq!(names(&h), ["Floor", "Box", "Ball"], "only the meshes");
+    h.app.studio.filter = "ba".to_string();
+    h.app.studio.rebuild_tree();
+    assert_eq!(names(&h), ["Ball"], "a search inside the type");
+    h.app.studio.kind_filter = Some(Kind::Light);
+    h.app.studio.rebuild_tree();
+    assert!(names(&h).is_empty(), "no light is called ba");
+    h.frames(2);
+    h.app.studio.filter.clear();
+    h.app.studio.kind_filter = None;
+    h.app.studio.rebuild_tree();
+    assert_eq!(names(&h).len(), 4, "back to the whole tree");
 }
 
 #[test]
@@ -1405,6 +1463,38 @@ fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
             std::fs::copy(&src, &dst).unwrap();
         }
     }
+}
+
+#[test]
+fn the_project_panel_badges_the_files_git_sees_as_changed_and_says_the_branch() {
+    use crate::vcs::Status;
+    let dir = std::env::temp_dir().join(format!("lunaris-studio-git-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("scenes")).unwrap();
+    let git = |args: &[&str]| std::process::Command::new("git").arg("-C").arg(&dir).args(args).output().map(|o| o.status.success()).unwrap_or(false);
+    if !git(&["init", "-q", "-b", "trunk"]) {
+        return; // no git on this machine
+    }
+    std::fs::write(dir.join("scenes/a.lunaris.json"), r#"{"entities":[]}"#).unwrap();
+    std::fs::write(dir.join("scenes/b.lunaris.json"), r#"{"entities":[]}"#).unwrap();
+    assert!(git(&["add", "."]) && git(&["-c", "user.name=t", "-c", "user.email=t@users.noreply.github.com", "commit", "-q", "-m", "first"]));
+    std::fs::write(dir.join("scenes/a.lunaris.json"), r#"{"entities":[],"changed":true}"#).unwrap();
+    std::fs::write(dir.join("scenes/c.lunaris.json"), r#"{"entities":[]}"#).unwrap();
+    let mut h = Harness::on(dir.clone());
+    h.app.studio.tab = crate::state::BottomTab::Project;
+    for _ in 0..300 {
+        h.frames(1);
+        if h.app.project.git_answered() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    h.frames(2);
+    let (a, summary) = h.app.project.git_status("scenes/a.lunaris.json");
+    assert_eq!(a, Some(Status::Modified));
+    assert_eq!(h.app.project.git_status("scenes/c.lunaris.json").0, Some(Status::Untracked));
+    assert_eq!(h.app.project.git_status("scenes/b.lunaris.json").0, None, "a file that is as committed has no badge");
+    assert!(summary.starts_with("trunk") && summary.contains("2 changed"), "{summary}");
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// Pictures of the editor for looking at, drawn in software (`shot.rs`) from the Caldera example: nothing is checked, and without `LUNARIS_SHOTS` (the folder to write

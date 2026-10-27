@@ -34,6 +34,8 @@ pub struct ProjectUi {
     pub open_scene: Option<String>,
     closed: HashSet<String>,
     thumbs: Option<Thumbs>,
+    /// What git says about the files (badges on the tiles, the branch at the foot).
+    vcs: crate::vcs::Vcs,
     /// Where each tile was drawn last frame (for tests).
     tile_rects: Vec<(String, egui::Rect)>,
 }
@@ -51,6 +53,16 @@ fn icon_of(kind: &str) -> Icon {
     }
 }
 
+/// The colour of a source control badge: orange for a change, green for a new file in git, blue-grey for a file git does not know, red for a conflict.
+fn badge_color(s: crate::vcs::Status) -> Color32 {
+    match s {
+        crate::vcs::Status::Modified => Color32::from_rgb(240, 160, 50),
+        crate::vcs::Status::Added => Color32::from_rgb(90, 200, 110),
+        crate::vcs::Status::Untracked => Color32::from_rgb(150, 170, 210),
+        crate::vcs::Status::Conflict => Color32::from_rgb(230, 70, 70),
+    }
+}
+
 fn human(b: u64) -> String {
     if b >= 1_000_000 {
         format!("{:.1} MB", b as f64 / 1e6)
@@ -64,6 +76,7 @@ fn human(b: u64) -> String {
 impl ProjectUi {
     pub fn reload(&mut self) {
         self.loaded = None;
+        self.vcs.invalidate();
     }
 
     /// How many picture thumbnails are ready (for tests).
@@ -81,6 +94,18 @@ impl ProjectUi {
     #[cfg(test)]
     pub fn set_kind_filter(&mut self, kind: &str) {
         self.kind_filter = kind.to_string();
+    }
+
+    /// What git says about the file at `path`, and the foot's summary of the repository (for tests).
+    #[cfg(test)]
+    pub fn git_status(&self, path: &str) -> (Option<crate::vcs::Status>, String) {
+        (self.vcs.status_of(path), self.vcs.snapshot.as_ref().map(|s| s.summary()).unwrap_or_default())
+    }
+
+    /// Whether git has been asked about the workspace and has answered (for tests).
+    #[cfg(test)]
+    pub fn git_answered(&self) -> bool {
+        self.vcs.snapshot.is_some()
     }
 
     /// The middle of the tile of the file at `path`, as drawn last frame (for tests).
@@ -128,6 +153,7 @@ impl ProjectUi {
 
     pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio) {
         self.load(studio);
+        self.vcs.poll(&studio.opts.root);
         let ctx = ui.ctx().clone();
         if self.thumbs.is_none() {
             self.thumbs = Some(Thumbs::new(studio.opts.root.clone()));
@@ -207,6 +233,7 @@ impl ProjectUi {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.small_button("Refresh").clicked() {
                             self.loaded = None;
+                            self.vcs.invalidate();
                         }
                         crate::chrome::search_box(ui, &mut self.filter, "Search", 160.0);
                         let shown = KINDS.iter().find(|(k, _)| *k == self.kind_filter).map_or("All types", |(_, l)| *l);
@@ -277,6 +304,13 @@ impl ProjectUi {
                                 ui.painter().rect_filled(egui::Rect::from_min_max(egui::pos2(tile.min.x, tile.max.y - 3.0), tile.max), CornerRadius::ZERO, bar);
                             }
                             // a picture shows itself, a model a small picture of itself and a sound its waveform (fitted into the tile), everything else its icon
+                            let badge = if kind == "folder" { self.vcs.snapshot.as_ref().and_then(|s| s.of_folder(&path)) } else { self.vcs.status_of(&path) };
+                            if let Some(b) = badge {
+                                // the source control badge, in the corner of the tile
+                                let c = egui::pos2(tile.max.x - 6.0, tile.min.y + 6.0);
+                                ui.painter().circle_filled(c, 4.5, badge_color(b));
+                                ui.painter().circle_stroke(c, 4.5, Stroke::new(1.0, Color32::from_black_alpha(170)));
+                            }
                             let thumb = if kind == "texture" || kind == "model" || kind == "sound" { self.thumbs.as_mut().and_then(|t| t.get(&ctx, &path, bytes)).map(|t| (t.id(), t.size_vec2())) } else { None };
                             if let Some((id, size)) = thumb {
                                 let inner = tile.shrink(3.0);
@@ -291,10 +325,15 @@ impl ProjectUi {
                             let h = galley.size().y.min(30.0);
                             let at = egui::pos2(rect.center().x - galley.size().x.min(74.0) / 2.0, rect.min.y + 62.0);
                             ui.painter().with_clip_rect(egui::Rect::from_min_size(egui::pos2(rect.min.x, rect.min.y + 60.0), Vec2::new(78.0, h + 2.0))).galley(at, galley, theme::TEXT);
-                            if searching {
-                                resp.clone().on_hover_text(&path);
-                            } else if bytes > 0 {
-                                resp.clone().on_hover_text(format!("{path}\n{}", human(bytes)));
+                            let mut tip = if searching { path.clone() } else if bytes > 0 { format!("{path}\n{}", human(bytes)) } else { String::new() };
+                            if let Some(b) = badge {
+                                if !tip.is_empty() {
+                                    tip.push('\n');
+                                }
+                                tip.push_str(if kind == "folder" { "holds files that git sees as changed" } else { b.label() });
+                            }
+                            if !tip.is_empty() {
+                                resp.clone().on_hover_text(tip);
                             }
                             if resp.clicked() {
                                 self.selected = Some(path.clone());
@@ -334,7 +373,12 @@ impl ProjectUi {
                     });
                 });
                 // the item count, bottom left (Unreal: "67 items")
-                ui.painter().text(ui.max_rect().left_bottom() + Vec2::new(8.0, -4.0), Align2::LEFT_BOTTOM, format!("{count} items"), FontId::proportional(11.5), theme::TEXT_DIM);
+                let git = self.vcs.snapshot.as_ref().map(|s| s.summary()).filter(|s| !s.is_empty());
+                let foot = match git {
+                    Some(g) => format!("{count} items   git: {g}"),
+                    None => format!("{count} items"),
+                };
+                ui.painter().text(ui.max_rect().left_bottom() + Vec2::new(8.0, -4.0), Align2::LEFT_BOTTOM, foot, FontId::proportional(11.5), theme::TEXT_DIM);
                 if let Some(p) = go {
                     self.folder = p;
                 }

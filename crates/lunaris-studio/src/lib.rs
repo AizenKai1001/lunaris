@@ -37,6 +37,7 @@ mod streaming_ui;
 mod theme;
 mod thumbs;
 mod ui_designer;
+mod vcs;
 mod viewport;
 mod vsc_defaults;
 mod vsc_theme;

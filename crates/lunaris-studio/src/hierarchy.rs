@@ -102,8 +102,28 @@ impl HierarchyUi {
 
     pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio, spawn_at: [f32; 3]) {
         ui.horizontal(|ui| {
-            let r = crate::chrome::search_box(ui, &mut studio.filter, "Search", ui.available_width() - 34.0);
+            let r = crate::chrome::search_box(ui, &mut studio.filter, "Search", ui.available_width() - 108.0);
             if r.changed() {
+                studio.rebuild_tree();
+            }
+            // the type filter (Unreal's Outliner filters by what an actor is): only the entities of one kind, as a flat list like a search
+            let label = studio.kind_filter.map_or("All types", type_name).to_string();
+            let mut picked: Option<Option<Kind>> = None;
+            crate::chrome::drop_down(ui, &label, |ui| {
+                if ui.selectable_label(studio.kind_filter.is_none(), "All types").clicked() {
+                    picked = Some(None);
+                    ui.close();
+                }
+                for k in FILTER_KINDS {
+                    let n = studio.all.iter().filter(|r| r.kind == k).count();
+                    if n > 0 && ui.selectable_label(studio.kind_filter == Some(k), format!("{} ({n})", type_name(k))).clicked() {
+                        picked = Some(Some(k));
+                        ui.close();
+                    }
+                }
+            });
+            if let Some(k) = picked {
+                studio.kind_filter = k;
                 studio.rebuild_tree();
             }
             ui.menu_button("+", |ui| create_menu(ui, studio, spawn_at));
@@ -181,7 +201,7 @@ impl HierarchyUi {
                 }
                 let x0 = rect.min.x + 28.0 + r.depth as f32 * 14.0;
                 // the fold arrow
-                if r.children > 0 && studio.filter.is_empty() {
+                if r.children > 0 && studio.filter.is_empty() && studio.kind_filter.is_none() {
                     let open = studio.expanded.contains(&r.uid);
                     let arrow = egui::Rect::from_min_size(egui::pos2(x0, rect.min.y), Vec2::new(14.0, row_h));
                     ui.painter().text(arrow.center(), egui::Align2::CENTER_CENTER, if open { "v" } else { ">" }, FontId::monospace(11.0), theme::TEXT_DIM);
@@ -321,10 +341,14 @@ impl HierarchyUi {
         // the status line: how many, and how many of them are selected
         let (status, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), footer_h), Sense::hover());
         ui.painter().rect_filled(status, CornerRadius::ZERO, theme::HEADER);
-        let text = if chosen.len() > 1 { format!("{} entities ({} selected)", studio.total_entities, chosen.len()) } else { format!("{} entities", studio.total_entities) };
+        let shown = if studio.kind_filter.is_some() || !studio.filter.is_empty() { format!("{} of {} entities", total, studio.total_entities) } else { format!("{} entities", studio.total_entities) };
+        let text = if chosen.len() > 1 { format!("{shown} ({} selected)", chosen.len()) } else { shown };
         ui.painter().text(egui::pos2(status.min.x + 8.0, status.center().y), egui::Align2::LEFT_CENTER, text, FontId::proportional(12.0), theme::TEXT_DIM);
     }
 }
+
+/// The kinds the type filter offers (those that have no entity are left out of the menu).
+const FILTER_KINDS: [Kind; 12] = [Kind::Mesh, Kind::Light, Kind::Camera, Kind::Sprite, Kind::Tilemap, Kind::Text, Kind::Ui, Kind::Emitter, Kind::Audio, Kind::Collider, Kind::Environment, Kind::Empty];
 
 /// What the Type column says for a kind of entity.
 fn type_name(k: Kind) -> &'static str {
