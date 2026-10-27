@@ -61,3 +61,5 @@ mod secure_tests;
 mod secure_net_tests;
 #[cfg(test)]
 mod fuzz_tests;
+#[cfg(test)]
+mod client_fuzz_tests;

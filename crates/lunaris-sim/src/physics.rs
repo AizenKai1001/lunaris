@@ -342,7 +342,9 @@ impl StaticGrid {
 
     fn is_big(k: [f32; 4]) -> bool {
         let ((x0, z0), (x1, z1)) = Self::span(k);
-        x1 - x0 >= Self::BIG || z1 - z0 >= Self::BIG
+        // (in i64: the cells of the two ends of a box a million kilometres wide are at the two ends of the i32 range, and their difference overflows an i32 and wrapped to -1: the box was not a big one,
+        // and every cell between its ends was made, gigabytes of them)
+        x1 as i64 - x0 as i64 >= Self::BIG as i64 || z1 as i64 - z0 as i64 >= Self::BIG as i64
     }
 
     /// The grid of the statics whose boxes are `keys` (the lists hold the number of the static in `keys`).
@@ -1225,4 +1227,26 @@ fn step_reference_once(world: &mut World, gravity: [f32; 3], dt: f32, terrains: 
         contacts.sort_by_key(|c| (c.a, c.b));
     }
     Some(contacts)
+}
+
+#[cfg(test)]
+mod static_grid_tests {
+    use super::StaticGrid;
+
+    #[test]
+    fn a_box_a_million_kilometres_wide_is_one_of_the_big_ones_and_is_not_put_in_cells() {
+        let wide = [-5e29, 0.0, 5e29, 1.0];
+        assert!(StaticGrid::is_big(wide), "a box 1e30 metres wide is a big one");
+        let grid = StaticGrid::build(&[wide, [0.0, 0.0, 1.0, 1.0]]);
+        assert_eq!(grid.big, vec![0], "it is on the list every mover looks at");
+        assert_eq!(grid.cells.len(), 1, "and only the small box has cells");
+        // along z, and with infinite ends
+        assert!(StaticGrid::is_big([0.0, -1e30, 1.0, 1e30]));
+        assert!(StaticGrid::is_big([f32::NEG_INFINITY, 0.0, f32::INFINITY, 1.0]));
+        // a box of numbers that are not numbers is put in one cell and does no harm
+        let nan = StaticGrid::build(&[[f32::NAN; 4]]);
+        assert!(nan.big.is_empty() && nan.cells.len() == 1);
+        // the ordinary cases are as they were
+        assert!(!StaticGrid::is_big([0.0, 0.0, 100.0, 100.0]) && StaticGrid::is_big([0.0, 0.0, 129.0, 1.0]));
+    }
 }
