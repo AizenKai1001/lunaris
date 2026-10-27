@@ -46,6 +46,8 @@ pub struct Engine {
     pub(crate) gpu: crate::gpu::GpuState,
     /// The quality `render` uses when the call names none: `reference` (the CPU renderer) unless a GPU renderer was offered.
     pub(crate) default_quality: String,
+    /// The file the last `load_scene` read (a workspace path): `check` uses it to say when a missing file is there next to the scene. Not part of the simulation.
+    pub(crate) scene_path: Option<String>,
 }
 
 pub(crate) struct Args<'a>(pub(crate) &'a Json);
@@ -103,7 +105,7 @@ pub(crate) fn uid_json(u: u64) -> Json {
 impl Engine {
     pub fn new(seed: u64, root: impl Into<PathBuf>) -> Engine {
         let root = root.into();
-        let mut engine = Engine { sim: Sim::new(seed), undo: Vec::new(), redo: Vec::new(), current_group: None, last_group: None, snapshots: BTreeMap::new(), last_recording: None, revision: 0, textures: TextureCache::new(Some(root.clone())), root, gpu: crate::gpu::GpuState::Off, default_quality: "reference".to_string() };
+        let mut engine = Engine { sim: Sim::new(seed), undo: Vec::new(), redo: Vec::new(), current_group: None, last_group: None, snapshots: BTreeMap::new(), last_recording: None, revision: 0, textures: TextureCache::new(Some(root.clone())), root, gpu: crate::gpu::GpuState::Off, default_quality: "reference".to_string(), scene_path: None };
         // heightmaps of `Terrain` entities are read from the workspace
         engine.sim.asset_root = Some(engine.root.clone());
         // sandboxed WebAssembly systems need no permission: a module can touch nothing but the batch of fields it is given
@@ -399,6 +401,7 @@ impl Engine {
                     None => self.sim.threads,
                 };
                 self.sim = fresh;
+                self.scene_path = None;
                 self.undo.clear();
                 self.redo.clear();
                 Ok(Json::obj([("seed", hex(seed)), ("threads", Json::from(self.sim.threads)), ("tick", Json::from(0)), ("entities", Json::from(0))]))
@@ -1019,6 +1022,7 @@ impl Engine {
         next.clear();
         let created = next.load_scene(&scene)?; // errors leave the live simulation untouched
         self.sim = next;
+        self.scene_path = a.opt_str("path")?.map(|p| p.replace('\\', "/"));
         self.undo.clear();
         self.redo.clear();
         Ok(Json::obj([("entities", Json::from(created.len())), ("tick", Json::from(0)), ("hash", hex(self.sim.state_hash()))]))

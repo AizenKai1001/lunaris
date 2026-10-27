@@ -80,6 +80,8 @@ mod mesh_tests;
 #[cfg(test)]
 mod saves_tests;
 #[cfg(test)]
+mod scene_folder_hint_tests;
+#[cfg(test)]
 mod scene_roundtrip_tests;
 #[cfg(test)]
 mod script_tests;

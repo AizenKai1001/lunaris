@@ -77,12 +77,9 @@ fn get_script_gives_back_text_that_defines_the_same_system() {
     assert!(e.call("get_script", &j(r#"{"name":"nope"}"#)).unwrap_err().code == "no_such_system");
 }
 
-/// Every graph system of a real scene as Lunaris Script text and back: `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-api real_scene_scripts -- --ignored --nocapture`.
-#[test]
-#[ignore]
-fn every_system_of_a_real_scene_survives_the_trip_through_script_text_real_scene_scripts() {
-    let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
-    let mut e = crate::Engine::new(1, std::path::PathBuf::from(root));
+/// Every graph system of the scene `scene` (a path in the workspace `root`) as Lunaris Script text and back: how many systems it has, and what is said of each that comes back different, is refused or has no text form.
+fn script_trip(root: &std::path::Path, scene: &str) -> (usize, Vec<String>) {
+    let mut e = crate::Engine::new(1, root);
     e.call("load_scene", &Json::obj([("path", Json::str(scene))])).unwrap();
     let names: Vec<String> = e.call("systems", &Json::Null).unwrap().get("graph").and_then(|s| s.as_array()).unwrap_or(&[]).iter().filter_map(|s| s.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect();
     // (the unary operators a scene may hold as `{"abs": [x]}` are read the same as `{"abs": x}`; `enabled: true` is what a system is anyway)
@@ -98,8 +95,20 @@ fn every_system_of_a_real_scene_survives_the_trip_through_script_text_real_scene
             other => other.clone(),
         }
     }
-    let plain = |d: &Json| unwrapped(d).to_string_compact().unwrap().replace(",\"enabled\":true", "");
-    let (mut seen, mut bad) = (0, Vec::new());
+    // (the order of the keys of an object means nothing: the script text writes `doc` and `order` where it likes)
+    fn sorted(j: &Json) -> Json {
+        match j {
+            Json::Obj(pairs) => {
+                let mut v: Vec<(String, Json)> = pairs.iter().map(|(k, x)| (k.clone(), sorted(x))).collect();
+                v.sort_by(|a, b| a.0.cmp(&b.0));
+                Json::Obj(v)
+            }
+            Json::Arr(a) => Json::Arr(a.iter().map(sorted).collect()),
+            other => other.clone(),
+        }
+    }
+    let plain = |d: &Json| sorted(&unwrapped(d)).to_string_compact().unwrap().replace("\"enabled\":true,", "").replace(",\"enabled\":true", "");
+    let mut bad = Vec::new();
     for name in &names {
         let Ok(got) = e.call("get_script", &Json::obj([("name", Json::str(name.clone()))])) else {
             bad.push(format!("{name}: has no script form"));
@@ -112,18 +121,47 @@ fn every_system_of_a_real_scene_survives_the_trip_through_script_text_real_scene
             Err(err) => bad.push(format!("{name}: the text is refused: {err}")),
             Ok(_) => {
                 let after = e.call("get_system", &Json::obj([("name", Json::str(name.clone()))])).unwrap().get("def").unwrap().clone();
-                if plain(&before) != plain(&after) {
-                    bad.push(format!("{name}: comes back different"));
+                let (x, y) = (plain(&before), plain(&after));
+                if x != y {
+                    // where the two texts first differ, with what stands round it
+                    let at = x.bytes().zip(y.bytes()).position(|(p, q)| p != q).unwrap_or(x.len().min(y.len()));
+                    let around = |s: &str| s.chars().skip(at.saturating_sub(70)).take(160).collect::<String>();
+                    bad.push(format!("{name}: comes back different, first at byte {at}:\n      before: ...{}\n      after:  ...{}", around(&x), around(&y)));
                 }
             }
         }
-        seen += 1;
     }
-    println!("{seen} of {} graph systems through script text; {} do not survive", names.len(), bad.len());
+    (names.len(), bad)
+}
+
+/// Every graph system of a real scene as Lunaris Script text and back: `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-api real_scene_scripts -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn every_system_of_a_real_scene_survives_the_trip_through_script_text_real_scene_scripts() {
+    let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
+    let (n, bad) = script_trip(std::path::Path::new(&root), &scene);
+    println!("{n} graph systems through script text; {} do not survive", bad.len());
     for b in &bad {
         println!("  {b}");
     }
     assert!(bad.is_empty(), "{} systems change in the script text and back", bad.len());
+}
+
+/// The same for every example the repository ships (a hundred and more systems in 70 scenes: the statements and operators that only some of them use).
+#[test]
+fn every_system_of_every_example_survives_the_trip_through_script_text() {
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut scenes = Vec::new();
+    crate::scene_roundtrip_tests::scenes_under(&repo.join("examples"), &mut scenes);
+    let (mut systems, mut bad) = (0, Vec::new());
+    for path in &scenes {
+        let rel = path.strip_prefix(&repo).unwrap().to_string_lossy().replace('\\', "/");
+        let (n, scene_bad) = script_trip(&repo, &rel);
+        systems += n;
+        bad.extend(scene_bad.into_iter().map(|b| format!("{rel}: {b}")));
+    }
+    assert!(systems > 100, "only {systems} graph systems found in the examples");
+    assert!(bad.is_empty(), "{} of {systems} systems change in the script text and back:\n{}", bad.len(), bad.join("\n"));
 }
 
 /// A real scene saved and loaded again is the same world: `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-api real_scene_saves -- --ignored --nocapture`.

@@ -4,7 +4,7 @@ use crate::Engine;
 use lunaris_json::{parse, Json};
 use std::path::{Path, PathBuf};
 
-fn scenes_under(dir: &Path, out: &mut Vec<PathBuf>) {
+pub(crate) fn scenes_under(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(rd) = std::fs::read_dir(dir) else { return };
     let mut entries: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
     entries.sort();

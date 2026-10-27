@@ -93,6 +93,17 @@ fn file_exists(root: &Path, rel: &str) -> bool {
     lunaris_json::safe_relative(rel).is_ok_and(|norm| root.join(norm).is_file())
 }
 
+impl Engine {
+    /// `hint`, and when the missing file `name` is there next to the scene that was loaded, the way to open that scene: a world that a generator wrote into a folder of its own names its files from that folder, and `--root` on the folder is how it is meant to be opened.
+    fn with_scene_folder_hint(&self, name: &str, hint: &str) -> String {
+        let Some((dir, _)) = self.scene_path.as_deref().and_then(|p| p.rsplit_once('/')) else { return hint.to_string() };
+        if dir.is_empty() || !file_exists(&self.root, &format!("{dir}/{name}")) {
+            return hint.to_string();
+        }
+        format!("{hint}; `{dir}/{name}` exists: this scene names its files from its own folder, so open it with `--root {dir}` (or write `{dir}/{name}`)")
+    }
+}
+
 /// How many cells round one anchor a `ProcGrid` may look at before `check` says so.
 const MAX_GRID_WINDOW: f32 = 2500.0;
 
@@ -129,7 +140,8 @@ impl Engine {
                     problems.add("error", Some(uid), "Terrain.heightmap is empty".into(), "name a greyscale PNG of the workspace (16 bits is best); `files` lists the pictures");
                 } else if !self.sim.heightfields.contains_key(&name) {
                     let why = self.sim.terrain_errors.get(&name).cloned().unwrap_or_else(|| "it has not been read".to_string());
-                    problems.add("error", Some(uid), format!("the heightmap `{name}` could not be used: {why}"), "a greyscale PNG (8 or 16 bits, not interlaced) inside the workspace folder");
+                    let hint = self.with_scene_folder_hint(&name, "a greyscale PNG (8 or 16 bits, not interlaced) inside the workspace folder");
+                    problems.add("error", Some(uid), format!("the heightmap `{name}` could not be used: {why}"), &hint);
                 }
             }
         }
@@ -1866,7 +1878,8 @@ impl Engine {
                 if !lunaris_render::is_model_name(mesh) {
                     problems.add("error", Some(*uid), format!("unknown mesh `{mesh}`"), "built-ins: cube, sphere, plane, cylinder, quad; models end in .glb or .gltf");
                 } else if !file_exists(&root, mesh) {
-                    problems.add("error", Some(*uid), format!("the model file `{mesh}` is not in the workspace"), "paths are relative to the workspace folder");
+                    let hint = self.with_scene_folder_hint(mesh, "paths are relative to the workspace folder");
+                    problems.add("error", Some(*uid), format!("the model file `{mesh}` is not in the workspace"), &hint);
                 }
             }
         }
@@ -1882,7 +1895,8 @@ impl Engine {
         }
         for (uid, tex) in &mesh_textures {
             if !texture_ok(tex) {
-                problems.add("error", Some(*uid), format!("the mesh texture `{tex}` was not found"), "use checker, gradient, one of the materials (grass, dirt, stone, bricks, wood, sand, concrete, tiles, metal) or a PNG path inside the workspace");
+                let hint = self.with_scene_folder_hint(tex, "use checker, gradient, one of the materials (grass, dirt, stone, bricks, wood, sand, concrete, tiles, metal) or a PNG path inside the workspace");
+                problems.add("error", Some(*uid), format!("the mesh texture `{tex}` was not found"), &hint);
             }
         }
         // a `view:UID` that names nothing that draws a view is a picture that never comes
@@ -1901,7 +1915,8 @@ impl Engine {
                 problems.add("error", Some(*uid), "has a Sprite but no Transform, so it is never drawn".into(), "add a Transform");
             }
             if !texture_ok(tex) {
-                problems.add("error", Some(*uid), format!("the texture `{tex}` was not found"), "use circle, ring, checker, gradient, one of the materials (grass, dirt, stone, bricks, wood, sand, concrete, tiles, metal) or a PNG path inside the workspace");
+                let hint = self.with_scene_folder_hint(tex, "use circle, ring, checker, gradient, one of the materials (grass, dirt, stone, bricks, wood, sand, concrete, tiles, metal) or a PNG path inside the workspace");
+                problems.add("error", Some(*uid), format!("the texture `{tex}` was not found"), &hint);
             }
         }
         for (uid, m, tex, data) in &tilemaps {
@@ -1909,7 +1924,8 @@ impl Engine {
                 problems.add("error", Some(*uid), "has a Tilemap but no Transform, so it is never drawn".into(), "add a Transform");
             }
             if !texture_ok(tex) {
-                problems.add("error", Some(*uid), format!("the tileset `{tex}` was not found"), "use a PNG path inside the workspace");
+                let hint = self.with_scene_folder_hint(tex, "use a PNG path inside the workspace");
+                problems.add("error", Some(*uid), format!("the tileset `{tex}` was not found"), &hint);
             }
             if m.sheet[0] == 0 || m.sheet[1] == 0 || m.size[0] == 0 || m.size[1] == 0 {
                 problems.add("error", Some(*uid), "a Tilemap's sheet and size need at least 1 in each direction".into(), "");
