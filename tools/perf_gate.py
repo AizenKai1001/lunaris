@@ -89,7 +89,11 @@ def parse_studio(text):
 
 
 def run_studio(cmd):
-    out = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    out = subprocess.run(cmd, capture_output=True, text=True)
+    if out.returncode != 0:
+        # the test did not build or failed: say why (the end of what it printed) instead of a bare traceback
+        print("\n".join((out.stdout + "\n" + out.stderr).strip().splitlines()[-25:]))
+        sys.exit(f"perf gate (editor): `{' '.join(cmd)}` exited with {out.returncode}")
     return parse_studio(out.stdout + "\n" + out.stderr)
 
 
