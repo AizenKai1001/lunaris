@@ -80,6 +80,10 @@ mod mesh_tests;
 #[cfg(test)]
 mod saves_tests;
 #[cfg(test)]
+mod format_fuzz_tests;
+#[cfg(test)]
+mod script_fuzz_tests;
+#[cfg(test)]
 mod scene_folder_hint_tests;
 #[cfg(test)]
 mod scene_fuzz_tests;
