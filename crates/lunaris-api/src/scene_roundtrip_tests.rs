@@ -97,3 +97,52 @@ fn every_example_scene_check_findings() {
     }
     println!("{} scenes: {errors} errors, {warnings} warnings, {infos} notes", scenes.len());
 }
+
+/// How long each example takes to load, to check and to save (the slowest first): where scene loading is slow, which a small machine feels first. Ignored: it prints a table.
+/// `cargo test --release -p lunaris-api every_example_scene_load_times -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn every_example_scene_load_times() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut scenes = Vec::new();
+    scenes_under(&repo.join("examples"), &mut scenes);
+    let ms = |t: std::time::Instant| t.elapsed().as_secs_f64() * 1e3;
+    let mut rows: Vec<(f64, String)> = Vec::new();
+    for path in &scenes {
+        let rel = path.strip_prefix(&repo).unwrap().to_string_lossy().replace('\\', "/");
+        let bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+        let mut e = Engine::new(1, &repo);
+        let t = std::time::Instant::now();
+        if e.call("load_scene", &Json::obj([("path", Json::str(rel.clone()))])).is_err() {
+            continue;
+        }
+        let load = ms(t);
+        let n = e.sim.world.len();
+        let t = std::time::Instant::now();
+        let _ = e.call("check", &Json::Null);
+        let check = ms(t);
+        let t = std::time::Instant::now();
+        let text = e.call("save_scene", &Json::Null).unwrap().to_string_pretty().unwrap();
+        let save = ms(t);
+        rows.push((load, format!("{rel}: {n} entities, {} KB file, load {load:.1} ms, check {check:.1} ms, save {save:.1} ms ({} KB)", bytes / 1024, text.len() / 1024)));
+    }
+    rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    for (_, r) in rows.iter().take(25) {
+        println!("{r}");
+    }
+}
+
+/// What `check` costs on one scene, run again and again (so that a profiler can look at it): `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-api check_cost -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn check_cost_on_a_big_scene() {
+    let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
+    let mut e = Engine::new(1, Path::new(&root));
+    e.call("load_scene", &Json::obj([("path", Json::str(scene))])).unwrap();
+    let runs: usize = std::env::var("LUNARIS_RUNS").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
+    let t = std::time::Instant::now();
+    for _ in 0..runs {
+        let _ = e.call("check", &Json::Null).unwrap();
+    }
+    println!("check: {:.1} ms each over {runs} runs ({} entities)", t.elapsed().as_secs_f64() * 1e3 / runs as f64, e.sim.world.len());
+}

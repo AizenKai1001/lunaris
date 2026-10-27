@@ -36,6 +36,9 @@ fn fbm(seed: u64, x: f32, z: f32, salt: u64) -> f32 {
     sum / 0.9375
 }
 
+/// The narrowest lot a house is built on (the widths a house is given start here): a house is set back with a gap of 2.2 to 3.2 m at each side, and a narrower one has no room for its floor plan.
+pub(crate) const HOUSE_MIN_WIDTH: f32 = 13.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LandUse {
     Downtown,
@@ -289,6 +292,10 @@ impl Plan {
                 }
                 if kind == Kind::Tower && w < 22.0 {
                     kind = Kind::Masonry;
+                }
+                // the last lot of a strip is what is left of it: a house there is a gap, a few metres of house and a gap, with no room for a floor plan inside
+                if kind == Kind::House && w < HOUSE_MIN_WIDTH {
+                    kind = Kind::Shophouse;
                 }
                 // a skyscraper needs a lot it can stand on: wide enough, and deep enough for its podium and its tiers
                 if kind == Kind::Skyscraper && (w < 24.0 || d < 22.0) {

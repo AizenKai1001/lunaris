@@ -190,6 +190,12 @@ fn clean_name(raw: Option<&str>) -> String {
     }
 }
 
+/// How far a spectator (or a player coming back) is told that the game is complete: the frontier, but never past the tick the game ends on. The frontier moves in jumps and can stand a tick or two beyond the
+/// limit when the game is over; a follower told that those ticks are complete plays them before it hears where the game ended (`bye`), and ends on another tick than everybody else.
+fn told_to_followers(released: u64, max_ticks: Option<u64>) -> u64 {
+    max_ticks.map_or(released, |m| released.min(m))
+}
+
 pub(crate) fn run(listener: TcpListener, cfg: &HostConfig) -> Result<HostReport, String> {
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
     let (tx, rx) = mpsc::channel::<Ev>();
@@ -972,7 +978,7 @@ impl<'a> Host2<'a> {
     // ------------------------------------------------------------------------------------------ spectators and returning players
     /// Send a spectator, or a returning player, the next part of the log (as much as its queue takes, up to `limit` bytes waiting).
     fn pump(&mut self, id: u64, limit: usize) {
-        let released = self.released;
+        let released = told_to_followers(self.released, self.cfg.max_ticks);
         let log_first = self.log_first;
         let end = log_first + self.log.len() as u64;
         let mut failed = false;
@@ -1004,7 +1010,7 @@ impl<'a> Host2<'a> {
                             i += 1;
                         }
                         // the ticks below the next change are complete (they had no changes), unless this chunk ends in the middle of a tick
-                        let upto = if i < end { self.log[(i - log_first) as usize].0.tick } else { released };
+                        let upto = (if i < end { self.log[(i - log_first) as usize].0.tick } else { released }).min(released);
                         let msg = Json::obj([("log", Json::obj([("n", Json::from(chunks as i64)), ("upto", Json::from(upto as i64)), ("inputs", Json::Arr(inputs))]))]);
                         chunks += 1;
                         if !c.link.send(&msg) {
@@ -1147,5 +1153,19 @@ impl<'a> Host2<'a> {
         self.report.ended = reason;
         self.report.log = InputLog { entries: self.log.iter().filter(|(e, _)| e.tick < t).map(|(e, _)| e.clone()).collect(), complete: self.log_first == 0 };
         std::mem::take(&mut self.report)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::told_to_followers;
+
+    #[test]
+    fn a_follower_is_never_told_that_a_tick_after_the_end_of_the_game_is_complete() {
+        // the frontier stood at 602 when a game limited to 600 ticks was over
+        assert_eq!(told_to_followers(602, Some(600)), 600);
+        assert_eq!(told_to_followers(600, Some(600)), 600);
+        assert_eq!(told_to_followers(150, Some(600)), 150, "while the game is on, everything the frontier says");
+        assert_eq!(told_to_followers(9_999, None), 9_999, "a game with no limit has no end to hold back from");
     }
 }

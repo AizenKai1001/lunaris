@@ -220,6 +220,10 @@ fn pick_lot(rng: &mut Rng, mix: &[f32; 7], depth: f32, left: f32) -> (Kind, f32,
     if kind == Kind::Skyscraper && (w < 24.0 || d < 22.0) {
         kind = if w >= 22.0 { Kind::Tower } else { Kind::Masonry };
     }
+    // the last lot of a strip is what is left of it: a house on a narrower one has no room for its floor plan
+    if kind == Kind::House && w < crate::plan::HOUSE_MIN_WIDTH {
+        kind = Kind::Shophouse;
+    }
     (kind, d, w)
 }
 

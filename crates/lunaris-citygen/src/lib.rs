@@ -24,3 +24,6 @@ pub mod export;
 pub mod polar;
 pub mod serverside;
 pub mod shell;
+
+#[cfg(test)]
+mod lot_tests;
