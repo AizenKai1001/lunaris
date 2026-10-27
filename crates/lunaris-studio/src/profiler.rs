@@ -4,8 +4,10 @@
 use crate::state::{Mode, Studio};
 use crate::theme;
 use eframe::egui::{self, Align2, CornerRadius, FontId, RichText, Sense, Shape, Stroke, Vec2};
+use lunaris_json::Json;
 use lunaris_sim::sim::StepProfile;
 use lunaris_sim::Sim;
+use std::path::Path;
 
 /// Ticks in one window of measurement (one second of game time at 60 ticks a second).
 pub const WINDOW_TICKS: u64 = 60;
@@ -62,6 +64,72 @@ impl Window {
     pub fn headroom(&self, budget_ms: f64) -> f64 {
         budget_ms / self.avg_ms.max(1e-6)
     }
+
+    /// The window as a capture file: what a later run is compared with.
+    pub fn to_json(&self) -> Json {
+        Json::obj([
+            ("lunaris_profile", Json::from(1)),
+            ("ticks", Json::from(self.ticks as i64)),
+            ("avg_ms", Json::from(self.avg_ms)),
+            ("max_ms", Json::from(self.max_ms)),
+            ("entities", Json::from(self.entities as i64)),
+            ("stages", Json::arr(self.rows.iter().map(|r| Json::obj([("name", Json::str(r.name.clone())), ("avg_ms", Json::from(r.avg_ms)), ("max_ms", Json::from(r.max_ms)), ("share", Json::from(r.share))])))),
+        ])
+    }
+
+    /// A window from a capture file; None when it is not one.
+    pub fn from_json(j: &Json) -> Option<Window> {
+        j.get("lunaris_profile")?;
+        let num = |v: &Json, k: &str| v.get(k).and_then(|x| x.as_f64());
+        let rows = j
+            .get("stages")?
+            .as_array()?
+            .iter()
+            .filter_map(|r| Some(Row { name: r.get("name")?.as_str()?.to_string(), avg_ms: num(r, "avg_ms")?, max_ms: num(r, "max_ms").unwrap_or(0.0), share: num(r, "share").unwrap_or(0.0) }))
+            .collect();
+        Some(Window { ticks: num(j, "ticks")? as u64, avg_ms: num(j, "avg_ms")?, max_ms: num(j, "max_ms").unwrap_or(0.0), entities: num(j, "entities").unwrap_or(0.0) as usize, rows })
+    }
+
+    /// How much more (positive) or less (negative) each stage of this window takes a tick than in `base`, by name; a stage the base never ran counts from nothing.
+    pub fn deltas(&self, base: &Window) -> Vec<(String, f64)> {
+        let before: std::collections::HashMap<&str, f64> = base.rows.iter().map(|r| (r.name.as_str(), r.avg_ms)).collect();
+        self.rows.iter().map(|r| (r.name.clone(), r.avg_ms - before.get(r.name.as_str()).copied().unwrap_or(0.0))).collect()
+    }
+}
+
+/// The folder of the workspace the captures are kept in.
+pub const CAPTURES: &str = "profiles";
+
+/// Write a window to `ROOT/profiles/profile-<seconds>.json` (the folder is made); the name of the file.
+pub fn save_capture(w: &Window, root: &Path) -> Result<String, String> {
+    let dir = root.join(CAPTURES);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot make {CAPTURES}: {e}"))?;
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let mut name = format!("profile-{secs}.json");
+    let mut n = 1;
+    while dir.join(&name).exists() {
+        n += 1;
+        name = format!("profile-{secs}-{n}.json");
+    }
+    let text = w.to_json().to_string_pretty().map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(&name), text).map_err(|e| format!("cannot write {name}: {e}"))?;
+    Ok(name)
+}
+
+/// The captures of the workspace, newest name last.
+pub fn list_captures(root: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(root.join(CAPTURES)).into_iter().flatten().flatten().filter_map(|e| e.file_name().into_string().ok()).filter(|n| n.starts_with("profile-") && n.ends_with(".json")).collect();
+    names.sort();
+    names
+}
+
+/// A capture of the workspace, by file name.
+pub fn load_capture(root: &Path, name: &str) -> Option<Window> {
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return None;
+    }
+    let text = std::fs::read_to_string(root.join(CAPTURES).join(name)).ok()?;
+    Window::from_json(&lunaris_json::parse(&text).ok()?)
 }
 
 #[derive(Default)]
@@ -71,6 +139,9 @@ pub struct ProfilerUi {
     pub history: Vec<f32>,
     pub frozen: bool,
     filter: String,
+    /// The capture the stages are compared with (its file name and what it holds), and the captures in the workspace.
+    pub baseline: Option<(String, Window)>,
+    captures: Vec<String>,
 }
 
 impl ProfilerUi {
@@ -110,6 +181,33 @@ impl ProfilerUi {
             }
             ui.toggle_value(&mut self.frozen, "Freeze").on_hover_text("Stop taking new measurements, to read the ones on screen");
             ui.add(egui::TextEdit::singleline(&mut self.filter).hint_text("Filter stages").desired_width(160.0));
+            // captures: keep the window on screen as a file, and compare the stages with an earlier one (did the change help?)
+            let root = studio.opts.root.clone();
+            if ui.add_enabled(self.last.is_some(), egui::Button::new("Save capture")).on_hover_text("Write this window of measurements to profiles/ in the workspace, to compare a later run with").clicked() {
+                if let Some(w) = &self.last {
+                    match save_capture(w, &root) {
+                        Ok(name) => {
+                            studio.toast(format!("Saved {CAPTURES}/{name}"), false);
+                            self.captures = list_captures(&root);
+                        }
+                        Err(e) => studio.toast(e, true),
+                    }
+                }
+            }
+            if self.captures.is_empty() {
+                self.captures = list_captures(&root);
+            }
+            let label = self.baseline.as_ref().map_or("Compare with...".to_string(), |(n, _)| format!("vs {n}"));
+            egui::ComboBox::from_id_salt("profiler-baseline").selected_text(label).width(190.0).show_ui(ui, |ui| {
+                if ui.selectable_label(self.baseline.is_none(), "(no comparison)").clicked() {
+                    self.baseline = None;
+                }
+                for name in self.captures.clone().iter().rev() {
+                    if ui.selectable_label(self.baseline.as_ref().is_some_and(|(n, _)| n == name), name).clicked() {
+                        self.baseline = load_capture(&root, name).map(|w| (name.clone(), w));
+                    }
+                }
+            });
             match studio.mode {
                 Mode::Edit => ui.label(RichText::new("Press Play: the game is timed while it runs").small().color(theme::TEXT_DIM)),
                 Mode::Paused => ui.label(RichText::new("Paused").small().color(theme::TEXT_DIM)),
@@ -133,6 +231,10 @@ impl ProfilerUi {
             head(ui, "of a 60 Hz tick", format!("{:.1}%", load * 100.0), theme::TEXT);
             head(ui, "headroom", format!("{:.0}x", w.headroom(budget_ms)), theme::TEXT);
             head(ui, "entities", w.entities.to_string(), theme::TEXT);
+            if let Some((_, b)) = &self.baseline {
+                let d = w.avg_ms - b.avg_ms;
+                head(ui, "vs capture", format!("{d:+.3} ms ({:+.0}%)", d / b.avg_ms.max(1e-9) * 100.0), if d > b.avg_ms * 0.03 { theme::ERR } else if d < -b.avg_ms * 0.03 { theme::OK } else { theme::TEXT });
+            }
         });
         // history
         let graph_h = 46.0;
@@ -185,6 +287,7 @@ impl ProfilerUi {
         // one bar per stage
         let filter = self.filter.to_lowercase();
         let rows: Vec<&Row> = w.rows.iter().filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter)).collect();
+        let deltas: std::collections::HashMap<String, f64> = self.baseline.as_ref().map(|(_, b)| w.deltas(b).into_iter().collect()).unwrap_or_default();
         let widest = rows.iter().map(|r| r.avg_ms).fold(1e-9f64, f64::max);
         egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("profiler-rows").show_rows(ui, 18.0, rows.len(), |ui, range| {
             ui.spacing_mut().item_spacing.y = 0.0;
@@ -195,7 +298,8 @@ impl ProfilerUi {
                 let group = r.name.contains("(all)");
                 let name_w = 260.0f32.min(rect.width() * 0.4);
                 let bar_x0 = rect.min.x + name_w + 6.0;
-                let bar_w = (rect.width() - name_w - 180.0).max(40.0);
+                // (room at the right for the change against a capture, when there is one)
+                let bar_w = (rect.width() - name_w - 180.0 - if deltas.is_empty() { 0.0 } else { 100.0 }).max(40.0);
                 let full = (r.avg_ms / widest) as f32;
                 let color = if group { theme::TEXT_DIM } else if r.share > 40.0 { theme::WARN } else { theme::BLUE };
                 ui.painter().rect_filled(egui::Rect::from_min_size(egui::pos2(bar_x0, rect.min.y + 3.0), Vec2::new((bar_w * full).max(1.0), 12.0)), CornerRadius::ZERO, color.gamma_multiply(0.85));
@@ -206,7 +310,13 @@ impl ProfilerUi {
                     FontId::proportional(12.0),
                     if group { theme::TEXT_DIM } else { theme::TEXT },
                 );
-                ui.painter().text(egui::pos2(bar_x0 + bar_w + 8.0, rect.center().y), Align2::LEFT_CENTER, format!("{:.4} ms   {:.1}%   max {:.3}", r.avg_ms, r.share, r.max_ms), FontId::monospace(11.0), theme::TEXT);
+                let at = egui::pos2(bar_x0 + bar_w + 8.0, rect.center().y);
+                let text = ui.painter().text(at, Align2::LEFT_CENTER, format!("{:.4} ms   {:.1}%   max {:.3}", r.avg_ms, r.share, r.max_ms), FontId::monospace(11.0), theme::TEXT);
+                if let Some(d) = deltas.get(&r.name) {
+                    // against the capture: red where this run takes more, green where it takes less (a change under a hundredth of a millisecond is noise)
+                    let color = if *d > 0.01 { theme::ERR } else if *d < -0.01 { theme::OK } else { theme::TEXT_DIM };
+                    ui.painter().text(egui::pos2(text.max.x + 10.0, rect.center().y), Align2::LEFT_CENTER, format!("{d:+.4} ms"), FontId::monospace(11.0), color);
+                }
             }
         });
     }
@@ -236,6 +346,30 @@ mod tests {
         assert_eq!(w.entities, 500);
         // 1.67 ms of a 16.67 ms tick: ten times the headroom
         assert!((w.headroom(1000.0 / 60.0) - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_window_goes_to_a_capture_file_and_comes_back_and_a_later_window_is_compared_with_it() {
+        let before = Window::from_profile(&profile(&[("physics", 240.0, 9.0), ("movement", 60.0, 2.0)], 60, 300.0, 12.0), 100);
+        let dir = std::env::temp_dir().join(format!("lunaris-profiler-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let name = save_capture(&before, &dir).unwrap();
+        let second = save_capture(&before, &dir).unwrap();
+        assert_ne!(name, second, "two captures in the same second keep both");
+        assert_eq!(list_captures(&dir), { let mut v = vec![name.clone(), second]; v.sort(); v });
+        let back = load_capture(&dir, &name).expect("a capture comes back");
+        assert_eq!((back.ticks, back.entities), (60, 100));
+        assert!((back.avg_ms - before.avg_ms).abs() < 1e-9 && (back.max_ms - 12.0).abs() < 1e-9);
+        assert_eq!(back.rows, before.rows, "the stages, their averages, slowest and shares");
+        assert!(load_capture(&dir, "../etc.json").is_none() && load_capture(&dir, "nothing.json").is_none(), "a name outside the folder or a file that is not there is none");
+        // a later run: physics is faster, a stage is new
+        let after = Window::from_profile(&profile(&[("physics", 180.0, 7.0), ("movement", 60.0, 2.0), ("fx", 30.0, 1.0)], 60, 270.0, 9.0), 100);
+        let d: std::collections::HashMap<String, f64> = after.deltas(&back).into_iter().collect();
+        assert!((d["physics"] + 1.0).abs() < 1e-9, "a millisecond a tick less: {d:?}");
+        assert!(d["movement"].abs() < 1e-9);
+        assert!((d["fx"] - 0.5).abs() < 1e-9, "a stage the capture never ran counts from nothing");
+        assert!(Window::from_json(&lunaris_json::parse(r#"{"stages":[]}"#).unwrap()).is_none(), "a file that is not a capture is not one");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

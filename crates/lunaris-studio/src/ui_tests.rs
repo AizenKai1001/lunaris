@@ -206,6 +206,46 @@ fn every_panel_in_a_small_window_for_looking_at() {
 }
 
 #[test]
+fn the_top_front_and_right_views_look_straight_along_an_axis_and_a_click_still_finds_the_box() {
+    use crate::viewport::Projection;
+    let mut h = Harness::new();
+    let box_uid = h.uid("Box");
+    h.app.viewport.projection = Projection::Top;
+    h.app.viewport.target = [0.0, 1.0, 0.0];
+    h.app.viewport.ortho_h = 10.0;
+    h.frames(3);
+    let o = h.screen_of("Box", [0.0, 1.0, 0.0]);
+    let (px, pz) = (h.app.viewport.project([2.0, 1.0, 0.0]).unwrap(), h.app.viewport.project([0.0, 1.0, -2.0]).unwrap());
+    assert!(px.x > o.x + 10.0 && (px.y - o.y).abs() < 1.0, "top: +x is to the right: {o:?} {px:?}");
+    assert!(pz.y < o.y - 10.0 && (pz.x - o.x).abs() < 1.0, "top: -z is up the screen: {o:?} {pz:?}");
+    // there is no perspective: a thing higher up is not drawn bigger or off to one side
+    let high = h.app.viewport.project([2.0, 50.0, 0.0]).unwrap();
+    assert!((high.x - px.x).abs() < 0.5 && (high.y - px.y).abs() < 0.5, "{high:?} {px:?}");
+    // (the sun's icon is at the origin, over the middle of the box in this view: click near a corner)
+    let corner = h.app.viewport.project([0.4, 1.0, 0.4]).unwrap();
+    h.click(corner);
+    assert_eq!(h.app.studio.selection, Some(box_uid), "a click in the top view picks the box");
+    h.shoot("view_top");
+    h.app.viewport.projection = Projection::Front;
+    h.frames(3);
+    let o = h.screen_of("Box", [0.0, 1.0, 0.0]);
+    let (px, py) = (h.app.viewport.project([2.0, 1.0, 0.0]).unwrap(), h.app.viewport.project([0.0, 3.0, 0.0]).unwrap());
+    assert!(px.x > o.x + 10.0 && (px.y - o.y).abs() < 1.0, "front: +x is to the right");
+    assert!(py.y < o.y - 10.0 && (py.x - o.x).abs() < 1.0, "front: +y is up");
+    h.shoot("view_front");
+    h.app.viewport.projection = Projection::Right;
+    h.frames(3);
+    let o = h.screen_of("Box", [0.0, 1.0, 0.0]);
+    let pz = h.app.viewport.project([0.0, 1.0, -2.0]).unwrap();
+    assert!(pz.x > o.x + 10.0, "right: -z is to the right of the screen: {o:?} {pz:?}");
+    // a bookmark brings the view back as it was
+    h.app.viewport.set_bookmark(0);
+    h.app.viewport.projection = Projection::Perspective;
+    h.app.viewport.go_bookmark(0);
+    assert_eq!(h.app.viewport.projection, Projection::Right);
+}
+
+#[test]
 fn select_what_uses_this_finds_the_entities_that_name_a_file_in_any_of_the_fields_that_do() {
     let mut h = Harness::new();
     let spawn = |h: &mut Harness, comps: &str| h.app.studio.call("spawn", j(&format!(r#"{{"components":{comps}}}"#))).unwrap();
@@ -261,6 +301,22 @@ fn the_streaming_overlay_reads_the_zones_and_says_how_many_are_loaded() {
     assert_eq!(h.app.viewport.zones.zones.len(), 3);
     assert_eq!(h.app.viewport.zones.summary(), "zones 1 of 3 loaded");
     h.shoot("streaming_overlay");
+}
+
+#[test]
+fn the_streaming_tab_lists_the_zones_without_the_overlay_loaded_first() {
+    let mut h = Harness::new();
+    h.app.studio.call("define_prefab", j(r#"{"name":"block","components":{"Transform":{}}}"#)).unwrap();
+    for (name, x, loaded) in [("Market", 0, false), ("Docks", 60, true), ("North", 120, false)] {
+        h.app.studio.call("spawn", j(&format!(r#"{{"components":{{"Name":{{"value":"{name}"}},"Transform":{{"pos":[{x},0,0]}},"StreamZone":{{"prefab":"block","radius":30,"loaded":{loaded}}}}}}}"#))).unwrap();
+    }
+    assert!(!h.app.viewport.streaming, "the overlay is off");
+    h.app.studio.tab = crate::state::BottomTab::Streaming;
+    h.frames(4);
+    assert_eq!(h.app.viewport.zones.zones.len(), 3, "the tab reads the zones itself");
+    let names: Vec<&str> = crate::streaming_ui::listed(&h.app.viewport.zones.zones, "", false, [0.0; 3]).iter().map(|z| z.name.as_str()).collect();
+    assert_eq!(names, ["Docks", "Market", "North"], "the loaded one first, then the nearest");
+    h.shoot("streaming_tab");
 }
 
 #[test]
@@ -1681,6 +1737,17 @@ fn screenshots_of_the_editor_for_looking_at() {
     };
     h.frames(4);
     h.shoot("13_profiler_while_playing");
+    // compared with a capture made before some change: the stages that cost less are green, those that cost more red
+    if let Some(w) = h.app.profiler.last.clone() {
+        let mut base = w.clone();
+        base.avg_ms *= 1.3;
+        for (k, r) in base.rows.iter_mut().enumerate() {
+            r.avg_ms *= if k % 3 == 0 { 1.6 } else if k % 3 == 1 { 0.8 } else { 1.0 };
+        }
+        h.app.profiler.baseline = Some(("profile-1792000000.json".to_string(), base));
+        h.frames(3);
+        h.shoot("13d_profiler_compared_with_a_capture");
+    }
 }
 
 #[test]

@@ -121,6 +121,48 @@ impl GpuStats {
     }
 }
 
+/// How the scene view looks at the world: through a perspective lens, or straight along an axis with no perspective (Unreal's Top, Front and Side views, for placing things exactly).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Projection {
+    Perspective,
+    Top,
+    Bottom,
+    Front,
+    Back,
+    Left,
+    Right,
+}
+
+impl Projection {
+    pub const ALL: [Projection; 7] = [Projection::Perspective, Projection::Top, Projection::Bottom, Projection::Front, Projection::Back, Projection::Left, Projection::Right];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Projection::Perspective => "Perspective",
+            Projection::Top => "Top",
+            Projection::Bottom => "Bottom",
+            Projection::Front => "Front",
+            Projection::Back => "Back",
+            Projection::Left => "Left",
+            Projection::Right => "Right",
+        }
+    }
+
+    /// The direction an orthographic view looks and the direction that is up on the screen; None for the perspective view. Top looks down with -z up the screen, Front looks along -z (from the +z side, x to the right, as the 2D view does),
+    /// Right looks along -x (from the +x side), and Bottom, Back and Left are the same seen from the other side.
+    pub fn axes(self) -> Option<(V3, V3)> {
+        match self {
+            Projection::Perspective => None,
+            Projection::Top => Some(([0.0, -1.0, 0.0], [0.0, 0.0, -1.0])),
+            Projection::Bottom => Some(([0.0, 1.0, 0.0], [0.0, 0.0, 1.0])),
+            Projection::Front => Some(([0.0, 0.0, -1.0], [0.0, 1.0, 0.0])),
+            Projection::Back => Some(([0.0, 0.0, 1.0], [0.0, 1.0, 0.0])),
+            Projection::Right => Some(([-1.0, 0.0, 0.0], [0.0, 1.0, 0.0])),
+            Projection::Left => Some(([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])),
+        }
+    }
+}
+
 /// A saved place of the scene camera (Unreal's camera bookmarks): the orbit view and the 2D view both, so a bookmark returns to whichever one is showing.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Bookmark {
@@ -130,6 +172,7 @@ pub struct Bookmark {
     pub target: V3,
     pub ortho_h: f32,
     pub center2: [f32; 2],
+    pub projection: Projection,
 }
 
 /// How many bookmarks the keys 1 to 9 reach.
@@ -144,6 +187,8 @@ pub struct Viewport {
     pub target: V3,
     pub ortho_h: f32,
     pub center2: [f32; 2],
+    /// Perspective, or one of the orthographic views of the scene (they use `target` and `ortho_h`; `yaw` and `pitch` are what the perspective view comes back to).
+    pub projection: Projection,
     /// Ctrl+1 to Ctrl+9 save the view of the scene camera, 1 to 9 return to it (kept while the editor is open).
     pub bookmarks: [Option<Bookmark>; BOOKMARKS],
     renderer: Option<Result<GpuRenderer, String>>,
@@ -202,6 +247,7 @@ impl Viewport {
             target: [0.0, 1.0, 0.0],
             ortho_h: 12.0,
             center2: [0.0, 0.0],
+            projection: Projection::Perspective,
             bookmarks: [None; BOOKMARKS],
             renderer: None,
             textures: TextureCache::new(Some(root)),
@@ -270,7 +316,7 @@ impl Viewport {
         if n >= BOOKMARKS || self.kind == ViewKind::Game {
             return false;
         }
-        self.bookmarks[n] = Some(Bookmark { yaw: self.yaw, pitch: self.pitch, dist: self.dist, target: self.target, ortho_h: self.ortho_h, center2: self.center2 });
+        self.bookmarks[n] = Some(Bookmark { yaw: self.yaw, pitch: self.pitch, dist: self.dist, target: self.target, ortho_h: self.ortho_h, center2: self.center2, projection: self.projection });
         true
     }
 
@@ -280,7 +326,7 @@ impl Viewport {
         if self.kind == ViewKind::Game {
             return false;
         }
-        (self.yaw, self.pitch, self.dist, self.target, self.ortho_h, self.center2) = (b.yaw, b.pitch, b.dist, b.target, b.ortho_h, b.center2);
+        (self.yaw, self.pitch, self.dist, self.target, self.ortho_h, self.center2, self.projection) = (b.yaw, b.pitch, b.dist, b.target, b.ortho_h, b.center2, b.projection);
         self.forced = true;
         true
     }
@@ -306,6 +352,11 @@ impl Viewport {
     fn basis(&self, aspect: f32) -> Cam {
         match self.kind {
             ViewKind::Scene2D => Cam { eye: [self.center2[0], self.center2[1], 100.0], fwd: [0.0, 0.0, -1.0], right: [1.0, 0.0, 0.0], up: [0.0, 1.0, 0.0], tan: 0.5, aspect, ortho: Some(self.ortho_h) },
+            ViewKind::Scene if self.projection != Projection::Perspective => {
+                let (fwd, up) = self.projection.axes().expect("an orthographic view has axes");
+                // (far enough back to see everything of a big world along the axis: the picture's far plane is 4,000 m)
+                Cam { eye: sub(self.target, mul(fwd, ORTHO_EYE_DISTANCE)), fwd, right: cross(fwd, up), up, tan: 0.5, aspect, ortho: Some(self.ortho_h) }
+            }
             _ => {
                 let (sy, cy) = self.yaw.sin_cos();
                 let (sp, cp) = self.pitch.sin_cos();
@@ -450,6 +501,24 @@ impl Viewport {
                     });
                 }
             });
+            if self.kind == ViewKind::Scene {
+                let before = self.projection;
+                chrome::drop_down(ui, self.projection.label(), |ui| {
+                    for p in Projection::ALL {
+                        if ui.selectable_label(self.projection == p, p.label()).clicked() {
+                            self.projection = p;
+                            ui.close();
+                        }
+                    }
+                });
+                if before == Projection::Perspective && self.projection != Projection::Perspective {
+                    // (the same picture to begin with: the height the lens saw at the distance of the target)
+                    self.ortho_h = (2.0 * self.dist * (60.0f32.to_radians() * 0.5).tan()).clamp(0.5, 4000.0);
+                    self.forced = true;
+                } else if before != self.projection {
+                    self.forced = true;
+                }
+            }
             chrome::rule(ui);
             let two_d = self.kind == ViewKind::Scene2D;
             if chrome::pill(ui, "2D", two_d, false).clicked() && self.kind != ViewKind::Game {
@@ -822,16 +891,18 @@ impl Viewport {
                 self.center2[1] += delta.y * per_px;
             }
         } else if self.kind == ViewKind::Scene {
-            if orbit {
+            let flat = self.projection != Projection::Perspective;
+            // (an orthographic view has nothing to orbit: the button that orbits pans it)
+            if orbit && !flat {
                 self.yaw -= delta.x * 0.008;
                 self.pitch = (self.pitch + delta.y * 0.008).clamp(-1.5, 1.5);
             }
-            if pan {
-                let per_px = 2.0 * self.dist * cam.tan / rect.height().max(1.0);
+            if pan || (orbit && flat) {
+                let per_px = if flat { self.ortho_h } else { 2.0 * self.dist * cam.tan } / rect.height().max(1.0);
                 self.target = add(self.target, add(mul(cam.right, -delta.x * per_px), mul(cam.up, delta.y * per_px)));
             }
             // fly: with the right button held, the keys move the view
-            if resp.dragged_by(PointerButton::Secondary) {
+            if resp.dragged_by(PointerButton::Secondary) && !flat {
                 let (fwd, right, up) = ui.input(|i| {
                     let k = |key: Key| if i.key_down(key) { 1.0 } else { 0.0 };
                     (k(Key::W) - k(Key::S), k(Key::D) - k(Key::A), k(Key::E) - k(Key::Q))
@@ -848,7 +919,7 @@ impl Viewport {
         }
         if resp.hovered() {
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-            if scroll != 0.0 && resp.dragged_by(PointerButton::Secondary) && self.kind == ViewKind::Scene {
+            if scroll != 0.0 && resp.dragged_by(PointerButton::Secondary) && self.kind == ViewKind::Scene && self.projection == Projection::Perspective {
                 // flying: the wheel sets the speed, as in the other editors
                 self.fly_speed = fly_speed_after_scroll(self.fly_speed, scroll);
             } else if scroll != 0.0 {
@@ -1111,9 +1182,11 @@ impl Viewport {
         let (w, h) = (rect.width(), rect.height());
         let at = |p: [f32; 2]| Pos2::new(rect.min.x + p[0], rect.min.y + p[1]);
         // the ground grid
-        if self.grid && self.kind == ViewKind::Scene {
+        // (the ground grid is edge-on in the views from the side: only the perspective and the top and bottom views have it)
+        if self.grid && self.kind == ViewKind::Scene && matches!(self.projection, Projection::Perspective | Projection::Top | Projection::Bottom) {
             let mut step = 1.0f32;
-            while self.dist / step > 14.0 {
+            let extent = if self.projection == Projection::Perspective { self.dist } else { self.ortho_h };
+            while extent / step > 14.0 {
                 step *= 10.0;
             }
             let n = 20i32;
@@ -1167,7 +1240,7 @@ impl Viewport {
                 painter.circle_filled(tip, 8.0, axis.color());
                 painter.text(tip, Align2::CENTER_CENTER, match axis { Axis::X => "X", Axis::Y => "Y", Axis::Z => "Z" }, FontId::proportional(10.0), Color32::from_rgb(20, 20, 20));
             }
-            painter.text(origin + Vec2::new(0.0, 46.0), Align2::CENTER_CENTER, "< Persp", FontId::proportional(11.0), Color32::from_rgba_unmultiplied(220, 220, 225, 170));
+            painter.text(origin + Vec2::new(0.0, 46.0), Align2::CENTER_CENTER, format!("< {}", if self.projection == Projection::Perspective { "Persp" } else { self.projection.label() }), FontId::proportional(11.0), Color32::from_rgba_unmultiplied(220, 220, 225, 170));
         }
     }
 }
@@ -1177,8 +1250,11 @@ pub fn fly_speed_after_scroll(speed: f32, scroll: f32) -> f32 {
     (speed * (1.0 + scroll * 0.003).clamp(0.5, 2.0)).clamp(0.1, 10.0)
 }
 
-/// The scene toolbar is drawn in its short form (the switches under "Show", the snap steps under "Snap") when the view is narrower than this many points: the long form needs about 800.
-const NARROW_TOOLBAR: f32 = 880.0;
+/// The scene toolbar is drawn in its short form (the switches under "Show", the snap steps under "Snap") when the view is narrower than this many points: the long form needs about 870.
+const NARROW_TOOLBAR: f32 = 940.0;
+
+/// How far an orthographic view's eye is from its target, along the way it looks.
+const ORTHO_EYE_DISTANCE: f32 = 1000.0;
 
 fn snap_label(title: &str, unit: &str, value: f32) -> String {
     if value > 0.0 { format!("{title} {value}{unit}") } else { format!("{title} off") }
