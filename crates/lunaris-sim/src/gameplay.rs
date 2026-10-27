@@ -2442,6 +2442,17 @@ fn fx_clocks(world: &mut World, dt: f32) {
     });
 }
 
+/// Whether a toolkit updates in this step, and with how much time: the resource `resource` (`gameplay.every.perception`, `gameplay.every.flyagent`; a whole number, 1 or missing: every step) says it updates only every that many steps, so that a server whose
+/// machines do not need 60 decisions a second (Unreal's actor tick interval) pays for half of them with 2. The update that runs is given the time of all the steps it stood for (`every` times `dt`), so that what it adds up (timers, accelerations,
+/// awareness) comes out as it would have; `phase` puts toolkits in different steps so that they do not all run in the same one. A function of the tick and the resource, so it is the same in a replay.
+pub(crate) fn due(world: &World, resource: &str, tick: u64, dt: f32, phase: u64) -> Option<f32> {
+    let every = world.resource(resource).filter(|v| v.is_finite() && *v >= 1.0).map_or(1, |v| (v as u64).min(600));
+    if every == 1 {
+        return Some(dt);
+    }
+    (tick.wrapping_add(phase) % every == 0).then_some(dt * every as f32)
+}
+
 /// After the graph systems, navigation and characters: lifetimes run out, spawners spawn, the sun moves, sensors look, state machines react,
 /// tweens move, cameras follow. Events from the machines go to the script set's events.
 pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fields: &Terrains, meshes: &crate::meshcol::MeshStore, mut prof: Option<&mut crate::sim::StepProfile>) {
@@ -2498,9 +2509,13 @@ pub fn update(world: &mut World, scripts: &mut ScriptSet, tick: u64, dt: f32, fi
     part!("survival::update", crate::survival::update(world, dt, &mut flow_events));
     part!("health", health(world, dt, &mut flow_events));
     part!("stealth::update", crate::stealth::update(world, dt));
-    part!("perception::update", crate::perception::update(world, dt, fields, meshes, &mut flow_events));
+    if let Some(d) = due(world, "gameplay.every.perception", tick, dt, 0) {
+        part!("perception::update", crate::perception::update(world, d, fields, meshes, &mut flow_events));
+    }
     crate::flyagent::set_timing(prof.is_some());
-    part!("flyagent::update", crate::flyagent::update(world, dt, fields, meshes));
+    if let Some(d) = due(world, "gameplay.every.flyagent", tick, dt, 1) {
+        part!("flyagent::update", crate::flyagent::update(world, d, fields, meshes));
+    }
     if let Some(p) = prof.as_deref_mut() {
         for (k, ms) in crate::flyagent::take_ms().iter().enumerate() {
             if *ms > 0.0 {

@@ -65,6 +65,10 @@ selector
   act event patrol
 ```
 
+## How often it looks: `gameplay.every.perception`
+
+A server with hundreds of machines does not need sixty decisions a second from each (Unreal's actor tick interval): the resource `gameplay.every.perception` (a whole number; 1 or missing: every step) makes the whole `Perception` toolkit (sight, awareness, memory, the searchlights' sweep and their exposure) update only every that many steps, and `gameplay.every.flyagent` does the same for the flying machines (docs/DRONES.md). The update that runs is given the time of all the steps it stands for, so awareness fills and timers run out in the same time as before, and a machine that is due on odd steps and one that is due on even steps are staggered (perception on the steps where the tick is a multiple of the number, drones one step later) so that the work does not all land in one step. With 2 a machine notices up to one step later and a sweeping searchlight turns in bigger jumps; set it from `lunaris server --resources gameplay.every.perception=2,gameplay.every.flyagent=2` (the values are resources, so they are part of the state hash: the same game with other values is another game). Measured on the 300-bot city server (100 s, four runs in turn, both with `nav.cells_per_step=2000`): with 2 for both the step took **4.6 and 4.9 ms against 5.6 and 5.8 ms** (perception 0.27 and 0.29 ms against 0.60 and 0.62; drones 0.24 and 0.26 against 0.71 and 0.78), the tick 16.5 and 17.2 ms against 19.2 and 18.9, p99 22.6 and 23.7 ms against 25.5 and 27.4, steps over 10 ms 22 and 77 against 142 and 213, ticks over 33 ms 3 and 7 against 11 and 8. Tests `an_ai_that_looks_every_second_step_notices_in_the_same_time`, `a_drone_that_decides_every_second_step_changes_its_state_in_half_the_steps_and_arrives_all_the_same` and `a_toolkit_that_updates_every_few_steps_is_due_in_one_step_of_them_with_their_time_and_odd_values_mean_every_step`.
+
 ## Noise
 
 An AI hears a `Noisy {radius}` (metres it carries now; a game's script sets it every tick from what the entity is doing: footsteps by speed, a door, a crash) and every `Weapon` that fires, to that

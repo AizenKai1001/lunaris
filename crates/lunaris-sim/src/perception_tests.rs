@@ -294,3 +294,25 @@ fn the_examples_of_the_docs_work_a_behaviour_tree_on_the_state_and_footsteps_fro
     let r = |s: &Sim, uid: u64| s.world.get::<crate::components::Noisy>(s.world.entity(uid).unwrap()).unwrap().radius;
     assert_eq!((r(&s, 1), r(&s, 2)), (4.0, 14.0), "a walk is quiet, a sprint is loud");
 }
+
+#[test]
+fn an_ai_that_looks_every_second_step_notices_in_the_same_time() {
+    let mut times = Vec::new();
+    for every in [None, Some(2.0)] {
+        let mut s = Sim::new(1);
+        ai(&mut s, 1, 0.0, 0.0, 2, r#""sight_range":30,"notice_time":1.0"#);
+        target(&mut s, 2, 0.0, -10.0, 1);
+        if let Some(e) = every {
+            s.world.set_resource("gameplay.every.perception", Some(e)).unwrap();
+        }
+        let mut alert_at = None;
+        for step in 1..=120u32 {
+            s.step_n(1);
+            if alert_at.is_none() && perception(&s, 1).state == 2 {
+                alert_at = Some(step);
+            }
+        }
+        times.push(alert_at.expect("it noticed"));
+    }
+    assert!((times[0] as i32 - times[1] as i32).abs() <= 3, "alert after {} steps looking every step and {} looking every second: the same second, give or take a step of its own", times[0], times[1]);
+}

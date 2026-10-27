@@ -216,3 +216,54 @@ fn flying_is_deterministic() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn a_toolkit_that_updates_every_few_steps_is_due_in_one_step_of_them_with_their_time_and_odd_values_mean_every_step() {
+    use crate::gameplay::due;
+    let mut s = Sim::new(1);
+    let dt = 1.0 / 60.0;
+    assert_eq!(due(&s.world, "gameplay.every.x", 5, dt, 0), Some(dt), "no resource: every step");
+    s.world.set_resource("gameplay.every.x", Some(3.0)).unwrap();
+    let runs: Vec<u64> = (0..9).filter(|t| due(&s.world, "gameplay.every.x", *t, dt, 0).is_some()).collect();
+    assert_eq!(runs, [0, 3, 6]);
+    assert_eq!(due(&s.world, "gameplay.every.x", 3, dt, 0), Some(dt * 3.0), "it is given the time of the steps it stands for");
+    let staggered: Vec<u64> = (0..9).filter(|t| due(&s.world, "gameplay.every.x", *t, dt, 1).is_some()).collect();
+    assert_eq!(staggered, [2, 5, 8], "a phase puts it in another step");
+    for odd in [0.0, 0.5, -4.0] {
+        s.world.set_resource("gameplay.every.x", Some(odd)).unwrap();
+        assert_eq!(due(&s.world, "gameplay.every.x", 7, dt, 0), Some(dt), "{odd} means every step");
+    }
+    s.world.set_resource("gameplay.every.x", Some(1.0e12)).unwrap();
+    assert_eq!(due(&s.world, "gameplay.every.x", 600, dt, 0), Some(dt * 600.0), "at most every 600 steps");
+}
+
+#[test]
+fn a_drone_that_decides_every_second_step_changes_its_state_in_half_the_steps_and_arrives_all_the_same() {
+    let build = |every: Option<f64>| {
+        let mut s = world();
+        drone(&mut s, 1, [0.0, 6.0, 0.0], r#""mode":1,"goal":[30,0,0],"speed":10,"hover":6"#);
+        if let Some(e) = every {
+            s.world.set_resource("gameplay.every.flyagent", Some(e)).unwrap();
+        }
+        s
+    };
+    let (mut every, mut half) = (build(None), build(Some(2.0)));
+    let (mut changes_every, mut changes_half) = (0, 0);
+    let (mut last_every, mut last_half) = (agent(&every, 1).speed_now, agent(&half, 1).speed_now);
+    for _ in 0..60 * 8 {
+        every.step_n(1);
+        half.step_n(1);
+        let (a, b) = (agent(&every, 1).speed_now, agent(&half, 1).speed_now);
+        changes_every += (a != last_every) as u32;
+        changes_half += (b != last_half) as u32;
+        (last_every, last_half) = (a, b);
+    }
+    assert!(changes_half <= 60 * 8 / 2 + 1, "its own state changes only in the steps it is due in: {changes_half}");
+    assert!(changes_every > changes_half + 100, "{changes_every} against {changes_half}");
+    for (name, s) in [("every step", &every), ("every second step", &half)] {
+        let p = pos(s, 1);
+        assert!(dist_xz(p, [30.0, 0.0, 0.0]) < 2.5, "{name}: {p:?}");
+        assert!((p[1] - 6.0).abs() < 0.8, "{name} holds its height: {p:?}");
+        assert!(agent(s, 1).arrived, "{name}");
+    }
+}
