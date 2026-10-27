@@ -17,11 +17,13 @@ pub struct InspectorUi {
     files_loaded: bool,
     /// What is typed in the search box of an entity picker (a field that names another entity).
     uid_filter: String,
+    /// How many points wider than the panel the fields of the last frame were (0 when they all fit): a row that does not fit is clipped, so a test looks for them.
+    pub overflow: f32,
 }
 
 impl Default for InspectorUi {
     fn default() -> InspectorUi {
-        InspectorUi { epoch: 0, search: String::new(), resets: Vec::new(), files: Vec::new(), files_loaded: false, uid_filter: String::new() }
+        InspectorUi { epoch: 0, search: String::new(), resets: Vec::new(), files: Vec::new(), files_loaded: false, uid_filter: String::new(), overflow: 0.0 }
     }
 }
 
@@ -167,7 +169,7 @@ impl InspectorUi {
         crate::chrome::search_box(ui, &mut self.search, "Search", ui.available_width());
         let query = self.search.trim().to_lowercase();
         ui.add_space(2.0);
-        egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("inspector-scroll").show(ui, |ui| {
+        let scrolled = egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("inspector-scroll").show(ui, |ui| {
             let attached = ent.parent().is_some();
             let mut remove: Option<String> = None;
             let mut copy: Option<String> = None;
@@ -252,6 +254,7 @@ impl InspectorUi {
             });
             ui.add_space(24.0);
         });
+        self.overflow = (scrolled.content_size.x - scrolled.inner_rect.width()).max(0.0);
     }
 
     fn transform(&mut self, ui: &mut egui::Ui, studio: &mut Studio, ent: &Entity, value: &Json, attached: bool, defaults: Option<&Json>) {
@@ -385,7 +388,7 @@ impl InspectorUi {
                     let n = v.and_then(|x| x.as_u64()).unwrap_or(0);
                     let mut picked: Option<u64> = None;
                     ui.horizontal(|ui| {
-                        egui::ComboBox::from_id_salt(("entity", uid, comp, &f.name)).selected_text(uid_label(studio, n)).width((ui.available_width() - 100.0).max(80.0)).show_ui(ui, |ui| {
+                        egui::ComboBox::from_id_salt(("entity", uid, comp, &f.name)).selected_text(uid_label(studio, n)).width((ui.available_width() - 100.0).max(80.0)).truncate().show_ui(ui, |ui| {
                             ui.add(egui::TextEdit::singleline(&mut self.uid_filter).hint_text("Search entities").desired_width(180.0));
                             if ui.selectable_label(n == 0, "None").clicked() {
                                 picked = Some(0);
@@ -417,7 +420,8 @@ impl InspectorUi {
                         }
                     } else {
                         let mut xs = nums(v, f.count);
-                        ui.horizontal(|ui| {
+                        // (the values wrap onto lines when the row is too narrow for them, instead of being wider than the panel)
+                        ui.horizontal_wrapped(|ui| {
                             let mut changed = false;
                             if is_color(&f.name, f.count) {
                                 let to8 = |x: f64| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
@@ -466,7 +470,8 @@ impl InspectorUi {
                         }
                     } else {
                         let mut xs = nums(v, f.count);
-                        ui.horizontal(|ui| {
+                        // (the values wrap onto lines when the row is too narrow for them, instead of being wider than the panel)
+                        ui.horizontal_wrapped(|ui| {
                             let mut changed = false;
                             for x in xs.iter_mut() {
                                 if ui.add(egui::DragValue::new(x).speed(0.2).max_decimals(0)).changed() {

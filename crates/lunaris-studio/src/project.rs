@@ -30,6 +30,8 @@ pub struct ProjectUi {
     kind_filter: String,
     loaded: Option<Instant>,
     files: Vec<(String, String, u64)>,
+    /// The workspace has more files than the listing holds (the `files` tool gives at most 2,000).
+    truncated: bool,
     pub selected: Option<String>,
     pub open_scene: Option<String>,
     closed: HashSet<String>,
@@ -158,6 +160,7 @@ impl ProjectUi {
         self.loaded = Some(Instant::now());
         self.files.clear();
         if let Ok(f) = studio.engine.call("files", &Json::obj([("recursive", Json::Bool(true)), ("limit", Json::from(2000))])) {
+            self.truncated = matches!(f.get("truncated"), Some(Json::Bool(true)));
             for e in f.get("files").and_then(|x| x.as_array()).unwrap_or(&[]) {
                 if let (Some(p), Some(k)) = (e.get("path").and_then(|p| p.as_str()), e.get("kind").and_then(|k| k.as_str())) {
                     if p.split('/').any(|part| part == "__pycache__" || part == "node_modules" || part == ".venv") {
@@ -417,10 +420,13 @@ impl ProjectUi {
                 });
                 // the item count, bottom left (Unreal: "67 items")
                 let git = self.vcs.snapshot.as_ref().map(|s| s.summary()).filter(|s| !s.is_empty());
-                let foot = match git {
+                let mut foot = match git {
                     Some(g) => format!("{count} items   git: {g}"),
                     None => format!("{count} items"),
                 };
+                if self.truncated {
+                    foot.push_str("   the workspace has more files than the 2,000 listed here");
+                }
                 ui.painter().text(ui.max_rect().left_bottom() + Vec2::new(8.0, -4.0), Align2::LEFT_BOTTOM, foot, FontId::proportional(11.5), theme::TEXT_DIM);
                 if let Some(p) = go {
                     self.folder = p;

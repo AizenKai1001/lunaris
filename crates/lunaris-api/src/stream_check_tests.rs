@@ -103,3 +103,19 @@ fn a_camera_that_looks_away_from_every_mesh_is_told_so_and_turning_it_quiets_it(
     call(&mut e, "set", r#"{"uid":1,"component":"Transform","value":{"rot":[0,1,0,0]}}"#);
     assert!(!messages(&mut e).iter().any(|x| x.contains("looks along its local -Z")), "turned to face the cube");
 }
+
+#[test]
+fn a_scene_of_hundreds_of_thousands_of_triangles_gets_advice_about_the_cpu_renderer_and_a_gpu_quiets_it() {
+    let mut e = engine();
+    call(&mut e, "spawn", r#"{"count":2000,"components":{"Transform":{},"MeshRenderer":{"mesh":"cube"}}}"#);
+    assert!(!messages(&mut e).iter().any(|x| x.contains("triangles are drawn")), "24,000 triangles are nothing");
+    call(&mut e, "spawn", r#"{"count":30000,"components":{"Transform":{},"MeshRenderer":{"mesh":"cube"}}}"#);
+    let m = messages(&mut e);
+    let advice: Vec<&String> = m.iter().filter(|x| x.contains("triangles are drawn")).collect();
+    assert_eq!(advice.len(), 1, "{m:?}");
+    assert!(advice[0].starts_with("info:") && advice[0].contains("384000") && advice[0].contains("no graphics card"), "{advice:?}");
+    // meshes that are hidden are not drawn
+    let mut hidden = engine();
+    call(&mut hidden, "spawn", r#"{"count":30000,"components":{"Transform":{},"MeshRenderer":{"mesh":"cube","visible":false}}}"#);
+    assert!(!messages(&mut hidden).iter().any(|x| x.contains("triangles are drawn")));
+}

@@ -189,6 +189,8 @@ pub struct Viewport {
     pub center2: [f32; 2],
     /// Perspective, or one of the orthographic views of the scene (they use `target` and `ortho_h`; `yaw` and `pitch` are what the perspective view comes back to).
     pub projection: Projection,
+    /// How many pictures have been drawn (for tests: an idle editor draws none).
+    pub renders: u64,
     /// Ctrl+1 to Ctrl+9 save the view of the scene camera, 1 to 9 return to it (kept while the editor is open).
     pub bookmarks: [Option<Bookmark>; BOOKMARKS],
     renderer: Option<Result<GpuRenderer, String>>,
@@ -248,6 +250,7 @@ impl Viewport {
             ortho_h: 12.0,
             center2: [0.0, 0.0],
             projection: Projection::Perspective,
+            renders: 0,
             bookmarks: [None; BOOKMARKS],
             renderer: None,
             textures: TextureCache::new(Some(root)),
@@ -375,6 +378,7 @@ impl Viewport {
     }
 
     fn render(&mut self, studio: &mut Studio, ctx: &egui::Context, w: u32, h: u32, want_ids: bool) {
+        self.renders += 1;
         let cam = self.basis(w as f32 / h as f32);
         let view = match self.kind {
             ViewKind::Game => View::World(None),

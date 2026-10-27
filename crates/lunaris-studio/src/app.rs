@@ -36,6 +36,20 @@ struct Sound {
     _output: Output,
 }
 
+/// A drag handle along the edge of a panel (`strip` is a thin rectangle on the edge): how far the pointer was dragged this frame. The panels have fixed sizes that only this changes, because a resizable
+/// egui panel takes the size its content asks for, and the content of a tab or an entity asks for different sizes (the scene view beside it was redrawn at every one).
+fn edge_drag(ui: &mut egui::Ui, id: &str, strip: Rect, cursor: egui::CursorIcon) -> Vec2 {
+    let drag = ui.interact(strip, ui.id().with(id), egui::Sense::drag());
+    if drag.hovered() || drag.dragged() {
+        ui.ctx().set_cursor_icon(cursor);
+    }
+    if drag.dragged() {
+        drag.drag_delta()
+    } else {
+        Vec2::ZERO
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Pending {
     Quit,
@@ -71,6 +85,11 @@ pub struct App {
     pub(crate) settings_saved: ProjectSettings,
     pub(crate) settings_open: bool,
     pub(crate) shortcuts_open: bool,
+    /// The width of the Inspector panel, set by dragging its left edge (the content never makes it wider: what does not fit is clipped, or wraps).
+    pub(crate) inspector_width: f32,
+    /// The same for the Hierarchy panel (its right edge) and the bottom panel (its top edge): fixed sizes that only a drag changes.
+    pub(crate) hierarchy_width: f32,
+    pub(crate) bottom_height: f32,
     settings_scenes: Vec<String>,
     pub(crate) script: ScriptEditor,
     pub(crate) blueprint: BlueprintEditor,
@@ -166,6 +185,9 @@ impl App {
             settings: ProjectSettings::load(&opts_root),
             settings_open: false,
             shortcuts_open: false,
+            inspector_width: 330.0,
+            hierarchy_width: 250.0,
+            bottom_height: 240.0,
             settings_scenes: Vec::new(),
             script,
             blueprint,
@@ -996,7 +1018,9 @@ impl App {
         Panel::top("toolbar").exact_size(36.0).resizable(false).frame(bar(theme::TOOLBAR, 36.0)).show(ui, |ui| self.toolbar(ui));
         Panel::bottom("status").exact_size(22.0).resizable(false).frame(bar(theme::TOOLBAR, 22.0)).show(ui, |ui| self.status_bar(ui));
         if self.show_bottom {
-            Panel::bottom("bottom").default_size(240.0).size_range(if self.studio.tab == BottomTab::Systems { 340.0..=900.0 } else { 90.0..=600.0 }).resizable(true).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
+            // (a fixed height: the content of a tab, the Console's list above all, made the panel and with it the scene view change size every frame)
+            let (lo, hi) = if self.studio.tab == BottomTab::Systems { (340.0, 900.0) } else { (90.0, 600.0) };
+            let bottom = Panel::bottom("bottom").exact_size(self.bottom_height.clamp(lo, hi)).resizable(false).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
                 let problems_label = match self.problems.counts() {
                     (0, 0) => "Problems".to_string(),
                     (e, w) => format!("Problems ({})", e + w),
@@ -1033,10 +1057,15 @@ impl App {
                     }
                 });
             });
+            let top = bottom.response.rect.min.y;
+            let moved = edge_drag(ui, "bottom-edge", Rect::from_min_max(egui::pos2(bottom.response.rect.min.x, top - 3.0), egui::pos2(bottom.response.rect.max.x, top + 3.0)), egui::CursorIcon::ResizeVertical);
+            if moved.y != 0.0 {
+                self.bottom_height = (self.bottom_height.clamp(lo, hi) - moved.y).clamp(lo, hi);
+            }
         }
         if self.show_hierarchy {
             let at = self.viewport.target;
-            Panel::left("hierarchy").default_size(250.0).size_range(160.0..=480.0).resizable(true).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
+            let hierarchy = Panel::left("hierarchy").exact_size(self.hierarchy_width).resizable(false).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
                 if self.studio.center == Center::Blueprint {
                     chrome::tab_strip(ui, &[(0, "My Blueprint")], 0, |_| {});
                     chrome::body().show(ui, |ui| self.blueprint.my_blueprint(ui, &mut self.studio));
@@ -1059,9 +1088,14 @@ impl App {
                     });
                 }
             });
+            let right = hierarchy.response.rect.max.x;
+            let moved = edge_drag(ui, "hierarchy-edge", Rect::from_min_max(egui::pos2(right - 3.0, hierarchy.response.rect.min.y), egui::pos2(right + 3.0, hierarchy.response.rect.max.y)), egui::CursorIcon::ResizeHorizontal);
+            if moved.x != 0.0 {
+                self.hierarchy_width = (self.hierarchy_width + moved.x).clamp(160.0, 480.0);
+            }
         }
         if self.show_inspector {
-            Panel::right("inspector").default_size(330.0).size_range(240.0..=640.0).resizable(true).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
+            let panel = Panel::right("inspector").exact_size(self.inspector_width).resizable(false).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
                 if self.studio.center == Center::Blueprint {
                     chrome::tab_strip(ui, &[(0, "Details")], 0, |_| {});
                     chrome::body().show(ui, |ui| egui::ScrollArea::vertical().id_salt("bp-details").auto_shrink([false, false]).show(ui, |ui| self.blueprint.details(ui, &mut self.studio)));
@@ -1079,6 +1113,13 @@ impl App {
                     chrome::body().show(ui, |ui| self.inspector.show(ui, &mut self.studio));
                 }
             });
+            // the left edge is a handle: the panel is as wide as it was dragged to, and no content widens it (a resizable egui panel grows to fit the widest row it has ever held)
+            let edge = panel.response.rect;
+            let strip = Rect::from_min_max(egui::pos2(edge.min.x - 3.0, edge.min.y), egui::pos2(edge.min.x + 3.0, edge.max.y));
+            let moved = edge_drag(ui, "inspector-edge", strip, egui::CursorIcon::ResizeHorizontal);
+            if moved.x != 0.0 {
+                self.inspector_width = (self.inspector_width - moved.x).clamp(240.0, 640.0);
+            }
         }
         egui::CentralPanel::default().frame(chrome::dock(theme::PANEL)).show(ui, |ui| match self.studio.center {
             Center::View => {

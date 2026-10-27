@@ -427,6 +427,83 @@ fn ctrl_g_puts_the_selection_under_a_new_group_that_moves_them_all_and_one_undo_
     assert_eq!(h.app.studio.all.iter().find(|r| r.uid == group).and_then(|r| r.parent), None);
 }
 
+/// The width the Inspector panel takes, found from where the scene view ends in a 1600-point window.
+fn inspector_width(h: &Harness) -> f32 {
+    h.size.x - h.app.viewport.last_rect.max.x
+}
+
+#[test]
+fn the_inspector_does_not_grow_a_little_every_frame() {
+    let mut h = Harness::new();
+    h.app.studio.select(Some(h.uid("Box")));
+    h.frames(6);
+    let first = inspector_width(&h);
+    let widths: Vec<String> = [20, 40, 80].iter().map(|n| { h.frames(*n); format!("{:.1}", inspector_width(&h)) }).collect();
+    assert!(widths.iter().all(|w| (w.parse::<f32>().unwrap() - first).abs() < 0.6), "{first:.1} after 6 frames, then {widths:?} after 20, 60 and 140 more: the panel creeps wider");
+}
+
+#[test]
+fn the_scene_view_keeps_its_size_whatever_tab_or_entity_is_showing_and_the_panels_are_dragged_by_their_edges() {
+    use crate::state::{BottomTab, Center};
+    let mut h = Harness::new();
+    h.app.studio.select(Some(h.uid("Box")));
+    h.frames(6);
+    let size = h.app.viewport.last_rect.size();
+    // every bottom tab, each long enough to settle
+    for tab in [BottomTab::Console, BottomTab::Systems, BottomTab::Profiler, BottomTab::History, BottomTab::Streaming, BottomTab::Problems, BottomTab::Project] {
+        h.app.studio.tab = tab;
+        h.frames(10);
+        let now = h.app.viewport.last_rect.size();
+        let narrow_tab = tab == BottomTab::Systems; // (the Systems tab needs a taller panel: the view is shorter there, and steady)
+        assert!((now.x - size.x).abs() < 1.5 && (narrow_tab || (now.y - size.y).abs() < 1.5), "{tab:?}: the scene view went from {size:?} to {now:?}");
+        let renders = h.app.viewport.renders;
+        h.frames(10);
+        assert_eq!(h.app.viewport.renders, renders, "{tab:?}: the scene was drawn again with nothing changed");
+    }
+    h.app.studio.center = Center::View;
+    // dragging the top edge of the bottom panel and the right edge of the Hierarchy changes them, within limits
+    let (hw, bh) = (h.app.hierarchy_width, h.app.bottom_height);
+    let edge_x = h.app.viewport.last_rect.min.x - 1.5;
+    h.drag(Pos2::new(edge_x, 300.0), Pos2::new(edge_x + 80.0, 300.0));
+    assert!(h.app.hierarchy_width > hw + 40.0, "{}", h.app.hierarchy_width);
+    let top = h.app.viewport.last_rect.max.y + 1.0;
+    h.drag(Pos2::new(700.0, top), Pos2::new(700.0, top - 60.0));
+    assert!(h.app.bottom_height > bh + 30.0, "{}", h.app.bottom_height);
+}
+
+#[test]
+fn the_inspector_keeps_its_width_and_every_component_fits_in_it() {
+    let mut h = Harness::new();
+    h.app.studio.select(Some(h.uid("Box")));
+    h.frames(4);
+    let normal = inspector_width(&h);
+    assert!((normal - 330.0).abs() < 2.0, "{normal}");
+    let mut too_wide: Vec<String> = Vec::new();
+    for name in h.app.studio.components_available() {
+        let uid = h.app.studio.call("spawn", j(r#"{"components":{"Transform":{}}}"#)).unwrap().get("uid").unwrap().as_u64().unwrap();
+        if h.app.studio.call("add_component", j(&format!(r#"{{"uid":{uid},"component":"{name}"}}"#))).is_err() {
+            continue;
+        }
+        h.app.studio.rows_dirty = true;
+        h.app.studio.select(Some(uid));
+        h.frames(4);
+        assert!((inspector_width(&h) - normal).abs() < 2.0, "{name} changed the width of the panel to {:.0}", inspector_width(&h));
+        if h.app.inspector.overflow > 1.0 {
+            too_wide.push(format!("{name} by {:.0}", h.app.inspector.overflow));
+        }
+    }
+    assert!(too_wide.is_empty(), "rows wider than the panel (their ends are cut off): {too_wide:?}");
+    // dragging the left edge of the panel makes it wider or narrower, within limits
+    let edge = h.app.viewport.last_rect.max.x + 2.0;
+    h.drag(Pos2::new(edge, 300.0), Pos2::new(edge - 100.0, 300.0));
+    assert!(inspector_width(&h) > normal + 60.0, "{:.0}", inspector_width(&h));
+    // (the measure itself: a panel far narrower than any row has rows that do not fit)
+    h.app.inspector_width = 90.0;
+    h.app.studio.select(Some(h.uid("Box")));
+    h.frames(4);
+    assert!(h.app.inspector.overflow > 10.0, "{}", h.app.inspector.overflow);
+}
+
 #[test]
 fn the_inspector_draws_every_component_the_engine_has_without_trouble() {
     let mut h = Harness::new();
@@ -590,6 +667,113 @@ fn the_rows_read_from_the_world_are_the_rows_the_query_tool_gave() {
     let (t, few) = crate::rows_world::read(&h.app.studio.engine.sim.world, 5);
     assert_eq!((t, few.len()), (total, 5));
     assert_eq!(few.iter().map(|r| r.uid).collect::<Vec<_>>(), now.iter().take(5).map(|r| r.uid).collect::<Vec<_>>());
+}
+
+#[test]
+fn a_selected_entity_does_not_make_the_editor_change_the_world_or_draw_again_by_itself() {
+    let mut h = Harness::new();
+    h.app.studio.select(Some(h.uid("Box")));
+    h.frames(5);
+    let (rev, renders) = (h.app.studio.live_revision, h.app.viewport.renders);
+    h.frames(30);
+    assert_eq!(h.app.studio.live_revision, rev, "drawing the Inspector wrote to the world");
+    assert_eq!(h.app.viewport.renders, renders, "the picture was drawn again with nothing changed");
+}
+
+/// A real, big scene in the editor: `LUNARIS_BIG_ROOT=/path/to/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-studio --features eframe/x11 real_scene -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn real_scene_in_the_editor() {
+    let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
+    let mut h = Harness::on(std::path::PathBuf::from(&root));
+    let t = std::time::Instant::now();
+    h.app.studio.open_scene(&scene);
+    println!("open_scene: {:.0} ms, {} entities", t.elapsed().as_secs_f64() * 1e3, h.app.studio.engine.sim.world.len());
+    let t = std::time::Instant::now();
+    h.app.studio.refresh_rows();
+    println!("refresh_rows: {:.1} ms ({} rows of {})", t.elapsed().as_secs_f64() * 1e3, h.app.studio.all.len(), h.app.studio.total_entities);
+    let t = std::time::Instant::now();
+    h.frames(3);
+    println!("three frames (the first draws the scene with the CPU reference renderer): {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+    let t = std::time::Instant::now();
+    h.frames(30);
+    println!("an idle frame: {:.2} ms", t.elapsed().as_secs_f64() * 1e3 / 30.0);
+    // every kind of entity the scene has gets drawn in the Inspector
+    let uids: Vec<u64> = h.app.studio.all.iter().map(|r| r.uid).collect();
+    let step = (uids.len() / 400).max(1);
+    let (mut selecting, mut drawing) = (std::time::Duration::ZERO, std::time::Duration::ZERO);
+    let mut drawn = 0;
+    let renders_before = h.app.viewport.renders;
+    let mut redrawers: Vec<String> = Vec::new();
+    for uid in uids.iter().step_by(step) {
+        let t = std::time::Instant::now();
+        h.app.studio.select(Some(*uid));
+        selecting += t.elapsed();
+        let (t, before, rect) = (std::time::Instant::now(), (h.app.viewport.renders, h.app.studio.live_revision), h.app.viewport.last_rect);
+        h.frames(1);
+        drawing += t.elapsed();
+        drawn += 1;
+        if h.app.viewport.renders != before.0 && redrawers.len() < 12 {
+            let comps: Vec<String> = h.app.studio.entity.as_ref().map(|e| e.comps.iter().map(|(n, _)| n.clone()).collect()).unwrap_or_default();
+            redrawers.push(format!("#{uid} view x {:.0}..{:.0} -> {:.0}..{:.0} of {}, {:?}", rect.min.x, rect.max.x, h.app.viewport.last_rect.min.x, h.app.viewport.last_rect.max.x, h.size.x, comps));
+        }
+    }
+    for r in &redrawers {
+        println!("a selection that drew a picture: {r}");
+    }
+    println!("pictures drawn during those {drawn} selections: {}", h.app.viewport.renders - renders_before);
+    println!("select + frame for {drawn} entities spread over the scene: select {:.2} ms, frame {:.2} ms each", selecting.as_secs_f64() * 1e3 / drawn as f64, drawing.as_secs_f64() * 1e3 / drawn as f64);
+    let t = std::time::Instant::now();
+    h.app.problems.run(&mut h.app.studio);
+    let (e, w) = h.app.problems.counts();
+    println!("check: {:.0} ms, {e} errors, {w} warnings", t.elapsed().as_secs_f64() * 1e3);
+    for p in h.app.problems.list.iter().take(8) {
+        println!("  [{}] {:?}: {}", p.severity, p.entity, p.message);
+    }
+    // the width of the scene view over a few frames after each of a few selections: it should not move
+    for uid in [3u64, 22, 1459, 1468, 1477, 51, 1459, 22, 3] {
+        h.app.studio.select(Some(uid));
+        let widths: Vec<String> = (0..4).map(|_| {
+            h.frames(1);
+            format!("{:.0}", h.app.viewport.last_rect.max.x)
+        }).collect();
+        println!("selecting #{uid}: the scene view ends at x = {} (the panel is {:.0} wide, set to {:.0}, overflow {:.1}, {:?})", widths.join(", "), inspector_width(&h), h.app.inspector_width, h.app.inspector.overflow, h.app.studio.entity.as_ref().map(|e| e.comps.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>()));
+    }
+    // the cost of a frame with each bottom tab showing, and with each of the other editors in the middle
+    {
+        use crate::state::{BottomTab, Center};
+        for (name, tab) in [("Project", BottomTab::Project), ("Console", BottomTab::Console), ("Systems", BottomTab::Systems), ("Profiler", BottomTab::Profiler), ("History", BottomTab::History), ("Streaming", BottomTab::Streaming), ("Problems", BottomTab::Problems)] {
+            h.app.studio.tab = tab;
+            h.frames(3);
+            let heights: Vec<String> = (0..8).map(|_| { h.frames(1); format!("{:.0}x{:.0}", h.app.viewport.last_rect.width(), h.app.viewport.last_rect.height()) }).collect();
+            println!("the {name} tab: the scene view is {}", heights.join(" "));
+            let (t, renders) = (std::time::Instant::now(), h.app.viewport.renders);
+            h.frames(20);
+            println!("the {name} tab: {:.2} ms a frame, {} pictures drawn in those 20", t.elapsed().as_secs_f64() * 1e3 / 20.0, h.app.viewport.renders - renders);
+        }
+        h.app.studio.tab = BottomTab::Project;
+        h.frames(3);
+        h.app.project.reload();
+        let t = std::time::Instant::now();
+        h.frames(1);
+        println!("the Project panel listing the workspace's files again (it does so every 3 s): {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+        for (name, c) in [("UI designer", Center::Ui), ("Blueprint", Center::Blueprint), ("Script", Center::Script), ("Canvas", Center::Canvas), ("Sequencer", Center::Sequencer), ("Effects", Center::Effects)] {
+            h.app.studio.center = c;
+            h.frames(3);
+            let t = std::time::Instant::now();
+            h.frames(20);
+            println!("the {name} tab: {:.2} ms a frame", t.elapsed().as_secs_f64() * 1e3 / 20.0);
+        }
+        h.app.studio.center = Center::View;
+        h.frames(3);
+    }
+    h.shoot("real_scene");
+    h.app.studio.select(Some(33));
+    h.frames(3);
+    h.shoot("real_scene_33");
+    h.app.studio.select(Some(51));
+    h.frames(3);
+    h.shoot("real_scene_51");
 }
 
 /// How long the editor takes to start and draw its first frames: `... startup_cost -- --ignored --nocapture`.

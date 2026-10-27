@@ -5,7 +5,7 @@ use lunaris_ecs::Result;
 use lunaris_json::Json;
 use lunaris_render::mesh::builtin;
 use lunaris_sim::components::{Animator, Camera, Collider, LocalTransform, MeshRenderer, Parent, Sound, Sprite, Text, Tilemap, Transform};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 mod draw_order;
@@ -100,6 +100,8 @@ const MAX_GRID_WINDOW: f32 = 2500.0;
 const STREAM_ZONES_UNLIMITED: usize = 24;
 
 /// How many `NavAgent`s make a crowd that the checks on navigation limits are about.
+/// About how many triangles the CPU reference renderer holds at 30 pictures a second on one core (960 x 540, `lunaris bench` on an i7-9700K: 359,040 triangles in 40 ms).
+const CPU_TRIANGLES_ADVICE: u64 = 300_000;
 const CROWD_AGENTS: usize = 20;
 
 impl Engine {
@@ -1790,6 +1792,32 @@ impl Engine {
         // ---- the camera
         if !cameras.iter().any(|c| c.1 && with_transform.contains(&c.0)) {
             problems.add("warning", None, "no active Camera with a Transform: pictures use a default view".into(), "add an entity with Camera and Transform, or pass eye/target to `render`");
+        }
+
+        // ---- the CPU renderer: advice when the pictures would be drawn by the processor (no graphics card was offered) and the scene is heavy. The number is the engine's own measurement (`lunaris bench`, docs/PERFORMANCE.md):
+        // the reference renderer draws 359,040 triangles at 960 x 540 in 40 ms on one thread of an i7-9700K, so about 300,000 hold 30 pictures a second on one core (the work follows the triangles, not the meshes).
+        if self.default_quality == "reference" {
+            let mut found: Vec<(bool, u32)> = Vec::new();
+            world.for_each_uid::<(&MeshRenderer,), _>(|_, _, (m,)| found.push((m.visible, m.mesh.0)))?;
+            let mut named: BTreeMap<u32, u64> = BTreeMap::new();
+            for (visible, sym) in found {
+                if visible {
+                    *named.entry(sym).or_default() += 1;
+                }
+            }
+            let mut triangles: u64 = 0;
+            for (sym, n) in named {
+                let name = world.strings().get(sym);
+                // (a model's triangles are guessed from the size of its file, about 60 bytes each; a built-in's are counted)
+                let each = match builtin(name) {
+                    Some(m) => (m.idx.len() / 3) as u64,
+                    None => std::fs::metadata(root.join(name)).map(|m| m.len() / 60).unwrap_or(0),
+                };
+                triangles += each * n;
+            }
+            if triangles > CPU_TRIANGLES_ADVICE {
+                problems.add("info", None, format!("about {triangles} triangles are drawn: with no graphics card the processor draws the pictures, and it holds about {CPU_TRIANGLES_ADVICE} triangles of a 960 x 540 picture on one core at 30 a second (an i7-9700K; a slower machine holds less, a picture with more pixels too)"), "use a GPU quality, fewer or simpler meshes (models with levels of detail), or smaller pictures");
+            }
         }
 
         // ---- a camera that looks away from every mesh draws an empty picture (it looks along its local -Z)
