@@ -43,10 +43,10 @@ examples/ragdolls.lunaris.json           state 649e8f4d62cc96b2  frame 16e482f7f
 examples/ropes.lunaris.json              state 4396f95f9c6921e4  frame 825b5f99b0ae52da
 examples/showcase.lunaris.json           state 57a42fa4ba6aeb14  frame c1715350b9142e83
 examples/skirmish.lunaris.json           state 7215f58b961932b3  frame 8997082fb6180518
-examples/spider_house.lunaris.json       state 3610b8b3eb3d9f79  frame 4ca2614a8b5ba69e
+examples/spider_house.lunaris.json       state f9500dc95a62427c  frame 122091e7c64d0551
 examples/spiders.lunaris.json            state 59c178dd0e8bcb78  frame be24d3735acbe1d6
 examples/spiders_blocks.lunaris.json     state 64fc650054f1a422  frame 051b86f7f32b43a7
-examples/spiders_hills.lunaris.json      state 3e1f8aacbdbb3f98  frame 8b50359187964437
+examples/spiders_hills.lunaris.json      state 757f5c6c956f3a64  frame bb507e0c9030fcb4
 examples/spiders_ramps.lunaris.json      state 376391aa566d9707  frame 361c1ad2f53d4990
 examples/spiders_steep.lunaris.json      state 3253758f511325e2  frame b06423c27759f11b
 examples/spiders_wall.lunaris.json       state 9fbb294ea3937c08  frame 1c0fea3683a9b796

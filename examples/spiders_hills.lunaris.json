@@ -76,7 +76,7 @@
      ]
     },
     "Terrain": {
-     "heightmap": "spider_hills.png",
+     "heightmap": "examples/spider_hills.png",
      "size": [
       30.0,
       30.0

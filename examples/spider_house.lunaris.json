@@ -847,7 +847,7 @@
      ]
     },
     "Terrain": {
-     "heightmap": "house_hill.png",
+     "heightmap": "examples/house_hill.png",
      "size": [
       1.2,
       1.2
@@ -877,7 +877,7 @@
      ]
     },
     "Terrain": {
-     "heightmap": "house_mound.png",
+     "heightmap": "examples/house_mound.png",
      "size": [
       1.6,
       1.6

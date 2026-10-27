@@ -51,8 +51,8 @@ box("Sofa", 3.2, 0.25, -2.2, 2.0, 0.5, 0.9, [0.3, 0.38, 0.5, 1])
 box("Cabinet", 3.6, 0.8, 3.3, 1.2, 1.6, 0.6, wood)
 box("Ledge", 5.7, 2.3, 0.0, 0.4, 0.1, 2.0, wood)
 # two piles of cushions in the open (heightfield mounds made by target/patch_house_terrain_hills.py's recipe: a flat top and 40 and 45 degree sides, in examples/house_hill.png and house_mound.png): the spiders can walk up from any side, with food on top
-add("Cushion hill", {"Transform": {"pos": [-1.8, 0.0, 1.0]}, "Terrain": {"heightmap": "house_hill.png", "size": [1.2, 1.2], "height": 0.30, "color": [0.65, 0.3, 0.27, 1], "friction": 1.2}})
-add("Cushion mound", {"Transform": {"pos": [2.3, 0.0, 1.2]}, "Terrain": {"heightmap": "house_mound.png", "size": [1.6, 1.6], "height": 0.45, "color": [0.3, 0.5, 0.36, 1], "friction": 1.2}})
+add("Cushion hill", {"Transform": {"pos": [-1.8, 0.0, 1.0]}, "Terrain": {"heightmap": "examples/house_hill.png", "size": [1.2, 1.2], "height": 0.30, "color": [0.65, 0.3, 0.27, 1], "friction": 1.2}})
+add("Cushion mound", {"Transform": {"pos": [2.3, 0.0, 1.2]}, "Terrain": {"heightmap": "examples/house_mound.png", "size": [1.6, 1.6], "height": 0.45, "color": [0.3, 0.5, 0.36, 1], "friction": 1.2}})
 # the nest: a rug in the left room's corner, where the spiders live
 add("Nest rug", {"Transform": {"pos": [-4.9, 0.006, 2.9], "scale": [1.8, 0.012, 1.5]}, "MeshRenderer": {"mesh": "cube", "color": [0.2, 0.12, 0.1, 1], "roughness": 1.0}})
 
