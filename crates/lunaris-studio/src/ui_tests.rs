@@ -347,6 +347,86 @@ fn duplicate_and_delete_take_what_is_attached_under_an_entity_with_it_and_each_i
 }
 
 #[test]
+fn ctrl_g_puts_the_selection_under_a_new_group_that_moves_them_all_and_one_undo_takes_it_back() {
+    let mut h = Harness::new();
+    let (b, ball) = (h.uid("Box"), h.uid("Ball"));
+    let (box_at, ball_at) = (h.pos_of("Box"), h.pos_of("Ball"));
+    h.app.studio.refresh_rows();
+    let total = h.app.studio.total_entities;
+    assert!(h.app.studio.group_selected().is_none(), "nothing selected: nothing to group");
+    h.app.studio.select(Some(b));
+    h.app.studio.toggle_select(ball);
+    h.key(Key::G, Modifiers::COMMAND);
+    assert_eq!(h.app.studio.total_entities, total + 1);
+    let group = h.app.studio.selection.expect("the group is selected");
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == group).map(|r| r.name.as_str()), Some("Group"));
+    for u in [b, ball] {
+        assert_eq!(h.app.studio.all.iter().find(|r| r.uid == u).and_then(|r| r.parent), Some(group), "{u} hangs on the group");
+    }
+    // they did not move (their world places are what they were), and the group stands between them
+    assert_eq!(h.pos_of("Box"), box_at);
+    assert_eq!(h.pos_of("Ball"), ball_at);
+    let gp = h.pos_of("Group");
+    assert!((gp[0] - (box_at[0] + ball_at[0]) / 2.0).abs() < 1e-4 && (gp[1] - (box_at[1] + ball_at[1]) / 2.0).abs() < 1e-4, "{gp:?}");
+    // moving the group moves them both
+    h.app.studio.set(group, "Transform", j(r#"{"pos":[10,0,0]}"#), None);
+    h.app.studio.engine.sim.step();
+    assert!((h.pos_of("Box")[0] - (box_at[0] - gp[0] + 10.0)).abs() < 1e-3, "{:?}", h.pos_of("Box"));
+    // a second group is named apart; one undo of the group call takes the group away and frees the two
+    h.app.studio.set(group, "Transform", Json::obj([("pos", Json::arr(gp.iter().map(|x| Json::from(*x))))]), None);
+    h.app.studio.select(Some(group));
+    let second = h.app.studio.group_selected().expect("a group of the group");
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == second).map(|r| r.name.as_str()), Some("Group 2"));
+    h.app.studio.undo();
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total + 1, "one undo took the second group away");
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == group).and_then(|r| r.parent), None);
+}
+
+#[test]
+fn the_inspector_draws_every_component_the_engine_has_without_trouble() {
+    let mut h = Harness::new();
+    let names = h.app.studio.components_available();
+    assert!(names.len() > 100, "{} components", names.len());
+    let (mut drawn, mut refused) = (0, 0);
+    for name in &names {
+        let uid = h.app.studio.call("spawn", j(r#"{"components":{"Transform":{}}}"#)).unwrap().get("uid").unwrap().as_u64().unwrap();
+        if h.app.studio.call("add_component", j(&format!(r#"{{"uid":{uid},"component":"{name}"}}"#))).is_err() {
+            refused += 1;
+            continue;
+        }
+        h.app.studio.rows_dirty = true;
+        h.app.studio.select(Some(uid));
+        h.frames(2);
+        drawn += 1;
+        assert!(h.app.studio.entity.as_ref().is_some_and(|e| e.comp(name).is_some()), "the Inspector has {name} to draw");
+    }
+    assert!(drawn > 100, "{drawn} components drawn, {refused} refused");
+    assert!(refused < names.len() / 3, "{refused} components cannot be added by name alone");
+}
+
+#[test]
+fn a_field_that_names_an_entity_shows_its_name_and_the_picker_lists_by_what_is_typed() {
+    use crate::inspector::{matching_entities, uid_label};
+    let mut h = Harness::new();
+    h.app.studio.call("spawn", j(r#"{"uid":100,"components":{"Name":{"value":"Hero"},"Transform":{}}}"#)).unwrap();
+    h.app.studio.call("spawn", j(r#"{"uid":101,"components":{"Name":{"value":"Sidekick"},"Transform":{},"Parent":{"target":100},"LocalTransform":{}}}"#)).unwrap();
+    h.app.studio.refresh_rows();
+    assert_eq!(uid_label(&h.app.studio, 0), "None");
+    assert_eq!(uid_label(&h.app.studio, 100), "Hero  #100");
+    assert_eq!(uid_label(&h.app.studio, 9999), "#9999 (no such entity)");
+    let names = |f: &str| matching_entities(&h.app.studio, f, 50).iter().map(|r| r.name.clone()).collect::<Vec<_>>();
+    assert_eq!(names("sidek"), ["Sidekick"], "any case, part of the name");
+    assert_eq!(names("100"), ["Hero"], "the uid");
+    assert!(names("").len() >= 6, "everything when nothing is typed");
+    assert_eq!(matching_entities(&h.app.studio, "", 3).len(), 3, "at most the limit");
+    // the Inspector draws the field of the selected child (its Parent.target) without trouble
+    h.app.studio.select(Some(101));
+    h.frames(3);
+    h.shoot("inspector_entity_picker");
+}
+
+#[test]
 fn make_prefab_turns_an_entity_and_what_hangs_on_it_into_a_template_that_spawns_the_same_shape() {
     let mut h = Harness::new();
     for c in [

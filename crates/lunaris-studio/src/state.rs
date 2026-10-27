@@ -1174,6 +1174,42 @@ impl Studio {
         Some(name)
     }
 
+    /// Put the selected entities (the ones not already inside another selected one) under a new empty entity named Group, standing at their middle: each keeps its place in the world (its `LocalTransform` is
+    /// worked out from the two), so moving the group moves them all. One undo step. The group is selected; its uid, or None when nothing is selected.
+    pub fn group_selected(&mut self) -> Option<u64> {
+        self.refresh_rows();
+        let roots = self.selection_roots();
+        if roots.is_empty() {
+            return None;
+        }
+        let places: Vec<V3> = roots.iter().filter_map(|u| self.world_of(*u)).collect();
+        let n = places.len().max(1) as f32;
+        let mid = [places.iter().map(|p| p[0]).sum::<f32>() / n, places.iter().map(|p| p[1]).sum::<f32>() / n, places.iter().map(|p| p[2]).sum::<f32>() / n];
+        let group = self.engine.sim.world.next_uid();
+        let name = self.unique_name("Group");
+        let jv = |v: V3| Json::arr(v.iter().map(|x| Json::from(*x)));
+        let mut cmds: Vec<Json> = vec![Self::obj(vec![("op", Json::str("spawn")), ("uid", Json::from(group as i64)), ("components", Json::obj([("Name", Json::obj([("value", Json::str(name))])), ("Transform", Json::obj([("pos", jv(mid))]))]))])];
+        for u in &roots {
+            let Some(got) = self.engine.call("get", &Self::obj(vec![("uid", Json::from(*u as i64)), ("components", Json::arr([Json::str("Transform")]))])).ok() else { continue };
+            let Some(t) = got.get("components").and_then(|c| c.get("Transform")) else { continue };
+            let pos = t.get("pos").and_then(|p| p.as_array()).filter(|a| a.len() >= 3).map(|a| [a[0].as_f64().unwrap_or(0.0) as f32, a[1].as_f64().unwrap_or(0.0) as f32, a[2].as_f64().unwrap_or(0.0) as f32]).unwrap_or([0.0; 3]);
+            let mut local = vec![("pos", jv([pos[0] - mid[0], pos[1] - mid[1], pos[2] - mid[2]]))];
+            for k in ["rot", "scale"] {
+                if let Some(v) = t.get(k) {
+                    local.push((k, v.clone()));
+                }
+            }
+            cmds.push(Self::obj(vec![("op", Json::str("add")), ("uid", Json::from(*u as i64)), ("component", Json::str("Parent")), ("value", Json::obj([("target", Json::from(group as i64))]))]));
+            cmds.push(Self::obj(vec![("op", Json::str("add")), ("uid", Json::from(*u as i64)), ("component", Json::str("LocalTransform")), ("value", Json::obj(local))]));
+        }
+        self.try_call("batch", Self::obj(vec![("commands", Json::arr(cmds))]))?;
+        self.rows_dirty = true;
+        self.refresh_rows();
+        self.expanded.insert(group);
+        self.select(Some(group));
+        Some(group)
+    }
+
     /// Copy the selected entities, each with what is attached under it, for `paste_entities`; the same as JSON text for the system clipboard (so that a scene in another editor can take them). None when nothing is selected.
     pub fn copy_selected(&mut self) -> Option<String> {
         self.refresh_rows();

@@ -15,11 +15,13 @@ pub struct InspectorUi {
     pub resets: Vec<(String, egui::Pos2)>,
     pub files: Vec<(String, String)>,
     files_loaded: bool,
+    /// What is typed in the search box of an entity picker (a field that names another entity).
+    uid_filter: String,
 }
 
 impl Default for InspectorUi {
     fn default() -> InspectorUi {
-        InspectorUi { epoch: 0, search: String::new(), resets: Vec::new(), files: Vec::new(), files_loaded: false }
+        InspectorUi { epoch: 0, search: String::new(), resets: Vec::new(), files: Vec::new(), files_loaded: false, uid_filter: String::new() }
     }
 }
 
@@ -54,6 +56,23 @@ fn component_icon(name: &str) -> Icon {
 
 const BUILTIN_MESHES: [&str; 5] = ["cube", "sphere", "plane", "cylinder", "quad"];
 const BUILTIN_TEXTURES: [&str; 9] = ["checker", "bricks", "grass", "wood", "stone", "tiles", "sand", "metal", "noise"];
+
+/// What an entity picker shows for the uid `n`: None for 0, the name and uid of the entity, or that it is gone.
+pub(crate) fn uid_label(studio: &Studio, n: u64) -> String {
+    if n == 0 {
+        return "None".to_string();
+    }
+    match studio.all.iter().find(|r| r.uid == n) {
+        Some(r) => format!("{}  #{n}", r.name),
+        None => format!("#{n} (no such entity)"),
+    }
+}
+
+/// The entities a picker lists for what was typed: those whose name contains it (or whose uid it is), at most `limit`.
+pub(crate) fn matching_entities<'a>(studio: &'a Studio, filter: &str, limit: usize) -> Vec<&'a crate::state::Row> {
+    let f = filter.trim().to_lowercase();
+    studio.all.iter().filter(|r| f.is_empty() || r.name.to_lowercase().contains(&f) || r.uid.to_string() == f).take(limit).collect()
+}
 
 fn num(v: Option<&Json>) -> f64 {
     v.and_then(|x| x.as_f64()).unwrap_or(0.0)
@@ -329,6 +348,13 @@ impl InspectorUi {
                     let list: Option<(Vec<String>, &str)> = match (comp, f.name.as_str()) {
                         ("MeshRenderer", "mesh") => Some((BUILTIN_MESHES.iter().map(|s| s.to_string()).chain(self.files.iter().filter(|(_, k)| k == "model").map(|(p, _)| p.clone())).collect(), "mesh")),
                         ("MeshRenderer", "texture") | ("Sprite", "texture") | ("Ui", "texture") => Some((BUILTIN_TEXTURES.iter().map(|s| s.to_string()).chain(self.files.iter().filter(|(_, k)| k == "texture").map(|(p, _)| p.clone())).collect(), "texture")),
+                        // (a field that names a prefab, a zone's or a spawner's or a thrower's: the prefabs of the scene)
+                        (_, "prefab") => {
+                            if studio.prefabs.is_empty() {
+                                studio.refresh_prefabs();
+                            }
+                            Some((studio.prefabs.clone(), "prefab"))
+                        }
                         (_, "file") => Some((self.files.iter().filter(|(_, k)| k == "sound").map(|(p, _)| p.clone()).collect(), "sound file")),
                         (_, "voice") | (_, "name") if comp == "Sound" || comp == "SoundFile" || comp == "AudioSource" => Some((["coin", "hit", "jump", "win", "lose", "click", "shoot", "explosion"].iter().map(|s| s.to_string()).collect(), "built-in sound")),
                         _ => None,
@@ -355,10 +381,25 @@ impl InspectorUi {
                     });
                 }
                 "uid" => {
-                    let mut n = v.and_then(|x| x.as_u64()).unwrap_or(0);
+                    // an entity picker (Unreal's actor field): the name of the entity it names, and a list with a search box to choose another
+                    let n = v.and_then(|x| x.as_u64()).unwrap_or(0);
+                    let mut picked: Option<u64> = None;
                     ui.horizontal(|ui| {
-                        if ui.add(egui::DragValue::new(&mut n).speed(0.2)).changed() {
-                            set(self, studio, Json::from(n as i64));
+                        egui::ComboBox::from_id_salt(("entity", uid, comp, &f.name)).selected_text(uid_label(studio, n)).width((ui.available_width() - 100.0).max(80.0)).show_ui(ui, |ui| {
+                            ui.add(egui::TextEdit::singleline(&mut self.uid_filter).hint_text("Search entities").desired_width(180.0));
+                            if ui.selectable_label(n == 0, "None").clicked() {
+                                picked = Some(0);
+                            }
+                            egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
+                                for r in matching_entities(studio, &self.uid_filter, 200) {
+                                    if ui.selectable_label(r.uid == n, format!("{}  #{}", r.name, r.uid)).clicked() {
+                                        picked = Some(r.uid);
+                                    }
+                                }
+                            });
+                        });
+                        if let Some(p) = picked {
+                            set(self, studio, Json::from(p as i64));
                         }
                         if let Some(sel) = studio.selection {
                             if sel != uid && ui.small_button("<- selection").clicked() {

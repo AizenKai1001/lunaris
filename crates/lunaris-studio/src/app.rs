@@ -492,7 +492,10 @@ impl App {
         if dup {
             self.studio.duplicate_selected();
         }
-        // Ctrl+A selects everything listed in the Hierarchy; F2 renames the selected entity
+        // Ctrl+G puts the selection under a new group; Ctrl+A selects everything listed in the Hierarchy; F2 renames the selected entity
+        if ctx.input_mut(|i| i.consume_key(cmd, Key::G)) {
+            self.studio.group_selected();
+        }
         let (all, rename) = ctx.input_mut(|i| (i.consume_key(cmd, Key::A), i.consume_key(Modifiers::NONE, Key::F2)));
         if all {
             let uids: Vec<u64> = self.studio.rows.iter().map(|r| r.uid).collect();
@@ -602,6 +605,10 @@ impl App {
                 }
                 if ui.add_enabled(has, egui::Button::new("Delete               Del")).clicked() {
                     self.studio.delete_selected();
+                    ui.close();
+                }
+                if ui.add_enabled(has, egui::Button::new("Group               Ctrl+G")).on_hover_text("Put the selected entities under a new empty entity, so that they move together").clicked() {
+                    self.studio.group_selected();
                     ui.close();
                 }
                 if ui.add_enabled(has, egui::Button::new("Make Prefab")).on_hover_text("A template of the selected entity and what hangs on it, to place again and again (it is in the Place panel)").clicked() {
