@@ -40,7 +40,7 @@ You drive a deterministic engine through the `lunaris` MCP tools. Work in small 
 
 ## 4. Check and look
 
-- `check` after every build step: no camera, unknown meshes or textures, missing models, clips that do not exist, tile maps with the wrong number of tiles, graph systems that read resources nothing sets.
+- `check` after every build step: no camera, a 3D scene with no light and no environment (flat ambient colour), unknown meshes or textures, missing models, clips that do not exist, tile maps with the wrong number of tiles, graph systems that read resources nothing sets.
 - `render` at 640x360 to look; the reply lists `visible` entities with pixel counts and boxes, `renderer` says what drew it. `minimap` is a text map; `pick`, `raycast`, `nearby` answer "what is there". To check sound without ears: `acoustics {listener, source}` (room reverberation, what gets through walls, echoes) and `record_audio {ticks, path}` (levels per ear, a timeline, `silent`); sounds are `SoundFile` (event name to WAV), `AudioSource` (loops on an entity) and `AcousticMaterial` on colliders (`docs/AUDIO.md`).
 - A black or flat picture usually means: no light, the camera inside something, a mesh scale of 0, or a camera pointing away (the camera looks down -Z).
 

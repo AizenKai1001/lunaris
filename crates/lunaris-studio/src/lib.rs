@@ -30,6 +30,7 @@ mod problems_ui;
 mod project;
 mod project_settings;
 mod rows_world;
+mod shortcuts_ui;
 #[cfg(test)]
 mod shot;
 mod script_ui;

@@ -70,6 +70,7 @@ pub struct App {
     pub(crate) settings: ProjectSettings,
     pub(crate) settings_saved: ProjectSettings,
     pub(crate) settings_open: bool,
+    pub(crate) shortcuts_open: bool,
     settings_scenes: Vec<String>,
     pub(crate) script: ScriptEditor,
     pub(crate) blueprint: BlueprintEditor,
@@ -164,6 +165,7 @@ impl App {
             settings_saved: ProjectSettings::load(&opts_root),
             settings: ProjectSettings::load(&opts_root),
             settings_open: false,
+            shortcuts_open: false,
             settings_scenes: Vec::new(),
             script,
             blueprint,
@@ -641,7 +643,7 @@ impl App {
             ui.menu_button("View", |ui| {
                 ui.checkbox(&mut self.show_hierarchy, "Hierarchy");
                 ui.checkbox(&mut self.show_inspector, "Inspector");
-                ui.checkbox(&mut self.show_bottom, "Project / Console / Systems / Profiler");
+                ui.checkbox(&mut self.show_bottom, "Bottom panel (Project, Console, Problems ...)");
                 ui.separator();
                 if ui.button("Frame selection    F").clicked() {
                     self.viewport.focus_selection(&self.studio);
@@ -685,6 +687,10 @@ impl App {
                     let _ = std::process::Command::new("explorer").arg(docs).spawn();
                     ui.close();
                 }
+                if ui.button("Keyboard Shortcuts...").clicked() {
+                    self.shortcuts_open = true;
+                    ui.close();
+                }
                 ui.label(RichText::new(format!("Lunaris Editor, engine {}", lunaris_api::VERSION)).small().color(theme::TEXT_DIM));
             });
         });
@@ -703,8 +709,12 @@ impl App {
                 }
             }
             chrome::rule(ui);
-            ui.add_sized([56.0, 22.0], egui::Button::new("Pivot")).on_hover_text("Tools work around the object's own origin");
-            ui.add_sized([56.0, 22.0], egui::Button::new("Global")).on_hover_text("Handles are aligned to the world");
+            ui.add_sized([56.0, 22.0], egui::Button::new("Pivot")).on_hover_text("Tools work around the object's own origin (the only way so far)");
+            // (the same switch as the World / Local pill of the scene toolbar)
+            let space = if self.viewport.local_space { "Local" } else { "World" };
+            if ui.add_sized([56.0, 22.0], egui::Button::new(space)).on_hover_text("The Move and Rotate handles along the world's axes (World) or the selected object's own (Local)").clicked() {
+                self.viewport.local_space = !self.viewport.local_space;
+            }
         });
         // middle: play, pause, step
         let mid = Rect::from_center_size(rect.center(), Vec2::new(120.0, rect.height()));
@@ -1234,6 +1244,9 @@ impl App {
         }
         self.confirm_dialog(&ctx);
         self.settings_window(&ctx);
+        if self.shortcuts_open {
+            self.shortcuts_open = crate::shortcuts_ui::window(&ctx);
+        }
         self.handle_shot(&ctx);
     }
 }

@@ -1792,6 +1792,39 @@ impl Engine {
             problems.add("warning", None, "no active Camera with a Transform: pictures use a default view".into(), "add an entity with Camera and Transform, or pass eye/target to `render`");
         }
 
+        // ---- a camera that looks away from every mesh draws an empty picture (it looks along its local -Z)
+        if sprites.is_empty() && tilemaps.is_empty() {
+            let w = &*world;
+            let tf = |uid: u64| w.entity(uid).and_then(|e| w.get::<Transform>(e)).map(|t| (t.pos, t.rot));
+            if let Some((cpos, rot)) = cameras.iter().find(|c| c.1).and_then(|c| tf(c.0)) {
+                // (the quaternion's turn of (0, 0, -1))
+                let (q, v) = ([rot[0], rot[1], rot[2]], [0.0f32, 0.0, -1.0]);
+                let cross = |a: [f32; 3], b: [f32; 3]| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+                let t = cross(q, v);
+                let t = [t[0] + rot[3] * v[0], t[1] + rot[3] * v[1], t[2] + rot[3] * v[2]];
+                let u = cross(q, t);
+                let fwd = [v[0] + 2.0 * u[0], v[1] + 2.0 * u[1], v[2] + 2.0 * u[2]];
+                let placed: Vec<[f32; 3]> = meshes.iter().filter_map(|(uid, _)| tf(*uid).map(|p| p.0)).collect();
+                let finite = fwd.iter().chain(cpos.iter()).all(|x| x.is_finite());
+                if finite && !placed.is_empty() && placed.iter().all(|p| (p[0] - cpos[0]) * fwd[0] + (p[1] - cpos[1]) * fwd[1] + (p[2] - cpos[2]) * fwd[2] <= 0.0) {
+                    problems.add("warning", cameras.iter().find(|c| c.1).map(|c| c.0), "the active Camera looks along its local -Z and every mesh is behind it: pictures are empty".into(), "turn the camera (Transform.rot) or move it; `render` also takes eye and target to look at a point");
+                }
+            }
+        }
+
+        // ---- light: meshes with no Light and no Environment are drawn in one flat ambient colour, which looks like a picture with no shapes in it
+        {
+            use lunaris_sim::components::{Environment, Light};
+            let (mut lights, mut environments) = (0usize, 0usize);
+            world.for_each_uid::<(&Light,), _>(|_, _, _| lights += 1)?;
+            world.for_each_uid::<(&Environment,), _>(|_, _, _| environments += 1)?;
+            let shaded = meshes.iter().filter(|(u, _)| with_transform.contains(u)).count();
+            // (a flat 2D game keeps its colours as authored and needs none: sprites and tile maps, or a lone mesh, are not asked to)
+            if shaded >= 2 && sprites.is_empty() && tilemaps.is_empty() && lights == 0 && environments == 0 {
+                problems.add("warning", None, format!("{shaded} meshes and no Light or Environment: surfaces are drawn in one flat ambient colour, with no shading"), "add a directional Light (its rot aims the sun) and an Environment for the sky and the glow");
+            }
+        }
+
         // ---- things that are drawn
         let texture_ok = |name: &str| name.is_empty() || lunaris_render::is_procedural_texture(name) || file_exists(&root, name);
         for (uid, mesh) in &meshes {
@@ -1805,6 +1838,16 @@ impl Engine {
                     problems.add("error", Some(*uid), format!("unknown mesh `{mesh}`"), "built-ins: cube, sphere, plane, cylinder, quad; models end in .glb or .gltf");
                 } else if !file_exists(&root, mesh) {
                     problems.add("error", Some(*uid), format!("the model file `{mesh}` is not in the workspace"), "paths are relative to the workspace folder");
+                }
+            }
+        }
+        // a mesh with a 0 in its scale has no volume on that axis and draws nothing (a way of hiding it that `visible` says better)
+        {
+            let w = &self.sim.world;
+            for (uid, _) in &meshes {
+                let Some(t) = w.entity(*uid).and_then(|e| w.get::<lunaris_sim::components::Transform>(e)) else { continue };
+                if t.scale.iter().any(|s| *s == 0.0) {
+                    problems.add("warning", Some(*uid), format!("Transform.scale {:?} has a 0: the mesh has no volume and is not drawn", t.scale), "set the scale to 1 (or the size you want); to hide a mesh on purpose set MeshRenderer.visible to false");
                 }
             }
         }

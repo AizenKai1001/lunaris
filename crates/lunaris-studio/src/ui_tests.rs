@@ -347,6 +347,20 @@ fn duplicate_and_delete_take_what_is_attached_under_an_entity_with_it_and_each_i
 }
 
 #[test]
+fn the_keyboard_shortcuts_window_opens_from_the_help_menu_state_and_draws() {
+    let mut h = Harness::new();
+    h.app.shortcuts_open = true;
+    h.frames(30); // (a window fades in over a few tenths of a second)
+    assert!(h.app.shortcuts_open, "it stays open until it is closed");
+    h.shoot("keyboard_shortcuts");
+    // the World / Local button of the main toolbar and the pill of the scene toolbar are one switch
+    assert!(!h.app.viewport.local_space);
+    h.app.viewport.local_space = true;
+    h.frames(2);
+    assert!(h.app.viewport.local_space);
+}
+
+#[test]
 fn the_problems_tab_lists_what_check_finds_and_a_click_selects_the_entity() {
     let mut h = Harness::new();
     let floor = h.uid("Floor");

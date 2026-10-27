@@ -49,3 +49,57 @@ fn a_grid_that_looks_at_thousands_of_cells_round_an_anchor_is_told_so() {
     let m = messages(&mut e);
     assert!(m.iter().any(|x| x.contains("cells round every anchor") && x.contains("radius 3000")), "{m:?}");
 }
+
+#[test]
+fn meshes_with_no_light_and_no_environment_are_told_they_are_flat_and_either_one_quiets_it() {
+    let mut e = engine();
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"pos":[0,1,5]},"Camera":{}}}"#);
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"pos":[0,1,0]},"MeshRenderer":{"mesh":"cube"}}}"#);
+    assert!(!messages(&mut e).iter().any(|x| x.contains("no Light or Environment")), "a lone mesh is not asked to have a light");
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"pos":[3,1,0]},"MeshRenderer":{"mesh":"sphere"}}}"#);
+    let m = messages(&mut e);
+    assert!(m.iter().any(|x| x.contains("no Light or Environment")), "{m:?}");
+    call(&mut e, "spawn", r#"{"components":{"Transform":{},"Light":{"kind":0}}}"#);
+    let m = messages(&mut e);
+    assert!(!m.iter().any(|x| x.contains("no Light or Environment")), "a light quiets it: {m:?}");
+    // an Environment alone does too (the sky lights the surfaces in the GPU qualities), and a 2D scene (it has a sprite) needs neither
+    let mut sky = engine();
+    call(&mut sky, "spawn", r#"{"components":{"Transform":{"pos":[0,1,0]},"MeshRenderer":{"mesh":"cube"}}}"#);
+    call(&mut sky, "spawn", r#"{"components":{"Transform":{"pos":[3,1,0]},"MeshRenderer":{"mesh":"cube"}}}"#);
+    call(&mut sky, "spawn", r#"{"components":{"Environment":{"sky":true}}}"#);
+    assert!(!messages(&mut sky).iter().any(|x| x.contains("no Light or Environment")));
+    let mut empty = engine();
+    for x in [0, 3, 6] {
+        call(&mut empty, "spawn", &format!(r#"{{"components":{{"Transform":{{"pos":[{x},0,0]}},"MeshRenderer":{{"mesh":"cube"}}}}}}"#));
+    }
+    call(&mut empty, "spawn", r#"{"components":{"Transform":{},"Sprite":{}}}"#);
+    assert!(!messages(&mut empty).iter().any(|x| x.contains("no Light or Environment")));
+}
+
+#[test]
+fn a_mesh_with_a_zero_in_its_scale_is_told_it_is_not_drawn() {
+    let mut e = engine();
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"scale":[1,0,1]},"MeshRenderer":{"mesh":"cube"}}}"#);
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"scale":[2,2,2]},"MeshRenderer":{"mesh":"cube"}}}"#);
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"scale":[1,0,1]}}}"#);
+    let m = messages(&mut e);
+    let zero: Vec<&String> = m.iter().filter(|x| x.contains("has a 0")).collect();
+    assert_eq!(zero.len(), 1, "only the mesh that has a zero: {m:?}");
+    assert!(zero[0].contains("not drawn"));
+}
+
+#[test]
+fn a_camera_that_looks_away_from_every_mesh_is_told_so_and_turning_it_quiets_it() {
+    let mut e = engine();
+    // the camera at z = 5 looks along -Z by default: a cube at the origin is in front of it
+    call(&mut e, "spawn", r#"{"uid":1,"components":{"Transform":{"pos":[0,1,5]},"Camera":{}}}"#);
+    call(&mut e, "spawn", r#"{"components":{"Transform":{"pos":[0,1,0]},"MeshRenderer":{"mesh":"cube"}}}"#);
+    assert!(!messages(&mut e).iter().any(|x| x.contains("looks along its local -Z")));
+    // a cube behind it: the camera at z = -5 still looks along -Z
+    call(&mut e, "set", r#"{"uid":1,"component":"Transform","value":{"pos":[0,1,-5]}}"#);
+    let m = messages(&mut e);
+    assert!(m.iter().any(|x| x.contains("looks along its local -Z")), "{m:?}");
+    // turned half a way round (a quarter turn each way of y is a half turn together: rot = (0, 1, 0, 0)) it sees the cube
+    call(&mut e, "set", r#"{"uid":1,"component":"Transform","value":{"rot":[0,1,0,0]}}"#);
+    assert!(!messages(&mut e).iter().any(|x| x.contains("looks along its local -Z")), "turned to face the cube");
+}
