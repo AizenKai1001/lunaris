@@ -32,6 +32,20 @@ fn a_good_motor_spring_cone_and_sleep_say_nothing() {
 }
 
 #[test]
+fn the_joint_kinds_that_exist_are_not_called_unknown_and_one_that_does_not_is() {
+    // (the ragdoll and domino examples use kinds 3 and 4; the check once told their authors that these "act as a rope")
+    let mut e = engine();
+    spawn(&mut e, 1, &format!("{}}}", hinge(3)));
+    spawn(&mut e, 2, &format!("{}}}", hinge(4)));
+    spawn(&mut e, 3, &format!("{}}}", hinge(2)));
+    let m = messages(&mut e);
+    assert!(!m.iter().any(|x| x.contains("Joint.kind")), "{m:?}");
+    spawn(&mut e, 4, &format!("{}}}", hinge(5)));
+    let m = messages(&mut e);
+    assert_eq!(m.iter().filter(|x| x.contains("Joint.kind 5")).count(), 1, "{m:?}");
+}
+
+#[test]
 fn a_motor_or_a_spring_without_a_hinge_and_a_cone_without_a_ball_and_socket_are_named() {
     let mut e = engine();
     spawn(&mut e, 1, &format!(r#"{},"JointMotor":{{"speed":2,"max_torque":10}}}}"#, hinge(3)));

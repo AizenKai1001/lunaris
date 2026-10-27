@@ -423,7 +423,10 @@ impl InspectorUi {
                         // (the values wrap onto lines when the row is too narrow for them, instead of being wider than the panel)
                         ui.horizontal_wrapped(|ui| {
                             let mut changed = false;
-                            if is_color(&f.name, f.count) {
+                            // (a drag box is as wide as its number: a thin padding and the room the colour button and the gaps take keep the row inside the panel)
+                            ui.spacing_mut().button_padding.x = 2.0;
+                            let color = is_color(&f.name, f.count);
+                            if color {
                                 let to8 = |x: f64| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
                                 let mut c = Color32::from_rgba_unmultiplied(to8(xs[0]), to8(xs[1]), to8(xs[2]), if f.count == 4 { to8(xs[3]) } else { 255 });
                                 let before = c;
@@ -439,10 +442,11 @@ impl InspectorUi {
                                     changed = true;
                                 }
                             }
-                            let w = ((ui.available_width() - 6.0 * f.count as f32) / f.count as f32).clamp(36.0, 90.0);
+                            let (gap, button) = (ui.spacing().item_spacing.x, if color { ui.spacing().interact_size.x } else { 0.0 });
+                            let w = ((ui.available_width() - button - gap * f.count as f32) / f.count as f32).clamp(36.0, 90.0);
                             for x in xs.iter_mut() {
                                 let sp = speed_for(*x);
-                                if ui.add_sized([w, 20.0], egui::DragValue::new(x).speed(sp).max_decimals(3)).changed() {
+                                if ui.add_sized([w, 20.0], drag(x, sp)).changed() {
                                     changed = true;
                                 }
                             }
@@ -535,14 +539,28 @@ fn reset_button(ui: &mut egui::Ui) -> egui::Response {
     resp.on_hover_text("Reset to default")
 }
 
+/// A drag box that shows fewer decimals the bigger the number is: "-1638.616" is 9 characters and pushed a row wider than the panel (a value is as exact as it is shown, in the box and when it is edited).
+fn drag(x: &mut f64, speed: f64) -> egui::DragValue<'_> {
+    let decimals = match x.abs() {
+        a if a >= 1000.0 => 1,
+        a if a >= 100.0 => 2,
+        _ => 3,
+    };
+    egui::DragValue::new(x).speed(speed).max_decimals(decimals)
+}
+
 /// Three small drag boxes with X, Y, Z in their colours; true when one was changed.
 fn vec3_row(ui: &mut egui::Ui, v: &mut [f64], speed: f64, labels: [&str; 3], reset: bool) -> (bool, Option<egui::Response>) {
     let mut changed = false;
     let mut arrow = None;
     ui.horizontal(|ui| {
-        let w = ((ui.available_width() - 42.0) / 3.0).clamp(46.0, 100.0);
+        // (a drag box is as wide as the number in it, whatever it was given: a thin padding keeps three boxes with real values (-26.857, 100.125) and the reset arrow inside the panel. The arrow's place is always kept, so that the
+        // boxes do not change their width when a value stops being the default)
+        ui.spacing_mut().button_padding.x = 2.0;
+        let gaps = 3.0 * ui.spacing().item_spacing.x;
+        let w = ((ui.available_width() - gaps - 16.0) / 3.0).clamp(40.0, 100.0);
         for (i, l) in labels.iter().enumerate() {
-            let r = ui.add_sized([w, 20.0], egui::DragValue::new(&mut v[i]).speed(speed).max_decimals(3));
+            let r = ui.add_sized([w, 20.0], drag(&mut v[i], speed));
             if r.changed() {
                 changed = true;
             }

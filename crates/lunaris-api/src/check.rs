@@ -1685,8 +1685,8 @@ impl Engine {
                 if j.target.0 != 0 && w.entity(j.target.0).and_then(|t| w.get::<Transform>(t)).is_none() {
                     problems.add("warning", Some(uid), format!("the Joint's target {} does not exist or has no Transform, so the joint does nothing", j.target.0), "name another end (`target`: the uid of a body, or of anything with a Transform) or use 0 and an `anchor` point");
                 }
-                if j.kind > 2 {
-                    problems.add("warning", Some(uid), format!("Joint.kind {} is not 0 (rope), 1 (rod) or 2 (spring); it acts as a rope", j.kind), "");
+                if j.kind > 4 {
+                    problems.add("warning", Some(uid), format!("Joint.kind {} is not 0 (rope), 1 (rod), 2 (spring), 3 (ball-and-socket) or 4 (hinge); it acts as a rope", j.kind), "");
                 }
             }
         }
@@ -1854,7 +1854,8 @@ impl Engine {
         }
 
         // ---- things that are drawn
-        let texture_ok = |name: &str| name.is_empty() || lunaris_render::is_procedural_texture(name) || file_exists(&root, name);
+        // (`view:UID` is the picture a `CameraView` draws, a texture too: the monitor of docs/GAMEPLAY.md)
+        let texture_ok = |name: &str| name.is_empty() || lunaris_render::is_procedural_texture(name) || name.starts_with("view:") || file_exists(&root, name);
         for (uid, mesh) in &meshes {
             if !with_transform.contains(uid) {
                 problems.add("error", Some(*uid), "has a MeshRenderer but no Transform, so it is never drawn".into(), "add a Transform");
@@ -1882,6 +1883,17 @@ impl Engine {
         for (uid, tex) in &mesh_textures {
             if !texture_ok(tex) {
                 problems.add("error", Some(*uid), format!("the mesh texture `{tex}` was not found"), "use checker, gradient, one of the materials (grass, dirt, stone, bricks, wood, sand, concrete, tiles, metal) or a PNG path inside the workspace");
+            }
+        }
+        // a `view:UID` that names nothing that draws a view is a picture that never comes
+        {
+            let w = &self.sim.world;
+            for (uid, tex) in mesh_textures.iter().chain(sprites.iter()) {
+                let Some(n) = tex.strip_prefix("view:") else { continue };
+                let drawn = n.parse::<u64>().ok().and_then(|n| w.entity(n)).is_some_and(|e| w.get::<lunaris_sim::components::CameraView>(e).is_some());
+                if !drawn {
+                    problems.add("warning", Some(*uid), format!("the texture `{tex}` names no entity with a CameraView, so no picture is drawn into it"), "`view:` is followed by the uid of the entity that has the CameraView (docs/GAMEPLAY.md)");
+                }
             }
         }
         for (uid, tex) in &sprites {

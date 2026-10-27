@@ -2,7 +2,7 @@
 //! has nothing to work on says so, because the picture would look as if it were not there.
 use super::Problems;
 use lunaris_ecs::{Result, World};
-use lunaris_sim::components::{AutoExposure, LensFlare, Light, MeshRenderer, ReflectionProbe, Ssr, Transform, Water, WaterBody};
+use lunaris_sim::components::{AutoExposure, GrassField, LensFlare, Light, MeshRenderer, ReflectionProbe, Ssr, Terrain, Transform, Water, WaterBody};
 
 pub(super) fn run(world: &mut World, problems: &mut Problems) -> Result<()> {
     let mut meshes = 0usize;
@@ -17,6 +17,9 @@ pub(super) fn run(world: &mut World, problems: &mut Problems) -> Result<()> {
             }
         }
     })?;
+    // (a land that is a `Terrain` or a field of grass is lit 3D too, with no mesh in the scene: the effects have something to work on)
+    world.for_each_uid::<(&Terrain,), _>(|_, _, _| meshes += 1)?;
+    world.for_each_uid::<(&GrassField,), _>(|_, _, _| meshes += 1)?;
     let mut suns = 0usize;
     world.for_each_uid::<(&Light,), _>(|_, _, (l,)| {
         if l.kind == 0 {

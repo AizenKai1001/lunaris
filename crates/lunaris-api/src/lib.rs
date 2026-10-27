@@ -68,6 +68,8 @@ mod attached_note_tests;
 #[cfg(test)]
 mod stream_check_tests;
 #[cfg(test)]
+mod view_texture_check_tests;
+#[cfg(test)]
 mod history_tests;
 #[cfg(test)]
 mod interact_check_tests;
@@ -77,6 +79,8 @@ mod vehicle_tests;
 mod mesh_tests;
 #[cfg(test)]
 mod saves_tests;
+#[cfg(test)]
+mod scene_roundtrip_tests;
 #[cfg(test)]
 mod script_tests;
 #[cfg(test)]

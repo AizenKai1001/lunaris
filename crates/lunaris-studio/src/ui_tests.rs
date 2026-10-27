@@ -2411,3 +2411,148 @@ fn stopping_can_keep_what_the_selected_entities_have_after_playing() {
     assert_eq!(h.app.studio.stop_keeping_selected(), 0);
 }
 
+
+/// Every example scene opened in the editor the way File > Open does, and worked on: its rows are all there, every entity's Inspector draws inside the panel without writing to the world, Duplicate and Delete are undone to the very
+/// same state, Play and Stop put the scene back as it was, and `check` runs. `cargo test --release -p lunaris-studio --features eframe/x11 every_example -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn every_example_scene_in_the_editor() {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
+    let mut scenes: Vec<std::path::PathBuf> = Vec::new();
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        let mut v: Vec<_> = rd.flatten().map(|e| e.path()).collect();
+        v.sort();
+        for p in v {
+            if p.is_dir() {
+                if !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('_')) {
+                    walk(&p, out);
+                }
+            } else if p.to_string_lossy().ends_with(".lunaris.json") {
+                out.push(p);
+            }
+        }
+    }
+    walk(&repo.join("examples"), &mut scenes);
+    let mut h = Harness::on(repo.clone());
+    let hash = |h: &mut Harness| h.app.studio.engine.call("hash", &Json::Null).unwrap().get("hash").unwrap().as_str().unwrap().to_string();
+    let scene_text = |h: &mut Harness| {
+        let mut doc = h.app.studio.engine.call("save_scene", &Json::Null).unwrap();
+        // (the next free uid is in the file, and an undo does not give a uid back: uids are never used twice)
+        if let Json::Obj(pairs) = &mut doc {
+            pairs.retain(|(k, _)| k != "next_uid");
+        }
+        doc.to_string_compact().unwrap()
+    };
+    let mut bad: Vec<String> = Vec::new();
+    for path in &scenes {
+        let rel = path.strip_prefix(&repo).unwrap().to_string_lossy().replace('\\', "/");
+        let t = std::time::Instant::now();
+        let mut notes: Vec<String> = Vec::new();
+        let r = catch_unwind(AssertUnwindSafe(|| {
+            h.app.studio.open_scene(&rel);
+            h.frames(3);
+            if h.app.studio.scene.as_deref() != Some(rel.as_str()) {
+                notes.push("did not open".to_string());
+                return;
+            }
+            let n = h.app.studio.engine.sim.world.len();
+            if h.app.studio.all.len() != n.min(10_000) {
+                notes.push(format!("{} rows for {n} entities", h.app.studio.all.len()));
+            }
+            let h0 = hash(&mut h);
+            let doc0 = scene_text(&mut h);
+            let uids: Vec<u64> = h.app.studio.all.iter().map(|r| r.uid).collect();
+            let step = (uids.len() / 25).max(1);
+            for uid in uids.iter().step_by(step) {
+                let rev = h.app.studio.live_revision;
+                h.app.studio.select(Some(*uid));
+                h.frames(2);
+                if h.app.inspector.overflow > 1.0 {
+                    let comps: Vec<String> = h.app.studio.entity.as_ref().map(|e| e.comps.iter().map(|(n, _)| n.clone()).collect()).unwrap_or_default();
+                    notes.push(format!("#{uid} {comps:?}: rows {:.0} points wider than the Inspector", h.app.inspector.overflow));
+                    break;
+                }
+                if h.app.studio.live_revision != rev {
+                    notes.push(format!("#{uid}: drawing the Inspector changed the world"));
+                    break;
+                }
+            }
+            if h.app.studio.all.len() != n.min(10_000) || hash(&mut h) != h0 || scene_text(&mut h) != doc0 {
+                notes.push("selecting changed the scene".to_string());
+            }
+            if let Some(uid) = uids.first().copied() {
+                // (what is compared is the scene as it would be saved, without its next free uid)
+                h.app.studio.duplicate(uid);
+                h.app.studio.undo();
+                h.frames(1);
+                if scene_text(&mut h) != doc0 {
+                    notes.push(format!("duplicate + undo of #{uid} changed the scene"));
+                }
+                h.app.studio.delete(uid);
+                h.app.studio.undo();
+                h.frames(1);
+                if scene_text(&mut h) != doc0 {
+                    notes.push(format!("delete + undo of #{uid} changed the scene"));
+                }
+            }
+            let before_play = hash(&mut h);
+            h.app.studio.play();
+            h.frames(15);
+            h.app.studio.stop();
+            h.frames(2);
+            if hash(&mut h) != before_play {
+                notes.push("Play + Stop did not put the scene back".to_string());
+            }
+            h.app.problems.run(&mut h.app.studio);
+        }));
+        if r.is_err() {
+            notes.push("PANIC".to_string());
+        }
+        println!("{rel}: {:.0} ms{}", t.elapsed().as_secs_f64() * 1e3, if notes.is_empty() { String::new() } else { format!("  <-- {}", notes.join("; ")) });
+        bad.extend(notes.into_iter().map(|n| format!("{rel}: {n}")));
+    }
+    assert!(bad.is_empty(), "{} problems in {} scenes:\n{}", bad.len(), scenes.len(), bad.join("\n"));
+}
+
+#[test]
+fn rows_with_real_values_and_every_reset_arrow_showing_fit_in_the_inspector() {
+    let mut h = Harness::new();
+    let cases = [
+        ("a Transform that is not at the defaults", r#"{"components":{"Name":{"value":"T"},"Transform":{"pos":[12.5,-3.25,100.125],"rot":[-0.231945,0.822352,0,0.519556],"scale":[2,3,4]}}}"#),
+        ("a Light with a colour that is not white", r#"{"components":{"Name":{"value":"L"},"Transform":{},"Light":{"kind":0,"color":[1.0,0.72,0.46],"intensity":2.6}}}"#),
+        ("a Camera with a clear colour", r#"{"components":{"Name":{"value":"C"},"Transform":{},"Camera":{"fov_y":55,"clear":[0.5,0.6,0.8,1]}}}"#),
+        ("a mesh with a colour and a texture", r#"{"components":{"Name":{"value":"M"},"Transform":{},"MeshRenderer":{"mesh":"cube","color":[0.3,0.6,0.3,1],"metallic":0.5,"roughness":0.25,"texture":"grass","uv_scale":[40,40]}}}"#),
+        ("a Camera thousands of metres from the origin", r#"{"components":{"Name":{"value":"F"},"Transform":{"pos":[-1638.6158167672525,1613.742473581666,4502.05995572922],"rot":[-0.12854320606946856,-0.17216259343480453,-0.022665635416815415,0.9763825861650424]},"Camera":{"active":true,"far":32000.0,"fov_y":38,"near":1.0}}}"#),
+        ("a Sprite with a translucent colour", r#"{"components":{"Name":{"value":"S"},"Transform":{"pos":[-18.22,0.59,-3]},"Sprite":{"size":[0.08,0.08],"color":[1,1,0.85,0.8],"texture":"circle","sheet":[1,1],"frame":0}}}"#),
+        ("a tree with a collider and a sway", r#"{"components":{"Transform":{"pos":[83.50759887695312,15.76729965209961,47.56420135498047],"rot":[0,0.9364,0,-0.3509],"scale":[1.3016,1.3016,1.3016]},"Collider":{"shape":1,"size":[0.7,3.4,0.7]},"MeshRenderer":{"mesh":"cube","color":[0.8,0.8,0.8,1],"roughness":0.9,"bump":0.03},"Sway":{"amount":0.12,"extent":6,"speed":0.7,"offset":0.6}}}"#),
+    ];
+    let mut too_wide: Vec<String> = Vec::new();
+    for (what, spawn) in cases {
+        let uid = h.app.studio.call("spawn", j(spawn)).unwrap().get("uid").unwrap().as_u64().unwrap();
+        h.app.studio.rows_dirty = true;
+        h.app.studio.select(Some(uid));
+        h.frames(4);
+        println!("{what}: {:.1} points wider than the panel", h.app.inspector.overflow);
+        if h.app.inspector.overflow > 1.0 {
+            too_wide.push(format!("{what}: {:.1}", h.app.inspector.overflow));
+        }
+    }
+    assert!(too_wide.is_empty(), "{too_wide:?}");
+}
+
+/// One entity of one example scene in the Inspector, with the width it takes: `LUNARIS_ONE=examples/x.lunaris.json:5 cargo test ... one_example_entity -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn one_example_entity() {
+    let Ok(spec) = std::env::var("LUNARIS_ONE") else { return };
+    let (scene, uid) = spec.rsplit_once(':').unwrap();
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
+    let mut h = Harness::on(repo);
+    h.app.studio.open_scene(scene);
+    h.frames(3);
+    h.app.studio.select(Some(uid.parse().unwrap()));
+    h.frames(4);
+    println!("overflow {:.1}", h.app.inspector.overflow);
+}

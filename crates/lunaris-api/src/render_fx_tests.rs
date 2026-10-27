@@ -36,6 +36,11 @@ fn check_finds_the_mistakes_of_auto_exposure() {
     // a flat scene has nothing to measure
     e.call("spawn", &j(r#"{"uid":2,"components":{"AutoExposure":{}}}"#)).unwrap();
     assert!(problems(&mut e).iter().any(|p| p.contains("no 3D meshes")), "{:?}", problems(&mut e));
+    // a land with no mesh on it is a lit 3D scene too (the hollowlight hills are one)
+    e.call("spawn", &j(r#"{"uid":9,"components":{"Transform":{},"Terrain":{}}}"#)).unwrap();
+    assert!(!problems(&mut e).iter().any(|p| p.contains("no 3D meshes")), "{:?}", problems(&mut e));
+    e.call("despawn", &j(r#"{"uid":9}"#)).unwrap();
+    assert!(problems(&mut e).iter().any(|p| p.contains("no 3D meshes")), "{:?}", problems(&mut e));
     cube(&mut e);
     assert!(!problems(&mut e).iter().any(|p| p.contains("AutoExposure")), "{:?}", problems(&mut e));
     // numbers that mean nothing, and a second one
