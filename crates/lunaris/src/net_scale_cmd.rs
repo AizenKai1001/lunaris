@@ -246,6 +246,22 @@ pub fn token(kv: &HashMap<String, String>) -> ExitCode {
     })
 }
 
+/// The resources of `--resources NAME=VALUE,NAME=VALUE`, set on the world in one step; how many were set.
+fn set_resources(engine: &mut Engine, list: &str) -> Result<usize, String> {
+    let mut values: Vec<(String, Json)> = Vec::new();
+    for item in list.split(',').map(str::trim).filter(|i| !i.is_empty()) {
+        let (name, value) = item.split_once('=').ok_or_else(|| format!("--resources: `{item}` is not NAME=VALUE"))?;
+        let number: f64 = value.trim().parse().map_err(|_| format!("--resources: the value of {} must be a number, not `{}`", name.trim(), value.trim()))?;
+        values.push((name.trim().to_string(), Json::from(number)));
+    }
+    if values.is_empty() {
+        return Ok(0);
+    }
+    let n = values.len();
+    engine.call("set_resource", &Json::obj([("values", Json::obj(values))])).map_err(|e| format!("--resources: {e}"))?;
+    Ok(n)
+}
+
 /// `lunaris server --scene SCENE [--players N] [--port P] [--bind ADDR] [--seconds S]`: the scene is the game, run here (docs/GAME_SERVER.md): its own systems, an avatar for every player that
 /// connects, what it replicates (`NetEntity`) told to the players, saved as its `NetHost` says. Without `--scene` it is the demo match of [`server`].
 fn game_server(kv: &HashMap<String, String>, seed: u64, root: PathBuf, scene: &str) -> Result<ExitCode, String> {
@@ -262,6 +278,11 @@ fn game_server(kv: &HashMap<String, String>, seed: u64, root: PathBuf, scene: &s
     let bind = kv.get("bind").cloned().unwrap_or_else(|| "127.0.0.1".to_string());
     let mut engine = Engine::new(seed.max(1), root);
     engine.call("load_scene", &Json::obj([("path", Json::str(scene))])).map_err(|e| format!("cannot load {scene}: {e}"))?;
+    // (`--resources NAME=VALUE,NAME=VALUE`: resources set once the scene is loaded, for what depends on the machine and the load and not on the game: `nav.cells_per_step=2000`, `stream.loads_per_tick=3`, `procgrid.every=4`)
+    if let Some(list) = kv.get("resources") {
+        let n = set_resources(&mut engine, list)?;
+        println!("{n} resources set from --resources");
+    }
     let entities = engine.sim.world.len();
     let transport = UdpTransport::bind(&format!("{bind}:{port}")).map_err(|e| format!("cannot listen on {bind}:{port}: {e}"))?;
     let profile = kv.contains_key("profile");
@@ -642,6 +663,19 @@ pub fn swarm(positional: &[String], kv: &HashMap<String, String>) -> ExitCode {
 mod tests {
     use super::*;
     use lunaris_sim::components::NetConnect;
+
+    /// `--resources` sets every named resource in one step, and says what is wrong with a list that is not NAME=VALUE pairs of numbers.
+    #[test]
+    fn the_resources_flag_sets_each_named_resource_and_refuses_a_bad_list() {
+        let mut engine = Engine::new(1, std::env::temp_dir());
+        assert_eq!(set_resources(&mut engine, "nav.cells_per_step=2000, stream.loads_per_tick = 3,,").unwrap(), 2);
+        assert_eq!(engine.sim.world.resource("nav.cells_per_step"), Some(2000.0));
+        assert_eq!(engine.sim.world.resource("stream.loads_per_tick"), Some(3.0));
+        assert_eq!(set_resources(&mut engine, "").unwrap(), 0);
+        assert!(set_resources(&mut engine, "nav.cells_per_step").unwrap_err().contains("NAME=VALUE"));
+        assert!(set_resources(&mut engine, "procgrid.every=often").unwrap_err().contains("must be a number"));
+        assert_eq!(engine.sim.world.resource("procgrid.every"), None, "a bad list sets nothing");
+    }
 
     fn status(engine: &mut Engine) -> (u32, String) {
         let mut found: Option<NetConnect> = None;
