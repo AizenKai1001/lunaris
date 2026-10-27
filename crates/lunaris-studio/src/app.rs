@@ -492,6 +492,28 @@ impl App {
         if dup {
             self.studio.duplicate_selected();
         }
+        // Ctrl+A selects everything listed in the Hierarchy; F2 renames the selected entity
+        let (all, rename) = ctx.input_mut(|i| (i.consume_key(cmd, Key::A), i.consume_key(Modifiers::NONE, Key::F2)));
+        if all {
+            let uids: Vec<u64> = self.studio.rows.iter().map(|r| r.uid).collect();
+            let main = self.studio.selection;
+            self.studio.select_many(uids, main);
+        }
+        if rename {
+            if let Some(uid) = self.studio.selection {
+                let name = self.studio.all.iter().find(|r| r.uid == uid).map(|r| r.name.clone()).unwrap_or_default();
+                self.show_hierarchy = true;
+                self.hierarchy.begin_rename(uid, &name);
+            }
+        }
+        // Ctrl+C and Ctrl+V reach the window as copy and paste events, with the system clipboard's text in the paste (a scene in another editor may have put entities there)
+        let (copy, paste) = ctx.input(|i| (i.events.iter().any(|e| matches!(e, egui::Event::Copy)), i.events.iter().find_map(|e| if let egui::Event::Paste(t) = e { Some(t.clone()) } else { None })));
+        if copy {
+            self.copy_entities(ctx);
+        }
+        if let Some(text) = paste {
+            self.studio.paste_entities(Some(&text));
+        }
         if del {
             self.studio.delete_selected();
         }
@@ -508,6 +530,15 @@ impl App {
     }
 
     // ------------------------------------------------------------------------------------------------------------- panels
+
+    /// Copy the selected entities (with what is attached under them) for a paste here or in another editor.
+    fn copy_entities(&mut self, ctx: &egui::Context) {
+        if let Some(text) = self.studio.copy_selected() {
+            ctx.copy_text(text);
+            let n = self.studio.entity_clipboard.len();
+            self.studio.toast(format!("Copied {n} {}", if n == 1 { "entity" } else { "entities" }), false);
+        }
+    }
 
     fn menu_bar(&mut self, ui: &mut egui::Ui) {
         let spawn_at = self.viewport.target;
@@ -556,12 +587,33 @@ impl App {
                 }
                 ui.separator();
                 let has = self.studio.selection.is_some();
+                if ui.add_enabled(has, egui::Button::new("Copy                 Ctrl+C")).clicked() {
+                    let ctx = ui.ctx().clone();
+                    self.copy_entities(&ctx);
+                    ui.close();
+                }
+                if ui.add_enabled(!self.studio.entity_clipboard.is_empty(), egui::Button::new("Paste                Ctrl+V")).clicked() {
+                    self.studio.paste_entities(None);
+                    ui.close();
+                }
                 if ui.add_enabled(has, egui::Button::new("Duplicate        Ctrl+D")).clicked() {
                     self.studio.duplicate_selected();
                     ui.close();
                 }
                 if ui.add_enabled(has, egui::Button::new("Delete               Del")).clicked() {
                     self.studio.delete_selected();
+                    ui.close();
+                }
+                if ui.add_enabled(has, egui::Button::new("Make Prefab")).on_hover_text("A template of the selected entity and what hangs on it, to place again and again (it is in the Place panel)").clicked() {
+                    if let Some(u) = self.studio.selection {
+                        self.studio.make_prefab(u);
+                    }
+                    ui.close();
+                }
+                if ui.button("Select All          Ctrl+A").clicked() {
+                    let uids: Vec<u64> = self.studio.rows.iter().map(|r| r.uid).collect();
+                    let main = self.studio.selection;
+                    self.studio.select_many(uids, main);
                     ui.close();
                 }
                 if ui.button("Select None").clicked() {

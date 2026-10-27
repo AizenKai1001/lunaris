@@ -28,6 +28,7 @@ mod place;
 mod profiler;
 mod project;
 mod project_settings;
+mod rows_world;
 #[cfg(test)]
 mod shot;
 mod script_ui;

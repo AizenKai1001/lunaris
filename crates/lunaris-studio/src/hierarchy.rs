@@ -94,6 +94,18 @@ pub fn create_menu(ui: &mut egui::Ui, studio: &mut Studio, at: [f32; 3]) {
 }
 
 impl HierarchyUi {
+    /// The entity whose name is being typed (for tests).
+    #[cfg(test)]
+    pub fn renaming_uid(&self) -> Option<u64> {
+        self.renaming.as_ref().map(|(u, _)| *u)
+    }
+
+    /// Start renaming an entity (F2): its row turns into a text box.
+    pub fn begin_rename(&mut self, uid: u64, name: &str) {
+        self.renaming = Some((uid, name.to_string()));
+        self.focus_rename = true;
+    }
+
     /// The middle of the eye of the row of `uid`, as drawn last frame (for tests).
     #[cfg(test)]
     pub fn eye_center(&self, uid: u64) -> Option<egui::Pos2> {
@@ -147,6 +159,7 @@ impl HierarchyUi {
         let mut duplicate: Option<u64> = None;
         let mut attach: Option<(u64, Option<u64>)> = None;
         let mut start_rename: Option<(u64, String)> = None;
+        let mut make_prefab: Option<u64> = None;
         let mut eye_click: Option<(u64, bool)> = None;
         self.eyes.clear();
         let selected = studio.selection;
@@ -266,6 +279,10 @@ impl HierarchyUi {
                         delete = Some(r.uid);
                         ui.close();
                     }
+                    if ui.button("Make Prefab").on_hover_text("A template of this entity and what hangs on it, to place again and again (it is in the Place panel)").clicked() {
+                        make_prefab = Some(r.uid);
+                        ui.close();
+                    }
                     ui.separator();
                     if r.parent.is_some() && ui.button("Detach from parent").clicked() {
                         attach = Some((r.uid, None));
@@ -307,6 +324,9 @@ impl HierarchyUi {
                 studio.expanded.insert(u);
             }
             studio.rebuild_tree();
+        }
+        if let Some(u) = make_prefab {
+            studio.make_prefab(u);
         }
         if let Some(r) = start_rename {
             studio.select(Some(r.0));

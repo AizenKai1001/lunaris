@@ -304,6 +304,198 @@ fn the_streaming_overlay_reads_the_zones_and_says_how_many_are_loaded() {
 }
 
 #[test]
+fn duplicate_and_delete_take_what_is_attached_under_an_entity_with_it_and_each_is_one_undo_step() {
+    let mut h = Harness::new();
+    for c in [
+        r#"{"uid":100,"components":{"Name":{"value":"Crate"},"Transform":{"pos":[0,0,5]}}}"#,
+        r#"{"uid":101,"components":{"Name":{"value":"Lid"},"Transform":{"pos":[0,1,5]},"Parent":{"target":100},"LocalTransform":{"pos":[0,1,0]}}}"#,
+        r#"{"uid":102,"components":{"Name":{"value":"Latch"},"Transform":{"pos":[0,1,6]},"Parent":{"target":101},"LocalTransform":{"pos":[0,0,1]}}}"#,
+    ] {
+        h.app.studio.call("spawn", j(c)).unwrap();
+    }
+    h.app.studio.refresh_rows();
+    let total = h.app.studio.total_entities;
+    assert_eq!(h.app.studio.subtree(100), [100, 101, 102], "a parent before its children");
+    assert_eq!(h.app.studio.subtree(102), [102]);
+    let get = |h: &mut Harness, uid: u64| -> Json { h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["Name","Parent","Transform"]}}"#))).unwrap().get("components").unwrap().clone() };
+    h.app.studio.duplicate(100);
+    assert_eq!(h.app.studio.total_entities, total + 3, "the crate, its lid and the latch on the lid");
+    let copy = h.app.studio.selection.expect("the copy of the crate is selected");
+    let root = get(&mut h, copy);
+    assert_eq!(root.get("Name").unwrap().get("value").unwrap().as_str(), Some("Crate 2"));
+    assert_eq!(root.get("Transform").unwrap().get("pos").unwrap().as_array().unwrap()[0].as_f64(), Some(1.0), "a metre to the side");
+    let kid = h.app.studio.all.iter().find(|r| r.parent == Some(copy)).expect("the copy has a child").uid;
+    let grandkid = h.app.studio.all.iter().find(|r| r.parent == Some(kid)).expect("and the child has one").uid;
+    assert!(![100, 101, 102].contains(&kid) && ![100, 101, 102].contains(&grandkid), "new entities, not the old ones");
+    assert_eq!(get(&mut h, kid).get("Name").unwrap().get("value").unwrap().as_str(), Some("Lid"));
+    assert_eq!(get(&mut h, 101).get("Parent").unwrap().get("target").unwrap().as_u64(), Some(100), "the originals are as they were");
+    // one undo takes the whole copy back, and a delete takes the copy with what hangs on it and one undo brings it all back
+    h.app.studio.undo();
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total, "one undo takes the three copies away");
+    h.app.studio.redo();
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total + 3);
+    h.app.studio.delete(copy);
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total, "the crate and what hung on it are gone");
+    assert!(h.app.studio.all.iter().all(|r| r.parent.is_none_or(|p| h.app.studio.all.iter().any(|q| q.uid == p))), "no child is left with a parent that is gone");
+    h.app.studio.undo();
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total + 3, "one undo brings them all back");
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == grandkid).and_then(|r| r.parent), Some(kid));
+}
+
+#[test]
+fn make_prefab_turns_an_entity_and_what_hangs_on_it_into_a_template_that_spawns_the_same_shape() {
+    let mut h = Harness::new();
+    for c in [
+        r#"{"uid":100,"components":{"Name":{"value":"Crate"},"Transform":{"pos":[3,0,5],"scale":[2,2,2]},"MeshRenderer":{"mesh":"cube","color":[0.6,0.4,0.2,1]}}}"#,
+        r#"{"uid":101,"components":{"Name":{"value":"Lid"},"Transform":{"pos":[3,2,5]},"Parent":{"target":100},"LocalTransform":{"pos":[0,1,0],"scale":[1,0.1,1]},"MeshRenderer":{"mesh":"cube"}}}"#,
+        r#"{"uid":102,"components":{"Name":{"value":"Latch"},"Transform":{"pos":[3,2,6]},"Parent":{"target":101},"LocalTransform":{"pos":[0,0,1]},"MeshRenderer":{"mesh":"sphere"}}}"#,
+    ] {
+        h.app.studio.call("spawn", j(c)).unwrap();
+    }
+    assert_eq!(h.app.studio.make_prefab(100).as_deref(), Some("Crate"));
+    assert!(h.app.studio.prefabs.contains(&"Crate".to_string()), "it is listed for the Place panel");
+    assert_eq!(h.app.studio.make_prefab(100).as_deref(), Some("Crate 2"), "a name that is taken gets a number");
+    let total = h.app.studio.total_entities;
+    // spawning it makes the same shape: a root, its lid and the latch on the lid, the root where it was asked to be
+    let r = h.app.studio.call("spawn_prefab", j(r#"{"prefab":"Crate","at":[20,0,0]}"#)).unwrap();
+    assert!(r.get("ok").is_some() || r.get("uid").is_some() || r.get("first_uid").is_some(), "{r:?}");
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total + 3);
+    let roots: Vec<&crate::state::Row> = h.app.studio.all.iter().filter(|r| r.name == "Crate" && r.uid != 100).collect();
+    assert_eq!(roots.len(), 1);
+    let root = roots[0].uid;
+    let pos = h.app.studio.call("get", j(&format!(r#"{{"uid":{root},"components":["Transform"]}}"#))).unwrap().get("components").unwrap().get("Transform").unwrap().clone();
+    assert_eq!(pos.get("pos").unwrap().as_array().unwrap()[0].as_f64(), Some(20.0));
+    assert_eq!(pos.get("scale").unwrap().as_array().unwrap()[0].as_f64(), Some(2.0), "the root keeps its scale");
+    let lid = h.app.studio.all.iter().find(|r| r.parent == Some(root)).expect("the lid hangs on the new crate");
+    assert_eq!(lid.name, "Lid");
+    let latch = h.app.studio.all.iter().find(|r| r.parent == Some(lid.uid)).expect("and the latch on the lid");
+    assert_eq!(latch.name, "Latch");
+    // the original is as it was
+    assert_eq!(h.app.studio.all.iter().find(|r| r.uid == 101).and_then(|r| r.parent), Some(100));
+}
+
+#[test]
+fn ctrl_a_selects_everything_listed_and_f2_starts_renaming_the_selected_entity() {
+    let mut h = Harness::new();
+    let ball = h.uid("Ball");
+    h.app.studio.select(Some(ball));
+    h.key(Key::A, Modifiers::COMMAND);
+    assert_eq!(h.app.studio.selected.len(), h.app.studio.rows.len(), "every row is selected");
+    assert_eq!(h.app.studio.selection, Some(ball), "the main one stays the main one");
+    h.app.studio.select(Some(ball));
+    assert_eq!(h.app.hierarchy.renaming_uid(), None);
+    h.key(Key::F2, Modifiers::NONE);
+    assert_eq!(h.app.hierarchy.renaming_uid(), Some(ball), "F2 turns the row of the selected entity into a text box");
+}
+
+#[test]
+fn ctrl_c_and_ctrl_v_copy_entities_with_what_hangs_on_them_into_this_scene_or_another_editor() {
+    let mut h = Harness::new();
+    for c in [
+        r#"{"uid":100,"components":{"Name":{"value":"Crate"},"Transform":{"pos":[3,0,5]}}}"#,
+        r#"{"uid":101,"components":{"Name":{"value":"Lid"},"Transform":{"pos":[3,1,5]},"Parent":{"target":100},"LocalTransform":{"pos":[0,1,0]}}}"#,
+    ] {
+        h.app.studio.call("spawn", j(c)).unwrap();
+    }
+    h.app.studio.refresh_rows();
+    let total = h.app.studio.total_entities;
+    // nothing selected: nothing to copy
+    assert!(h.app.studio.copy_selected().is_none());
+    // the keys reach the window as copy and paste events
+    h.app.studio.select(Some(100));
+    h.frame(vec![Event::Copy]);
+    assert_eq!(h.app.studio.entity_clipboard.len(), 2, "the crate and its lid");
+    h.frame(vec![Event::Paste("something that is not entities".to_string())]);
+    h.frames(2);
+    assert_eq!(h.app.studio.total_entities, total + 2, "a paste of other text pastes the last copy");
+    let copy = h.app.studio.selection.expect("the pasted crate is selected");
+    let got = h.app.studio.call("get", j(&format!(r#"{{"uid":{copy},"components":["Name","Transform"]}}"#))).unwrap();
+    assert_eq!(got.get("components").unwrap().get("Name").unwrap().get("value").unwrap().as_str(), Some("Crate 2"));
+    assert_eq!(got.get("components").unwrap().get("Transform").unwrap().get("pos").unwrap().as_array().unwrap()[0].as_f64(), Some(3.0), "pasted where it was");
+    let lid = h.app.studio.all.iter().find(|r| r.parent == Some(copy)).expect("the pasted lid hangs on the pasted crate");
+    assert_ne!(lid.uid, 101);
+    // one undo takes the paste back
+    h.app.studio.undo();
+    h.app.studio.refresh_rows();
+    assert_eq!(h.app.studio.total_entities, total);
+    // the text of the system clipboard carries them to another editor
+    h.app.studio.select(Some(100));
+    let text = h.app.studio.copy_selected().expect("text");
+    let mut other = Harness::new();
+    let before = other.app.studio.total_entities;
+    other.app.studio.entity_clipboard.clear();
+    assert_eq!(other.app.studio.paste_entities(Some(&text)), 2);
+    assert_eq!(other.app.studio.total_entities, before + 2);
+    assert!(other.app.studio.all.iter().any(|r| r.name == "Crate") && other.app.studio.all.iter().any(|r| r.name == "Lid"));
+    // a child copied alone is pasted free, with its place
+    other.app.studio.select(Some(other.uid("Lid")));
+    let lone = other.app.studio.copy_selected().expect("text");
+    other.app.studio.paste_entities(Some(&lone));
+    let pasted = other.app.studio.selection.unwrap();
+    assert!(other.app.studio.all.iter().find(|r| r.uid == pasted).unwrap().parent.is_none(), "a copy whose parent was not copied is free");
+    let got = other.app.studio.call("get", j(&format!(r#"{{"uid":{pasted},"components":["LocalTransform","Transform"]}}"#))).unwrap();
+    assert!(got.get("components").unwrap().get("LocalTransform").is_none_or(|v| v.is_null()), "and it has no LocalTransform");
+}
+
+#[test]
+fn the_rows_read_from_the_world_are_the_rows_the_query_tool_gave() {
+    let mut h = Harness::new();
+    for c in [
+        r#"{"uid":100,"components":{"Name":{"value":"Parent"},"Transform":{"pos":[1,2,3]},"MeshRenderer":{"mesh":"cube"}}}"#,
+        r#"{"uid":101,"components":{"Name":{"value":"Child"},"Transform":{},"Parent":{"target":100},"LocalTransform":{"pos":[0,1,0]},"MeshRenderer":{"mesh":"sphere","visible":false}}}"#,
+        r#"{"uid":102,"components":{"Name":{"value":"Grandchild"},"Transform":{},"Parent":{"target":101},"LocalTransform":{},"MeshRenderer":{"mesh":"cube"}}}"#,
+        r#"{"uid":103,"components":{"Transform":{"pos":[5,0,0]},"Camera":{}}}"#,
+        r#"{"uid":104,"components":{"Name":{"value":"Panel"},"Ui":{"pos":[0.1,0.1],"size":[0.2,0.2]}}}"#,
+        r#"{"uid":105,"components":{"Name":{"value":"No place"}}}"#,
+        r#"{"uid":106,"components":{"Transform":{},"Emitter":{}}}"#,
+        r#"{"uid":107,"components":{"Name":{"value":"Orphan"},"Transform":{},"Parent":{"target":99999},"LocalTransform":{}}}"#,
+    ] {
+        h.app.studio.call("spawn", j(c)).unwrap();
+    }
+    let (total, expect) = h.app.studio.rows_via_query().expect("the query answers");
+    let (now_total, now) = crate::rows_world::read(&h.app.studio.engine.sim.world, 10_000);
+    assert_eq!(total, now_total);
+    assert_eq!(now, expect, "the same rows in the same order");
+    assert!(now.len() >= 12 && now.iter().any(|r| r.uid == 100 && r.meshes == 3 && r.shown == 2), "a parent counts the meshes under it and the shown ones");
+    // a limit keeps the first by uid
+    let (t, few) = crate::rows_world::read(&h.app.studio.engine.sim.world, 5);
+    assert_eq!((t, few.len()), (total, 5));
+    assert_eq!(few.iter().map(|r| r.uid).collect::<Vec<_>>(), now.iter().take(5).map(|r| r.uid).collect::<Vec<_>>());
+}
+
+/// What a big scene costs the editor: `cargo test --release -p lunaris-studio --features eframe/x11 big_scene -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn big_scene_editor_costs() {
+    let mut h = Harness::new();
+    let n = 10_000;
+    let mut cmds = Vec::new();
+    for i in 0..n {
+        cmds.push(format!(r#"{{"op":"spawn","components":{{"Name":{{"value":"Thing {i}"}},"Transform":{{"pos":[{},0,{}]}},"MeshRenderer":{{"mesh":"cube","color":[0.5,0.5,0.5,1]}}}}}}"#, i % 100, i / 100));
+    }
+    h.app.studio.call("batch", j(&format!(r#"{{"commands":[{}]}}"#, cmds.join(",")))).unwrap();
+    let time = |label: &str, f: &mut dyn FnMut()| {
+        let t = std::time::Instant::now();
+        f();
+        println!("{label}: {:.2} ms", t.elapsed().as_secs_f64() * 1e3);
+    };
+    time("refresh_rows (10,000 entities)", &mut || h.app.studio.refresh_rows());
+    h.frames(3);
+    let t = std::time::Instant::now();
+    h.frames(60);
+    println!("an idle frame (nothing changed): {:.2} ms", t.elapsed().as_secs_f64() * 1e3 / 60.0);
+    h.app.studio.mode = Mode::Play;
+    let t = std::time::Instant::now();
+    h.frames(60);
+    println!("a playing frame (rows rebuilt every 250 ms, the game stepped): {:.2} ms", t.elapsed().as_secs_f64() * 1e3 / 60.0);
+}
+
+#[test]
 fn the_streaming_tab_lists_the_zones_without_the_overlay_loaded_first() {
     let mut h = Harness::new();
     h.app.studio.call("define_prefab", j(r#"{"name":"block","components":{"Transform":{}}}"#)).unwrap();

@@ -81,7 +81,7 @@ pub struct LogLine {
 }
 
 /// One line of the hierarchy.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Row {
     pub uid: u64,
     pub name: String,
@@ -256,6 +256,8 @@ pub struct Studio {
     pub brush: Option<crate::paint::Brush>,
     /// The values of a component that the Inspector copied (its name and its fields as the engine gave them), for Paste.
     pub component_clipboard: Option<(String, Json)>,
+    /// Entities copied with Ctrl+C (and the same as JSON text): each with its uid and components, the roots first and every parent before its children.
+    pub entity_clipboard: Vec<(u64, Json)>,
     pub quit: bool,
     next_refresh: Option<Instant>,
     /// When the scene file had the modification time we know of (what we loaded or saved), and when to look again.
@@ -307,6 +309,7 @@ impl Studio {
             prefabs: Vec::new(),
             brush: None,
             component_clipboard: None,
+            entity_clipboard: Vec::new(),
             quit: false,
             next_refresh: None,
             scene_stamp: None,
@@ -429,10 +432,18 @@ impl Studio {
     }
 
     pub fn refresh_rows(&mut self) {
+        let (total, rows) = crate::rows_world::read(&self.engine.sim.world, MAX_ROWS);
+        self.total_entities = total;
+        self.install_rows(rows);
+    }
+
+    /// The rows the way the editor used to read them, through the `query` tool and its JSON (a test compares the two).
+    #[cfg(test)]
+    pub fn rows_via_query(&mut self) -> Option<(usize, Vec<Row>)> {
         let select = Json::arr(["Name", "Parent", "Transform", "Camera", "Light", "MeshRenderer", "Sprite", "Text", "Ui", "Emitter", "AudioSource", "Collider", "Tilemap", "Environment"].iter().map(|s| Json::str(*s)));
         let q = self.engine.call("query", &Self::obj(vec![("select", select), ("limit", Json::from(MAX_ROWS as i64))]));
-        let Ok(q) = q else { return };
-        self.total_entities = q.get("total").and_then(|t| t.as_u64()).unwrap_or(0) as usize;
+        let Ok(q) = q else { return None };
+        let total = q.get("total").and_then(|t| t.as_u64()).unwrap_or(0) as usize;
         let mut rows: Vec<Row> = Vec::new();
         let mut mesh_rows: Vec<(usize, bool)> = Vec::new();
         for e in q.get("entities").and_then(|e| e.as_array()).unwrap_or(&[]) {
@@ -474,18 +485,12 @@ impl Studio {
             }
             rows.push(Row { uid, name, parent, depth: 0, children: 0, kind, pos, own_mesh, meshes: 0, shown: 0 });
         }
-        // each row counts the meshes in it and under it, and how many of them are shown
-        let by_uid: std::collections::HashMap<u64, usize> = rows.iter().enumerate().map(|(i, r)| (r.uid, i)).collect();
-        for (i, visible) in mesh_rows {
-            let (mut at, mut hops) = (Some(i), 0);
-            while let Some(k) = at {
-                rows[k].meshes += 1;
-                rows[k].shown += visible as u32;
-                hops += 1;
-                let up = rows[k].parent.and_then(|p| by_uid.get(&p).copied());
-                at = if hops > 256 { None } else { up.filter(|p| *p != k) };
-            }
-        }
+        crate::rows_world::count_meshes(&mut rows, &mesh_rows);
+        Some((total, rows))
+    }
+
+    /// Make `rows` the Hierarchy's entities and lay them out.
+    fn install_rows(&mut self, rows: Vec<Row>) {
         self.all = rows;
         self.rebuild_tree();
         // a selected entity that is gone leaves the selection (only judged against a list that was just read)
@@ -870,38 +875,84 @@ impl Studio {
         }
     }
 
+    /// The entity and everything attached under it (its children, theirs, ...): the entity first, and every parent before its children.
+    pub fn subtree(&self, uid: u64) -> Vec<u64> {
+        let mut kids: std::collections::HashMap<u64, Vec<u64>> = std::collections::HashMap::new();
+        for r in &self.all {
+            if let Some(p) = r.parent {
+                kids.entry(p).or_default().push(r.uid);
+            }
+        }
+        let mut out = vec![uid];
+        let mut seen: HashSet<u64> = HashSet::from([uid]);
+        let mut i = 0;
+        while i < out.len() {
+            if let Some(k) = kids.get(&out[i]) {
+                for c in k {
+                    if seen.insert(*c) {
+                        out.push(*c);
+                    }
+                }
+            }
+            i += 1;
+        }
+        out
+    }
+
+    /// Delete the entity and what is attached under it (children first, so that none is left with a parent that is gone), as one undo step.
     pub fn delete(&mut self, uid: u64) {
-        if self.try_call("despawn", Self::obj(vec![("uid", Json::from(uid as i64))])).is_some() {
-            if self.selection == Some(uid) {
+        self.refresh_rows();
+        let doomed = self.subtree(uid);
+        let done = if doomed.len() == 1 {
+            self.try_call("despawn", Self::obj(vec![("uid", Json::from(uid as i64))]))
+        } else {
+            let cmds: Vec<Json> = doomed.iter().rev().map(|u| Self::obj(vec![("op", Json::str("despawn")), ("uid", Json::from(*u as i64))])).collect();
+            self.try_call("batch", Self::obj(vec![("commands", Json::arr(cmds))]))
+        };
+        if done.is_some() {
+            if self.selection.is_some_and(|s| doomed.contains(&s)) {
                 self.select(None);
             }
-            self.selected.retain(|u| *u != uid);
+            self.selected.retain(|u| !doomed.contains(u));
             self.rows_dirty = true;
         }
     }
 
+    /// Copy the entity with everything attached under it: the copies get the next free uids, the copy of each child hangs on the copy of its parent, the copy of the entity itself has a new name and the whole
+    /// group stands a metre to the side. One undo step.
     pub fn duplicate(&mut self, uid: u64) {
-        let Some(got) = self.try_call("get", Self::obj(vec![("uid", Json::from(uid as i64))])) else { return };
-        let Some(Json::Obj(mut comps)) = got.get("components").cloned() else { return };
-        // a copy gets a new name and sits a little to the side
-        let base = comps.iter().find(|(k, _)| k == "Name").and_then(|(_, v)| v.get("value")).and_then(|v| v.as_str()).unwrap_or("Entity").to_string();
-        let new_name = self.unique_name(&base);
-        for (k, v) in comps.iter_mut() {
-            if k == "Name" {
-                *v = Json::obj([("value", Json::str(new_name.clone()))]);
-            } else if k == "Transform" {
-                if let Some(p) = v.get("pos").and_then(|p| p.as_array()).filter(|a| a.len() == 3) {
-                    let moved = Json::arr([Json::from(p[0].as_f64().unwrap_or(0.0) + 1.0), p[1].clone(), p[2].clone()]);
-                    v.set("pos", moved);
+        self.refresh_rows();
+        let tree = self.subtree(uid);
+        let first = self.engine.sim.world.next_uid();
+        let new_uid: std::collections::HashMap<u64, u64> = tree.iter().enumerate().map(|(i, u)| (*u, first + i as u64)).collect();
+        let mut cmds: Vec<Json> = Vec::new();
+        for (i, u) in tree.iter().enumerate() {
+            let Some(got) = self.try_call("get", Self::obj(vec![("uid", Json::from(*u as i64))])) else { return };
+            let Some(Json::Obj(mut comps)) = got.get("components").cloned() else { return };
+            let base = comps.iter().find(|(k, _)| k == "Name").and_then(|(_, v)| v.get("value")).and_then(|v| v.as_str()).unwrap_or("Entity").to_string();
+            for (k, v) in comps.iter_mut() {
+                match k.as_str() {
+                    "Name" if i == 0 => *v = Json::obj([("value", Json::str(self.unique_name(&base)))]),
+                    "Transform" => {
+                        if let Some(p) = v.get("pos").and_then(|p| p.as_array()).filter(|a| a.len() == 3) {
+                            let moved = Json::arr([Json::from(p[0].as_f64().unwrap_or(0.0) + 1.0), p[1].clone(), p[2].clone()]);
+                            v.set("pos", moved);
+                        }
+                    }
+                    "Parent" => {
+                        if let Some(copy) = v.get("target").and_then(|t| t.as_u64()).and_then(|t| new_uid.get(&t)) {
+                            v.set("target", Json::from(*copy as i64));
+                        }
+                    }
+                    _ => {}
                 }
             }
+            cmds.push(Self::obj(vec![("op", Json::str("spawn")), ("uid", Json::from(new_uid[u] as i64)), ("components", Json::Obj(comps))]));
         }
-        if let Some(r) = self.try_call("spawn", Self::obj(vec![("components", Json::Obj(comps))])) {
-            if let Some(u) = r.get("uid").and_then(|u| u.as_u64()) {
-                self.rows_dirty = true;
-                self.refresh_rows();
-                self.select(Some(u));
-            }
+        if self.try_call("batch", Self::obj(vec![("commands", Json::arr(cmds))])).is_some() {
+            self.rows_dirty = true;
+            self.refresh_rows();
+            self.select(Some(new_uid[&uid]));
         }
     }
 
@@ -1058,6 +1109,141 @@ impl Studio {
     pub fn redo(&mut self) {
         let _ = self.try_call("redo", Json::Null);
         self.rows_dirty = true;
+    }
+
+    /// The definition of a prefab from an entity and what is attached under it: the entity's components without a `Parent` or a `LocalTransform` (it is the root) and with its place at the origin (a spawn
+    /// says where), and a child node for each entity attached to it, with its name and components (its `LocalTransform` says where it stands; a `Parent` and a `Transform` are made for it).
+    pub fn prefab_definition(&mut self, uid: u64) -> Option<Json> {
+        self.refresh_rows();
+        let mut kids: std::collections::HashMap<u64, Vec<u64>> = std::collections::HashMap::new();
+        for r in &self.all {
+            if let Some(p) = r.parent {
+                kids.entry(p).or_default().push(r.uid);
+            }
+        }
+        fn node(studio: &mut Studio, kids: &std::collections::HashMap<u64, Vec<u64>>, uid: u64, root: bool, depth: usize) -> Option<Json> {
+            let got = studio.engine.call("get", &Studio::obj(vec![("uid", Json::from(uid as i64))])).ok()?;
+            let Json::Obj(comps) = got.get("components")? else { return None };
+            let mut components: Vec<(String, Json)> = Vec::new();
+            let mut name: Option<String> = None;
+            for (k, v) in comps {
+                match k.as_str() {
+                    "Name" if !root => name = v.get("value").and_then(|n| n.as_str()).map(str::to_string),
+                    "Parent" => {}
+                    "LocalTransform" if root => {}
+                    "Transform" if !root => {}
+                    "Transform" => {
+                        let mut t = v.clone();
+                        t.set("pos", Json::arr([Json::from(0.0), Json::from(0.0), Json::from(0.0)]));
+                        components.push((k.clone(), t));
+                    }
+                    _ => components.push((k.clone(), v.clone())),
+                }
+            }
+            let mut out: Vec<(String, Json)> = Vec::new();
+            if let Some(n) = name {
+                out.push(("name".to_string(), Json::str(n)));
+            }
+            out.push(("components".to_string(), Json::Obj(components)));
+            if depth < 7 {
+                let children: Vec<Json> = kids.get(&uid).map(|k| k.iter().filter_map(|c| node(studio, kids, *c, false, depth + 1)).collect()).unwrap_or_default();
+                if !children.is_empty() {
+                    out.push(("children".to_string(), Json::Arr(children)));
+                }
+            }
+            Some(Json::Obj(out))
+        }
+        node(self, &kids, uid, true, 0)
+    }
+
+    /// Make a prefab of the entity and what hangs on it, named after the entity (a number is added when the name is taken); the name, or None when it could not be made. The scene is not changed: the prefab is
+    /// a template, and is in the Place panel to be dragged in.
+    pub fn make_prefab(&mut self, uid: u64) -> Option<String> {
+        let def = self.prefab_definition(uid)?;
+        self.refresh_prefabs();
+        let base = self.all.iter().find(|r| r.uid == uid).map(|r| r.name.clone()).unwrap_or_else(|| "Prefab".to_string());
+        let name = if self.prefabs.contains(&base) { (2..).map(|i| format!("{base} {i}")).find(|n| !self.prefabs.contains(n)).unwrap_or(base) } else { base };
+        let (components, children) = (def.get("components").cloned().unwrap_or(Json::Obj(Vec::new())), def.get("children").cloned());
+        let mut args = vec![("name", Json::str(name.clone())), ("components", components)];
+        if let Some(c) = children {
+            args.push(("children", c));
+        }
+        self.try_call("define_prefab", Self::obj(args))?;
+        self.refresh_prefabs();
+        self.toast(format!("Prefab {name} made: drag it from the Place panel"), false);
+        Some(name)
+    }
+
+    /// Copy the selected entities, each with what is attached under it, for `paste_entities`; the same as JSON text for the system clipboard (so that a scene in another editor can take them). None when nothing is selected.
+    pub fn copy_selected(&mut self) -> Option<String> {
+        self.refresh_rows();
+        let mut list: Vec<(u64, Json)> = Vec::new();
+        for root in self.selection_roots() {
+            for u in self.subtree(root) {
+                let got = self.engine.call("get", &Self::obj(vec![("uid", Json::from(u as i64))])).ok()?;
+                list.push((u, got.get("components").cloned().unwrap_or(Json::Null)));
+            }
+        }
+        if list.is_empty() {
+            return None;
+        }
+        let text = Json::obj([("lunaris_entities", Json::arr(list.iter().map(|(u, c)| Json::obj([("uid", Json::from(*u as i64)), ("components", c.clone())]))))]).to_string_compact().ok()?;
+        self.entity_clipboard = list;
+        Some(text)
+    }
+
+    /// The entities in text made by `copy_selected` (what a paste from the system clipboard may hold); None when it is something else.
+    pub fn entities_in_text(text: &str) -> Option<Vec<(u64, Json)>> {
+        let doc = lunaris_json::parse(text.trim()).ok()?;
+        let list = doc.get("lunaris_entities")?.as_array()?;
+        let out: Vec<(u64, Json)> = list.iter().filter_map(|e| Some((e.get("uid")?.as_u64()?, e.get("components")?.clone()))).collect();
+        (!out.is_empty()).then_some(out)
+    }
+
+    /// Put copied entities in the scene (the text of the system clipboard when it holds some, else the last copy): new uids, each copy of a child hanging on the copy of its parent, a copy whose parent was not copied
+    /// is free (its place is kept), a name already taken gets a number. They stand where they were, and are the selection; one undo step. How many were made.
+    pub fn paste_entities(&mut self, text: Option<&str>) -> usize {
+        let clip = text.and_then(Self::entities_in_text).unwrap_or_else(|| self.entity_clipboard.clone());
+        if clip.is_empty() {
+            return 0;
+        }
+        self.refresh_rows();
+        let first = self.engine.sim.world.next_uid();
+        let new_uid: std::collections::HashMap<u64, u64> = clip.iter().enumerate().map(|(i, (u, _))| (*u, first + i as u64)).collect();
+        let mut taken: HashSet<String> = self.all.iter().map(|r| r.name.clone()).collect();
+        let mut cmds: Vec<Json> = Vec::new();
+        for (u, comps) in &clip {
+            let Json::Obj(pairs) = comps else { continue };
+            let mut pairs = pairs.clone();
+            let parent = pairs.iter().find(|(k, _)| k == "Parent").and_then(|(_, v)| v.get("target")).and_then(|t| t.as_u64()).filter(|t| *t != 0);
+            let inside = parent.is_some_and(|p| new_uid.contains_key(&p));
+            if parent.is_some() && !inside {
+                pairs.retain(|(k, _)| k != "Parent" && k != "LocalTransform");
+            }
+            for (k, v) in pairs.iter_mut() {
+                if k == "Parent" {
+                    if let Some(copy) = v.get("target").and_then(|t| t.as_u64()).and_then(|t| new_uid.get(&t)) {
+                        v.set("target", Json::from(*copy as i64));
+                    }
+                } else if k == "Name" {
+                    let base = v.get("value").and_then(|n| n.as_str()).unwrap_or("Entity").to_string();
+                    let name = if taken.contains(&base) { (2..).map(|i| format!("{base} {i}")).find(|n| !taken.contains(n)).unwrap_or(base) } else { base };
+                    taken.insert(name.clone());
+                    *v = Json::obj([("value", Json::str(name))]);
+                }
+            }
+            cmds.push(Self::obj(vec![("op", Json::str("spawn")), ("uid", Json::from(new_uid[u] as i64)), ("components", Json::Obj(pairs))]));
+        }
+        let n = cmds.len();
+        if self.try_call("batch", Self::obj(vec![("commands", Json::arr(cmds))])).is_none() {
+            return 0;
+        }
+        self.rows_dirty = true;
+        self.refresh_rows();
+        // the pasted roots are the selection
+        let roots: Vec<u64> = clip.iter().filter(|(_, c)| c.get("Parent").and_then(|p| p.get("target")).and_then(|t| t.as_u64()).filter(|t| *t != 0).is_none_or(|t| !new_uid.contains_key(&t))).map(|(u, _)| new_uid[u]).collect();
+        self.select_many(roots, None);
+        n
     }
 
     /// Copy the values of component `name` of entity `uid` for `paste_component`. False when the entity has no such component.

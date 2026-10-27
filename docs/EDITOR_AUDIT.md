@@ -23,7 +23,7 @@ Section 3 of [ROADMAP](ROADMAP.md) asks for an audit of the editor against Unrea
 | **Output Log** | Console: every tool call with arguments and answer, errors in red, **warnings in yellow with their own filter and count (2026-10-26)**, search, "Check scene", a box to type any tool call | categories for game messages (the lines are `LogTool`, `LogEditor`, `LogWarning`, `LogError`) | S |
 | **Packaging** | File > Build Windows Player, Build and Run | other platforms from the editor; a packaging settings page | M |
 | **Source control** | **badges in the Project panel (2026-10-26)**: a dot on every file git sees as changed, new or in conflict, a folder carries the strongest of its files, and the branch with the number of changes at the foot; committing and the rest are git's | a diff of a scene against the last commit; stage and commit from the editor | S |
-| **Place Actors** | the **Place** tab of the left panel (2026-10-25): click or drag a template into the scene | no custom palettes (prefabs and scripts as rows), no recently placed list | S |
+| **Place Actors** | the **Place** tab of the left panel (2026-10-25): click or drag a template into the scene | the prefabs of the scene are rows (PREFABS) and **Make Prefab** (Hierarchy menu, Edit menu; 2026-10-26) makes one from an entity and what hangs on it; no palettes of scripts, no recently placed list | S |
 | **Layout** | fixed docking with panel toggles | drag panels, save and restore layouts | M |
 
 Sizes: **S** is a day or less, **M** a few days, **L** a week or more.
