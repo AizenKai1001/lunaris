@@ -251,6 +251,8 @@ pub struct Studio {
     pub prefabs: Vec<String>,
     /// The brush of Paint mode while one is armed (the scene view sprinkles copies of it where the button is dragged).
     pub brush: Option<crate::paint::Brush>,
+    /// The values of a component that the Inspector copied (its name and its fields as the engine gave them), for Paste.
+    pub component_clipboard: Option<(String, Json)>,
     pub quit: bool,
     next_refresh: Option<Instant>,
     /// When the scene file had the modification time we know of (what we loaded or saved), and when to look again.
@@ -300,6 +302,7 @@ impl Studio {
             system_error: None,
             prefabs: Vec::new(),
             brush: None,
+            component_clipboard: None,
             quit: false,
             next_refresh: None,
             scene_stamp: None,
@@ -1050,6 +1053,34 @@ impl Studio {
         self.rows_dirty = true;
     }
 
+    /// Copy the values of component `name` of entity `uid` for `paste_component`. False when the entity has no such component.
+    pub fn copy_component(&mut self, uid: u64, name: &str) -> bool {
+        let got = self.engine.call("get", &Self::obj(vec![("uid", Json::from(uid as i64)), ("components", Json::arr([Json::str(name)]))])).ok();
+        match got.and_then(|g| g.get("components").and_then(|c| c.get(name)).cloned()).filter(|v| !v.is_null()) {
+            Some(v) => {
+                self.component_clipboard = Some((name.to_string(), v));
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Put the copied values on the selected entities (the one shown when none is selected): the component is added where it is missing and its fields are set where it is there, in one undo step.
+    pub fn paste_component(&mut self) {
+        let Some((name, value)) = self.component_clipboard.clone() else { return };
+        let mut targets: Vec<u64> = self.selected.clone();
+        if targets.is_empty() {
+            targets.extend(self.entity.as_ref().map(|e| e.uid));
+        }
+        if targets.is_empty() {
+            return;
+        }
+        // (`add_component` merges into a component that is there, so one command does both)
+        let commands = targets.iter().map(|u| Json::obj([("op", Json::str("add")), ("uid", Json::from(*u as i64)), ("component", Json::str(name.clone())), ("value", value.clone())]));
+        let _ = self.try_call("batch", Self::obj(vec![("commands", Json::arr(commands))]));
+        self.rows_dirty = true;
+    }
+
     /// Take the scene back (`steps` above 0) or forward (below 0) that many edits, as that many calls of `undo` or `redo`; it stops at the first one that fails (there is nothing more to undo or redo).
     pub fn undo_by(&mut self, steps: i64) {
         for _ in 0..steps.unsigned_abs() {
@@ -1095,6 +1126,46 @@ impl Studio {
         self.log(LogKind::Info, "Stopped: the scene is back as it was".to_string(), String::new(), 0.0);
         self.rows_dirty = true;
         self.revision = u64::MAX;
+    }
+
+    /// The components of an entity as the engine has them now (None when there is no such entity).
+    fn components_now(&mut self, uid: u64) -> Option<Vec<(String, Json)>> {
+        match self.engine.call("get", &Self::obj(vec![("uid", Json::from(uid as i64))])).ok()?.get("components") {
+            Some(Json::Obj(c)) => Some(c.clone()),
+            _ => None,
+        }
+    }
+
+    /// Stop playing but keep what the selected entities were doing: what they have now that differs from the scene that comes back (their places, the values the game changed) is written into
+    /// that scene in one undo step (Unreal's "Keep Simulation Changes"). Entities made while playing are not in the scene and are left; a component the game added or removed is added or left as it was.
+    /// Returns how many entities had something kept.
+    pub fn stop_keeping_selected(&mut self) -> usize {
+        if self.mode == Mode::Edit {
+            return 0;
+        }
+        let uids: Vec<u64> = if self.selected.is_empty() { self.selection.into_iter().collect() } else { self.selected.clone() };
+        let playing: Vec<(u64, Vec<(String, Json)>)> = uids.iter().filter_map(|u| self.components_now(*u).map(|c| (*u, c))).collect();
+        self.stop();
+        let mut commands: Vec<Json> = Vec::new();
+        let mut kept = 0usize;
+        for (uid, comps) in playing {
+            let Some(before) = self.components_now(uid) else { continue };
+            let mut any = false;
+            for (name, value) in comps {
+                let same = before.iter().find(|(n, _)| *n == name).is_some_and(|(_, v)| v.to_string_compact().ok() == value.to_string_compact().ok());
+                if !same {
+                    any = true;
+                    commands.push(Json::obj([("op", Json::str("add")), ("uid", Json::from(uid as i64)), ("component", Json::str(name)), ("value", value)]));
+                }
+            }
+            kept += any as usize;
+        }
+        if !commands.is_empty() {
+            let _ = self.try_call("batch", Self::obj(vec![("commands", Json::Arr(commands))]));
+            self.log(LogKind::Info, format!("Kept the changes of {kept} entit{} from the play session", if kept == 1 { "y" } else { "ies" }), String::new(), 0.0);
+            self.rows_dirty = true;
+        }
+        kept
     }
 
     pub fn is_playing(&self) -> bool {

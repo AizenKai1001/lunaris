@@ -403,6 +403,12 @@ pub fn wander(world: &mut World, ctx: &mut SimCtx) {
 thread_local! {
     /// While a profile runs: the milliseconds the parts of `physics` took since the profile took them (`PHYSICS_PARTS`).
     static PHYSICS_MS: std::cell::RefCell<[f64; 4]> = const { std::cell::RefCell::new([0.0; 4]) };
+    /// The same for the parts of the reference step of the bodies (`physics::REF_STAGES`).
+    static PHYSICS_REF_MS: std::cell::RefCell<[f64; 12]> = const { std::cell::RefCell::new([0.0; 12]) };
+}
+
+pub(crate) fn take_physics_ref_ms() -> [f64; 12] {
+    PHYSICS_REF_MS.with(|m| std::mem::take(&mut *m.borrow_mut()))
 }
 
 /// What `PHYSICS_MS` counts: the bodies' step, the raycast vehicles, the probes, and the settings and the rest.
@@ -422,6 +428,9 @@ pub fn physics(world: &mut World, ctx: &mut SimCtx) {
             *t = now;
         }
     };
+    if timed {
+        crate::physics::reference_profile(true);
+    }
     let mut gravity = [0.0f32, -9.8, 0.0];
     let mut lowest = u64::MAX;
     world
@@ -440,6 +449,15 @@ pub fn physics(world: &mut World, ctx: &mut SimCtx) {
         crate::physics::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes, &ctx.physics, ctx.threads, &mut ctx.contact_memory, &mut ctx.sleep)
     };
     lap(0);
+    if timed {
+        let ns = crate::physics::reference_stage_ns();
+        PHYSICS_REF_MS.with(|m| {
+            let mut m = m.borrow_mut();
+            for k in 0..12 {
+                m[k] += ns[k] as f64 * 1e-6;
+            }
+        });
+    }
     // raycast vehicles push their chassis with what the wheels meet (a world without a `Vehicle` finds none and goes on)
     crate::vehicle::step(world, gravity, ctx.dt, &ctx.terrains, &ctx.meshes);
     lap(1);

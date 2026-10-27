@@ -544,6 +544,13 @@ impl Sim {
                 }
             }
         }
+        if let Some(p) = prof.as_mut() {
+            for (k, ms) in systems::take_physics_ref_ms().iter().enumerate() {
+                if *ms > 0.0 {
+                    p.add(&format!("physics: bodies: {}", crate::physics::REF_STAGES[k]), *ms);
+                }
+            }
+        }
         self.contact_memory = std::mem::take(&mut ctx.contact_memory);
         self.sleep = std::mem::take(&mut ctx.sleep);
         self.rng = ctx.rng;

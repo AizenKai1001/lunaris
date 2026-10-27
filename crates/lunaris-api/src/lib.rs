@@ -64,6 +64,8 @@ mod flyagent_check_tests;
 #[cfg(test)]
 mod nav_check_tests;
 #[cfg(test)]
+mod stream_check_tests;
+#[cfg(test)]
 mod history_tests;
 #[cfg(test)]
 mod interact_check_tests;

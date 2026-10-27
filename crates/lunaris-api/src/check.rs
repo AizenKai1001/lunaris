@@ -93,6 +93,12 @@ fn file_exists(root: &Path, rel: &str) -> bool {
     lunaris_json::safe_relative(rel).is_ok_and(|norm| root.join(norm).is_file())
 }
 
+/// How many cells round one anchor a `ProcGrid` may look at before `check` says so.
+const MAX_GRID_WINDOW: f32 = 2500.0;
+
+/// How many `StreamZone`s a scene may have, with no `ProcGrid`, before `check` asks for `stream.loads_per_tick`.
+const STREAM_ZONES_UNLIMITED: usize = 24;
+
 /// How many `NavAgent`s make a crowd that the checks on navigation limits are about.
 const CROWD_AGENTS: usize = 20;
 
@@ -1579,6 +1585,22 @@ impl Engine {
                 if !self.sim.scripts.prefabs.contains_key(&name) {
                     problems.add("warning", Some(uid), format!("StreamZone.prefab `{name}` is not a defined prefab, so nothing is ever loaded"), "define it with define_prefab (see `prefabs`)");
                 }
+            }
+            // ---- streaming: a procedural grid that looks at a great many cells, zones that all load in the step they are wanted (docs/GAMEPLAY.md, "StreamAnchor", docs/REALWORLD.md)
+            let mut grids: Vec<(u64, lunaris_sim::components::ProcGrid)> = Vec::new();
+            w.for_each_uid::<(&lunaris_sim::components::ProcGrid,), _>(|_, uid, (g,)| grids.push((uid, *g)))?;
+            for (uid, g) in &grids {
+                let cell = g.cell.max(10.0);
+                let side = (2.0 * g.radius.max(1.0) / cell).ceil() + 1.0;
+                if side * side > MAX_GRID_WINDOW {
+                    problems.add("warning", Some(*uid), format!("this ProcGrid looks at about {:.0} cells round every anchor (radius {} m, cell {} m): with a hundred anchors that is thousands of cells measured in each step it runs", side * side, g.radius, g.cell), "make the cells bigger or the radius smaller, and set the resource procgrid.every (a whole number: look at the cells every that many steps)");
+                }
+            }
+            let mut zones_n = 0usize;
+            w.for_each_uid::<(&lunaris_sim::components::StreamZone,), _>(|_, _, _| zones_n += 1)?;
+            let loads = w.resource("stream.loads_per_tick").unwrap_or(0.0);
+            if (zones_n >= STREAM_ZONES_UNLIMITED || !grids.is_empty()) && !(loads >= 1.0) {
+                problems.add("warning", None, format!("{} with no limit on the zones loaded in a tick: every zone that comes into range loads in that tick, and a prefab of a few thousand entities takes tens of milliseconds to make", if grids.is_empty() { format!("{zones_n} StreamZones") } else { "a ProcGrid".to_string() }), "set the resource stream.loads_per_tick (a whole number, 2 to 4 for a city): the nearest zone loads first and the others the ticks after");
             }
             // ---- crowds of path finders: what a server with many of them has to ration (docs/NAVIGATION.md, "Crowds")
             let mut agents = 0usize;

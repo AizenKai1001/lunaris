@@ -1504,6 +1504,16 @@ fn screenshots_of_the_editor_for_looking_at() {
     for _ in 0..70 {
         h.frames(1);
     }
+    // (the card's passes as a GPU quality would have measured them: the tests draw with the CPU reference, which has none)
+    h.app.viewport.gpu_fixed = true;
+    h.app.viewport.gpu = crate::viewport::GpuStats {
+        adapter: "NVIDIA GeForce RTX 2060 SUPER".to_string(),
+        passes: [("shadows", 0.62f32), ("main", 2.4), ("main.meshes", 1.7), ("main.sky", 0.2), ("main.terrain", 0.4), ("post", 0.35), ("ui", 0.05)].iter().map(|(n, ms)| (n.to_string(), *ms)).collect(),
+        cpu: [("gather", 1.8f32), ("cull", 0.4), ("encode", 0.9), ("submit", 0.2)].iter().map(|(n, ms)| (n.to_string(), *ms)).collect(),
+        draws: 1412,
+        triangles: 880_000,
+    };
+    h.frames(4);
     h.shoot("13_profiler_while_playing");
 }
 
@@ -1534,3 +1544,56 @@ fn the_history_tab_lists_the_edits_and_a_jump_takes_the_scene_to_the_state_after
     h.frames(2);
     assert_eq!(h.app.studio.engine.call("history", &Json::Null).unwrap().get("undo_depth").and_then(|v| v.as_u64()), Some(0));
 }
+
+#[test]
+fn the_values_of_a_component_are_copied_and_pasted_onto_the_selected_entities_in_one_undo_step() {
+    let mut h = Harness::new();
+    let (b, ball) = (h.uid("Box"), h.uid("Ball"));
+    // the box is red, the ball blue; copy the box's MeshRenderer and paste it on the ball (selected with it)
+    assert!(h.app.studio.copy_component(b, "MeshRenderer"));
+    assert!(!h.app.studio.copy_component(b, "Light"), "a component that is not there is not copied, and the clipboard keeps what it had");
+    assert_eq!(h.app.studio.component_clipboard.as_ref().map(|c| c.0.as_str()), Some("MeshRenderer"));
+    h.app.studio.select(Some(ball));
+    let depth = |h: &mut Harness| h.app.studio.engine.call("history", &Json::Null).unwrap().get("undo_depth").and_then(|v| v.as_u64()).unwrap();
+    let before = depth(&mut h);
+    h.app.studio.paste_component();
+    let color = |h: &mut Harness, uid: u64| {
+        let g = h.app.studio.call("get", j(&format!(r#"{{"uid":{uid},"components":["MeshRenderer"]}}"#))).unwrap();
+        g.get("components").unwrap().get("MeshRenderer").unwrap().get("color").unwrap().as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect::<Vec<_>>()
+    };
+    assert_eq!(color(&mut h, ball), color(&mut h, b), "the ball has the box's values now");
+    assert_eq!(depth(&mut h), before + 1, "one undo step");
+    h.app.studio.undo();
+    assert_ne!(color(&mut h, ball), color(&mut h, b), "and one undo takes them back");
+    // pasting a component the targets do not have adds it
+    assert!(h.app.studio.copy_component(h.uid("Sun"), "Light"));
+    h.app.studio.select(Some(ball));
+    h.app.studio.paste_component();
+    let has_light = h.app.studio.call("get", j(&format!(r#"{{"uid":{ball},"components":["Light"]}}"#))).unwrap().get("components").and_then(|c| c.get("Light")).is_some_and(|v| !v.is_null());
+    assert!(has_light, "the Light was added");
+}
+
+#[test]
+fn stopping_can_keep_what_the_selected_entities_have_after_playing() {
+    let mut h = Harness::new();
+    let (box_uid, ball) = (h.uid("Box"), h.uid("Ball"));
+    let before_ball = h.pos_of("Ball");
+    h.app.play();
+    // while the game runs both are moved (by hand, as the game's own systems or the author's hand would), then the Box is selected and the stop keeps its changes only
+    h.app.studio.call("set", j(&format!(r#"{{"uid":{box_uid},"component":"Transform","value":{{"pos":[7,1,-3]}}}}"#))).unwrap();
+    h.app.studio.call("set", j(&format!(r#"{{"uid":{ball},"component":"Transform","value":{{"pos":[-9,1,9]}}}}"#))).unwrap();
+    h.app.studio.select(Some(box_uid));
+    let depth = |h: &mut Harness| h.app.studio.engine.call("history", &Json::Null).unwrap().get("undo_depth").and_then(|v| v.as_u64()).unwrap();
+    let kept = h.app.stop_keeping();
+    assert_eq!(kept, 1);
+    assert!(!h.app.studio.is_playing());
+    assert_eq!(h.pos_of("Box"), [7.0, 1.0, -3.0], "the Box keeps where it was moved to");
+    assert_eq!(h.pos_of("Ball"), before_ball, "the Ball, not selected, is back where the scene had it");
+    // (stopping restores the scene, which empties the undo list; what is kept is the one step on it)
+    assert_eq!(depth(&mut h), 1, "the kept changes are one undo step");
+    h.app.studio.undo();
+    assert_eq!(h.pos_of("Box"), [0.0, 1.0, 0.0], "and one undo puts the Box back in the scene's place");
+    // nothing selected, nothing to keep; not playing, nothing to do
+    assert_eq!(h.app.studio.stop_keeping_selected(), 0);
+}
+

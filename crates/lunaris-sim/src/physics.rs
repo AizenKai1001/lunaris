@@ -503,9 +503,9 @@ pub fn step(world: &mut World, gravity: [f32; 3], dt: f32, terrains: &Terrains, 
 const RESTARTS: usize = 8;
 
 /// The parts of the reference step that `reference_stage_ns` times.
-pub const REF_STAGES: [&str; 8] = ["gather", "joints, forces", "continuous collision", "broad phase", "solve", "corrections", "sleeping", "write back"];
+pub const REF_STAGES: [&str; 12] = ["gather", "joints, forces", "continuous collision", "broad phase", "solve", "corrections", "sleeping", "write back", "gather: queries", "gather: sort of the colliders", "gather: bodies of the colliders", "gather: bodies of the meshes"];
 static REF_PROFILE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-static REF_STAGE_NS: [std::sync::atomic::AtomicU64; 8] = [const { std::sync::atomic::AtomicU64::new(0) }; 8];
+static REF_STAGE_NS: [std::sync::atomic::AtomicU64; 12] = [const { std::sync::atomic::AtomicU64::new(0) }; 12];
 
 /// Time the parts of the reference step from now on (a few clock reads a step; for every world that takes the reference path, that is one with spinning bodies,
 /// joints, terrain, meshes or hulls). `reference_stage_ns` reads the totals since the last call and clears them.
@@ -514,7 +514,7 @@ pub fn reference_profile(on: bool) {
 }
 
 /// The nanoseconds spent in each part of the reference step (see `REF_STAGES`) since the last call; all zero unless `reference_profile(true)`.
-pub fn reference_stage_ns() -> [u64; 8] {
+pub fn reference_stage_ns() -> [u64; 12] {
     std::array::from_fn(|i| REF_STAGE_NS[i].swap(0, std::sync::atomic::Ordering::Relaxed))
 }
 
@@ -582,7 +582,9 @@ fn step_reference_once(world: &mut World, gravity: [f32; 3], dt: f32, terrains: 
         sleep.clear();
         return Some(Vec::new());
     }
+    lap!(8);
     raw.sort_by_key(|r| r.0);
+    lap!(9);
     // who collides with whom (a world without a `CollisionLayer` has an empty list and filters nothing)
     let layers = Layers::gather(world);
     // the bodies that turn (a world without any pays for nothing but this query)
@@ -669,6 +671,7 @@ fn step_reference_once(world: &mut World, gravity: [f32; 3], dt: f32, terrains: 
         let ext = Body::bounds(shape, state.as_deref().map_or(&rot::IDENTITY, |r| &r.axes));
         bodies.push(Body { uid, entity, pos: t.pos, vel, shape, ext, inv_mass, restitution, friction, gravity_scale, drag, trigger: c.trigger, filter: layers.of(uid), spins: spin.is_some(), rich, asleep, rot: state });
     }
+    lap!(10);
 
     // the terrain: a static body of its own, in uid order with the others
     let mut ground: Vec<Placed> = Vec::new();
@@ -734,6 +737,7 @@ fn step_reference_once(world: &mut World, gravity: [f32; 3], dt: f32, terrains: 
         mesh_filters.push(layers.of(inst.uid));
         bodies.push(Body { uid: inst.uid, entity: inst.entity, pos: centre, vel: [0.0; 3], shape: Shape::Mesh(placed_meshes.len() - 1), ext: half, inv_mass: 0.0, restitution: inst.restitution, friction: inst.friction, gravity_scale: 1.0, drag: 0.0, trigger: false, filter: layers.of(inst.uid), spins: false, rich: true, asleep: false, rot: None });
     }
+    lap!(11);
     if bodies.is_empty() {
         memory.clear();
         sleep.clear();

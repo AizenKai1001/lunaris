@@ -102,7 +102,7 @@ impl ProfilerUi {
         self.history.clear();
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio) {
+    pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio, gpu: &crate::viewport::GpuStats) {
         let budget_ms = studio.engine.sim.dt as f64 * 1000.0;
         ui.horizontal(|ui| {
             if ui.button("Clear").clicked() {
@@ -152,6 +152,36 @@ impl ProfilerUi {
         for line in w.advice(budget_ms) {
             ui.label(RichText::new(line).small().color(theme::WARN));
         }
+        // the card: what the scene view's last picture cost, pass by pass (the card's own clock; the scene view has to be drawn by a GPU quality, not the CPU reference)
+        egui::CollapsingHeader::new(RichText::new(match gpu.total_ms() {
+            Some(ms) => format!("Card: {ms:.2} ms a picture on {}   {} draws, {} triangles", gpu.adapter, gpu.draws, gpu.triangles),
+            None if gpu.draws > 0 => format!("Card: {} draws, {} triangles (no pass times: this card has no timestamp queries)", gpu.draws, gpu.triangles),
+            None => "Card: no times (the scene view is drawn by the CPU reference renderer: pick a GPU quality in the bar above it)".to_string(),
+        }))
+        .id_salt("profiler-card")
+        .default_open(gpu.total_ms().is_some())
+        .show(ui, |ui| {
+            let rows = gpu.rows();
+            let widest = rows.iter().filter(|r| !r.part).map(|r| r.ms).fold(1e-6f32, f32::max);
+            for r in &rows {
+                ui.horizontal(|ui| {
+                    ui.add_space(if r.part { 24.0 } else { 6.0 });
+                    let name_w = if r.part { 200.0 } else { 218.0 };
+                    ui.add_sized([name_w, 16.0], egui::Label::new(RichText::new(&r.name).small().color(if r.part { theme::TEXT_DIM } else { theme::TEXT })));
+                    let (bar, _) = ui.allocate_exact_size(Vec2::new(160.0, 12.0), Sense::hover());
+                    let w = (bar.width() * (r.ms / widest).clamp(0.0, 1.0)).max(1.0);
+                    ui.painter().rect_filled(egui::Rect::from_min_size(bar.min, Vec2::new(w, 12.0)), CornerRadius::ZERO, if r.part { theme::TEXT_DIM } else { theme::BLUE }.gamma_multiply(0.85));
+                    ui.label(RichText::new(format!("{:.3} ms", r.ms)).small().monospace());
+                });
+            }
+            if !gpu.cpu.is_empty() {
+                ui.add_space(4.0);
+                ui.label(RichText::new("The processor, by phase").small().color(theme::TEXT_DIM));
+                for (name, ms) in &gpu.cpu {
+                    ui.label(RichText::new(format!("   {name:<28} {ms:.3} ms")).small().monospace());
+                }
+            }
+        });
         // one bar per stage
         let filter = self.filter.to_lowercase();
         let rows: Vec<&Row> = w.rows.iter().filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter)).collect();

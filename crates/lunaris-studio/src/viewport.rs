@@ -68,6 +68,59 @@ impl Cam {
     }
 }
 
+/// What the last picture the card drew measured (`GpuRenderer::last_gpu_ms` and friends; empty for the CPU reference renderer, and the times empty on a card without timestamp queries or while nothing asks for them).
+#[derive(Clone, Debug, Default)]
+pub struct GpuStats {
+    pub adapter: String,
+    /// The milliseconds of each pass; a name with a dot is a part of the pass before the dot.
+    pub passes: Vec<(String, f32)>,
+    /// The milliseconds the processor spent on the picture, by phase.
+    pub cpu: Vec<(String, f32)>,
+    /// Draw calls of all the passes, and the triangles the main view drew.
+    pub draws: u32,
+    pub triangles: u64,
+}
+
+/// One row of the card's times as the Profiler shows them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GpuRow {
+    pub name: String,
+    pub ms: f32,
+    /// A part of the pass above it.
+    pub part: bool,
+}
+
+impl GpuStats {
+    /// The time of the picture on the card: the passes without a dot added up (the parts are inside them), or none when nothing was timed.
+    pub fn total_ms(&self) -> Option<f32> {
+        let sum: f32 = self.passes.iter().filter(|(n, _)| !n.contains('.')).map(|(_, ms)| *ms).sum();
+        (!self.passes.is_empty()).then_some(sum)
+    }
+
+    /// The passes, the slowest first, each followed by its parts (the slowest first); a part whose pass was not timed comes after all of them.
+    pub fn rows(&self) -> Vec<GpuRow> {
+        let by_time = |a: &&(String, f32), b: &&(String, f32)| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0));
+        let mut tops: Vec<&(String, f32)> = self.passes.iter().filter(|(n, _)| !n.contains('.')).collect();
+        tops.sort_by(by_time);
+        let mut out = Vec::new();
+        let mut used = vec![false; self.passes.len()];
+        for t in tops {
+            out.push(GpuRow { name: t.0.clone(), ms: t.1, part: false });
+            let prefix = format!("{}.", t.0);
+            let mut parts: Vec<(usize, &(String, f32))> = self.passes.iter().enumerate().filter(|(_, (n, _))| n.starts_with(&prefix)).collect();
+            parts.sort_by(|a, b| by_time(&a.1, &b.1));
+            for (i, p) in parts {
+                used[i] = true;
+                out.push(GpuRow { name: p.0.clone(), ms: p.1, part: true });
+            }
+        }
+        let mut rest: Vec<&(String, f32)> = self.passes.iter().enumerate().filter(|(i, (n, _))| !used[*i] && n.contains('.')).map(|(_, p)| p).collect();
+        rest.sort_by(by_time);
+        out.extend(rest.into_iter().map(|p| GpuRow { name: p.0.clone(), ms: p.1, part: true }));
+        out
+    }
+}
+
 pub struct Viewport {
     pub kind: ViewKind,
     pub tool: Tool,
@@ -99,6 +152,11 @@ pub struct Viewport {
     pub snap_scale: f32,
     /// The statistics overlay (frame time, picture time, entities, tick, fly speed).
     pub stats: bool,
+    /// Time every pass on the card (the Stats overlay or the Profiler tab wants it: timestamp queries are not free), and what the last GPU picture measured.
+    pub profile_gpu: bool,
+    pub gpu: GpuStats,
+    /// Tests: keep `gpu` as it was set (a CPU picture would clear it).
+    pub gpu_fixed: bool,
     /// How fast the fly camera moves, as a multiple of its usual speed (right button held and the wheel changes it).
     pub fly_speed: f32,
     /// Time between editor frames (smoothed) and the last picture's drawing time, in milliseconds.
@@ -145,6 +203,9 @@ impl Viewport {
             fly_speed: 1.0,
             frame_ms: 0.0,
             picture_ms: 0.0,
+            profile_gpu: false,
+            gpu: GpuStats::default(),
+            gpu_fixed: false,
             error: None,
             forced: true,
             game_input: false,
@@ -243,7 +304,10 @@ impl Viewport {
                 match self.renderer.as_mut() {
                     Some(Ok(r)) => {
                         used = r.adapter_name();
-                        r.render_frame(&mut studio.engine.sim.world, &mut self.textures, &opts, &q, want_ids)
+                        r.set_profile(self.profile_gpu);
+                        let frame = r.render_frame(&mut studio.engine.sim.world, &mut self.textures, &opts, &q, want_ids);
+                        self.gpu = GpuStats { adapter: used.clone(), passes: r.last_gpu_ms.clone(), cpu: r.last_cpu_ms.clone(), draws: r.last_draws, triangles: r.last_triangles };
+                        frame
                     }
                     Some(Err(e)) => {
                         used = String::new();
@@ -257,6 +321,9 @@ impl Viewport {
             }
             None => {
                 used = "CPU reference renderer".to_string();
+                if !self.gpu_fixed {
+                    self.gpu = GpuStats::default();
+                }
                 lunaris_render::render(&mut studio.engine.sim.world, &mut self.textures, &opts).map_err(|e| e.to_string())
             }
         };
@@ -626,6 +693,12 @@ impl Viewport {
             format!("entities {}", studio.total_entities),
             format!("tick     {}", studio.tick),
         ];
+        if self.gpu.draws > 0 {
+            lines.push(format!("draws    {}  tris {}", self.gpu.draws, self.gpu.triangles));
+        }
+        if let Some(ms) = self.gpu.total_ms() {
+            lines.push(format!("card    {ms:5.2} ms"));
+        }
         if self.kind == ViewKind::Scene {
             lines.push(format!("fly speed x{:.2}", self.fly_speed));
         }
@@ -1017,3 +1090,28 @@ fn snap_menu(ui: &mut egui::Ui, title: &str, unit: &str, value: &mut f32, steps:
         }
     });
 }
+
+#[cfg(test)]
+mod gpu_tests {
+    use super::*;
+
+    fn stats(passes: &[(&str, f32)]) -> GpuStats {
+        GpuStats { passes: passes.iter().map(|(n, ms)| (n.to_string(), *ms)).collect(), ..GpuStats::default() }
+    }
+
+    #[test]
+    fn the_card_total_is_the_passes_without_a_dot_and_none_when_nothing_was_timed() {
+        assert_eq!(GpuStats::default().total_ms(), None);
+        let s = stats(&[("shadows", 1.0), ("main", 3.0), ("main.meshes", 2.0), ("main.sky", 0.5), ("post", 0.5)]);
+        assert_eq!(s.total_ms(), Some(4.5), "the parts are inside their pass");
+    }
+
+    #[test]
+    fn rows_put_the_slowest_pass_first_each_followed_by_its_parts_and_orphans_last() {
+        let s = stats(&[("shadows", 1.0), ("main.sky", 0.5), ("main", 3.0), ("main.meshes", 2.0), ("post", 0.25), ("bloom.blur", 0.1)]);
+        let names: Vec<(String, bool)> = s.rows().into_iter().map(|r| (r.name, r.part)).collect();
+        let want = [("main", false), ("main.meshes", true), ("main.sky", true), ("shadows", false), ("post", false), ("bloom.blur", true)];
+        assert_eq!(names, want.map(|(n, p)| (n.to_string(), p)));
+    }
+}
+

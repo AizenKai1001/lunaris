@@ -226,6 +226,15 @@ impl App {
         self.viewport.refresh();
     }
 
+    /// Stop playing and keep what the selected entities were doing (`Studio::stop_keeping_selected`).
+    pub(crate) fn stop_keeping(&mut self) -> usize {
+        self.release_input();
+        self.sound = None;
+        let kept = self.studio.stop_keeping_selected();
+        self.viewport.refresh();
+        kept
+    }
+
     fn release_input(&mut self) {
         if self.held.is_empty() {
             return;
@@ -587,6 +596,10 @@ impl App {
                     self.stop();
                     ui.close();
                 }
+                if ui.add_enabled(mode != Mode::Edit && !self.studio.selected.is_empty(), egui::Button::new("Stop and keep the selected entities' changes")).on_hover_text("Select entities in the Hierarchy while the game runs or is paused (move them, let the game change them); this stops and writes what they have now into the scene, in one undo step").clicked() {
+                    self.stop_keeping();
+                    ui.close();
+                }
             });
             ui.menu_button("Help", |ui| {
                 if ui.button("Documentation folder").clicked() {
@@ -910,7 +923,7 @@ impl App {
                     BottomTab::Project => self.project.show(ui, &mut self.studio),
                     BottomTab::Console => self.console.show(ui, &mut self.studio),
                     BottomTab::Systems => self.systems.show(ui, &mut self.studio),
-                    BottomTab::Profiler => self.profiler.show(ui, &mut self.studio),
+                    BottomTab::Profiler => self.profiler.show(ui, &mut self.studio, &self.viewport.gpu),
                     BottomTab::History => self.history.show(ui, &mut self.studio),
                 });
             });
@@ -963,6 +976,8 @@ impl App {
         }
         egui::CentralPanel::default().frame(chrome::dock(theme::PANEL)).show(ui, |ui| match self.studio.center {
             Center::View => {
+                // (the card's passes are timed while the Profiler tab or the Stats overlay shows them: timestamp queries are not free)
+                self.viewport.profile_gpu = self.viewport.stats || (self.show_bottom && self.studio.tab == BottomTab::Profiler);
                 self.viewport.show(ui, &mut self.studio);
                 if let Some(c) = self.viewport.goto.take() {
                     self.studio.center = c;

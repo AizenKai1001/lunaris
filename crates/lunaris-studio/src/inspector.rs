@@ -151,6 +151,8 @@ impl InspectorUi {
         egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("inspector-scroll").show(ui, |ui| {
             let attached = ent.parent().is_some();
             let mut remove: Option<String> = None;
+            let mut copy: Option<String> = None;
+            let mut paste = false;
             for (name, value) in &ent.comps {
                 if name == "Name" {
                     continue;
@@ -164,7 +166,17 @@ impl InspectorUi {
                     continue;
                 }
                 let (open, bar) = crate::chrome::foldout(ui, egui::Id::new(("comp", ent.uid, name)), name, component_icon(name), true);
+                let can_paste = studio.component_clipboard.as_ref().is_some_and(|(n, _)| n == name);
                 bar.context_menu(|ui| {
+                    if ui.button("Copy values").on_hover_text("Copy the values of this component to paste them on this or other entities").clicked() {
+                        copy = Some(name.clone());
+                        ui.close();
+                    }
+                    if ui.add_enabled(can_paste, egui::Button::new("Paste values")).on_hover_text("Put the copied values on every selected entity").clicked() {
+                        paste = true;
+                        ui.close();
+                    }
+                    ui.separator();
                     if ui.button("Remove component").clicked() {
                         remove = Some(name.clone());
                         ui.close();
@@ -191,8 +203,19 @@ impl InspectorUi {
             if let Some(c) = remove {
                 let _ = studio.try_call("remove_component", Json::obj([("uid", Json::from(ent.uid as i64)), ("component", Json::str(c))]));
             }
+            if let Some(c) = copy {
+                studio.copy_component(ent.uid, &c);
+            }
+            if paste {
+                studio.paste_component();
+            }
             ui.add_space(8.0);
             ui.vertical_centered(|ui| {
+                if let Some((n, _)) = studio.component_clipboard.clone() {
+                    if ui.button(format!("Paste {n}")).on_hover_text("Add the copied component, with its values, to every selected entity").clicked() {
+                        studio.paste_component();
+                    }
+                }
                 ui.menu_button("Add Component", |ui| {
                     let names = studio.components_available();
                     egui::ScrollArea::vertical().max_height(360.0).show(ui, |ui| {
