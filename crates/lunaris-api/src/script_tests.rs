@@ -76,3 +76,121 @@ fn get_script_gives_back_text_that_defines_the_same_system() {
     assert_eq!(before.to_string_compact().unwrap().replace(",\"enabled\":true", ""), after.to_string_compact().unwrap().replace(",\"enabled\":true", ""));
     assert!(e.call("get_script", &j(r#"{"name":"nope"}"#)).unwrap_err().code == "no_such_system");
 }
+
+/// Every graph system of a real scene as Lunaris Script text and back: `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-api real_scene_scripts -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn every_system_of_a_real_scene_survives_the_trip_through_script_text_real_scene_scripts() {
+    let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
+    let mut e = crate::Engine::new(1, std::path::PathBuf::from(root));
+    e.call("load_scene", &Json::obj([("path", Json::str(scene))])).unwrap();
+    let names: Vec<String> = e.call("systems", &Json::Null).unwrap().get("graph").and_then(|s| s.as_array()).unwrap_or(&[]).iter().filter_map(|s| s.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect();
+    // (the unary operators a scene may hold as `{"abs": [x]}` are read the same as `{"abs": x}`; `enabled: true` is what a system is anyway)
+    fn unwrapped(j: &Json) -> Json {
+        const UNARY: [&str; 18] = ["abs", "floor", "ceil", "sqrt", "neg", "not", "sin", "cos", "tan", "round", "sign", "fract", "exp", "ln", "log", "asin", "acos", "atan"];
+        match j {
+            Json::Obj(pairs) if pairs.len() == 1 && UNARY.contains(&pairs[0].0.as_str()) => match &pairs[0].1 {
+                Json::Arr(a) if a.len() == 1 => Json::Obj(vec![(pairs[0].0.clone(), unwrapped(&a[0]))]),
+                v => Json::Obj(vec![(pairs[0].0.clone(), unwrapped(v))]),
+            },
+            Json::Obj(pairs) => Json::Obj(pairs.iter().map(|(k, v)| (k.clone(), unwrapped(v))).collect()),
+            Json::Arr(a) => Json::Arr(a.iter().map(unwrapped).collect()),
+            other => other.clone(),
+        }
+    }
+    let plain = |d: &Json| unwrapped(d).to_string_compact().unwrap().replace(",\"enabled\":true", "");
+    let (mut seen, mut bad) = (0, Vec::new());
+    for name in &names {
+        let Ok(got) = e.call("get_script", &Json::obj([("name", Json::str(name.clone()))])) else {
+            bad.push(format!("{name}: has no script form"));
+            continue;
+        };
+        let source = got.get("source").unwrap().as_str().unwrap().to_string();
+        let before = e.call("get_system", &Json::obj([("name", Json::str(name.clone()))])).unwrap().get("def").unwrap().clone();
+        e.call("remove_system", &Json::obj([("name", Json::str(name.clone()))])).unwrap();
+        match e.call("define_script", &text(&source)) {
+            Err(err) => bad.push(format!("{name}: the text is refused: {err}")),
+            Ok(_) => {
+                let after = e.call("get_system", &Json::obj([("name", Json::str(name.clone()))])).unwrap().get("def").unwrap().clone();
+                if plain(&before) != plain(&after) {
+                    bad.push(format!("{name}: comes back different"));
+                }
+            }
+        }
+        seen += 1;
+    }
+    println!("{seen} of {} graph systems through script text; {} do not survive", names.len(), bad.len());
+    for b in &bad {
+        println!("  {b}");
+    }
+    assert!(bad.is_empty(), "{} systems change in the script text and back", bad.len());
+}
+
+/// A real scene saved and loaded again is the same world: `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-api real_scene_saves -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn a_real_scene_saved_and_loaded_again_is_the_same_world_real_scene_saves() {
+    let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
+    let root = std::path::PathBuf::from(root);
+    let mut a = crate::Engine::new(1, root.clone());
+    a.call("load_scene", &Json::obj([("path", Json::str(scene))])).unwrap();
+    let h1 = a.call("hash", &Json::Null).unwrap().get("hash").unwrap().as_str().unwrap().to_string();
+    let t = std::time::Instant::now();
+    let probe = format!("_probe_resave_{}.lunaris.json", std::process::id());
+    a.call("save_scene", &Json::obj([("path", Json::str(probe.clone()))])).unwrap();
+    println!("saved in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+    let mut b = crate::Engine::new(1, root.clone());
+    let t = std::time::Instant::now();
+    b.call("load_scene", &Json::obj([("path", Json::str(probe.clone()))])).unwrap();
+    println!("loaded in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+    let h2 = b.call("hash", &Json::Null).unwrap().get("hash").unwrap().as_str().unwrap().to_string();
+    let (n1, n2) = (a.sim.world.len(), b.sim.world.len());
+    println!("{n1} entities, hash {h1}; after the round trip {n2} entities, hash {h2}");
+    if h1 != h2 {
+        // what differs: entity by entity, component by component (the first few), then resources and systems
+        let mut shown = 0;
+        let uids: Vec<u64> = a.call("query", &Json::obj([("select", Json::arr([])), ("limit", Json::from(100_000))])).unwrap().get("entities").unwrap().as_array().unwrap().iter().filter_map(|e| e.get("uid").and_then(|u| u.as_u64())).collect();
+        let mut differing = 0;
+        for uid in uids {
+            let q = Json::obj([("uid", Json::from(uid as i64))]);
+            let (x, y) = (a.call("get", &q), b.call("get", &q));
+            let (Ok(x), Ok(y)) = (x, y) else {
+                differing += 1;
+                if shown < 8 {
+                    println!("  entity {uid}: missing after the round trip");
+                    shown += 1;
+                }
+                continue;
+            };
+            let (cx, cy) = (x.get("components").cloned().unwrap_or(Json::Null), y.get("components").cloned().unwrap_or(Json::Null));
+            if cx.to_string_compact().unwrap() != cy.to_string_compact().unwrap() {
+                differing += 1;
+                if shown < 8 {
+                    if let (Json::Obj(px), Json::Obj(py)) = (&cx, &cy) {
+                        for (k, v) in px {
+                            let other = py.iter().find(|(n, _)| n == k).map(|(_, w)| w);
+                            if other.map(|w| w.to_string_compact().unwrap()) != Some(v.to_string_compact().unwrap()) {
+                                println!("  entity {uid} {k}: {} -> {}", v.to_string_compact().unwrap().chars().take(160).collect::<String>(), other.map(|w| w.to_string_compact().unwrap().chars().take(160).collect::<String>()).unwrap_or("(gone)".to_string()));
+                            }
+                        }
+                        for (k, _) in py {
+                            if !px.iter().any(|(n, _)| n == k) {
+                                println!("  entity {uid} {k}: (new)");
+                            }
+                        }
+                    }
+                    shown += 1;
+                }
+            }
+        }
+        println!("{differing} entities differ in their components");
+        let (ra, rb) = (a.call("resources", &Json::Null).unwrap().to_string_compact().unwrap(), b.call("resources", &Json::Null).unwrap().to_string_compact().unwrap());
+        println!("resources the same: {}; systems the same: {}; prefabs the same: {}", ra == rb, a.call("systems", &Json::Null).unwrap().to_string_compact().unwrap() == b.call("systems", &Json::Null).unwrap().to_string_compact().unwrap(), a.call("prefabs", &Json::Null).unwrap().to_string_compact().unwrap() == b.call("prefabs", &Json::Null).unwrap().to_string_compact().unwrap());
+    }
+    assert_eq!((n1, &h1), (n2, &h2), "the saved scene is not the same world");
+    // a second save is the same text as the first (nothing is lost or reordered on the way)
+    let first = std::fs::read_to_string(root.join(&probe)).unwrap();
+    b.call("save_scene", &Json::obj([("path", Json::str(probe.clone()))])).unwrap();
+    let second = std::fs::read_to_string(root.join(&probe)).unwrap();
+    assert!(first == second, "saving twice gave different text ({} and {} bytes)", first.len(), second.len());
+}

@@ -6,6 +6,7 @@ tolerance, or when the memory an entity costs grew. A speed claim of the engine 
     python3 tools/perf_gate.py --bin target/release/lunaris --runs 5 --entities 200000
     python3 tools/perf_gate.py --selftest             check the gate's own comparison logic (no benchmark is run)
     python3 tools/perf_gate.py --gpu [--update]       the same for the graphics card (`lunaris bench --gpu`), with a baseline per machine and adapter (LUNARIS_GPU=name picks the card)
+    python3 tools/perf_gate.py --studio [--update]    the same for the editor with a 10,000-entity scene (the ignored `big_scene` test of lunaris-studio: the Hierarchy's rows and an idle frame)
 
 The baseline holds one entry per machine, named by its processor and core count (timings are only comparable on the same machine, the clock and the memory of another one would make
 every number a false alarm); on a machine with no entry only the memory an entity costs is checked (it does not depend on the machine) and the script says how to add one.
@@ -16,6 +17,7 @@ import argparse
 import json
 import os
 import platform
+import shlex
 import subprocess
 import sys
 
@@ -66,6 +68,31 @@ def adapter_of(run):
     return None
 
 
+# the lines of the editor's `big_scene` test that are gated, as the test prints them, and the name each has in the baseline
+STUDIO_LINES = {
+    "refresh_rows (10,000 entities)": "studio: Hierarchy rows, 10,000 entities",
+    "an idle frame (nothing changed)": "studio: an idle frame, 10,000 entities",
+}
+
+
+def parse_studio(text):
+    """The gated rows of the `big_scene` test's output: {baseline name: ms}. A line that is not there is left out (the gate then calls it missing)."""
+    rows = {}
+    for line in text.splitlines():
+        label, sep, rest = line.strip().partition(": ")
+        if sep and label in STUDIO_LINES and rest.endswith(" ms"):
+            try:
+                rows[STUDIO_LINES[label]] = float(rest[:-3])
+            except ValueError:
+                pass
+    return rows
+
+
+def run_studio(cmd):
+    out = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    return parse_studio(out.stdout + "\n" + out.stderr)
+
+
 def best_of(runs):
     """The smallest time of each row over the runs, and the memory an entity cost (the same in every run, so the last)."""
     rows = {}
@@ -106,6 +133,9 @@ def selftest():
     assert compare({"rows": {}}, {}, None) == [], "an empty baseline gates nothing"
     rows, mem = best_of([{"results": [{"name": "a", "ms": 3.0}], "bytes_per_entity": 99}, {"results": [{"name": "a", "ms": 2.0}], "bytes_per_entity": 99}])
     assert rows == {"a": 2.0} and mem == 99
+    got = parse_studio("running 1 test\nrefresh_rows (10,000 entities): 2.01 ms\nan idle frame (nothing changed): 0.60 ms\na playing frame (rows rebuilt every 250 ms, the game stepped): 4.10 ms\ntest big_scene_editor_costs ... ok\n")
+    assert got == {"studio: Hierarchy rows, 10,000 entities": 2.01, "studio: an idle frame, 10,000 entities": 0.6}, got
+    assert parse_studio("an idle frame (nothing changed): fast ms\n") == {}, "a line that is not a number is a missing row, not a crash"
     print("perf_gate selftest: ok")
 
 
@@ -155,6 +185,59 @@ def gpu_main(a):
     return 1 if bad else 0
 
 
+def studio_main(a):
+    """The editor's rows (the ignored `big_scene` test of lunaris-studio): the best of a few runs of each, against the baseline of this machine. They are a millisecond or two, so a row may be twice the baseline before it fails."""
+    if a.studio_cmd:
+        cmd = shlex.split(a.studio_cmd)
+    else:
+        # the x11 feature is for a Linux box that has no window system of its own (the test never opens a window)
+        cmd = ["cargo", "test", "--release", "-p", "lunaris-studio"] + (["--features", "eframe/x11"] if sys.platform.startswith("linux") else []) + ["big_scene", "--", "--ignored", "--nocapture"]
+    runs = [run_studio(cmd) for _ in range(max(1, a.runs))]
+
+    def best(runs):
+        rows = {}
+        for r in runs:
+            for name, ms in r.items():
+                rows[name] = min(rows.get(name, float("inf")), ms)
+        return rows
+    rows = best(runs)
+    key = machine_name()
+    try:
+        with open(BASELINE, encoding="utf-8") as f:
+            store = json.load(f)
+    except (OSError, ValueError):
+        store = {"entities": a.entities, "machines": {}}
+    if a.update:
+        store.setdefault("studio_machines", {})[key] = {"rows": {k: round(v, 3) for k, v in rows.items()}}
+        with open(BASELINE, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(store, f, indent=2, sort_keys=True)
+            f.write("\n")
+        print(f"editor baseline for {key} written to {BASELINE} ({len(rows)} rows, best of {len(runs)} runs)")
+        return 0
+    entry = store.get("studio_machines", {}).get(key)
+    if entry is None:
+        print(f"no editor baseline for {key}: run with --studio --update to add one")
+        return 0
+    bad = []
+    for again in range(3):
+        bad = []
+        for name, was in entry["rows"].items():
+            now = rows.get(name)
+            if now is None:
+                bad.append(f"{name}: row missing from the test's output")
+            elif now > was * 2.0:
+                bad.append(f"{name}: {now:.3f} ms against {was:.3f} ms ({(now / was - 1) * 100:+.0f}%, at most +100% allowed)")
+        if not bad or again == 2:
+            break
+        print(f"slower than the baseline ({len(bad)} row(s)): measuring again ({again + 1} of 2) before calling it a regression")
+        runs += [run_studio(cmd) for _ in range(max(1, a.runs))]
+        rows = best(runs)
+    for line in bad:
+        print("SLOWER  " + line)
+    print(f"perf gate (editor): {'FAILED' if bad else 'ok'} on {key} (best of {len(runs)} runs)")
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bin", default=os.path.join("target", "release", "lunaris.exe" if os.name == "nt" else "lunaris"))
@@ -164,12 +247,16 @@ def main():
     ap.add_argument("--update", action="store_true", help="write the baseline for this machine")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--gpu", action="store_true", help="gate the graphics card instead (`bench --gpu`; the baseline is kept per machine AND adapter, pick the card with LUNARIS_GPU=name)")
+    ap.add_argument("--studio", action="store_true", help="gate the editor instead (the ignored `big_scene` test of lunaris-studio, 10,000 entities)")
+    ap.add_argument("--studio-cmd", default="", help="the command that prints the editor rows (default: cargo test --release -p lunaris-studio big_scene -- --ignored --nocapture)")
     a = ap.parse_args()
     if a.selftest:
         selftest()
         return 0
     if a.gpu:
         return gpu_main(a)
+    if a.studio:
+        return studio_main(a)
     runs = [run_bench(a.bin, a.entities, a.ticks) for _ in range(max(1, a.runs))]
     rows, mem = best_of(runs)
     machine = machine_name()

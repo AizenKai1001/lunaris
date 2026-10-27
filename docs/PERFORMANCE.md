@@ -316,7 +316,11 @@ python3 tools/perf_gate.py --update        # measure and store the baseline for 
 python3 tools/perf_gate.py --selftest      # the gate's own comparison logic, no benchmark
 LUNARIS_GPU=2060 python3 tools/perf_gate.py --gpu            # the graphics card: the rows of `lunaris bench --gpu` (a picture and a frame as a game draws it)
 LUNARIS_GPU=2060 python3 tools/perf_gate.py --gpu --update   # store the baseline of this machine with this adapter
+python3 tools/perf_gate.py --studio          # the editor with 10,000 entities: the Hierarchy's rows and an idle frame (the ignored `big_scene` test of lunaris-studio, built in release)
+python3 tools/perf_gate.py --studio --update # store the baseline of this machine
 ```
+
+The editor gate keeps its baselines (`studio_machines`) per machine, runs the ignored `big_scene_editor_costs` test of `lunaris-studio` (a scene of 10,000 entities made inside the test, no game files, no window opened) and gates two of its lines: the time `refresh_rows` takes to read the Hierarchy's rows from the world and the cost of an idle frame (nothing changed, so the scene view must not draw again). Both are a millisecond or two, so a row may be twice its baseline before it fails; a row missing from the test's output fails. What the editor must never do (change the size of the scene view with the selected tab, draw a picture by itself) is pinned by ordinary tests, not by timings.
 
 The graphics gate keeps its baselines (`gpu_machines`) per machine **and adapter** (the key is `i7-9700K ... x8 / NVIDIA GeForce RTX 2060 SUPER (Vulkan, DiscreteGpu)`), compares the best of three runs of each of the six `gpu` rows, allows 50% (the processor feeds the card, so the rows are noisier than the core's), measures again up to twice before it calls a slowdown a regression, and says so and passes on a machine with no adapter or no baseline. The test machine has entries for both of its cards (2026-10-26).
 

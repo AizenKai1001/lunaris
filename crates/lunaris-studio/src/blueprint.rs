@@ -1448,6 +1448,63 @@ mod tests {
         assert!(seen >= 20, "{seen}");
     }
 
+    /// `{"abs": [x]}` and `{"abs": x}` are the same one-operand operation (the engine reads both): the nodes write the second, a scene may hold the first.
+    fn unary_unwrapped(j: &Json) -> Json {
+        const UNARY: [&str; 18] = ["abs", "floor", "ceil", "sqrt", "neg", "not", "sin", "cos", "tan", "round", "sign", "fract", "exp", "ln", "log", "asin", "acos", "atan"];
+        match j {
+            Json::Obj(pairs) if pairs.len() == 1 && UNARY.contains(&pairs[0].0.as_str()) => match &pairs[0].1 {
+                Json::Arr(a) if a.len() == 1 => Json::Obj(vec![(pairs[0].0.clone(), unary_unwrapped(&a[0]))]),
+                v => Json::Obj(vec![(pairs[0].0.clone(), unary_unwrapped(v))]),
+            },
+            Json::Obj(pairs) => Json::Obj(pairs.iter().map(|(k, v)| (k.clone(), unary_unwrapped(v))).collect()),
+            Json::Arr(a) => Json::Arr(a.iter().map(unary_unwrapped).collect()),
+            other => other.clone(),
+        }
+    }
+
+    /// The systems of a real scene through the nodes and back: `LUNARIS_BIG_ROOT=/workspace LUNARIS_BIG_SCENE=scenes/x.lunaris.json cargo test --release -p lunaris-studio real_scene_systems -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn every_system_of_a_real_scene_survives_the_trip_through_nodes_real_scene_systems() {
+        let (Ok(root), Ok(scene)) = (std::env::var("LUNARIS_BIG_ROOT"), std::env::var("LUNARIS_BIG_SCENE")) else { return };
+        let doc = parse(&std::fs::read_to_string(std::path::Path::new(&root).join(&scene)).unwrap()).unwrap();
+        let (mut seen, mut bad) = (0, Vec::new());
+        for d in doc.get("systems").and_then(|s| s.as_array()).unwrap_or(&[]) {
+            if d.get("do").is_none() {
+                continue;
+            }
+            let name = d.get("name").and_then(|n| n.as_str()).unwrap_or("?").to_string();
+            seen += 1;
+            // (`"enabled": true` is what a system is anyway: the nodes leave it out, and that is not a change)
+            let mut plain = d.clone();
+            if let Json::Obj(pairs) = &mut plain {
+                pairs.retain(|(k, v)| !(k == "enabled" && *v == Json::Bool(true)));
+            }
+            let d = &plain;
+            match Bp::from_json(d) {
+                Err(e) => bad.push(format!("{name}: cannot be read as nodes: {e}")),
+                Ok(bp) => match bp.to_json() {
+                    Err(p) => bad.push(format!("{name}: cannot be written back: {p:?}")),
+                    Ok(back) if !lunaris_json_eq(&unary_unwrapped(&back), &unary_unwrapped(d)) => {
+                        // where the two texts first differ
+                        let (x, y) = (d.to_string_compact().unwrap_or_default(), back.to_string_compact().unwrap_or_default());
+                        let at = x.bytes().zip(y.bytes()).position(|(p, q)| p != q).unwrap_or(x.len().min(y.len()));
+                        let cut = |t: &str| t.chars().skip(at.saturating_sub(60)).take(160).collect::<String>();
+                        bad.push(format!("{name}: comes back different at byte {at}:
+      was  {}
+      now  {}", cut(&x), cut(&y)));
+                    }
+                    Ok(_) => {}
+                },
+            }
+        }
+        println!("{seen} systems with a body; {} do not survive the trip", bad.len());
+        for b in &bad {
+            println!("  {b}");
+        }
+        assert!(bad.is_empty(), "{} of {seen} systems change when they go through the nodes and back", bad.len());
+    }
+
     #[test]
     fn what_the_nodes_cannot_say_is_kept_as_raw_nodes() {
         let d = def(r#"{"name":"odd","each":["A"],"do":[{"future":{"x":1}},{"set":"A.x","to":{"future_op":[1,2]}},{"set":"A.y","to":{"add":[]}}]}"#);

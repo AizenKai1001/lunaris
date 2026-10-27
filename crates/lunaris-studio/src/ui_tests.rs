@@ -767,6 +767,22 @@ fn real_scene_in_the_editor() {
         h.app.studio.center = Center::View;
         h.frames(3);
     }
+    // play in the editor: the snapshot, a second of game time (the CPU renderer draws every frame here), and stop putting everything back
+    {
+        let t = std::time::Instant::now();
+        h.app.studio.play();
+        println!("Play: {:.1} ms to start", t.elapsed().as_secs_f64() * 1e3);
+        let t = std::time::Instant::now();
+        h.frames(30);
+        println!("30 frames of play (with the CPU renderer drawing each): {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+        let t = std::time::Instant::now();
+        h.app.studio.stop();
+        h.frames(2);
+        println!("Stop: {:.1} ms to put the scene back, {} entities", t.elapsed().as_secs_f64() * 1e3, h.app.studio.engine.sim.world.len());
+        let t = std::time::Instant::now();
+        let saved = h.app.studio.engine.call("save_scene", &Json::obj([("path", Json::str("scenes/_editor_probe_save.lunaris.json"))]));
+        println!("saving the scene: {:.0} ms ({})", t.elapsed().as_secs_f64() * 1e3, if saved.is_ok() { "ok" } else { "refused" });
+    }
     h.shoot("real_scene");
     h.app.studio.select(Some(33));
     h.frames(3);

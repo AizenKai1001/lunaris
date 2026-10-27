@@ -641,8 +641,13 @@ impl Json {
                     return Err(WriteError(format!("cannot write non-finite number {f}")));
                 }
                 // Rust's shortest round-trip formatting; an integral float prints as "1", which re-reads as Int(1);
-                // readers use as_f64, so the value is the same.
-                let _ = write!(out, "{f}");
+                // readers use as_f64, so the value is the same. Negative zero is the exception: "-0" would re-read as the integer 0
+                // and lose the sign (a saved scene then loaded as another world: the state hash sees the sign bit), so it prints as "-0.0".
+                if *f == 0.0 && f.is_sign_negative() {
+                    out.push_str("-0.0");
+                } else {
+                    let _ = write!(out, "{f}");
+                }
             }
             Json::Str(s) => write_string(out, s),
             Json::Arr(a) => {
@@ -900,6 +905,17 @@ mod tests {
         assert!(Json::Float(f64::NAN).to_string_compact().is_err());
         assert!(Json::Arr(vec![Json::Float(f64::INFINITY)]).to_string_compact().is_err());
         assert_eq!(Json::Float(f64::NAN).to_string_lossy(), "null");
+    }
+
+    #[test]
+    fn negative_zero_keeps_its_sign_through_text() {
+        let t = Json::Float(-0.0).to_string_compact().unwrap();
+        assert_eq!(t, "-0.0");
+        let back = parse(&t).unwrap().as_f64().unwrap();
+        assert!(back == 0.0 && back.is_sign_negative(), "{t} read back as {back:?}");
+        assert_eq!(Json::Float(0.0).to_string_compact().unwrap(), "0");
+        // f32 values too: a position of -0.0 in a scene
+        assert_eq!(Json::from(-0.0f32).to_string_compact().unwrap(), "-0.0");
     }
 
     #[test]
