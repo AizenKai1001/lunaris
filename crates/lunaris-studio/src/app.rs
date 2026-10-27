@@ -459,6 +459,17 @@ impl App {
         if playing_game {
             return;
         }
+        // camera bookmarks: Ctrl+1 to Ctrl+9 save the view, 1 to 9 return to it (not while the right button flies the camera)
+        if !rmb {
+            const NUMS: [Key; crate::viewport::BOOKMARKS] = [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6, Key::Num7, Key::Num8, Key::Num9];
+            for (n, key) in NUMS.into_iter().enumerate() {
+                if ctx.input_mut(|i| i.consume_key(cmd, key)) {
+                    self.viewport.set_bookmark(n);
+                } else if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, key)) {
+                    self.viewport.go_bookmark(n);
+                }
+            }
+        }
         if undo {
             self.studio.undo();
         }

@@ -170,6 +170,63 @@ fn dragging_a_gizmo_handle_moves_the_selection_along_that_axis_only_and_is_one_u
 }
 
 #[test]
+fn the_streaming_overlay_reads_the_zones_and_says_how_many_are_loaded() {
+    let mut h = Harness::new();
+    h.app.studio.call("define_prefab", j(r#"{"name":"block","components":{"Transform":{}}}"#)).unwrap();
+    for (x, z, loaded) in [(-6, 3, false), (0, 5, true), (6, 3, false)] {
+        h.app.studio.call("spawn", j(&format!(r#"{{"components":{{"Transform":{{"pos":[{x},0.02,{z}]}},"StreamZone":{{"prefab":"block","radius":4,"min_radius":1.5,"loaded":{loaded}}}}}}}"#))).unwrap();
+    }
+    h.frames(2);
+    assert!(h.app.viewport.zones.zones.is_empty(), "nothing is read while the overlay is off");
+    h.app.viewport.streaming = true;
+    h.app.viewport.zones.invalidate();
+    h.frames(2);
+    assert_eq!(h.app.viewport.zones.zones.len(), 3);
+    assert_eq!(h.app.viewport.zones.summary(), "zones 1 of 3 loaded");
+    h.shoot("streaming_overlay");
+}
+
+#[test]
+fn local_space_turns_the_move_handles_with_the_object_and_a_drag_goes_along_them() {
+    let mut h = Harness::new();
+    h.click(h.screen_of("Box", [0.0, 1.0, 0.0]));
+    let uid = h.uid("Box");
+    // a quarter turn about y: the box's own x axis is the world's -z
+    h.app.studio.rotate_to(uid, [0.0, 0.70710677, 0.0, 0.70710677], "turn");
+    h.frames(3);
+    let world_tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    h.app.viewport.local_space = true;
+    h.frames(2);
+    let local_tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    assert!((world_tip - local_tip).length() > 20.0, "the x handle points elsewhere in local space: {world_tip:?} {local_tip:?}");
+    let from = h.app.viewport.handle_point(&h.app.studio, Axis::X, 0.6).unwrap();
+    let tip = h.app.viewport.handle_point(&h.app.studio, Axis::X, 1.0).unwrap();
+    let before = h.pos_of("Box");
+    h.drag(from, Pos2::new(from.x + (tip.x - from.x) * 1.8, from.y + (tip.y - from.y) * 1.8));
+    let after = h.pos_of("Box");
+    assert!((after[0] - before[0]).abs() < 1e-3 && (after[1] - before[1]).abs() < 1e-3, "nothing moved across the handle: {before:?} -> {after:?}");
+    assert!((after[2] - before[2]).abs() > 0.3, "it went along the object's x, which is the world's z: {before:?} -> {after:?}");
+}
+
+#[test]
+fn ctrl_and_a_number_save_the_camera_and_the_number_alone_returns_to_it() {
+    let mut h = Harness::new();
+    h.frames(2);
+    let saved = (h.app.viewport.yaw, h.app.viewport.pitch, h.app.viewport.dist, h.app.viewport.target);
+    h.key(Key::Num2, Modifiers::COMMAND);
+    assert!(h.app.viewport.bookmarks[1].is_some() && h.app.viewport.bookmarks[0].is_none(), "Ctrl+2 saves view 2 only");
+    // move the camera elsewhere, then press 2
+    (h.app.viewport.yaw, h.app.viewport.pitch, h.app.viewport.dist, h.app.viewport.target) = (2.5, -0.3, 40.0, [30.0, 2.0, -10.0]);
+    h.key(Key::Num3, Modifiers::NONE);
+    assert_eq!(h.app.viewport.dist, 40.0, "a view that was never saved leaves the camera where it is");
+    h.key(Key::Num2, Modifiers::NONE);
+    assert_eq!((h.app.viewport.yaw, h.app.viewport.pitch, h.app.viewport.dist, h.app.viewport.target), saved, "2 returns to the saved camera");
+    // the game view has the game's camera: nothing to save or return to
+    h.app.viewport.kind = crate::viewport::ViewKind::Game;
+    assert!(!h.app.viewport.set_bookmark(0) && !h.app.viewport.go_bookmark(1));
+}
+
+#[test]
 fn the_snap_steps_chosen_in_the_toolbar_round_what_the_handles_do() {
     use crate::viewport::Tool;
     let mut h = Harness::new();

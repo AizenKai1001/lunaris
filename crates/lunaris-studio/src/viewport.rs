@@ -121,6 +121,20 @@ impl GpuStats {
     }
 }
 
+/// A saved place of the scene camera (Unreal's camera bookmarks): the orbit view and the 2D view both, so a bookmark returns to whichever one is showing.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Bookmark {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub dist: f32,
+    pub target: V3,
+    pub ortho_h: f32,
+    pub center2: [f32; 2],
+}
+
+/// How many bookmarks the keys 1 to 9 reach.
+pub const BOOKMARKS: usize = 9;
+
 pub struct Viewport {
     pub kind: ViewKind,
     pub tool: Tool,
@@ -130,6 +144,8 @@ pub struct Viewport {
     pub target: V3,
     pub ortho_h: f32,
     pub center2: [f32; 2],
+    /// Ctrl+1 to Ctrl+9 save the view of the scene camera, 1 to 9 return to it (kept while the editor is open).
+    pub bookmarks: [Option<Bookmark>; BOOKMARKS],
     renderer: Option<Result<GpuRenderer, String>>,
     textures: TextureCache,
     pub quality: String,
@@ -150,6 +166,11 @@ pub struct Viewport {
     pub snap_move: f32,
     pub snap_rot: f32,
     pub snap_scale: f32,
+    /// The Move and Rotate handles follow the selected object's turn (Local) instead of the world's axes (World); scale always follows the object, and the 2D view keeps screen-aligned handles.
+    pub local_space: bool,
+    /// Draw every `StreamZone` as a ring on the ground (green while loaded), and the zones as last read.
+    pub streaming: bool,
+    pub zones: crate::streaming_ui::ZoneCache,
     /// The statistics overlay (frame time, picture time, entities, tick, fly speed).
     pub stats: bool,
     /// Time every pass on the card (the Stats overlay or the Profiler tab wants it: timestamp queries are not free), and what the last GPU picture measured.
@@ -181,6 +202,7 @@ impl Viewport {
             target: [0.0, 1.0, 0.0],
             ortho_h: 12.0,
             center2: [0.0, 0.0],
+            bookmarks: [None; BOOKMARKS],
             renderer: None,
             textures: TextureCache::new(Some(root)),
             quality: quality.to_string(),
@@ -196,6 +218,9 @@ impl Viewport {
             snap_move: 0.0,
             snap_rot: 0.0,
             snap_scale: 0.0,
+            local_space: false,
+            streaming: false,
+            zones: Default::default(),
             hover_axis: None,
             grid: true,
             gizmos: true,
@@ -238,6 +263,26 @@ impl Viewport {
         self.dist = (size * 2.5).clamp(1.5, 400.0);
         self.ortho_h = (size * 3.0).clamp(2.0, 400.0);
         self.forced = true;
+    }
+
+    /// Remember where the scene camera is as bookmark `n` (0 to 8; the key is `n` + 1). The game view has the game's camera: nothing to save there.
+    pub fn set_bookmark(&mut self, n: usize) -> bool {
+        if n >= BOOKMARKS || self.kind == ViewKind::Game {
+            return false;
+        }
+        self.bookmarks[n] = Some(Bookmark { yaw: self.yaw, pitch: self.pitch, dist: self.dist, target: self.target, ortho_h: self.ortho_h, center2: self.center2 });
+        true
+    }
+
+    /// Put the scene camera where bookmark `n` was saved; false when there is none (or the game view is showing).
+    pub fn go_bookmark(&mut self, n: usize) -> bool {
+        let Some(Some(b)) = self.bookmarks.get(n).copied() else { return false };
+        if self.kind == ViewKind::Game {
+            return false;
+        }
+        (self.yaw, self.pitch, self.dist, self.target, self.ortho_h, self.center2) = (b.yaw, b.pitch, b.dist, b.target, b.ortho_h, b.center2);
+        self.forced = true;
+        true
     }
 
     pub fn focus_selection(&mut self, studio: &Studio) {
@@ -389,6 +434,21 @@ impl Viewport {
                     }
                 }
             });
+            chrome::drop_down(ui, "Views", |ui| {
+                ui.label(egui::RichText::new("Ctrl+1 to Ctrl+9 save the view, 1 to 9 return to it").small().color(theme::TEXT_DIM));
+                for n in 0..BOOKMARKS {
+                    ui.horizontal(|ui| {
+                        let saved = self.bookmarks[n].is_some();
+                        if ui.add_enabled(saved, egui::Button::new(format!("Go to view {}", n + 1)).min_size(Vec2::new(100.0, 0.0))).clicked() {
+                            self.go_bookmark(n);
+                            ui.close();
+                        }
+                        if ui.button(if saved { "Replace" } else { "Save here" }).clicked() {
+                            self.set_bookmark(n);
+                        }
+                    });
+                }
+            });
             chrome::rule(ui);
             let two_d = self.kind == ViewKind::Scene2D;
             if chrome::pill(ui, "2D", two_d, false).clicked() && self.kind != ViewKind::Game {
@@ -398,12 +458,19 @@ impl Viewport {
             if chrome::pill(ui, "Grid", self.grid, false).clicked() {
                 self.grid = !self.grid;
             }
+            if chrome::pill(ui, "Streaming", self.streaming, false).on_hover_text("A ring on the ground for every StreamZone: green while it is loaded, grey while it is not").clicked() {
+                self.streaming = !self.streaming;
+                self.zones.invalidate();
+            }
             if chrome::pill(ui, "Stats", self.stats, false).on_hover_text("Frame time, picture time, entities and tick; with the right button held the wheel sets the fly speed").clicked() {
                 self.stats = !self.stats;
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if chrome::pill(ui, "Gizmos", self.gizmos, false).clicked() {
                     self.gizmos = !self.gizmos;
+                }
+                if chrome::pill(ui, if self.local_space { "Local" } else { "World" }, self.local_space, false).on_hover_text("The Move and Rotate handles along the object's own axes (Local) or the world's (World); Scale always follows the object").clicked() {
+                    self.local_space = !self.local_space;
                 }
                 // (Unreal's snap settings: a step for each of the three handles, or off)
                 snap_menu(ui, "Scale", "", &mut self.snap_scale, &[0.05, 0.1, 0.25, 0.5, 1.0]);
@@ -470,6 +537,9 @@ impl Viewport {
         if playing {
             // like the other editors: a tint over the view while the game runs
             painter.rect_filled(rect, CornerRadius::ZERO, Color32::from_rgba_unmultiplied(40, 70, 130, 22));
+        }
+        if self.streaming {
+            self.zones.refresh(studio);
         }
         if self.kind != ViewKind::Game {
             self.overlays(&painter, rect, studio, &cam);
@@ -699,10 +769,13 @@ impl Viewport {
         if let Some(ms) = self.gpu.total_ms() {
             lines.push(format!("card    {ms:5.2} ms"));
         }
+        if self.streaming {
+            lines.push(self.zones.summary());
+        }
         if self.kind == ViewKind::Scene {
             lines.push(format!("fly speed x{:.2}", self.fly_speed));
         }
-        let (w, h) = (172.0, 8.0 + lines.len() as f32 * 14.0);
+        let (w, h) = (if self.streaming { 244.0 } else { 172.0 }, 8.0 + lines.len() as f32 * 14.0);
         let r = Rect::from_min_size(rect.min + Vec2::new(8.0, 8.0), Vec2::new(w, h));
         painter.rect_filled(r, CornerRadius::same(3), Color32::from_rgba_unmultiplied(20, 22, 26, 190));
         for (i, l) in lines.iter().enumerate() {
@@ -816,21 +889,21 @@ impl Viewport {
         }
         let origin = studio.entity_world_pos()?;
         let rot = studio.entity.as_ref().and_then(|e| e.quat("Transform", "rot")).unwrap_or([0.0, 0.0, 0.0, 1.0]);
-        Some(Handles { origin, len: self.gizmo_len(cam, origin), rot })
+        Some(Handles { origin, len: self.gizmo_len(cam, origin), rot, local: self.local_space && self.kind != ViewKind::Scene2D })
     }
 
     /// The point at `t` (0 to 1) along an axis handle of the move tool, on the screen (for tests and hints).
     pub fn handle_point(&self, studio: &Studio, axis: Axis, t: f32) -> Option<Pos2> {
         let cam = self.basis(self.last_rect.width() / self.last_rect.height().max(1.0));
         let h = self.handles(studio, &cam)?;
-        self.project(add(h.origin, mul(axis.dir(), h.len * t)))
+        self.project(add(h.origin, mul(h.axis_dir(Tool::Move, axis), h.len * t)))
     }
 
     /// A point on the rotate tool's ring about `axis`, `degrees` round it, on the screen (for tests).
     pub fn ring_point(&self, studio: &Studio, axis: Axis, degrees: f32) -> Option<Pos2> {
         let cam = self.basis(self.last_rect.width() / self.last_rect.height().max(1.0));
         let h = self.handles(studio, &cam)?;
-        let (u, v) = axis.plane();
+        let (u, v) = h.plane_of(axis);
         let a = degrees.to_radians();
         self.project(add(h.origin, mul(add(mul(u, a.cos()), mul(v, a.sin())), h.len * 0.85)))
     }
@@ -881,7 +954,7 @@ impl Viewport {
                         Tool::Move => {
                             if let Some(mut np) = gizmo::moved(&d.handles, d.axis, d.grab, ro, rd) {
                                 if move_step > 0.0 {
-                                    np = [(np[0] / move_step).round() * move_step, (np[1] / move_step).round() * move_step, (np[2] / move_step).round() * move_step];
+                                    np = gizmo::snapped_move(&d.handles, d.axis, np, move_step);
                                 }
                                 // the others move by the same amount as the main one
                                 let delta = [np[0] - d.handles.origin[0], np[1] - d.handles.origin[1], np[2] - d.handles.origin[2]];
@@ -1037,6 +1110,9 @@ impl Viewport {
                     }
                 }
             }
+        }
+        if self.streaming && self.kind == ViewKind::Scene {
+            crate::streaming_ui::draw(painter, rect, &self.view_proj, cam.eye, &self.zones.zones);
         }
         // icons for what has no picture
         for r in &studio.all {

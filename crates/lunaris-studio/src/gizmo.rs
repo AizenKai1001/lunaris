@@ -57,26 +57,37 @@ impl Axis {
     }
 }
 
-/// Where the handles are: the selection's position, how long they are in the world, and (for scaling) how the object is turned.
+/// Where the handles are: the selection's position, how long they are in the world, how the object is turned, and whether the move and rotate handles follow the object's turn (`local`) or stay with the world.
 #[derive(Clone, Copy, Debug)]
 pub struct Handles {
     pub origin: V3,
     pub len: f32,
     pub rot: Q,
+    pub local: bool,
 }
 
 impl Handles {
-    /// The direction of an axis handle for this tool: scaling follows the object, the others stay with the world.
+    /// The direction of an axis handle for this tool: scaling always follows the object, move and rotate follow it in local space and stay with the world otherwise.
     pub fn axis_dir(&self, tool: Tool, a: Axis) -> V3 {
-        if tool == Tool::Scale {
+        if tool == Tool::Scale || (self.local && tool != Tool::Hand) {
             q_rotate(self.rot, a.dir())
         } else {
             a.dir()
         }
     }
 
-    fn ring(&self, a: Axis, n: usize) -> Vec<V3> {
+    /// The two directions that span the plane of the ring about `a`, turned with the object in local space.
+    pub fn plane_of(&self, a: Axis) -> (V3, V3) {
         let (u, v) = a.plane();
+        if self.local {
+            (q_rotate(self.rot, u), q_rotate(self.rot, v))
+        } else {
+            (u, v)
+        }
+    }
+
+    fn ring(&self, a: Axis, n: usize) -> Vec<V3> {
+        let (u, v) = self.plane_of(a);
         let r = self.len * 0.85;
         (0..=n)
             .map(|i| {
@@ -190,16 +201,27 @@ pub fn grab_value(tool: Tool, h: &Handles, a: Axis, ray_o: V3, ray_d: V3) -> Opt
 
 /// The angle of the point where the ray meets the plane of the ring, measured in the plane (radians).
 pub fn ring_angle(h: &Handles, a: Axis, ray_o: V3, ray_d: V3) -> Option<f32> {
-    let hit = ray_plane(ray_o, ray_d, h.origin, a.dir())?;
-    let (u, v) = a.plane();
+    let hit = ray_plane(ray_o, ray_d, h.origin, h.axis_dir(Tool::Rotate, a))?;
+    let (u, v) = h.plane_of(a);
     let d = sub(hit, h.origin);
     Some(dot(d, v).atan2(dot(d, u)))
 }
 
 /// The change of a move: the new position when the pointer's ray is `(ray_o, ray_d)` and the drag began at `grab`.
 pub fn moved(h: &Handles, a: Axis, grab: f32, ray_o: V3, ray_d: V3) -> Option<V3> {
-    let t = closest_on_line(h.origin, a.dir(), ray_o, ray_d)?;
-    Some(add(h.origin, mul(a.dir(), t - grab)))
+    let dir = h.axis_dir(Tool::Move, a);
+    let t = closest_on_line(h.origin, dir, ray_o, ray_d)?;
+    Some(add(h.origin, mul(dir, t - grab)))
+}
+
+/// The position of a move after snapping to `step` metres: on the world grid when the handle runs along a world axis, and by whole steps of the distance moved along the handle when it is slanted (a slanted line has no grid to land on).
+pub fn snapped_move(h: &Handles, a: Axis, np: V3, step: f32) -> V3 {
+    let dir = h.axis_dir(Tool::Move, a);
+    if dot(dir, a.dir()) > 0.9999 {
+        return [(np[0] / step).round() * step, (np[1] / step).round() * step, (np[2] / step).round() * step];
+    }
+    let d = dot(sub(np, h.origin), dir);
+    add(h.origin, mul(dir, (d / step).round() * step))
 }
 
 /// The factor a scale handle drag gives (1 = unchanged).
@@ -208,7 +230,7 @@ pub fn scaled(h: &Handles, a: Axis, grab: f32, ray_o: V3, ray_d: V3) -> Option<f
     Some((1.0 + (t - grab) / h.len.max(1e-4)).max(0.01))
 }
 
-/// The rotation (about the ring's world axis) a ring drag gives: from the grabbed angle to the current one.
+/// The rotation (about the ring's axis in the world, the object's own in local space) a ring drag gives: from the grabbed angle to the current one.
 pub fn turned(h: &Handles, a: Axis, grab: f32, ray_o: V3, ray_d: V3, snap_degrees: Option<f32>) -> Option<Q> {
     let now = ring_angle(h, a, ray_o, ray_d)?;
     let mut delta = now - grab;
@@ -223,7 +245,7 @@ pub fn turned(h: &Handles, a: Axis, grab: f32, ray_o: V3, ray_d: V3, snap_degree
         let step = s.to_radians();
         delta = (delta / step).round() * step;
     }
-    Some(q_axis_angle(a.dir(), delta))
+    Some(q_axis_angle(h.axis_dir(Tool::Rotate, a), delta))
 }
 
 #[cfg(test)]
@@ -231,7 +253,7 @@ mod tests {
     use super::*;
 
     fn handles() -> Handles {
-        Handles { origin: [0.0; 3], len: 2.0, rot: [0.0, 0.0, 0.0, 1.0] }
+        Handles { origin: [0.0; 3], len: 2.0, rot: [0.0, 0.0, 0.0, 1.0], local: false }
     }
 
     #[test]
@@ -267,12 +289,64 @@ mod tests {
     fn handles_are_found_under_the_pointer_and_nothing_else_is() {
         // an identity view maps x, y in -1..1 to the picture; a 200 x 200 picture: the x handle runs from the middle to the right
         let m = Mat::IDENTITY;
-        let h = Handles { origin: [0.0; 3], len: 0.5, rot: [0.0, 0.0, 0.0, 1.0] };
+        let h = Handles { origin: [0.0; 3], len: 0.5, rot: [0.0, 0.0, 0.0, 1.0], local: false };
         assert_eq!(hit(Tool::Move, &h, &m, 200.0, 200.0, [125.0, 100.0], false), Some(Axis::X));
         assert_eq!(hit(Tool::Move, &h, &m, 200.0, 200.0, [100.0, 75.0], false), Some(Axis::Y));
         assert_eq!(hit(Tool::Move, &h, &m, 200.0, 200.0, [30.0, 30.0], false), None);
         assert_eq!(hit(Tool::Hand, &h, &m, 200.0, 200.0, [125.0, 100.0], false), None);
         // the z handle points at the camera in this view: it is a dot, and 2D views have no z handle
         assert_eq!(hit(Tool::Move, &h, &m, 200.0, 200.0, [125.0, 100.0], true), Some(Axis::X));
+    }
+
+    /// An object turned a quarter turn about y: its own x axis points along the world's -z.
+    fn turned_object(local: bool) -> Handles {
+        Handles { origin: [1.0, 0.0, 2.0], len: 2.0, rot: q_axis_angle([0.0, 1.0, 0.0], std::f32::consts::FRAC_PI_2), local }
+    }
+
+    #[test]
+    fn local_handles_follow_the_object_and_world_handles_do_not() {
+        let (w, l) = (turned_object(false), turned_object(true));
+        assert_eq!(w.axis_dir(Tool::Move, Axis::X), [1.0, 0.0, 0.0]);
+        let own_x = l.axis_dir(Tool::Move, Axis::X);
+        assert!(own_x[0].abs() < 1e-5 && (own_x[2] + 1.0).abs() < 1e-5, "the object's x is the world's -z: {own_x:?}");
+        assert_eq!(l.axis_dir(Tool::Rotate, Axis::X), own_x);
+        // scale follows the object in both spaces
+        assert_eq!(w.axis_dir(Tool::Scale, Axis::X), own_x);
+        // a move along the local x handle moves along the world's z, by what the pointer swept
+        let d = [0.0, -1.0, 0.0];
+        let g = grab_value(Tool::Move, &l, Axis::X, [1.0, 5.0, 1.5], d).unwrap();
+        let p = moved(&l, Axis::X, g, [1.0, 5.0, 0.5], d).unwrap();
+        assert!((p[0] - 1.0).abs() < 1e-5 && (p[2] - 1.0).abs() < 1e-4, "the pointer went one metre towards -z, along the handle: {p:?}");
+    }
+
+    #[test]
+    fn a_local_ring_turns_the_object_about_its_own_axis() {
+        let l = turned_object(true);
+        let axis = l.axis_dir(Tool::Rotate, Axis::Y);
+        // looking down the object's y (the world's y too): a sweep of a quarter turn about it is a quarter turn about the world's y
+        let d = [0.0, -1.0, 0.0];
+        let g = grab_value(Tool::Rotate, &l, Axis::Y, [2.0, 5.0, 2.0], d).unwrap();
+        let q = turned(&l, Axis::Y, g, [1.0, 5.0, 3.0], d, None).unwrap();
+        assert!(dot(axis, [q[0], q[1], q[2]]).abs() > 0.69, "the turn is about the object's axis: {q:?}");
+        // a ring about the object's x (the world's -z) turns about -z: the quaternion's axis part lies along it
+        let own_x = l.axis_dir(Tool::Rotate, Axis::X);
+        let gx = grab_value(Tool::Rotate, &l, Axis::X, [1.0, 2.0, 5.0], [0.0, 0.0, -1.0]).unwrap();
+        let qx = turned(&l, Axis::X, gx, [2.0, 0.0, 5.0], [0.0, 0.0, -1.0], None).unwrap();
+        assert!(dot(own_x, [qx[0], qx[1], qx[2]]).abs() > 0.69, "{qx:?}");
+    }
+
+    #[test]
+    fn a_snapped_move_lands_on_the_grid_along_a_world_axis_and_in_whole_steps_along_a_slanted_one() {
+        let w = turned_object(false);
+        let p = snapped_move(&w, Axis::X, [3.3, 0.2, 2.6], 0.5);
+        assert_eq!(p, [3.5, 0.0, 2.5], "on the world grid");
+        // a handle at 45 degrees: the distance moved from the start is what is rounded
+        let s = std::f32::consts::FRAC_PI_4;
+        let l = Handles { origin: [0.0; 3], len: 2.0, rot: q_axis_angle([0.0, 1.0, 0.0], s), local: true };
+        let dir = l.axis_dir(Tool::Move, Axis::X);
+        let np = mul(dir, 2.3);
+        let q = snapped_move(&l, Axis::X, np, 0.5);
+        let dist = dot(q, dir);
+        assert!((dist - 2.5).abs() < 1e-4 && len(sub(q, mul(dir, dist))) < 1e-4, "2.3 m along the handle snaps to 2.5 m along it: {q:?}");
     }
 }

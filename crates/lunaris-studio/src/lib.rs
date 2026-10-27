@@ -33,6 +33,7 @@ mod shot;
 mod script_ui;
 mod sequencer;
 mod state;
+mod streaming_ui;
 mod theme;
 mod thumbs;
 mod ui_designer;
