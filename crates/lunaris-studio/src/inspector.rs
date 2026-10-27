@@ -19,13 +19,21 @@ pub struct InspectorUi {
     uid_filter: String,
     /// How many points wider than the panel the fields of the last frame were (0 when they all fit): a row that does not fit is clipped, so a test looks for them.
     pub overflow: f32,
+    /// With several entities selected: the `Component.field`s whose value is not the same on all of them (the row shows the entity selected last), and what that was worked out for (the selection and the revision of the world).
+    pub mixed: std::collections::BTreeSet<String>,
+    mixed_for: (Vec<u64>, u64),
+    /// Where the value of each field row was drawn last frame, by `Component.field` (a test looks for rows over one another).
+    pub rows: Vec<(String, egui::Rect)>,
 }
 
 impl Default for InspectorUi {
     fn default() -> InspectorUi {
-        InspectorUi { epoch: 0, search: String::new(), resets: Vec::new(), files: Vec::new(), files_loaded: false, uid_filter: String::new(), overflow: 0.0 }
+        InspectorUi { epoch: 0, search: String::new(), resets: Vec::new(), files: Vec::new(), files_loaded: false, uid_filter: String::new(), overflow: 0.0, mixed: Default::default(), mixed_for: (Vec::new(), u64::MAX), rows: Vec::new() }
     }
 }
+
+/// The most selected entities that are compared with the main one for the fields that differ.
+const MIXED_COMPARED: usize = 100;
 
 /// Fields whose whole numbers are really choices.
 fn choices(comp: &str, field: &str) -> Option<&'static [&'static str]> {
@@ -117,6 +125,43 @@ impl InspectorUi {
         }
     }
 
+    /// Which fields differ between the entity shown and the other selected ones (Unreal's "Multiple Values"): worked out again only when the selection or the world changed.
+    fn refresh_mixed(&mut self, studio: &mut Studio, ent: &Entity) {
+        if studio.selected.len() < 2 {
+            self.mixed.clear();
+            self.mixed_for = (Vec::new(), u64::MAX);
+            return;
+        }
+        let key = (studio.selected.clone(), studio.live_revision);
+        if self.mixed_for == key {
+            return;
+        }
+        self.mixed_for = key;
+        self.mixed.clear();
+        let others: Vec<u64> = studio.selected.iter().copied().filter(|u| *u != ent.uid).take(MIXED_COMPARED).collect();
+        for uid in others {
+            let Ok(got) = studio.engine.call("get", &Json::obj([("uid", Json::from(uid as i64))])) else { continue };
+            let Some(Json::Obj(comps)) = got.get("components") else { continue };
+            for (cname, cval) in comps {
+                let (Some((_, mine)), Json::Obj(fields)) = (ent.comps.iter().find(|(n, _)| n == cname), cval) else { continue };
+                for (fname, fval) in fields {
+                    if differs(mine.get(fname), Some(fval)) {
+                        self.mixed.insert(format!("{cname}.{fname}"));
+                    }
+                }
+            }
+        }
+    }
+
+    /// The label of a row: in orange italics, with a hint, when the selected entities do not all have the same value there.
+    fn row_label(&self, ui: &mut egui::Ui, text: &str, comp: &str, field: &str) {
+        if !self.mixed.is_empty() && self.mixed.contains(&format!("{comp}.{field}")) {
+            ui.label(RichText::new(text).italics().color(theme::WARN)).on_hover_text("Multiple values: the selected entities do not all have the same value here. The box shows the entity selected last; a value you type goes to all of them.");
+        } else {
+            ui.label(text);
+        }
+    }
+
     pub fn refresh_files(&mut self) {
         self.files.clear();
         self.files_loaded = false;
@@ -135,6 +180,7 @@ impl InspectorUi {
 
     pub fn show(&mut self, ui: &mut egui::Ui, studio: &mut Studio) {
         self.resets.clear();
+        self.rows.clear();
         // a new undo step starts when the pointer is released or Enter is pressed
         if ui.input(|i| i.pointer.any_released() || i.key_pressed(egui::Key::Enter)) {
             self.epoch += 1;
@@ -146,8 +192,9 @@ impl InspectorUi {
             return;
         };
         self.load_files(studio);
+        self.refresh_mixed(studio, &ent);
         if studio.selected.len() > 1 {
-            ui.label(RichText::new(format!("{} entities selected: this is the one selected last; a value you change goes to every selected entity that has the component, and Move, Duplicate and Delete act on all of them", studio.selected.len())).small().color(theme::TEXT_DIM));
+            ui.label(RichText::new(format!("{} entities selected: this is the one selected last; a value you change goes to every selected entity that has the component, and Move, Duplicate and Delete act on all of them. A label in orange italics is a value that the selected entities do not share", studio.selected.len())).small().color(theme::TEXT_DIM));
         }
         // name and the actions
         ui.horizontal(|ui| {
@@ -273,9 +320,7 @@ impl InspectorUi {
             ui.label(RichText::new("attached: edit LocalTransform").small().color(theme::TEXT_DIM));
             ui.end_row();
         }
-        ui.add_enabled_ui(!attached, |ui| {
-            ui.label("Position");
-        });
+        ui.add_enabled_ui(!attached, |ui| self.row_label(ui, "Position", "Transform", "pos"));
         let mut p = pos.clone();
         let off_pos = !attached && differs(value.get("pos"), defaults.and_then(|d| d.get("pos")));
         let (changed, arrow) = ui.add_enabled_ui(!attached, |ui| vec3_row(ui, &mut p, 0.05, ["X", "Y", "Z"], off_pos)).inner;
@@ -288,9 +333,7 @@ impl InspectorUi {
             let g = self.group(uid, "Transform", "pos");
             studio.set_selected(uid, "Transform", Json::obj([("pos", jarr(&p))]), Some(&g));
         }
-        ui.add_enabled_ui(!attached, |ui| {
-            ui.label("Rotation");
-        });
+        ui.add_enabled_ui(!attached, |ui| self.row_label(ui, "Rotation", "Transform", "rot"));
         let q = [rot[0] as f32, rot[1] as f32, rot[2] as f32, rot[3] as f32];
         let e = q_to_euler(q);
         let mut ed = [e[0] as f64, e[1] as f64, e[2] as f64];
@@ -306,9 +349,7 @@ impl InspectorUi {
             let g = self.group(uid, "Transform", "rot");
             studio.set_selected(uid, "Transform", Json::obj([("rot", jarr(&[nq[0] as f64, nq[1] as f64, nq[2] as f64, nq[3] as f64]))]), Some(&g));
         }
-        ui.add_enabled_ui(!attached, |ui| {
-            ui.label("Scale");
-        });
+        ui.add_enabled_ui(!attached, |ui| self.row_label(ui, "Scale", "Transform", "scale"));
         let mut s = scale;
         let off_scale = !attached && differs(value.get("scale"), defaults.and_then(|d| d.get("scale")));
         let (changed, arrow) = ui.add_enabled_ui(!attached, |ui| vec3_row(ui, &mut s, 0.02, ["X", "Y", "Z"], off_scale)).inner;
@@ -328,17 +369,21 @@ impl InspectorUi {
         let uid = ent.uid;
         let label = f.name.replace('_', " ");
         let label = format!("{}{}", &label[..1].to_uppercase(), &label[1..]);
-        ui.label(label);
+        self.row_label(ui, &label, comp, &f.name);
         let set = |this: &Self, studio: &mut Studio, value: Json| {
             let g = this.group(uid, comp, &f.name);
             studio.set_selected(uid, comp, Json::obj([(f.name.as_str(), value)]), Some(&g));
         };
         // (the widget gets the width of the cell less the room of the arrow; the arrow follows it on the rows whose value is not the one a new component starts with: Unreal's "reset to default")
         let mut arrow: Option<egui::Response> = None;
-        ui.horizontal(|ui| {
+        let mut value_rect = egui::Rect::NOTHING;
+        // (from the top: a value that wraps onto a second line, a colour with its four numbers, makes the row taller, and is not centred on the height of a line, over the row above and the one below)
+        ui.horizontal_top(|ui| {
             let room = (ui.available_width() - 24.0).max(60.0);
-            ui.scope(|ui| {
+            value_rect = ui.scope(|ui| {
+                // (the value has the whole room, so that the reset arrow after it is at the same place on every row)
                 ui.set_max_width(room);
+                ui.set_min_width(room);
             match f.ty.as_str() {
                 "bool" => {
                     let mut b = v.and_then(|x| x.as_bool()).unwrap_or(false);
@@ -427,6 +472,8 @@ impl InspectorUi {
                             ui.spacing_mut().button_padding.x = 2.0;
                             let color = is_color(&f.name, f.count);
                             if color {
+                                // (a small swatch: with four numbers beside it there is no room for the usual one)
+                                ui.spacing_mut().interact_size.x = 26.0;
                                 let to8 = |x: f64| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
                                 let mut c = Color32::from_rgba_unmultiplied(to8(xs[0]), to8(xs[1]), to8(xs[2]), if f.count == 4 { to8(xs[3]) } else { 255 });
                                 let before = c;
@@ -443,7 +490,9 @@ impl InspectorUi {
                                 }
                             }
                             let (gap, button) = (ui.spacing().item_spacing.x, if color { ui.spacing().interact_size.x } else { 0.0 });
-                            let w = ((ui.available_width() - button - gap * f.count as f32) / f.count as f32).clamp(36.0, 90.0);
+                            // (a colour with an alpha does not fit on one line of the panel: red, green and blue go beside the swatch and the alpha is on the next line)
+                            let per_line = if color && f.count == 4 { 3 } else { f.count };
+                            let w = ((ui.available_width() - button - gap * (per_line as f32 + 1.0) - 2.0) / per_line as f32).clamp(36.0, 90.0);
                             for x in xs.iter_mut() {
                                 let sp = speed_for(*x);
                                 if ui.add_sized([w, 20.0], drag(x, sp)).changed() {
@@ -489,11 +538,16 @@ impl InspectorUi {
                     }
                 }
             }
-            });
+            }).response.rect;
             if differs(v, default) {
-                arrow = Some(reset_button(ui));
+                // (two points down: the row is laid out from the top, and the boxes are a little taller than the arrow)
+                arrow = Some(ui.vertical(|ui| {
+                    ui.add_space(2.0);
+                    reset_button(ui)
+                }).inner);
             }
         });
+        self.rows.push((format!("{comp}.{}", f.name), value_rect));
         if let Some(r) = arrow {
             self.resets.push((format!("{comp}.{}", f.name), r.rect.center()));
             if r.clicked() {

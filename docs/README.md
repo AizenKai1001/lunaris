@@ -14,6 +14,7 @@ Start with the first four; the rest is by topic. Every path in these pages is ch
 | [DESIGN](DESIGN.md) | Goals in priority order and the decisions behind the engine |
 | [ROADMAP](ROADMAP.md) | Where the engine is going: performance, the engine-drawn dashboard, the editor, documentation |
 | [PERFORMANCE](PERFORMANCE.md) | How fast it is, how that is measured, every number with its command; comparison with other Rust ECS crates; start-up, memory, binary size |
+| [TESTING](TESTING.md) | The gates a change passes (tests, golden hashes, the performance gate) and the tests that run the engine against every example scene and a workspace of your own |
 | [COMPARISON](COMPARISON.md) | Lunaris next to Bevy, Godot, Unity and Unreal: only what can be compared fairly, with numbers measured by us or quoted with their source |
 
 ## Using the engine from outside

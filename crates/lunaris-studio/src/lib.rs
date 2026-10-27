@@ -47,6 +47,8 @@ mod vsc_defaults;
 mod vsc_theme;
 
 #[cfg(test)]
+mod multiple_values_tests;
+#[cfg(test)]
 mod ui_tests;
 
 pub use state::Options;

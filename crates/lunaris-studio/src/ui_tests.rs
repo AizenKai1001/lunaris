@@ -516,6 +516,11 @@ fn the_layout_is_kept_between_runs_and_an_untouched_one_writes_nothing() {
     assert_eq!(after, text, "the picture run changed the layout file");
 }
 
+/// The field rows of the Inspector's last frame that are drawn over the row below them (a value that wraps onto a second line, in the middle of a row of one line's height, was).
+fn overlapping_rows(h: &Harness) -> Vec<String> {
+    h.app.inspector.rows.windows(2).filter(|w| w[0].1.max.y > w[1].1.min.y + 0.5).map(|w| format!("{} ({:.0}..{:.0}) over {} (from {:.0})", w[0].0, w[0].1.min.y, w[0].1.max.y, w[1].0, w[1].1.min.y)).collect()
+}
+
 #[test]
 fn the_inspector_keeps_its_width_and_every_component_fits_in_it() {
     let mut h = Harness::new();
@@ -536,8 +541,9 @@ fn the_inspector_keeps_its_width_and_every_component_fits_in_it() {
         if h.app.inspector.overflow > 1.0 {
             too_wide.push(format!("{name} by {:.0}", h.app.inspector.overflow));
         }
+        too_wide.extend(overlapping_rows(&h).into_iter().map(|o| format!("{name}: {o}")));
     }
-    assert!(too_wide.is_empty(), "rows wider than the panel (their ends are cut off): {too_wide:?}");
+    assert!(too_wide.is_empty(), "rows wider than the panel (their ends are cut off) or drawn over one another: {too_wide:?}");
     // dragging the left edge of the panel makes it wider or narrower, within limits
     let edge = h.app.viewport.last_rect.max.x + 2.0;
     h.drag(Pos2::new(edge, 300.0), Pos2::new(edge - 100.0, 300.0));
@@ -2538,6 +2544,7 @@ fn rows_with_real_values_and_every_reset_arrow_showing_fit_in_the_inspector() {
         if h.app.inspector.overflow > 1.0 {
             too_wide.push(format!("{what}: {:.1}", h.app.inspector.overflow));
         }
+        too_wide.extend(overlapping_rows(&h).into_iter().map(|o| format!("{what}: {o}")));
     }
     assert!(too_wide.is_empty(), "{too_wide:?}");
 }
@@ -2555,4 +2562,63 @@ fn one_example_entity() {
     h.app.studio.select(Some(uid.parse().unwrap()));
     h.frames(4);
     println!("overflow {:.1}", h.app.inspector.overflow);
+    let stem = std::path::Path::new(scene).file_name().map(|n| n.to_string_lossy().replace(".lunaris.json", "")).unwrap_or_default();
+    h.shoot(&format!("one_{stem}_{uid}"));
+}
+
+#[test]
+fn the_inspector_of_two_entities_shows_which_rows_differ_picture() {
+    let mut h = Harness::new();
+    let (b, ball) = (h.uid("Box"), h.uid("Ball"));
+    h.app.studio.select_many(vec![b, ball], Some(ball));
+    h.frames(30);
+    h.shoot("multiple_values");
+}
+
+/// Pictures of the editor's other tabs with real scenes in them, to look at (`LUNARIS_SHOTS=dir cargo test ... pictures_of_real_tabs -- --ignored`): what a test cannot see (a row over another, a label cut off, a list that runs out of its panel).
+#[test]
+#[ignore]
+fn pictures_of_real_tabs() {
+    use crate::state::{BottomTab, Center};
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
+    let mut h = Harness::on(repo);
+    h.app.studio.open_scene("examples/moon_hopper.lunaris.json");
+    h.frames(3);
+    // the Blueprint of a long system, the same system as text, and the list of systems under the scene
+    h.app.studio.center = Center::Blueprint;
+    let name = "hero_move";
+    h.app.blueprint.open(&mut h.app.studio, name);
+    h.frames(6);
+    h.shoot("tab_blueprint");
+    h.app.studio.center = Center::Script;
+    h.app.script.open_system(&mut h.app.studio, name);
+    h.frames(6);
+    h.shoot("tab_script");
+    h.app.studio.center = Center::View;
+    h.app.studio.tab = BottomTab::Systems;
+    h.app.studio.open_system(name);
+    h.frames(6);
+    h.shoot("tab_systems");
+    h.app.studio.tab = BottomTab::Problems;
+    h.app.problems.run(&mut h.app.studio);
+    h.frames(6);
+    h.shoot("tab_problems");
+    // a scene with a Timeline, in the Sequencer
+    h.app.studio.open_scene("examples/caldera/island.lunaris.json");
+    h.frames(3);
+    h.app.studio.select(Some(7));
+    h.app.studio.center = Center::Sequencer;
+    h.frames(10);
+    h.shoot("tab_sequencer");
+    // the UI designer and the effects of two others
+    h.app.studio.open_scene("examples/ui_showcase.lunaris.json");
+    h.frames(3);
+    h.app.studio.center = Center::Ui;
+    h.frames(8);
+    h.shoot("tab_ui_designer");
+    h.app.studio.open_scene("examples/fx_showcase.lunaris.json");
+    h.frames(3);
+    h.app.studio.center = Center::Effects;
+    h.frames(8);
+    h.shoot("tab_effects");
 }
