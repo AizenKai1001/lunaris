@@ -20,6 +20,7 @@ mod history_ui;
 mod icons;
 mod input;
 mod inspector;
+mod layout;
 mod mathx;
 mod package;
 mod panels;

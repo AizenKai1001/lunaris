@@ -25,6 +25,8 @@ impl Harness {
     fn new() -> Harness {
         let dir = std::env::temp_dir().join(format!("lunaris-studio-test-{}-{:?}", std::process::id(), std::thread::current().id()).replace(['(', ')', ' '], ""));
         std::fs::create_dir_all(&dir).unwrap();
+        // (a layout that an earlier run with the same process number left behind would change the sizes the tests expect)
+        let _ = std::fs::remove_file(dir.join(".lunaris").join("editor.json"));
         let ctx = egui::Context::default();
         let opts = Options { root: dir, quality: "reference".to_string(), mute: true, ..Options::default() };
         let app = App::new(&ctx, opts);
@@ -469,6 +471,49 @@ fn the_scene_view_keeps_its_size_whatever_tab_or_entity_is_showing_and_the_panel
     let top = h.app.viewport.last_rect.max.y + 1.0;
     h.drag(Pos2::new(700.0, top), Pos2::new(700.0, top - 60.0));
     assert!(h.app.bottom_height > bh + 30.0, "{}", h.app.bottom_height);
+}
+
+#[test]
+fn the_layout_is_kept_between_runs_and_an_untouched_one_writes_nothing() {
+    use crate::state::BottomTab;
+    let base = std::env::temp_dir().join(format!("lunaris-layout-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    // an editor whose layout nobody changed leaves no file behind
+    let quiet = base.join("quiet");
+    std::fs::create_dir_all(&quiet).unwrap();
+    let mut h = Harness::on(quiet.clone());
+    h.frames(90);
+    h.app.save_layout(true);
+    assert!(!quiet.join(".lunaris").join("editor.json").exists(), "a layout that never changed was written");
+    // one whose layout was changed writes it, next to the preference the file already held
+    let dir = base.join("kept");
+    std::fs::create_dir_all(dir.join(".lunaris")).unwrap();
+    std::fs::write(dir.join(".lunaris").join("editor.json"), r#"{"script_theme":"Solarized"}"#).unwrap();
+    let mut h = Harness::on(dir.clone());
+    h.app.studio.tab = BottomTab::Console;
+    h.app.show_hierarchy = false;
+    h.frames(2);
+    // (a drag on the Inspector's edge: the size the next run opens with)
+    let edge = h.app.viewport.last_rect.max.x + 2.0;
+    h.drag(Pos2::new(edge, 300.0), Pos2::new(edge - 150.0, 300.0));
+    h.app.bottom_height = 180.0;
+    let dragged = h.app.inspector_width;
+    assert!(dragged > 400.0, "{dragged}");
+    h.app.save_layout(true);
+    let text = std::fs::read_to_string(dir.join(".lunaris").join("editor.json")).unwrap();
+    assert!(text.contains("Solarized"), "the other preference was lost: {text}");
+    let again = Harness::on(dir.clone());
+    assert_eq!(again.app.studio.tab, BottomTab::Console);
+    assert!(!again.app.show_hierarchy && again.app.show_inspector && again.app.show_bottom);
+    assert!((again.app.inspector_width - dragged).abs() < 1.0, "{} instead of {dragged}", again.app.inspector_width);
+    assert_eq!((again.app.hierarchy_width, again.app.bottom_height), (250.0, 180.0));
+    // a window made only to take a picture leaves the layout as it was
+    let opts = Options { root: dir.clone(), quality: "reference".to_string(), mute: true, shot: Some(dir.join("picture.png")), ..Options::default() };
+    let mut shot = App::new(&egui::Context::default(), opts);
+    shot.inspector_width = 500.0;
+    shot.save_layout(true);
+    let after = std::fs::read_to_string(dir.join(".lunaris").join("editor.json")).unwrap();
+    assert_eq!(after, text, "the picture run changed the layout file");
 }
 
 #[test]

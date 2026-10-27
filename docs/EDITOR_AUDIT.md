@@ -24,7 +24,7 @@ Section 3 of [ROADMAP](ROADMAP.md) asks for an audit of the editor against Unrea
 | **Packaging** | File > Build Windows Player, Build and Run | other platforms from the editor; a packaging settings page | M |
 | **Source control** | **badges in the Project panel (2026-10-26)**: a dot on every file git sees as changed, new or in conflict, a folder carries the strongest of its files, and the branch with the number of changes at the foot; committing and the rest are git's | a diff of a scene against the last commit; stage and commit from the editor | S |
 | **Place Actors** | the **Place** tab of the left panel (2026-10-25): click or drag a template into the scene | the prefabs of the scene are rows (PREFABS) and **Make Prefab** (Hierarchy menu, Edit menu; 2026-10-26) makes one from an entity and what hangs on it; no palettes of scripts, no recently placed list | S |
-| **Layout** | fixed docking with panel toggles | drag panels, save and restore layouts | M |
+| **Layout** | fixed docking with panel toggles (View menu); **the three panels are dragged by their edges and the sizes, the panels shown and the bottom tab are kept between runs** in the project's `.lunaris/editor.json` (2026-10-27) | no moving a panel to another side or into a tab group, no floating panels, no named layouts to switch between | M |
 
 Sizes: **S** is a day or less, **M** a few days, **L** a week or more.
 

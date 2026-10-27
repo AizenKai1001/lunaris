@@ -6,6 +6,7 @@ use crate::icons::{self, Icon};
 use crate::hierarchy::{create_menu, HierarchyUi};
 use crate::input;
 use crate::inspector::InspectorUi;
+use crate::layout::{self, PanelLayout};
 use crate::console::ConsoleUi;
 use crate::history_ui::HistoryUi;
 use crate::problems_ui::ProblemsUi;
@@ -90,6 +91,8 @@ pub struct App {
     /// The same for the Hierarchy panel (its right edge) and the bottom panel (its top edge): fixed sizes that only a drag changes.
     pub(crate) hierarchy_width: f32,
     pub(crate) bottom_height: f32,
+    /// Writes the layout (these sizes, the panels shown, the bottom tab) to `.lunaris/editor.json` after a change, and when the editor closes.
+    layout_saver: layout::Saver,
     settings_scenes: Vec<String>,
     pub(crate) script: ScriptEditor,
     pub(crate) blueprint: BlueprintEditor,
@@ -119,6 +122,8 @@ impl App {
         let opts_root = opts.root.clone();
         let select = opts.select.clone();
         let mut studio = Studio::new(opts.clone());
+        let start = PanelLayout::load(&opts_root);
+        studio.tab = start.tab;
         studio.refresh_rows();
         if let Some(s) = select {
             let uid = s.parse::<u64>().ok().or_else(|| studio.all.iter().find(|r| r.name == s).map(|r| r.uid));
@@ -185,17 +190,18 @@ impl App {
             settings: ProjectSettings::load(&opts_root),
             settings_open: false,
             shortcuts_open: false,
-            inspector_width: 330.0,
-            hierarchy_width: 250.0,
-            bottom_height: 240.0,
+            inspector_width: start.inspector_width,
+            hierarchy_width: start.hierarchy_width,
+            bottom_height: start.bottom_height,
+            layout_saver: layout::Saver::new(start.clone()),
             settings_scenes: Vec::new(),
             script,
             blueprint,
             designer: UiDesigner::default(),
             canvas,
-            show_hierarchy: true,
-            show_inspector: true,
-            show_bottom: true,
+            show_hierarchy: start.show_hierarchy,
+            show_inspector: start.show_inspector,
+            show_bottom: start.show_bottom,
             sound: None,
             last_title: String::new(),
             acc: 0.0,
@@ -974,6 +980,26 @@ impl App {
 }
 
 impl App {
+    pub(crate) fn panel_layout(&self) -> PanelLayout {
+        PanelLayout {
+            inspector_width: self.inspector_width,
+            hierarchy_width: self.hierarchy_width,
+            bottom_height: self.bottom_height,
+            show_hierarchy: self.show_hierarchy,
+            show_inspector: self.show_inspector,
+            show_bottom: self.show_bottom,
+            tab: self.studio.tab,
+        }
+    }
+
+    /// Keep the layout for the next start. A window made only to take a picture (`--shot`) leaves the user's layout alone.
+    pub(crate) fn save_layout(&mut self, force: bool) {
+        if self.shot.is_none() {
+            let now = self.panel_layout();
+            self.layout_saver.tick(&self.studio.opts.root, &now, force);
+        }
+    }
+
     /// Everything the window shows, once per frame (what `eframe` calls, and what the tests call without a window).
     pub fn draw(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
@@ -993,6 +1019,7 @@ impl App {
         if self.studio.quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
+        self.save_layout(false);
         self.run_simulation(&ctx);
         self.studio.sync();
         if let Some(name) = self.studio.open_script.take() {
@@ -1019,7 +1046,7 @@ impl App {
         Panel::bottom("status").exact_size(22.0).resizable(false).frame(bar(theme::TOOLBAR, 22.0)).show(ui, |ui| self.status_bar(ui));
         if self.show_bottom {
             // (a fixed height: the content of a tab, the Console's list above all, made the panel and with it the scene view change size every frame)
-            let (lo, hi) = if self.studio.tab == BottomTab::Systems { (340.0, 900.0) } else { (90.0, 600.0) };
+            let (lo, hi) = layout::bottom_range(self.studio.tab);
             let bottom = Panel::bottom("bottom").exact_size(self.bottom_height.clamp(lo, hi)).resizable(false).frame(chrome::dock(theme::PANEL)).show(ui, |ui| {
                 let problems_label = match self.problems.counts() {
                     (0, 0) => "Problems".to_string(),
@@ -1091,7 +1118,7 @@ impl App {
             let right = hierarchy.response.rect.max.x;
             let moved = edge_drag(ui, "hierarchy-edge", Rect::from_min_max(egui::pos2(right - 3.0, hierarchy.response.rect.min.y), egui::pos2(right + 3.0, hierarchy.response.rect.max.y)), egui::CursorIcon::ResizeHorizontal);
             if moved.x != 0.0 {
-                self.hierarchy_width = (self.hierarchy_width + moved.x).clamp(160.0, 480.0);
+                self.hierarchy_width = (self.hierarchy_width + moved.x).clamp(layout::HIERARCHY.0, layout::HIERARCHY.1);
             }
         }
         if self.show_inspector {
@@ -1118,7 +1145,7 @@ impl App {
             let strip = Rect::from_min_max(egui::pos2(edge.min.x - 3.0, edge.min.y), egui::pos2(edge.min.x + 3.0, edge.max.y));
             let moved = edge_drag(ui, "inspector-edge", strip, egui::CursorIcon::ResizeHorizontal);
             if moved.x != 0.0 {
-                self.inspector_width = (self.inspector_width - moved.x).clamp(240.0, 640.0);
+                self.inspector_width = (self.inspector_width - moved.x).clamp(layout::INSPECTOR.0, layout::INSPECTOR.1);
             }
         }
         egui::CentralPanel::default().frame(chrome::dock(theme::PANEL)).show(ui, |ui| match self.studio.center {
@@ -1298,6 +1325,7 @@ impl eframe::App for App {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.save_layout(true);
         self.stop();
     }
 
